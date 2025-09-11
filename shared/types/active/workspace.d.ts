@@ -1,0 +1,19 @@
+import type {FrontmatterProperties} from "#shared/types/types";
+import {type TreeItem} from "@nuxt/ui";
+
+/*
+Usage Scope: Active Workspaces
+ */
+export interface ActiveWorkspaceFileIndex { // Using the Hybrid ID Approach: uuid for Stable UI References, fullPath for primary key for fileIndex.
+    uuid: string; // The stable UI identifier
+    fullPath: string; // The primary key for the index
+    relativePath: string,
+    fileName: string,
+    isFolder: boolean,
+    children: string[] // Contains the `fullPath` of children
+    frontmatterProperties: FrontmatterProperties
+}
+
+export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
+    children: UITreeNode[]
+}

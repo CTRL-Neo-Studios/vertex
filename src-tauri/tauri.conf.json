@@ -1,22 +1,26 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "nuxt-app",
+  "productName": "Vertex",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "dev.ctrl-neo.vertex",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
   },
   "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": true,
     "windows": [
       {
-        "title": "nuxt-app",
-        "width": 800,
+        "title": "Vertex",
+        "width": 900,
         "height": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {
@@ -31,7 +35,22 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "entitlements": "./Entitlements.plist"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md"
+        ],
+        "mimeType": "text/plain",
+        "name": "Markdown",
+        "description": "The Markdown Format",
+        "role": "Editor"
+      }
     ]
   }
 }

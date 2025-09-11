@@ -1,0 +1,393 @@
+import type {ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
+import {
+    type DirEntry,
+    readDir,
+    readTextFile,
+    stat,
+    type UnwatchFn,
+    watch,
+    type WatchEvent
+} from "@tauri-apps/plugin-fs";
+import {join} from "@tauri-apps/api/path"
+import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/defaults/actives";
+import useUuid from "~/composables/utility/useUuid";
+import type {PossiblyRef} from "#shared/types/types";
+import type {ActiveSession} from "#shared/types/active/sessions";
+
+const watcherRegistry = new Map<string, UnwatchFn>();
+
+export function useActiveWorkspaceIndex(session?: ActiveSession) {
+    if (!session) {
+        console.error("useActiveWorkspaceIndex was called without a session!");
+    }
+
+    const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
+    // Turns the fileIndex into a recursive File tree to serve the UI
+    const fileTree = computed<UITreeNode[]>(() => {
+        const index = fileIndex.value; // No need for unref
+        if (Object.keys(index).length === 0) return [];
+
+        const getNode = (path: string): UITreeNode => {
+            const file = index[path];
+            return defaultUITreeNode({
+                ...file,
+                // The children array now correctly contains paths, so this works
+                children: file?.children.map(getNode) || []
+            });
+        };
+
+        const rootNodes: UITreeNode[] = [];
+        for (const path in index) {
+            const parentPath = path.substring(0, path.lastIndexOf('/'));
+            // This lookup now works because the keys of the index are paths
+            if (!index[parentPath]) {
+                rootNodes.push(getNode(path));
+            }
+        }
+        return rootNodes;
+    });
+
+    /**
+     * Builds index from a root path using Tauri's native recursive fs scan.
+     */
+    async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
+        const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
+        const workspaceRoot = unref(workspaceRootFilePath)
+
+        async function processDirectory(currentPath: string) {
+            const entries = await readDir(currentPath);
+            const childrenPaths: string[] = [];
+
+            for (const entry of entries) {
+                const entryPath = await join(currentPath, entry.name);
+                childrenPaths.push(entryPath);
+
+                newIndex[entryPath] = defaultActiveWorkspaceFileIndex({
+                    uuid: useUuid(),
+                    fullPath: entryPath,
+                    relativePath: entryPath.replace(workspaceRoot, '').substring(1),
+                    fileName: entry.name,
+                    isFolder: entry.isDirectory,
+                    children: [],
+                    frontmatterProperties: {},
+                });
+
+                if (entry.isDirectory) {
+                    newIndex[entryPath].children = await processDirectory(entryPath);
+                } else {
+                    // MODIFIED: Parse frontmatter immediately for files
+                    await updateFrontmatterForPath(entryPath, newIndex);
+                }
+            }
+            return childrenPaths;
+        }
+
+        await processDirectory(workspaceRoot);
+        fileIndex.value = newIndex;
+    }
+
+    /**
+     * Clears the File index map.
+     */
+    function clearIndex() {
+        fileIndex.value = {}
+    }
+
+    /**
+     * Fetches metadata for a single path and adds it to the index.
+     * Handles linking to its parent.
+     */
+    async function addFileToIndex(path: string, workspaceRoot: string, autoSort: boolean = true) {
+        try {
+            const fileStats = await stat(path);
+            const parentPath = path.substring(0, path.lastIndexOf('/'));
+            const isDirectory = fileStats.isDirectory;
+            const uuid = useUuid()
+
+            // 1. Create the new index entry
+            const newEntry: ActiveWorkspaceFileIndex = defaultActiveWorkspaceFileIndex({
+                uuid: uuid,
+                fullPath: path,
+                relativePath: path.replace(workspaceRoot, '').substring(1),
+                fileName: path.substring(path.lastIndexOf('/') + 1),
+                isFolder: isDirectory,
+                children: [], // New files/folders have no children initially
+                frontmatterProperties: {}, // Later, you could parse this here
+            });
+            unref(fileIndex)[path] = newEntry;
+
+            // 2. Link this new entry to its parent
+            const parentNode = fileIndex.value[parentPath];
+            if (parentNode && !parentNode.children.includes(path)) {
+                parentNode.children.push(path);
+                if (autoSort) parentNode.children.sort();
+            }
+
+            // MODIFIED: Also parse frontmatter when a new file is added
+            await updateFrontmatterForPath(path);
+
+            console.log(`Added to index: ${path}`);
+            return newEntry;
+
+        } catch (error) {
+            console.error(`Failed to add file to index: ${path}`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Removes a file or folder (and all its children recursively) from the index.
+     */
+    function removeFileFromIndex(path: string) {
+        const nodeToRemove = unref(fileIndex)[path];
+        if (!nodeToRemove) return;
+
+        // 1. Recursively remove all children first
+        if (nodeToRemove.isFolder) {
+            // Create a copy of children array to avoid modification during iteration
+            [...nodeToRemove.children].forEach(childId => {
+                removeFileFromIndex(childId);
+            });
+        }
+
+        // 2. Unlink from parent
+        const parentPath = path.substring(0, path.lastIndexOf('/'));
+        const parentNode = unref(fileIndex)[parentPath];
+        if (parentNode) {
+            const childIndex = parentNode.children.indexOf(path);
+            if (childIndex > -1) {
+                parentNode.children.splice(childIndex, 1);
+            }
+        }
+
+        // 3. Remove the node itself
+        delete unref(fileIndex)[path];
+        console.log(`Removed from index: ${path}`);
+    }
+
+    // Place this inside your useActiveWorkspaceIndex composable
+
+    /**
+     * Handles a file or folder being renamed/moved.
+     * This version preserves UUIDs to maintain UI state (e.g., open tabs)
+     * and recursively updates all child paths in-memory for moved folders.
+     */
+    async function moveFileInIndex(oldPath: string, newPath: string, workspaceRoot: string) {
+        const fileIndexState = fileIndex.value; // Work with a local reference for clarity
+        const nodeToMove = fileIndexState[oldPath];
+
+        if (!nodeToMove) {
+            console.warn(`Attempted to move a node that is not in the index: ${oldPath}`);
+            return;
+        }
+
+        // --- Step 1: Recursively update the node and all its children ---
+
+        // A helper function to update a node and its descendants in-memory
+        const recursivelyUpdatePaths = async (currentOldPath: string, currentNewPath: string) => {
+            const node = fileIndexState[currentOldPath];
+            if (!node) return;
+
+            // Create the new node data, preserving the UUID
+            const newNodeData: ActiveWorkspaceFileIndex = {
+                ...node,
+                uuid: node.uuid, // Preserve the stable ID
+                fullPath: currentNewPath,
+                relativePath: currentNewPath.replace(workspaceRoot, '').substring(1),
+                fileName: currentNewPath.substring(currentNewPath.lastIndexOf('/') + 1),
+                // The `children` paths need to be updated, which we'll do next
+            };
+
+            // If it's a folder, iterate its children and recursively call this function
+            if (node.isFolder) {
+                const updatedChildrenPaths: string[] = [];
+                for (const childOldPath of node.children) {
+                    // Construct the child's new path based on the parent's move
+                    const childName = childOldPath.substring(childOldPath.lastIndexOf('/') + 1);
+                    const childNewPath = await join(currentNewPath, childName); // Use join for safety
+                    await recursivelyUpdatePaths(childOldPath, childNewPath);
+                    updatedChildrenPaths.push(childNewPath);
+                }
+                newNodeData.children = updatedChildrenPaths;
+            }
+
+            // Add the updated node under its new path and delete the old one
+            delete fileIndexState[currentOldPath];
+            fileIndexState[currentNewPath] = newNodeData;
+        };
+
+        // Initial call to start the recursive update
+        await recursivelyUpdatePaths(oldPath, newPath);
+
+        // --- Step 2: Update the parent's `children` array ---
+
+        const oldParentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
+        const newParentPath = newPath.substring(0, newPath.lastIndexOf('/'));
+
+        // Remove from old parent's children list
+        const oldParentNode = fileIndexState[oldParentPath];
+        if (oldParentNode) {
+            const childIndex = oldParentNode.children.indexOf(oldPath);
+            if (childIndex > -1) {
+                oldParentNode.children.splice(childIndex, 1);
+            }
+        }
+
+        // Add to new parent's children list (even if it's the same parent)
+        const newParentNode = fileIndexState[newParentPath];
+        if (newParentNode) {
+            if (!newParentNode.children.includes(newPath)) {
+                newParentNode.children.push(newPath);
+                newParentNode.children.sort(); // Keep it sorted
+            }
+        }
+
+        // The change is now complete. Forcing a refresh on the ref is good practice
+        // if you were mutating deeply without Vue's reactivity system catching it,
+        // but since we are adding/deleting keys, it should be fine.
+        // fileIndex.value = { ...fileIndexState }; // Use if reactivity fails
+    }
+
+    /**
+     * Starts the file system watcher for the specified workspace root.
+     * It will automatically update the fileIndex on create, remove, or rename events.
+     *
+     * @param {string} workspaceRoot The absolute path of the workspace folder to watch.
+     */
+    async function startWatcher(workspaceRoot: string) {
+        // Before starting a new one, check if a watcher for this session already exists in the registry.
+        if (watcherRegistry.has(session!.uuid)) {
+            console.log(`Watcher for session ${session!.uuid} already exists. Stopping it first.`);
+            await stopWatcher(); // This will correctly use the registry
+        }
+
+        console.log(`Starting watcher for session ${session!.uuid} on: ${workspaceRoot}`);
+
+        let activeWatcher = await watch(workspaceRoot, (event: WatchEvent) => {
+            console.log('[Watcher Event]', event);
+
+            if (typeof event.type === 'object' && event.type !== null) {
+
+                // Inside this block, TypeScript now knows event.type is an object.
+                // It is now safe to use the `in` operator.
+
+                // --- Rename Event Handling ---
+                if ('modify' in event.type && event.type.modify.kind === 'rename') {
+                    const [oldPath, newPath] = event.paths;
+                    console.log(`Rename detected: ${oldPath} -> ${newPath}`);
+                    moveFileInIndex(oldPath || '', newPath || '', workspaceRoot);
+                    return;
+                }
+
+                // --- Create Event Handling ---
+                if ('create' in event.type) {
+                    for (const path of event.paths) {
+                        console.log(`Create detected: ${path}`);
+                        addFileToIndex(path, workspaceRoot);
+                    }
+                    return;
+                }
+
+                // --- Remove Event Handling ---
+                if ('remove' in event.type) {
+                    for (const path of event.paths) {
+                        console.log(`Remove detected: ${path}`);
+                        removeFileFromIndex(path);
+                    }
+                    return;
+                }
+
+                // --- Modify Event Handling (Content Change) ---
+                if ('modify' in event.type && event.type.modify.kind === 'data') {
+                    for (const path of event.paths) {
+                        updateFrontmatterForPath(path);
+                    }
+                    return;
+                }
+
+            } else {
+                // This block handles the case where event.type is a string ("any" or "other").
+                // Usually, these are less critical and can often be ignored or just logged.
+                console.log(`Received simple string event type: "${event.type}"`);
+            }
+
+        }, { recursive: true });
+
+        // Store the new unwatch function in our central registry.
+        watcherRegistry.set(session!.uuid, activeWatcher);
+        console.log(`Watcher started and registered for session ${session!.uuid}.`);
+
+        return activeWatcher
+    }
+
+    /**
+     * Stops the currently active file system watcher.
+     * This is crucial for cleanup when closing a workspace to prevent memory leaks.
+     */
+    async function stopWatcher() {
+        const unwatchFn = watcherRegistry.get(session!.uuid);
+
+        if (unwatchFn) {
+            console.log(`Stopping file watcher for session ${session!.uuid}...`);
+            unwatchFn(); // Execute the unwatch function.
+            watcherRegistry.delete(session!.uuid); // Clean up the registry.
+            console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
+        } else {
+            console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
+        }
+
+    }
+
+    /**
+     * Reads a file at a given path, parses its frontmatter, and updates the index.
+     * Does nothing if the path points to a folder or is not in the index.
+     */
+    async function updateFrontmatterForPath(path: string, index = fileIndex.value) {
+        const node = index[path];
+        if (!node || node.isFolder) return;
+        try {
+            const content = await readTextFile(path);
+            const result = parseFrontmatter(content);
+            if (result.error) {
+                console.error(`Frontmatter parsing error in ${path}:`, result.error);
+            } else {
+                node.frontmatterProperties = result.data || {};
+                console.log(`Updated frontmatter for ${path}`);
+            }
+        } catch (readError) {
+            console.error(`Failed to read file for frontmatter parsing: ${path}`, readError);
+        }
+    }
+
+    /**
+     * Finds a file in the index by its stable UUID.
+     * Returns the full file object or null if not found.
+     *
+     * Optimize: Can be optimized via adding a separate uuidToFilePathIndexMap later but it's hard to manage right now, i.e. premature optimization.
+     */
+    function getFileByUuid(uuid: string): ActiveWorkspaceFileIndex | null {
+        if (!uuid) return null;
+
+        for (const path in unref(fileIndex)) {
+            if (unref(fileIndex)[path]?.uuid === uuid) {
+                return unref(fileIndex)[path] || null;
+            }
+        }
+
+        return null;
+    }
+
+
+    return {
+        buildIndex,
+        fileIndex,
+        fileTree,
+        getFileByUuid,
+        addFileToIndex,
+        removeFileFromIndex,
+        moveFileInIndex,
+        startWatcher,
+        stopWatcher,
+        clearIndex
+    };
+}

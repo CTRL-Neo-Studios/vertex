@@ -1,25 +1,69 @@
+<script setup lang="ts">
+import {useAppRecents} from "~/composables/app/useAppRecents";
+import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
+
+const $recents = useAppRecents()
+onMounted(async () => {
+
+})
+</script>
+
 <template>
-  <div class="flex flex-col items-center justify-center gap-4 h-screen">
-    <h1 class="font-bold text-2xl text-(--ui-primary)">
-      Nuxt UI v3
-    </h1>
-
-    <div class="flex items-center gap-2">
-      <UButton
-        label="Documentation"
-        icon="i-lucide-square-play"
-        to="https://ui3.nuxt.dev/getting-started/installation/nuxt"
-        target="_blank"
-      />
-
-      <UButton
-        label="GitHub"
-        color="neutral"
-        variant="outline"
-        icon="i-simple-icons-github"
-        to="https://github.com/nuxt/ui"
-        target="_blank"
-      />
+    <div class="w-full h-screen grid grid-cols-2">
+        <div class="w-full flex flex-col items-center justify-center">
+            <div class="grid grid-cols-1 gap-2 select-none">
+                <NuxtImg src="icon.png" class="size-24 justify-self-center"/>
+                <div class="text-3xl font-bold text-center mb-6">Vertex</div>
+                <UButton label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost"/>
+                <UButton label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost"/>
+                <UButton label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost"/>
+            </div>
+        </div>
+        <div class="bg-muted border-l border-l-default flex flex-col w-full h-full">
+            <ScrollAreaRoot class="max-h-screen relative" style="--scrollbar-size: 10px">
+                <div class="text-xs text-muted/50 absolute top-0 bg-gradient-to-t from-transparent via-muted to-muted h-12 p-3 w-full z-10">Recently Opened</div>
+                <ScrollAreaViewport class="w-full h-full">
+                    <div class="grid-cols-1 grid gap-1 p-3 pt-8">
+                        <UButton v-for="(record, index) in unref($recents.recents)?.recentRecords" :key="index" class="cursor-pointer" :icon="record.isWorkspace ? 'i-lucide-folder' : 'i-lucide-file'" color="neutral" variant="ghost">
+                            <div class="flex flex-col justify-start items-start">
+                                <div>{{record.name}}</div>
+                                <div class="text-muted text-xs">{{record.fullPath}}</div>
+                            </div>
+                        </UButton>
+                    </div>
+                </ScrollAreaViewport>
+                <ScrollAreaScrollbar
+                    class="select-none touch-none z-20 w-2 m-2"
+                    orientation="vertical"
+                >
+                    <ScrollAreaThumb
+                        class="flex-1 bg-accented rounded-lg"
+                    />
+                </ScrollAreaScrollbar>
+                <div class="text-xs text-muted/50 absolute bottom-0 bg-gradient-to-b from-transparent to-muted h-3 p-3 w-full z-10"/>
+            </ScrollAreaRoot>
+        </div>
     </div>
-  </div>
 </template>
+
+<style>
+@reference "~/assets/css/main.css";
+/*
+ * KILL THE NATIVE WEBVIEW SCROLLBARS
+ * This is for WebKit (macOS, Linux)
+ * It hides the scrollbar UI but maintains scrolling functionality,
+ * allowing custom scrollbar components like reka-ui to work correctly.
+*/
+::-webkit-scrollbar {
+    display: none;
+}
+
+/*
+ * Optional but recommended: For completeness if you ever build for Windows
+ * or use a different webview provider.
+*/
+html {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+</style>

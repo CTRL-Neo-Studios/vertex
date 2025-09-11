@@ -1,12 +1,18 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    devtools: {enabled: true},
+    devtools: {enabled: false},
 
-    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n"],
+    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor"],
 
     css: ["~/assets/css/main.css"],
 
-    compatibilityDate: "2024-11-27",
+    compatibilityDate: "2025-09-04",
+
+    fonts: {
+        families: [
+            {name: 'SF-Pro', provider: 'local'},
+            {name: 'SF-Mono', provider: 'local'}
+        ]
+    },
 
     // Enable SSG
     ssr: false,
@@ -23,5 +29,11 @@ export default defineNuxtConfig({
             // Tauri requires a consistent port
             strictPort: true,
         },
-    },
+        optimizeDeps: {
+            entries: [
+                "@tauri-apps/plugin-store",
+                "@tauri-apps/plugin-fs"
+            ]
+        }
+    }
 });

@@ -1,6 +1,55 @@
-@import "tailwindcss";
-@import "@nuxt/ui";
+/*@import url('https://fonts.cdnfonts.com/css/segoe-ui-variable-static-display');*/
+/*@import url('https://fonts.cdnfonts.com/css/sf-pro-display');*/
+@import 'tailwindcss';
+@import '@nuxt/ui';
 
 @theme static {
-  --font-sans: "Public Sans", "Inter", "Segoe UI Variable Static Display", sans-serif;
+    --font-sans: 'Inter', 'SF-Pro', sans-serif;
+
+    --font-mono: 'Google Sans Code', 'JetBrains Mono', monospace, ui-monospace;
+
+    --font-editor: 'Inter', 'SF-Pro', var(--font-sans, sans-serif);
+
+    --font-editor-code: 'SF-Mono', var(--font-mono, monospace), monospace, ui-monospace;
+
+    --list-indent: 1.5rem;
+
+    --color-grandis-50: oklch(100% 0 none);
+    --color-grandis-100: oklch(100% 0 none);
+    --color-grandis-200: oklch(100% 0 none);
+    --color-grandis-300: oklch(96.511% 0.03446 82.914);
+    --color-grandis-400: oklch(93.076% 0.07259 84.408);
+    --color-grandis-500: oklch(89.637% 0.10729 83.52);
+    --color-grandis-600: oklch(85.323% 0.14575 81.229);
+    --color-grandis-700: oklch(81.467% 0.16697 76.078);
+    --color-grandis-800: oklch(72.414% 0.15408 73.202);
+    --color-grandis-900: oklch(58.618% 0.12412 74.192);
+    --color-grandis-950: oklch(51.313% 0.1085 74.502);
+    --color-grandis: var(--color-grandis-500, oklch(89.637% 0.10729 83.52));
+
+    --color-pale-sky-50: oklch(85.673% 0.00764 260.73);
+    --color-pale-sky-100: oklch(82.317% 0.0103 267.34);
+    --color-pale-sky-200: oklch(75.71% 0.01495 268.45);
+    --color-pale-sky-300: oklch(68.926% 0.01847 267.72);
+    --color-pale-sky-400: oklch(61.895% 0.02267 264.4);
+    --color-pale-sky-500: oklch(55.102% 0.02336 264.36);
+    --color-pale-sky-600: oklch(45.509% 0.01801 260.7);
+    --color-pale-sky-700: oklch(35.508% 0.01329 261.73);
+    --color-pale-sky-800: oklch(24.312% 0.00818 264.41);
+    --color-pale-sky-900: oklch(11.563% 0.00322 285.88);
+    --color-pale-sky-950: oklch(0% 0 none);
+    --color-pale-sky: var(--color-pale-sky-900, oklch(11.563% 0.00322 285.88));
+
+    --color-alizarin-crimson-50: oklch(96.153% 0.01298 17.382);
+    --color-alizarin-crimson-100: oklch(88.858% 0.04517 18.035);
+    --color-alizarin-crimson-200: oklch(77.237% 0.09986 19.596);
+    --color-alizarin-crimson-300: oklch(68.359% 0.14947 21.788);
+    --color-alizarin-crimson-400: oklch(61.188% 0.19302 24.911);
+    --color-alizarin-crimson-500: oklch(56.66% 0.21206 27.393);
+    --color-alizarin-crimson-600: oklch(47.126% 0.17391 27.149);
+    --color-alizarin-crimson-700: oklch(37.104% 0.13331 26.706);
+    --color-alizarin-crimson-800: oklch(26.418% 0.08868 25.703);
+    --color-alizarin-crimson-900: oklch(14.507% 0.03754 22.966);
+    --color-alizarin-crimson-950: oklch(0% 0 none);
+    --color-alizarin-crimson: var(--color-alizarin-crimson-500, oklch(56.66% 0.21206 27.393));
 }
