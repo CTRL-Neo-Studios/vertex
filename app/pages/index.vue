@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import {useAppRecents} from "~/composables/app/useAppRecents";
 import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
+import {useAppOpener} from "~/composables/app/useAppOpener";
 
+const openingFile = ref(false)
 const $recents = useAppRecents()
-onMounted(async () => {
+const {
+    openFolderOrFile
+} = useAppOpener()
 
-})
+async function openFile() {
+    openingFile.value = true
+    await openFolderOrFile()
+    openingFile.value = false
+}
 </script>
 
 <template>
@@ -14,9 +22,9 @@ onMounted(async () => {
             <div class="grid grid-cols-1 gap-2 select-none">
                 <NuxtImg src="icon.png" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
-                <UButton label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost"/>
-                <UButton label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost"/>
-                <UButton label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost"/>
+                <UButton label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
+                <UButton label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
+                <UButton label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
             </div>
         </div>
         <div class="bg-muted border-l border-l-default flex flex-col w-full h-full">

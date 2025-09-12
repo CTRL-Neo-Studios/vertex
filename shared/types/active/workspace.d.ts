@@ -17,3 +17,11 @@ export interface ActiveWorkspaceFileIndex { // Using the Hybrid ID Approach: uui
 export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
     children: UITreeNode[]
 }
+
+export type WorkspaceIndexEvent =
+    | { type: 'create'; path: string; }
+    | { type: 'remove'; path: string; }
+    | { type: 'rename'; oldPath: string; newPath: string; }
+    | { type: 'modify'; path: string; };
+
+export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;

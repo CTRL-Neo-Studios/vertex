@@ -12,7 +12,8 @@ const props = defineProps<{
 const modelValue = defineModel<string | undefined>()
 
 const emit = defineEmits<{
-    (e: 'file-click', value: UITreeNode): void
+    (e: 'file-click', value: UITreeNode): void,
+    (e: 'folder-toggle', path: string): void
 }>();
 
 const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
@@ -28,10 +29,9 @@ const formattedTreeData = computed(() => {
                 // e?.preventDefault();
                 onItemClick(treeItem)
             },
-            slot: node.isFolder ? 'folder' as const : 'file' as const
+            slot: node.isFolder ? 'folder' as const : 'file' as const,
+            originalNodeData: node
         };
-
-        treeItem.originalNodeData = node;
 
         return treeItem;
     };
@@ -44,8 +44,10 @@ function onItemClick(item: TreeItem) {
     const originalNode = item.originalNodeData as UITreeNode;
 
     // We only want to emit an event for files.
-    if (originalNode && !originalNode.isFolder) {
-        emit('file-click', originalNode);
+    if (originalNode.isFolder) {
+        emit('folder-toggle', originalNode.fullPath);
+    } else {
+        emit('file-click', originalNode)
     }
 }
 </script>
@@ -56,6 +58,6 @@ function onItemClick(item: TreeItem) {
         v-model="modelValue"
         expanded-icon="i-lucide-folder-open"
         collapsed-icon="i-lucide-folder-closed"
-        :expanded="expandedFolders"
+        v-model:expanded="expandedFolders"
     />
 </template>

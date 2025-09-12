@@ -23,8 +23,7 @@ export function useAppRecents() {
             await recentsStore.save();
         }
 
-        // TODO Uncomment this after testing
-        // await validate();
+        await validate();
         return recents.value;
     }
 

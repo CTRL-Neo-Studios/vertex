@@ -1,6 +1,7 @@
 import type {ActiveTab} from "#shared/types/active/tabs";
 import {defaultActiveTab} from "#shared/utils/defaults/apps";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {PossiblyRef} from "#shared/types/types";
 
 export function useActiveTabs(session?: ActiveSession) {
     const tabs = useState<ActiveTab[]>(`active.tabs.${session?.uuid}`, () => [])
@@ -10,7 +11,8 @@ export function useActiveTabs(session?: ActiveSession) {
      * Opens a new tab for a given file UUID.
      * If the tab is already open, it just makes it active.
      */
-    function openTab(fileUuid: string) {
+    function openTab(fileUuidRef: PossiblyRef<string>) {
+        const fileUuid = unref(fileUuidRef)
         const existingTab = unref(tabs).find(t => t.fileUuid === fileUuid);
         if (!existingTab) {
             tabs.value.push(defaultActiveTab({ fileUuid: fileUuid, changesSaved: true }));
@@ -23,7 +25,8 @@ export function useActiveTabs(session?: ActiveSession) {
     /**
      * Closes a tab. If it was the active tab, it activates the next available tab.
      */
-    function closeTab(uuid: string) {
+    function closeTab(uuidRef: PossiblyRef<string>) {
+        const uuid = unref(uuidRef)
         const tabIndex = unref(tabs).findIndex(t => t.fileUuid === uuid);
         if (tabIndex === -1) return;
 
@@ -45,14 +48,16 @@ export function useActiveTabs(session?: ActiveSession) {
      * Gets the tab in list of active tabs.
      * @param uuid uuid of the Tab.
      */
-    function getActiveTab(uuid: string): ActiveTab | undefined {
+    function getActiveTab(uuidRef: PossiblyRef<string>): ActiveTab | undefined {
+        const uuid = unref(uuidRef)
         return unref(tabs).find(i => i.fileUuid == uuid)
     }
 
     /**
      * Sets the active tab.
      */
-    function setActiveTab(uuid: string) {
+    function setActiveTab(uuidRef: PossiblyRef<string>) {
+        const uuid = unref(uuidRef)
         activeTabUuid.value = uuid;
     }
 
@@ -67,9 +72,20 @@ export function useActiveTabs(session?: ActiveSession) {
     /**
      * Checks if the tab of the UUID is opened.
      */
-    function isTabOpened(uuid: string) {
+    function isTabOpened(uuidRef: PossiblyRef<string>) {
+        const uuid = unref(uuidRef)
         const tabIndex = unref(tabs).findIndex(t => t.fileUuid === uuid);
         return tabIndex !== -1
+    }
+
+    function setTabSavedState(uuidRef: PossiblyRef<string>, state: PossiblyRef<boolean>) {
+        const uuid = unref(uuidRef);
+        const newState = unref(state);
+
+        const tab = unref(tabs).find(t => t.fileUuid === uuid);
+        if (tab) {
+            tab.changesSaved = newState;
+        }
     }
 
     return {
@@ -80,6 +96,7 @@ export function useActiveTabs(session?: ActiveSession) {
         setActiveTab,
         isTabOpened,
         getActiveTab,
-        clearTabs
+        clearTabs,
+        setTabSavedState
     };
 }

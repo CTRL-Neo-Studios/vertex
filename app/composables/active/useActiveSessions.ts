@@ -2,10 +2,11 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
 
 export function useActiveSessions() {
-    const sessions = useState<ActiveSession[]>(() => []);
+    const sessions = useState<ActiveSession[]>('active.sessions', () => []);
 
     function addSession(sesh: ActiveSession) {
         sessions.value.push(sesh)
+        return sesh
     }
 
     function removeSession(sessionId: PossiblyRef<string>) {
@@ -16,10 +17,20 @@ export function useActiveSessions() {
         return sessions.value.find(i => i.uuid == unref(sessionId));
     }
 
+    function hasSessionWithId(sessionId: PossiblyRef<string>) {
+        return sessions.value.findIndex(i => i.uuid == unref(sessionId)) != -1;
+    }
+
+    function hasSessionWithPath(fullFilePath: PossiblyRef<string>) {
+        return sessions.value.findIndex(i => i.rootPath == unref(fullFilePath)) != -1
+    }
+
     return {
         sessions,
         addSession,
         removeSession,
-        getSession
+        getSession,
+        hasSessionWithId,
+        hasSessionWithPath
     }
 }

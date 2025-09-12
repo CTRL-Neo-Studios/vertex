@@ -1,4 +1,9 @@
-import type {ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
+import type {
+    ActiveWorkspaceFileIndex,
+    UITreeNode,
+    WorkspaceIndexEvent,
+    WorkspaceIndexListener
+} from "#shared/types/active/workspace";
 import {
     type DirEntry,
     readDir,
@@ -15,6 +20,9 @@ import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
+// NEW: A registry for our event listeners, mapping session ID to a Set of callbacks.
+const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
+
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -22,30 +30,49 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     }
 
     const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
+    const expandedFolders = useState<Set<string>>(`active.workspace.expandedFolders.${session?.uuid}`, () => new Set());
     // Turns the fileIndex into a recursive File tree to serve the UI
     const fileTree = computed<UITreeNode[]>(() => {
-        const index = fileIndex.value; // No need for unref
+        const index = fileIndex.value;
         if (Object.keys(index).length === 0) return [];
 
-        const getNode = (path: string): UITreeNode => {
-            const file = index[path];
-            return defaultUITreeNode({
-                ...file,
-                // The children array now correctly contains paths, so this works
-                children: file?.children.map(getNode) || []
+        // This recursive function now builds the tree lazily.
+        const mapNodeToLazyTreeItem = (path: string): UITreeNode => {
+            const node = index[path];
+
+            // Base node data is the same.
+            const {children, ...baseNode} = defaultActiveWorkspaceFileIndex(node)
+            const treeItem = defaultUITreeNode({
+                ...baseNode
             });
+
+            // --- The Lazy Logic ---
+            if (node?.isFolder) {
+                // If this folder's path is in our `expandedFolders` set...
+                if (expandedFolders.value.has(path)) {
+                    // ...then recursively map its children.
+                    treeItem.children = node.children.map(mapNodeToLazyTreeItem);
+                } else {
+                    // ...otherwise, give it an empty children array so the UI shows an expander icon.
+                    // The children will be generated when the user clicks to expand.
+                    treeItem.children = [];
+                }
+            }
+
+            return treeItem;
         };
 
+        // Find and map only the root nodes. Recursion will handle the rest on demand.
         const rootNodes: UITreeNode[] = [];
         for (const path in index) {
             const parentPath = path.substring(0, path.lastIndexOf('/'));
-            // This lookup now works because the keys of the index are paths
             if (!index[parentPath]) {
-                rootNodes.push(getNode(path));
+                rootNodes.push(mapNodeToLazyTreeItem(path));
             }
         }
         return rootNodes;
     });
+
 
     /**
      * Builds index from a root path using Tauri's native recursive fs scan.
@@ -53,12 +80,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
         const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
         const workspaceRoot = unref(workspaceRootFilePath)
+        const time = new Date().getTime()
 
         async function processDirectory(currentPath: string) {
             const entries = await readDir(currentPath);
             const childrenPaths: string[] = [];
 
             for (const entry of entries) {
+                if (entry.name.startsWith('.')) continue;
+
                 const entryPath = await join(currentPath, entry.name);
                 childrenPaths.push(entryPath);
 
@@ -76,7 +106,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     newIndex[entryPath].children = await processDirectory(entryPath);
                 } else {
                     // MODIFIED: Parse frontmatter immediately for files
-                    await updateFrontmatterForPath(entryPath, newIndex);
+                    // if (entry.name.endsWith(".md"))
+                    //     await updateFrontmatterForPath(entryPath, newIndex);
                 }
             }
             return childrenPaths;
@@ -84,6 +115,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
         fileIndex.value = newIndex;
+        console.log((new Date()).getTime() - time)
+    }
+
+    async function ensureFrontmatterIsParsed(fullPath: string) {
+        const node = fileIndex.value[fullPath]
+        if (!node?.frontmatterProperties || Object.keys(node.frontmatterProperties).length === 0)
+            await updateFrontmatterForPath(fullPath)
     }
 
     /**
@@ -248,6 +286,14 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // fileIndex.value = { ...fileIndexState }; // Use if reactivity fails
     }
 
+    function _broadcast(event: WorkspaceIndexEvent) {
+        const listeners = listenerRegistry.get(session!.uuid);
+        if (listeners) {
+            // Call each subscribed listener with the event.
+            listeners.forEach(listener => listener(event));
+        }
+    }
+
     /**
      * Starts the file system watcher for the specified workspace root.
      * It will automatically update the fileIndex on create, remove, or rename events.
@@ -273,17 +319,34 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
                 // --- Rename Event Handling ---
                 if ('modify' in event.type && event.type.modify.kind === 'rename') {
+
+                    // --- FIX: Add a guard clause ---
+                    // If this is a partial rename event without both paths, ignore it.
+                    if (event.paths.length < 2) {
+                        console.log('Ignoring incomplete rename event.');
+                        return;
+                    }
+
+                    // At this point, we know we have two paths.
                     const [oldPath, newPath] = event.paths;
+
                     console.log(`Rename detected: ${oldPath} -> ${newPath}`);
-                    moveFileInIndex(oldPath || '', newPath || '', workspaceRoot);
+
+                    // Your defensive `|| ''` is good, but the guard clause prevents `undefined` from ever reaching here.
+                    moveFileInIndex(oldPath || '', newPath || '', workspaceRoot).then(() => {
+                        _broadcast({ type: 'rename', oldPath: oldPath || '', newPath: newPath || '' });
+                    });
                     return;
                 }
+
 
                 // --- Create Event Handling ---
                 if ('create' in event.type) {
                     for (const path of event.paths) {
                         console.log(`Create detected: ${path}`);
-                        addFileToIndex(path, workspaceRoot);
+                        addFileToIndex(path, workspaceRoot).then(() => {
+                            _broadcast({ type: 'create', path }); // Broadcast event
+                        });
                     }
                     return;
                 }
@@ -293,6 +356,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     for (const path of event.paths) {
                         console.log(`Remove detected: ${path}`);
                         removeFileFromIndex(path);
+                        _broadcast({ type: 'remove', path }); // Broadcast event
                     }
                     return;
                 }
@@ -300,7 +364,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 // --- Modify Event Handling (Content Change) ---
                 if ('modify' in event.type && event.type.modify.kind === 'data') {
                     for (const path of event.paths) {
-                        updateFrontmatterForPath(path);
+                        updateFrontmatterForPath(path).then(() => { // Assuming this is your parsing function
+                            _broadcast({ type: 'modify', path }); // Broadcast event
+                        });
                     }
                     return;
                 }
@@ -331,6 +397,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             console.log(`Stopping file watcher for session ${session!.uuid}...`);
             unwatchFn(); // Execute the unwatch function.
             watcherRegistry.delete(session!.uuid); // Clean up the registry.
+            // Also clean up listeners for this session to prevent memory leaks!
+            listenerRegistry.delete(session!.uuid);
             console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
         } else {
             console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
@@ -365,7 +433,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
      *
      * Optimize: Can be optimized via adding a separate uuidToFilePathIndexMap later but it's hard to manage right now, i.e. premature optimization.
      */
-    function getFileByUuid(uuid: string): ActiveWorkspaceFileIndex | null {
+    function getFileByUuid(uuidRef: PossiblyRef<string | undefined>): ActiveWorkspaceFileIndex | null {
+        const uuid = unref(uuidRef)
         if (!uuid) return null;
 
         for (const path in unref(fileIndex)) {
@@ -376,6 +445,36 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         return null;
     }
+
+    /**
+     * Toggles the expansion state of a folder in the tree.
+     */
+    function toggleFolderExpansion(folderPath: string) {
+        if (expandedFolders.value.has(folderPath)) {
+            expandedFolders.value.delete(folderPath);
+        } else {
+            expandedFolders.value.add(folderPath);
+        }
+    }
+
+
+    function on(listener: WorkspaceIndexListener): () => void {
+        // Get or create the listener set for this session.
+        if (!listenerRegistry.has(session!.uuid)) {
+            listenerRegistry.set(session!.uuid, new Set());
+        }
+        const listeners = listenerRegistry.get(session!.uuid)!;
+
+        // Add the new listener.
+        listeners.add(listener);
+
+        // Return an `unsubscribe` function.
+        // This is CRITICAL for preventing memory leaks in components.
+        return () => {
+            listeners.delete(listener);
+        };
+    }
+
 
 
     return {
@@ -388,6 +487,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         moveFileInIndex,
         startWatcher,
         stopWatcher,
-        clearIndex
+        clearIndex,
+        ensureFrontmatterIsParsed,
+        on
     };
 }
