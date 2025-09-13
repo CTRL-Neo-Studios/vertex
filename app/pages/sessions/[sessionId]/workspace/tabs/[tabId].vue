@@ -20,14 +20,14 @@ const content = useState<string>(`active.tabs.currentTab.${unref(sessionId)}.${u
 const {
     on,
     getFileByUuid,
-    ensureFrontmatterIsParsed
+    moveFileInIndex
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     closeTab,
     activeTabUuid,
     getActiveTab,
     isTabOpened,
-    setTabSavedState
+    setTabSavedState,
 } = useActiveTabs($sesh.getSession(sessionId))
 const cachedFileIndex = getFileByUuid(unref(tabId))
 
@@ -56,14 +56,8 @@ onMounted(async () => {
         await $navi.toWorkspaceEmptyTab(unref(sessionId))
 
     const currentIndexFile = getFileByUuid(tabId)
-    if (currentIndexFile?.fullPath) {
-        // New step: Ensure frontmatter is parsed before loading content.
-        // You would need to add and provide this function from your index composable.
-        await ensureFrontmatterIsParsed(currentIndexFile.fullPath);
-
+    if (currentIndexFile?.fullPath)
         content.value = await $fileio.readTextFromFile(currentIndexFile.fullPath)
-    }
-
 })
 
 on(async (event) => {
@@ -72,19 +66,22 @@ on(async (event) => {
         closeTab(tabId)
         await $navi.toWorkspaceEmptyTab(sessionId)
     } else if (event.type == "modify" && event.path == getFileByUuid(tabId)?.fullPath) {
-        isContentSaved.value = false
-        content.value = await $fileio.readTextFromFile(event.path)
-    } else if (event.type == "rename" && event.oldPath == getFileByUuid(tabId)?.fullPath) {
+        // isContentSaved.value = false
+        // content.value = await $fileio.readTextFromFile(event.path)
+    } else if (event.type == "rename" && (event.oldPath == getFileByUuid(tabId)?.fullPath || event.newPath == getFileByUuid(tabId)?.fullPath)) {
         isContentSaved.value = false
         fileName.value = await $fileio.getFileNameFromPath(event.newPath, true)
+        isContentSaved.value = true
     }
 })
 
 async function onRename() {
     isContentSaved.value = false
     const fullPath = getFileByUuid(tabId)?.fullPath
-    if (fullPath)
-        await $fileio.renameFileOrFolder(fullPath, unref(fileName))
+    if (fullPath) {
+        const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
+        await moveFileInIndex(fullPath, newPath, $sesh.getSession(sessionId)?.rootPath || '')
+    }
     isContentSaved.value = true;
 }
 watch(fileName, () => {
@@ -113,7 +110,7 @@ watch(fileName, () => {
                 <!-- This div can add padding or alignment for the editor -->
                 <div class="flex flex-col items-center justify-start md:p-0 mb-16 mt-10">
                     <!-- The editor is free to be as tall as its content requires -->
-                    <Editor v-model="content" class="max-w-2xl w-full" @update:model-value="() => {isContentSaved = false}"/>
+                    <Editor v-model="content" class="max-w-2xl w-full" @update:model-value="() => isContentSaved = false"/>
                 </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar

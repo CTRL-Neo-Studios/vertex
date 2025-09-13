@@ -12,6 +12,7 @@ const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
+const activeTreeItem = ref<string | null>()
 
 await until($sessionId).toMatch(v => v != undefined)
 
@@ -38,6 +39,10 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
+
+watch(activeTabUuid, (newValue) => {
+    activeTreeItem.value = newValue
+}, {deep: false})
 
 onMounted(async () => {
     if (!unref($sessionId))
@@ -98,7 +103,7 @@ onBeforeUnmount(async () => {
                 </div>
                 <SidebarCollapserButton side="left"/>
             </template>
-            <FileTreeComponent :nodes="fileTree" @file-click="onClickFile"/>
+            <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
         </UDashboardSidebar>
         <UDashboardPanel id="content" :ui="{
             body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
