@@ -18,6 +18,7 @@ const $fileio = useFileIO()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 // the isContentSaved here is the equivalent of determining whether a file is dirty. If in any operations in this file does shit to the content, just make it false, i.e. marking it dirty.
 const content = useState<string>(`active.tabs.currentTab.${unref(sessionId)}.${unref(tabId)}`), isContentSaved = ref(true)
+const isContentLoaded = ref(false);
 const {
     on,
     getFileByUuid,
@@ -57,9 +58,11 @@ watch(isContentSaved, (newValue) => {
 
 watch(fileIndex, () => {
     console.log('File Index Changed')
-})
+}, { deep: true })
 
 debouncedWatch(content, async () => {
+    if (!isContentLoaded.value) return;
+
     const fullFilePath = getFileByUuid(tabId)?.fullPath;
     if (!fullFilePath) return;
 
@@ -78,12 +81,14 @@ onMounted(async () => {
         await $navi.toWorkspaceEmptyTab(unref(sessionId))
 
     const currentIndexFile = getFileByUuid(tabId)
-    if (currentIndexFile?.fullPath)
+    if (currentIndexFile?.fullPath) {
         content.value = await $fileio.readTextFromFile(currentIndexFile.fullPath)
+        isContentLoaded.value = true
+    }
 })
 
-on(async (event) => {
-    console.log(event)
+const unsubscribe = on(async (event) => {
+    console.log(`[Listener for ${fileName.value}]`, event)
     if (event.type == "remove" && event.path == cachedFileIndex?.fullPath) {
         closeTab(tabId)
         await $navi.toWorkspaceEmptyTab(sessionId)
@@ -95,6 +100,10 @@ on(async (event) => {
         fileName.value = await $fileio.getFileNameFromPath(event.newPath, true)
         isContentSaved.value = true
     }
+})
+
+onBeforeUnmount(() => {
+    unsubscribe()
 })
 
 async function onRename() {

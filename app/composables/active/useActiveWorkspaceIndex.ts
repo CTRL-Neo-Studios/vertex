@@ -111,6 +111,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
      * Handles linking to its parent.
      */
     async function addFileToIndex(path: string, workspaceRoot: string, autoSort: boolean = true) {
+        if (unref(fileIndex)[path]) {
+            console.warn(`[addFileToIndex] Skipped: ${path} already exists in the index.`);
+            return unref(fileIndex)[path];
+        }
         console.log(`[addFileToIndex] ${path}`)
         try {
             const fileStats = await stat(path);
