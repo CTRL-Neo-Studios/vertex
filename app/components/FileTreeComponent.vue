@@ -26,8 +26,11 @@ const formattedTreeData = computed(() => {
             icon: node.isFolder ? undefined : 'i-lucide-file',
             children: node.children?.map(mapNodeToTreeItem),
             onSelect(e) {
-                // e?.preventDefault();
+                e?.preventDefault();
                 onItemClick(treeItem)
+            },
+            onToggle(e) {
+                // onItemClick(treeItem)
             },
             slot: node.isFolder ? 'folder' as const : 'file' as const,
             originalNodeData: node
@@ -49,6 +52,7 @@ function onItemClick(item: TreeItem) {
     } else {
         emit('file-click', originalNode)
     }
+    modelValue.value = item.id
 }
 
 function getItemContextMenu(item: TreeItem): ContextMenuItem[][] {
@@ -103,22 +107,22 @@ function getItemContextMenu(item: TreeItem): ContextMenuItem[][] {
 <template>
     <UTree
         :items="formattedTreeData"
-        v-model="modelValue"
         expanded-icon="i-lucide-folder-open"
         collapsed-icon="i-lucide-folder-closed"
         v-model:expanded="expandedFolders"
         value-key="id"
         :ui="{
-            itemWithChildren: 'ps-0'
+            itemWithChildren: 'ps-0',
+            listWithChildren: 'ms-4.5 pl-2'
         }"
         size="sm"
     >
-        <template #file-wrapper="{item, selected}">
+        <template #file-wrapper="{item}">
             <UContextMenu :items="getItemContextMenu(item)" size="sm">
-                <UButton size="sm" :label="item.label" :variant="selected ? 'soft' : 'ghost'" color="neutral" class="w-full select-none" @click="onItemClick(item)"/>
+                <UButton size="sm" :label="item.label" :variant="item.id == modelValue ? 'subtle' : 'ghost'" color="neutral" class="w-full select-none" @click="onItemClick(item)"/>
             </UContextMenu>
         </template>
-        <template #folder="{item, expanded, selected}" class="p-0">
+        <template #folder="{item, expanded}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item)" size="sm">
                 <div class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />

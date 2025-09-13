@@ -32,7 +32,11 @@ export default defineNuxtConfig({
         optimizeDeps: {
             entries: [
                 "@tauri-apps/plugin-store",
-                "@tauri-apps/plugin-fs"
+                "@tauri-apps/plugin-fs",
+                "@tauri-apps/plugin-dialog",
+                "@tauri-apps/api/path",
+                "@type32/codemirror-rich-obsidian-editor",
+                "reka-ui"
             ]
         }
     }

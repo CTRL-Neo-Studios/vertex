@@ -287,6 +287,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         let activeWatcher = await watch(workspaceRoot, (event: WatchEvent) => {
             const currentTabId = useRoute().params.tabId as string;
+            if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
+
+            console.log('[Detected Watcher Event]: ', event);
 
             if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && (event.type.modify.kind === 'metadata' || event.type.modify.kind === 'data')))) return;
 
@@ -295,13 +298,28 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 // Inside this block, TypeScript now knows event.type is an object.
                 // It is now safe to use the `in` operator.
 
+                // --- Remove Event Handling ---
+                if ('remove' in event.type) {
+                    for (const path of event.paths) {
+                        console.log(`Remove detected: ${path}`);
+                        removeFileFromIndex(path);
+                        _broadcast({ type: 'remove', path }); // Broadcast event
+                    }
+                    return;
+                }
+
                 // --- Rename Event Handling ---
                 if ('modify' in event.type && event.type.modify.kind === 'rename') {
 
                     // --- FIX: Add a guard clause ---
                     // If this is a partial rename event without both paths, ignore it.
                     if (event.paths.length < 2) {
-                        console.log('Ignoring incomplete rename event.');
+                        console.warn('Incomplete rename event. Removing affected index.');
+                        const path = event.paths[0]
+                        if (path) {
+                            removeFileFromIndex(path);
+                            _broadcast({type: 'remove', path});
+                        }
                         return;
                     }
 
@@ -329,18 +347,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     return;
                 }
 
-                // --- Remove Event Handling ---
-                if ('remove' in event.type) {
-                    for (const path of event.paths) {
-                        console.log(`Remove detected: ${path}`);
-                        removeFileFromIndex(path);
-                        _broadcast({ type: 'remove', path }); // Broadcast event
-                    }
-                    return;
-                }
 
-
-                console.log('[Watcher Event]', event);
+                console.log('[Executed Watcher Event]: ', event);
 
                 // --- Modify Event Handling (Content Change) ---
                 // if ('modify' in event.type && event.type.modify.kind === 'data') {
@@ -358,7 +366,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 console.log(`Received simple string event type: "${event.type}"`);
             }
 
-        }, { recursive: true });
+        }, { recursive: true, delayMs: 10 });
 
         // Store the new unwatch function in our central registry.
         watcherRegistry.set(session!.uuid, activeWatcher);

@@ -12,7 +12,7 @@ const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const activeTreeItem = ref<string | null>()
+const activeTreeItem = ref()
 
 await until($sessionId).toMatch(v => v != undefined)
 
@@ -69,7 +69,7 @@ onBeforeUnmount(async () => {
 
 <template>
     <UDashboardGroup
-        :class="['w-full h-full', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-muted/50']"
+        :class="['w-full h-full', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-muted']"
         unit="rem"
     >
         <UDashboardSidebar

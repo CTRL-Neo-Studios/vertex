@@ -10,14 +10,14 @@
     "postinstall": "nuxt prepare",
     "tauri": "cd src-tauri && tauri",
     "tauri:dev": "cd src-tauri && bun tauri dev",
-    "tauri:build": "cd src-tauri && pnpm i && bun tauri build",
+    "tauri:build": "cd src-tauri && bun i && bun tauri build",
     "tauri:build:debug": "cd src-tauri && bun tauri build --debug",
     "lint": "eslint .",
     "lint:fix": "eslint --fix ."
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.66",
-    "@iconify-json/simple-icons": "^1.2.50",
+    "@iconify-json/lucide": "^1.2.67",
+    "@iconify-json/simple-icons": "^1.2.51",
     "@nuxt/fonts": "0.11.4",
     "@nuxt/icon": "2.0.0",
     "@nuxt/image": "1.11.0",
@@ -28,10 +28,10 @@
     "@tauri-apps/plugin-fs": "^2.4.2",
     "@tauri-apps/plugin-opener": "^2.5.0",
     "@tauri-apps/plugin-store": "^2.4.0",
-    "@type32/codemirror-rich-obsidian-editor": "^0.0.8",
+    "@type32/codemirror-rich-obsidian-editor": "^0.0.9",
     "@vueuse/nuxt": "13.6.0",
     "katex": "^0.16.22",
-    "nuxt": "^4.1.1",
+    "nuxt": "^4.1.2",
     "nuxt-auth-utils": "0.5.23",
     "reka-ui": "^2.5.0",
     "vue": "^3.5.21",
@@ -45,6 +45,9 @@
   "trustedDependencies": [
     "@parcel/watcher",
     "@tailwindcss/oxide",
-    "core-js"
+    "core-js",
+    "esbuild",
+    "sharp",
+    "vue-demi"
   ]
 }

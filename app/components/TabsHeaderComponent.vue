@@ -54,18 +54,19 @@ async function exitTab(tab: ActiveTab) {
 
 <template>
     <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px">
-        <div class="text-xs text-muted/50 absolute left-0 top-0 bottom-0 bg-gradient-to-l from-transparent via-muted/50 to-muted/50 h-full w-4 z-10"/>
-        <ScrollAreaViewport class="w-full h-full">
-            <div class="flex items-center justify-center gap-1.5">
+        <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-muted h-full w-4 z-10"/>
+        <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
+            <div class="w-full inline-flex items-center justify-center gap-1.5">
                 <div
                     v-for="(tab, index) in unref(tabs)"
                     class="w-fit h-fit relative flex items-center justify-center group"
                 >
                     <UButton
                         :key="index"
-                        class="cursor-pointer pr-8"
-                        color="neutral"
-                        :variant="tabId == tab.fileUuid ? 'solid' : 'soft'"
+                        size="sm"
+                        :class="['cursor-pointer pr-8', tabId == tab.fileUuid ? '' : 'text-muted']"
+                        :color="tabId == tab.fileUuid ? 'primary' : 'neutral'"
+                        :variant="tabId == tab.fileUuid ? 'subtle' : 'soft'"
                         :label="getFileByUuid(tab.fileUuid)?.fileName"
                         :icon="tab.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff'"
                         @click="toTab(tab)"
@@ -78,14 +79,14 @@ async function exitTab(tab: ActiveTab) {
             </div>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar
-            class="select-none touch-none z-20 h-2 m-2"
+            class="select-none touch-none z-20 h-0 m-2"
             orientation="horizontal"
         >
             <ScrollAreaThumb
                 class="flex-1 bg-accented rounded-lg"
             />
         </ScrollAreaScrollbar>
-        <div class="text-xs text-muted/50 absolute right-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-muted/50 to-muted/50 h-full w-4 z-10"/>
+        <div class="absolute right-0 top-0 bottom-0 bg-gradient-to-r from-transparent to-muted h-full w-4 z-10"/>
     </ScrollAreaRoot>
 </template>
 

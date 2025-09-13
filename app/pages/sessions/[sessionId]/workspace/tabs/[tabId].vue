@@ -5,6 +5,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport, ScrollAreaRoot} from "reka-ui";
+import type {InternalLink, SpecialCodeBlockMapping} from "#codemirror-rich-obsidian-editor/editor-types"
 
 definePageMeta({
     layout: 'workspace'
@@ -20,7 +21,8 @@ const content = useState<string>(`active.tabs.currentTab.${unref(sessionId)}.${u
 const {
     on,
     getFileByUuid,
-    moveFileInIndex
+    moveFileInIndex,
+    fileIndex
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     closeTab,
@@ -32,10 +34,30 @@ const {
 const cachedFileIndex = getFileByUuid(unref(tabId))
 
 const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', true))
+const internalLinkList = computed<InternalLink[]>(() => {
+    const list: InternalLink[] = []
+    for (const path in unref(fileIndex)) {
+        if(!unref(fileIndex)[path]) continue;
+        const fn = unref(fileIndex)[path]?.fileName
+        if(!fn) continue;
+
+        list.push({
+            internalLinkName: $fileio.processFileNameFromPath(fn, true),
+            filePath: path,
+            redirectToPath: ''
+        } satisfies InternalLink)
+    }
+
+    return list
+})
 
 watch(isContentSaved, (newValue) => {
     setTabSavedState(tabId, newValue)
 }, {deep: false})
+
+watch(fileIndex, () => {
+    console.log('File Index Changed')
+})
 
 debouncedWatch(content, async () => {
     const fullFilePath = getFileByUuid(tabId)?.fullPath;
@@ -80,7 +102,6 @@ async function onRename() {
     const fullPath = getFileByUuid(tabId)?.fullPath
     if (fullPath) {
         const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
-        await moveFileInIndex(fullPath, newPath, $sesh.getSession(sessionId)?.rootPath || '')
     }
     isContentSaved.value = true;
 }
@@ -110,7 +131,7 @@ watch(fileName, () => {
                 <!-- This div can add padding or alignment for the editor -->
                 <div class="flex flex-col items-center justify-start md:p-0 mb-16 mt-10">
                     <!-- The editor is free to be as tall as its content requires -->
-                    <Editor v-model="content" class="max-w-2xl w-full" @update:model-value="() => isContentSaved = false"/>
+                    <Editor v-model="content" class="max-w-2xl w-full" :internal-link-map="internalLinkList" @update:model-value="() => isContentSaved = false"/>
                 </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar
