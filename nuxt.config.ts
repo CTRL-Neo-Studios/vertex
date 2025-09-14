@@ -30,7 +30,7 @@ export default defineNuxtConfig({
             strictPort: true,
         },
         optimizeDeps: {
-            entries: [
+            include: [
                 "@tauri-apps/plugin-store",
                 "@tauri-apps/plugin-fs",
                 "@tauri-apps/plugin-dialog",

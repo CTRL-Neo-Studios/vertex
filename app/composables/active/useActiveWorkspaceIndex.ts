@@ -293,7 +293,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const currentTabId = useRoute().params.tabId as string;
             if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
 
-            console.log('[Detected Watcher Event]: ', event);
+            // console.log('[Detected Watcher Event]: ', event);
 
             if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && (event.type.modify.kind === 'metadata' || event.type.modify.kind === 'data')))) return;
 
@@ -413,7 +413,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 console.error(`Frontmatter parsing error in ${path}:`, result.error);
             } else {
                 node.frontmatterProperties = result.data || {};
-                console.log(`Updated frontmatter for ${path}`);
+                // console.log(`Updated frontmatter for ${path}`);
             }
         } catch (readError) {
             console.error(`Failed to read file for frontmatter parsing: ${path}`, readError);

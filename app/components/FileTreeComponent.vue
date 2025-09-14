@@ -119,7 +119,7 @@ function getItemContextMenu(item: TreeItem): ContextMenuItem[][] {
     >
         <template #file-wrapper="{item}">
             <UContextMenu :items="getItemContextMenu(item)" size="sm">
-                <UButton size="sm" :label="item.label" :variant="item.id == modelValue ? 'subtle' : 'ghost'" color="neutral" class="w-full select-none" @click="onItemClick(item)"/>
+                <UButton size="sm" :label="item.label" :variant="item.id == modelValue ? 'subtle' : 'ghost'" :color="item.id == modelValue ? 'primary' : 'neutral'" class="w-full select-none" @click="onItemClick(item)"/>
             </UContextMenu>
         </template>
         <template #folder="{item, expanded}" class="p-0">

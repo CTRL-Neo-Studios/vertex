@@ -18,7 +18,7 @@ const emit = defineEmits<{
                 emit('on-rename')
             }"
         >
-            <EditableArea class="text-muted text-sm text-center">
+            <EditableArea class="text-highlighted text-sm text-center">
                 <EditablePreview/>
                 <EditableInput class="w-full"/>
             </EditableArea>

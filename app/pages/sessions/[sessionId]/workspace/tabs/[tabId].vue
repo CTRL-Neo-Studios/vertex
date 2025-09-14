@@ -5,7 +5,8 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport, ScrollAreaRoot} from "reka-ui";
-import type {InternalLink, SpecialCodeBlockMapping} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {InternalLink, SpecialCodeBlockMapping, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import EditorHeaderBreadcrumbs from "~/components/EditorHeaderBreadcrumbs.vue";
 
 definePageMeta({
     layout: 'workspace'
@@ -18,7 +19,7 @@ const $fileio = useFileIO()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 // the isContentSaved here is the equivalent of determining whether a file is dirty. If in any operations in this file does shit to the content, just make it false, i.e. marking it dirty.
 const content = useState<string>(`active.tabs.currentTab.${unref(sessionId)}.${unref(tabId)}`), isContentSaved = ref(true)
-const isContentLoaded = ref(false);
+const isContentLoaded = ref(false), isRenaming = ref(false);
 const {
     on,
     getFileByUuid,
@@ -31,6 +32,7 @@ const {
     getActiveTab,
     isTabOpened,
     setTabSavedState,
+    openTab
 } = useActiveTabs($sesh.getSession(sessionId))
 const cachedFileIndex = getFileByUuid(unref(tabId))
 
@@ -38,19 +40,28 @@ const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref
 const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
     for (const path in unref(fileIndex)) {
-        if(!unref(fileIndex)[path]) continue;
-        const fn = unref(fileIndex)[path]?.fileName
+        const f = unref(fileIndex)[path]
+        if(!f) continue;
+        const fn = f.fileName
         if(!fn) continue;
 
         list.push({
             internalLinkName: $fileio.processFileNameFromPath(fn, true),
-            filePath: path,
-            redirectToPath: ''
+            filePath: f.relativePath,
+            redirectToPath: f.uuid
         } satisfies InternalLink)
     }
 
     return list
 })
+
+async function onInternalLinkClick(args: InternalLinkClickDetail) {
+    const {redirectToPath} = args
+    if (redirectToPath) {
+        const tab = openTab(redirectToPath)
+        await $navi.toWorkspaceTab(sessionId, tab)
+    }
+}
 
 watch(isContentSaved, (newValue) => {
     setTabSavedState(tabId, newValue)
@@ -63,13 +74,11 @@ watch(fileIndex, () => {
 debouncedWatch(content, async () => {
     if (!isContentLoaded.value) return;
 
-    const fullFilePath = getFileByUuid(tabId)?.fullPath;
-    if (!fullFilePath) return;
-
     isContentSaved.value = false;
 
     try {
-        await $fileio.writeTextToFile(fullFilePath, content.value);
+        await until(isRenaming).toMatch(i => i == false)
+        await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
         isContentSaved.value = true;
     } catch (error) {
         console.error("Auto-save failed:", error);
@@ -107,12 +116,12 @@ onBeforeUnmount(() => {
 })
 
 async function onRename() {
-    isContentSaved.value = false
+    isRenaming.value = true
     const fullPath = getFileByUuid(tabId)?.fullPath
     if (fullPath) {
         const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
     }
-    isContentSaved.value = true;
+    isRenaming.value = false;
 }
 watch(fileName, () => {
     console.log(unref(fileName))
@@ -132,7 +141,7 @@ watch(fileName, () => {
             <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-lg">
                 <div class="w-full flex items-center justify-center p-2">
                     <div class="flex-grow flex items-center justify-center">
-                        <TextPreviewEditField v-model="fileName" @on-rename="onRename" class="w-fit"/>
+                        <EditorHeaderBreadcrumbs v-model="fileName" :relative-file-path="getFileByUuid(sessionId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
                     </div>
                 </div>
             </div>
@@ -140,7 +149,13 @@ watch(fileName, () => {
                 <!-- This div can add padding or alignment for the editor -->
                 <div class="flex flex-col items-center justify-start md:p-0 mb-16 mt-10">
                     <!-- The editor is free to be as tall as its content requires -->
-                    <Editor v-model="content" class="max-w-2xl w-full" :internal-link-map="internalLinkList" @update:model-value="() => isContentSaved = false"/>
+                    <Editor
+                        v-model="content"
+                        class="max-w-2xl w-full"
+                        :internal-link-map="internalLinkList"
+                        @update:model-value="() => isContentSaved = false"
+                        @internal-link-click="onInternalLinkClick"
+                    />
                 </div>
             </ScrollAreaViewport>
             <ScrollAreaScrollbar

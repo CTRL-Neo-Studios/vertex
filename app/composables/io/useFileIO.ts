@@ -17,8 +17,9 @@ export function useFileIO() {
     /**
      * Reads UTF-8 text from file.
      */
-    async function readTextFromFile(fullPathRef: PossiblyRef<string>): Promise<string> {
+    async function readTextFromFile(fullPathRef: PossiblyRef<string | undefined>): Promise<string> {
         const fullPath = unref(fullPathRef);
+        if (!fullPath) return '';
         return await readTextFile(fullPath);
     }
 
@@ -26,11 +27,13 @@ export function useFileIO() {
      * Writes UTF-8 text to file (overwrites).
      */
     async function writeTextToFile(
-        fullPathRef: PossiblyRef<string>,
-        dataRef: PossiblyRef<string>
+        fullPathRef: PossiblyRef<string | undefined>,
+        dataRef: PossiblyRef<string | undefined>
     ): Promise<void> {
         const fullPath = unref(fullPathRef);
         const data = unref(dataRef);
+
+        if (!fullPath || !data) return;
         await writeTextFile(fullPath, data);
     }
 
@@ -41,11 +44,11 @@ export function useFileIO() {
      * @returns New full path after rename.
      */
     async function renameFileOrFolder(
-        fullPathRef: PossiblyRef<string>,
-        newNameRef: PossiblyRef<string>
+        fullPathRef: PossiblyRef<string | undefined>,
+        newNameRef: PossiblyRef<string | undefined>
     ): Promise<string> {
         const fullPath = unref(fullPathRef);
-        const newName = unref(newNameRef).trim(); // Trim whitespace
+        const newName = unref(newNameRef)?.trim(); // Trim whitespace
 
         if (!fullPath || !newName) {
             throw new Error("Full path and new name are required.");

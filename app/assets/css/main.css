@@ -4,13 +4,13 @@
 @import '@nuxt/ui';
 
 @theme static {
-    --font-sans: 'Inter', 'SF-Pro', sans-serif;
+    --font-sans: 'Inter', sans-serif;
 
     --font-mono: 'Google Sans Code', 'JetBrains Mono', monospace, ui-monospace;
 
-    --font-editor: 'Inter', 'SF-Pro', var(--font-sans, sans-serif);
+    --font-editor: 'Inter', var(--font-sans, sans-serif);
 
-    --font-editor-code: 'SF-Mono', var(--font-mono, monospace), monospace, ui-monospace;
+    --font-editor-code: var(--font-mono, monospace), monospace, ui-monospace;
 
     --list-indent: 1.5rem;
 
@@ -52,4 +52,32 @@
     --color-alizarin-crimson-900: oklch(14.507% 0.03754 22.966);
     --color-alizarin-crimson-950: oklch(0% 0 none);
     --color-alizarin-crimson: var(--color-alizarin-crimson-500, oklch(56.66% 0.21206 27.393));
+}
+
+:root {
+    .cm-content {
+        .cm-line {
+            &:has(.cm-heading-1) {
+                @apply mb-4 scroll-mt-[calc(45px+var(--ui-header-height))] lg:scroll-mt-(--ui-header-height);
+            }
+
+            &:has(.cm-heading-2) {
+                @apply mt-2 mb-2 scroll-mt-[calc(48px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(48px+var(--ui-header-height))];
+            }
+
+            &:has(.cm-heading-3) {
+                @apply mt-2 mb-2 scroll-mt-[calc(32px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(32px+var(--ui-header-height))];
+            }
+
+            &:has(.cm-heading-4) {
+                @apply py-2 scroll-mt-[calc(24px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(24px+var(--ui-header-height))];
+            }
+
+            .cm-heading-4 {
+                @apply text-highlighted/70;
+            }
+
+            @apply text-pretty;
+        }
+    }
 }
