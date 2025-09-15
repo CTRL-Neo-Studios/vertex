@@ -156,15 +156,16 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     /**
      * Removes a file or folder (and all its children recursively) from the index.
      */
-    function removeFileFromIndex(path: string) {
+    function removeFileFromIndex(path: string): ActiveWorkspaceFileIndex[] {
         const nodeToRemove = unref(fileIndex)[path];
-        if (!nodeToRemove) return;
+        if (!nodeToRemove) return [];
+        const removedNodes: ActiveWorkspaceFileIndex[] = []
 
         // 1. Recursively remove all children first
         if (nodeToRemove.isFolder) {
             // Create a copy of children array to avoid modification during iteration
             [...nodeToRemove.children].forEach(childId => {
-                removeFileFromIndex(childId);
+                removedNodes.push(...removeFileFromIndex(childId));
             });
         }
 
@@ -179,8 +180,11 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
 
         // 3. Remove the node itself
+        removedNodes.push(defaultActiveWorkspaceFileIndex(unref(fileIndex)[path]))
         delete unref(fileIndex)[path];
         console.log(`Removed from index: ${path}`);
+
+        return removedNodes
     }
 
     // Place this inside your useActiveWorkspaceIndex composable
@@ -306,8 +310,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if ('remove' in event.type) {
                     for (const path of event.paths) {
                         console.log(`Remove detected: ${path}`);
-                        removeFileFromIndex(path);
-                        _broadcast({ type: 'remove', path }); // Broadcast event
+                        const removedNodes = removeFileFromIndex(path);
+                        _broadcast({ type: 'remove', path, removedNodes }); // Broadcast event
                     }
                     return;
                 }
@@ -359,8 +363,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                                 // `stat` threw an error, which means the file is no longer at this path.
                                 // This is our signal for a "move to trash" or delete operation.
                                 console.log(`File at '${path}' no longer exists. Treating as remove.`);
-                                removeFileFromIndex(path);
-                                _broadcast({ type: 'remove', path });
+                                const removedNodes = removeFileFromIndex(path);
+                                _broadcast({ type: 'remove', path, removedNodes });
                             }
                         }, 100); // A small delay to avoid race conditions with the file system.
                         return;

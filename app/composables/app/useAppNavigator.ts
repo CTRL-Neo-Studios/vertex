@@ -2,10 +2,13 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import type {PossiblyRef} from "#shared/types/types";
 
 export function useAppNavigator() {
-    async function toWorkspaceTab(sessionId: PossiblyRef<string | undefined>, tab: ActiveTab) {
-        if (unref(sessionId))
-            await navigateTo(`/sessions/${unref(sessionId)}/workspace/tabs/${tab.fileUuid}`)
-        else
+    async function toWorkspaceTab(sessionId: PossiblyRef<string | undefined>, tab: ActiveTab | undefined) {
+        if (unref(sessionId)) {
+            if (tab)
+                await navigateTo(`/sessions/${unref(sessionId)}/workspace/tabs/${tab.fileUuid}`)
+            else
+                await toWorkspaceEmptyTab(sessionId)
+        } else
             await navigateTo(`/sessions/${unref(sessionId)}/workspace/error`)
     }
 

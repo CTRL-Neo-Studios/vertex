@@ -20,7 +20,7 @@ export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
 
 export type WorkspaceIndexEvent =
     | { type: 'create'; path: string; }
-    | { type: 'remove'; path: string; }
+    | { type: 'remove'; path: string; removedNodes: ActiveWorkspaceFileIndex[] }
     | { type: 'rename'; oldPath: string; newPath: string; }
     | { type: 'modify'; path: string; };
 

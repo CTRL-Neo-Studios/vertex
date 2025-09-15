@@ -17,7 +17,6 @@ const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $fileio = useFileIO()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
-// the isContentSaved here is the equivalent of determining whether a file is dirty. If in any operations in this file does shit to the content, just make it false, i.e. marking it dirty.
 const content = useState<string>(`active.tabs.currentTab.${unref(sessionId)}.${unref(tabId)}`), isContentSaved = ref(true)
 const isContentLoaded = ref(false), isRenaming = ref(false);
 const {
@@ -32,7 +31,8 @@ const {
     getActiveTab,
     isTabOpened,
     setTabSavedState,
-    openTab
+    openTab,
+    tabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const cachedFileIndex = getFileByUuid(unref(tabId))
 const INVALID_CHARS = /[\\/:*?"<>|]/;
@@ -99,9 +99,16 @@ onMounted(async () => {
 
 const unsubscribe = on(async (event) => {
     console.log(`[Listener for ${fileName.value}]`, event)
-    if (event.type == "remove" && event.path == cachedFileIndex?.fullPath) {
-        closeTab(tabId)
-        await $navi.toWorkspaceEmptyTab(sessionId)
+    if (event.type == "remove") {
+        if (event.path == cachedFileIndex?.fullPath) {
+            closeTab(tabId)
+            if (unref(tabs)?.length == 0)
+                await $navi.toWorkspaceEmptyTab(sessionId)
+            else
+                await $navi.toWorkspaceTab(sessionId, getActiveTab(activeTabUuid))
+        } else {
+            event.removedNodes.forEach(i => closeTab(i.uuid))
+        }
     } else if (event.type == "modify" && event.path == getFileByUuid(tabId)?.fullPath) {
         // isContentSaved.value = false
         // content.value = await $fileio.readTextFromFile(event.path)
@@ -117,38 +124,41 @@ onBeforeUnmount(() => {
 })
 
 async function onRename(oldValue: string) {
-    isRenaming.value = true
+    isRenaming.value = true;
 
-    // console.log(oldValue)
-    // console.log(fileName.value)
-
-    // If modelValue is null/undefined, just update locally and return
-    if (fileName.value == null) {
+    // Revert to old value if new value is invalid or truly unchanged (case-sensitive check)
+    if (fileName.value == null || INVALID_CHARS.test(fileName.value) || fileName.value === oldValue) {
         fileName.value = oldValue;
         isRenaming.value = false;
         return;
     }
 
-    // Check for invalid characters
-    if (INVALID_CHARS.test(fileName.value)) {
-        fileName.value = oldValue
-        isRenaming.value = false;
-        return;
-    }
+    const fileToRename = getFileByUuid(tabId);
+    const workspaceRoot = $sesh.getSession(sessionId)?.rootPath;
 
-    // Only emit if value actually changed (case-insensitive)
-    if (fileName.value != oldValue) {
-        const fullPath = getFileByUuid(tabId)?.fullPath
+    if (fileToRename?.fullPath && workspaceRoot) {
+        try {
+            // 1. Perform the rename on the file system
+            const newPath = await $fileio.renameFileOrFolder(fileToRename.fullPath, unref(fileName));
 
-        if (fullPath) {
-            const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
+            if (newPath) {
+                // 2. Proactively update the in-memory index to prevent desync from watcher lag
+                console.log(`Proactively moving index from ${fileToRename.fullPath} to ${newPath}`);
+                await moveFileInIndex(fileToRename.fullPath, newPath, workspaceRoot);
+            }
+        } catch (error) {
+            console.error("Failed to rename file or update index:", error);
+            // Revert the filename in the UI if the operation fails
+            fileName.value = oldValue;
         }
-    } else {
-        fileName.value = oldValue;
     }
 
     isRenaming.value = false;
 }
+
+// watch(fileName, () => {
+//     console.log(unref(fileName))
+// })
 </script>
 
 <template>

@@ -74,7 +74,7 @@ async function exitTab(tab: ActiveTab) {
                     <UButton icon="i-lucide-x" size="xs" color="error" variant="ghost" @click="exitTab(tab)" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
                 </div>
                 <template v-if="unref(tabs).length == 0">
-                    <UButton variant="soft" label="Empty Tab"/>
+                    <UButton variant="subtle" color="primary" size="sm" label="Empty Tab"/>
                 </template>
             </div>
         </ScrollAreaViewport>

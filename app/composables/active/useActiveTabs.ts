@@ -2,6 +2,7 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import {defaultActiveTab} from "#shared/utils/defaults/apps";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
+import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 
 export function useActiveTabs(session?: ActiveSession) {
     const tabs = useState<ActiveTab[]>(`active.tabs.${session?.uuid}`, () => [])
@@ -48,7 +49,7 @@ export function useActiveTabs(session?: ActiveSession) {
      * Gets the tab in list of active tabs.
      * @param uuid uuid of the Tab.
      */
-    function getActiveTab(uuidRef: PossiblyRef<string>): ActiveTab | undefined {
+    function getActiveTab(uuidRef: PossiblyRef<string | undefined | null>): ActiveTab | undefined {
         const uuid = unref(uuidRef)
         return unref(tabs).find(i => i.fileUuid == uuid)
     }
