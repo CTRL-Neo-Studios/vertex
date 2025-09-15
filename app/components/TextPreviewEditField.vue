@@ -2,25 +2,30 @@
 import {EditableRoot, EditableArea, EditablePreview, EditableInput, EditableEditTrigger} from "reka-ui";
 
 const modelValue = defineModel<string>()
+const props = defineProps<{ disabled?: boolean }>()
 const emit = defineEmits<{
-    (e: 'on-rename'): void
+    (e: 'on-rename', oldValue: string): void
 }>()
+
 </script>
 
 <template>
     <div>
         <EditableRoot
+            name="edit"
+            :disabled="props?.disabled"
             v-slot="{isEditing}"
             placeholder="Rename your file..."
             auto-resize
-            v-model="modelValue"
+            v-model:model-value="modelValue"
+            submitMode="both"
             @submit="(value) => {
-                emit('on-rename')
+                emit('on-rename', value || '');
             }"
         >
             <EditableArea class="text-highlighted text-sm text-center">
                 <EditablePreview/>
-                <EditableInput class="w-full"/>
+                <EditableInput class="w-fit"/>
             </EditableArea>
             <EditableEditTrigger
                 v-if="isEditing"

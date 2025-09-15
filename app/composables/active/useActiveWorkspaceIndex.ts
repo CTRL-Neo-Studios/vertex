@@ -293,7 +293,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const currentTabId = useRoute().params.tabId as string;
             if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
 
-            // console.log('[Detected Watcher Event]: ', event);
+            console.log('[Detected Watcher Event]: ', event);
 
             if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && (event.type.modify.kind === 'metadata' || event.type.modify.kind === 'data')))) return;
 
@@ -314,29 +314,57 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
                 // --- Rename Event Handling ---
                 if ('modify' in event.type && event.type.modify.kind === 'rename') {
-
-                    // --- FIX: Add a guard clause ---
-                    // If this is a partial rename event without both paths, ignore it.
-                    if (event.paths.length < 2) {
-                        console.warn('Incomplete rename event. Removing affected index.');
-                        const path = event.paths[0]
-                        if (path) {
-                            removeFileFromIndex(path);
-                            _broadcast({type: 'remove', path});
-                        }
+                    // Standard rename with both paths. This is the ideal case.
+                    if (event.paths.length >= 2) {
+                        const [oldPath, newPath] = event.paths;
+                        console.log(`Rename detected: ${oldPath} -> ${newPath}`);
+                        moveFileInIndex(oldPath || '', newPath || '', workspaceRoot).then(() => {
+                            _broadcast({ type: 'rename', oldPath: oldPath || '', newPath: newPath || '' });
+                        });
                         return;
                     }
 
-                    // At this point, we know we have two paths.
-                    const [oldPath, newPath] = event.paths;
+                    // Incomplete rename with only one path. This is ambiguous.
+                    // It could be a "move to trash" or just a noisy event from a regular rename.
+                    if (event.paths.length === 1) {
+                        const path = event.paths[0];
+                        if (!path) return;
 
-                    console.log(`Rename detected: ${oldPath} -> ${newPath}`);
+                        // To figure out what it is, we check if the file still exists.
+                        // A short delay helps ensure the file system has settled.
+                        setTimeout(async () => {
+                            try {
+                                await stat(path);
+                                // File still exists (case-insensitively). This could be a case-only
+                                // rename or a noisy event. We need to check the actual file name on disk.
+                                const node = fileIndex.value[path];
+                                if (!node) return; // Should not happen, but a good safeguard.
 
-                    // Your defensive `|| ''` is good, but the guard clause prevents `undefined` from ever reaching here.
-                    moveFileInIndex(oldPath ?? '', newPath ?? '', workspaceRoot).then(() => {
-                        _broadcast({ type: 'rename', oldPath: oldPath ?? '', newPath: newPath ?? '' });
-                    });
-                    return;
+                                const parentPath = path.substring(0, path.lastIndexOf('/'));
+                                const entries = await readDir(parentPath);
+                                const eventFileName = path.substring(path.lastIndexOf('/') + 1);
+                                const actualEntry = entries.find(e => e.name.toLowerCase() === eventFileName.toLowerCase());
+
+                                // If we found the file and its casing is different, it's a case-only rename.
+                                if (actualEntry && actualEntry.name !== node.fileName) {
+                                    console.log(`Case-only rename detected: ${node.fileName} -> ${actualEntry.name}`);
+                                    const newPath = await join(parentPath, actualEntry.name);
+                                    await moveFileInIndex(path, newPath, workspaceRoot);
+                                    _broadcast({ type: 'rename', oldPath: path, newPath: newPath });
+                                } else {
+                                    // The file exists and the name is the same. It was a noisy event.
+                                    console.log('Ignoring noisy single-path rename event:', path);
+                                }
+                            } catch (error) {
+                                // `stat` threw an error, which means the file is no longer at this path.
+                                // This is our signal for a "move to trash" or delete operation.
+                                console.log(`File at '${path}' no longer exists. Treating as remove.`);
+                                removeFileFromIndex(path);
+                                _broadcast({ type: 'remove', path });
+                            }
+                        }, 100); // A small delay to avoid race conditions with the file system.
+                        return;
+                    }
                 }
 
 
@@ -370,7 +398,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 console.log(`Received simple string event type: "${event.type}"`);
             }
 
-        }, { recursive: true, delayMs: 10 });
+        }, { recursive: true, delayMs: 5 });
 
         // Store the new unwatch function in our central registry.
         watcherRegistry.set(session!.uuid, activeWatcher);

@@ -2,9 +2,9 @@
 import type { BreadcrumbItem } from '@nuxt/ui'
 
 const modelValue = defineModel<string>()
-const props = defineProps<{relativeFilePath: string}>()
+const props = defineProps<{relativeFilePath: string, renaming?: boolean}>()
 const emit = defineEmits<{
-    (e: 'on-rename'): void
+    (e: 'on-rename', oldValue: string): void
 }>()
 
 const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
@@ -26,7 +26,10 @@ const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
 <template>
     <UBreadcrumb separator-icon="i-lucide-slash" :items="breadcrumbItems" size="sm">
         <template #editable>
-            <TextPreviewEditField v-model="modelValue" @on-rename="() => emit('on-rename')"/>
+            <div class="inline-flex w-fit items-center justify-center font-medium">
+                <UIcon size="sm" name="i-lucide-loader-circle" class="animate-spin" v-if="props?.renaming"/>
+                <TextPreviewEditField class="w-fit" :disabled="props?.renaming" v-model="modelValue" @on-rename="(oldValue) => emit('on-rename', oldValue)"/>
+            </div>
         </template>
     </UBreadcrumb>
 </template>

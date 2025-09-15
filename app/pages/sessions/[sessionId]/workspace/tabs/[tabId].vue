@@ -35,6 +35,7 @@ const {
     openTab
 } = useActiveTabs($sesh.getSession(sessionId))
 const cachedFileIndex = getFileByUuid(unref(tabId))
+const INVALID_CHARS = /[\\/:*?"<>|]/;
 
 const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', true))
 const internalLinkList = computed<InternalLink[]>(() => {
@@ -67,9 +68,9 @@ watch(isContentSaved, (newValue) => {
     setTabSavedState(tabId, newValue)
 }, {deep: false})
 
-watch(fileIndex, () => {
-    console.log('File Index Changed')
-}, { deep: true })
+// watch(fileIndex, () => {
+//     console.log('File Index Changed')
+// }, { deep: true })
 
 debouncedWatch(content, async () => {
     if (!isContentLoaded.value) return;
@@ -115,17 +116,39 @@ onBeforeUnmount(() => {
     unsubscribe()
 })
 
-async function onRename() {
+async function onRename(oldValue: string) {
     isRenaming.value = true
-    const fullPath = getFileByUuid(tabId)?.fullPath
-    if (fullPath) {
-        const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
+
+    // console.log(oldValue)
+    // console.log(fileName.value)
+
+    // If modelValue is null/undefined, just update locally and return
+    if (fileName.value == null) {
+        fileName.value = oldValue;
+        isRenaming.value = false;
+        return;
     }
+
+    // Check for invalid characters
+    if (INVALID_CHARS.test(fileName.value)) {
+        fileName.value = oldValue
+        isRenaming.value = false;
+        return;
+    }
+
+    // Only emit if value actually changed (case-insensitive)
+    if (fileName.value != oldValue) {
+        const fullPath = getFileByUuid(tabId)?.fullPath
+
+        if (fullPath) {
+            const newPath = await $fileio.renameFileOrFolder(fullPath, unref(fileName))
+        }
+    } else {
+        fileName.value = oldValue;
+    }
+
     isRenaming.value = false;
 }
-watch(fileName, () => {
-    console.log(unref(fileName))
-})
 </script>
 
 <template>
@@ -141,7 +164,7 @@ watch(fileName, () => {
             <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-lg">
                 <div class="w-full flex items-center justify-center p-2">
                     <div class="flex-grow flex items-center justify-center">
-                        <EditorHeaderBreadcrumbs v-model="fileName" :relative-file-path="getFileByUuid(sessionId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
+                        <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(sessionId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
                     </div>
                 </div>
             </div>
