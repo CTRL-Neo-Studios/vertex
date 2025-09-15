@@ -4,13 +4,13 @@ import type { BreadcrumbItem } from '@nuxt/ui'
 const modelValue = defineModel<string>()
 const props = defineProps<{relativeFilePath: string, renaming?: boolean}>()
 const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string): void
+    (e: 'on-rename', oldValue: string, newValue: string): void
 }>()
 
 const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
     const items: BreadcrumbItem[] = []
-    const segments = props.relativeFilePath.split('/').pop() ?? []
-    for(let i = 0; i < segments.length; i++) {
+    const segments = props.relativeFilePath.split('/') ?? []
+    for(let i = 0; i < segments.length - 1; i++) {
         items.push({
             label: segments[i],
         })
@@ -24,11 +24,14 @@ const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
 </script>
 
 <template>
-    <UBreadcrumb separator-icon="i-lucide-slash" :items="breadcrumbItems" size="sm">
+    <UBreadcrumb :items="breadcrumbItems" size="sm" class="text-sm select-none">
+        <template #separator>
+            <span class="select-none text-muted text-center align-middle">/</span>
+        </template>
         <template #editable>
             <div class="inline-flex w-fit items-center justify-center font-medium">
                 <UIcon size="sm" name="i-lucide-loader-circle" class="animate-spin" v-if="props?.renaming"/>
-                <TextPreviewEditField class="w-fit" :disabled="props?.renaming" v-model="modelValue" @on-rename="(oldValue) => emit('on-rename', oldValue)"/>
+                <TextPreviewEditField size="sm" class="w-fit" :disabled="props?.renaming" v-model="modelValue" @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)"/>
             </div>
         </template>
     </UBreadcrumb>

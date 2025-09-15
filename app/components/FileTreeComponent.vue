@@ -55,8 +55,26 @@ function onItemClick(item: TreeItem) {
     modelValue.value = item.id
 }
 
-function getItemContextMenu(item: TreeItem): ContextMenuItem[][] {
+function getItemContextMenu(item: TreeItem, isFolder: boolean = false): ContextMenuItem[][] {
     return [
+        [
+            {
+                label: 'New Markdown File',
+                icon: 'i-lucide-file-plus'
+            },
+            {
+                label: 'New Folder',
+                icon: 'i-lucide-file-plus'
+            },
+            {
+                label: 'New Canvas',
+                icon: 'i-lucide-file-plus'
+            },
+            {
+                label: 'New Table',
+                icon: 'i-lucide-file-plus'
+            },
+        ],
         [
             {
                 label: 'Open in New Tab',

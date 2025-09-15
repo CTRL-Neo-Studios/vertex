@@ -69,7 +69,7 @@ onBeforeUnmount(async () => {
 
 <template>
     <UDashboardGroup
-        :class="['w-full h-full', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-muted']"
+        :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-muted']"
         unit="rem"
     >
         <UDashboardSidebar
@@ -106,19 +106,13 @@ onBeforeUnmount(async () => {
             <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
         </UDashboardSidebar>
         <UDashboardPanel id="content" :ui="{
-            body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
+            body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 drop-shadow-xl ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
             root: `lg:not-last:border-r-0`
         }">
             <template #header>
                 <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
-                    <template #left>
-                        <SidebarCollapserButton side="left" v-if="leftPanelCollapsed"/>
-                    </template>
                     <template #default>
                         <TabsHeaderComponent class="w-full"/>
-                    </template>
-                    <template #right>
-                        <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
                     </template>
                 </UDashboardNavbar>
             </template>

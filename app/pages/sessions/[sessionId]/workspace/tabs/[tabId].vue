@@ -159,6 +159,8 @@ async function onRename(oldValue: string) {
 // watch(fileName, () => {
 //     console.log(unref(fileName))
 // })
+
+console.log(getFileByUuid(tabId)?.relativePath)
 </script>
 
 <template>
@@ -174,7 +176,7 @@ async function onRename(oldValue: string) {
             <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-lg">
                 <div class="w-full flex items-center justify-center p-2">
                     <div class="flex-grow flex items-center justify-center">
-                        <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(sessionId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
+                        <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(tabId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
                     </div>
                 </div>
             </div>
@@ -199,7 +201,9 @@ async function onRename(oldValue: string) {
                     class="flex-1 bg-accented rounded-lg"
                 />
             </ScrollAreaScrollbar>
-            <div class="absolute z-10 bg-gradient-to-b from-transparent to-default left-0 right-0 bottom-0 h-6 rounded-b-lg"/>
+            <div class="absolute z-10 bg-gradient-to-b from-transparent to-default left-0 right-0 bottom-0 h-6 rounded-b-lg inline-flex justify-center items-center">
+
+            </div>
         </ScrollAreaRoot>
     </div>
 

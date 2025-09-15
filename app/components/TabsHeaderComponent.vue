@@ -5,10 +5,8 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-
-const props = defineProps<{
-    tabs?: ActiveTab[]
-}>()
+import type { DropdownMenuItem } from '@nuxt/ui'
+import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -24,6 +22,10 @@ const {
 const {
     getFileByUuid
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
+const {
+    leftPanelCollapsed,
+    rightPanelCollapsed
+} = useActiveLayouts($sesh.getSession(sessionId))
 
 async function toTab(tab: ActiveTab) {
     openTab(tab.fileUuid)
@@ -50,28 +52,55 @@ async function exitTab(tab: ActiveTab) {
         return;
     }
 }
+
+const dropdownItems = computed<DropdownMenuItem[]>(() => {
+    const items: DropdownMenuItem[] = []
+    unref(tabs)?.forEach(i => {
+        const node = getFileByUuid(i.fileUuid)
+        if(node) {
+            items.push({
+                label: node.fileName,
+                icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                id: i.fileUuid,
+                async toTab() {
+                    await toTab(i)
+                },
+                async exitTab() {
+                    await exitTab(i)
+                },
+                async onSelect(e: Event) {
+                    await toTab(i);
+                }
+            })
+        }
+    })
+    return items
+})
 </script>
 
 <template>
     <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px">
-        <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-muted h-full w-4 z-10"/>
+        <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} h-full w-fit z-10 inline-flex justify-start items-center`">
+            <div class="w-14"/>
+            <SidebarCollapserButton side="left" v-if="leftPanelCollapsed"/>
+        </div>
         <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
             <div class="w-full inline-flex items-center justify-center gap-1.5">
                 <div
-                    v-for="(tab, index) in unref(tabs)"
+                    v-for="(tab, index) in dropdownItems"
                     class="w-fit h-fit relative flex items-center justify-center group"
                 >
                     <UButton
                         :key="index"
                         size="sm"
-                        :class="['cursor-pointer pr-8', tabId == tab.fileUuid ? '' : 'text-muted']"
-                        :color="tabId == tab.fileUuid ? 'primary' : 'neutral'"
-                        :variant="tabId == tab.fileUuid ? 'subtle' : 'soft'"
-                        :label="getFileByUuid(tab.fileUuid)?.fileName"
-                        :icon="tab.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff'"
-                        @click="toTab(tab)"
+                        :class="['cursor-pointer pr-8', tabId == tab.id ? '' : 'text-muted']"
+                        :color="tabId == tab.id ? 'primary' : 'neutral'"
+                        :variant="tabId == tab.id ? 'subtle' : 'soft'"
+                        :label="tab.label"
+                        :icon="tab.icon"
+                        @click="tab.toTab()"
                     />
-                    <UButton icon="i-lucide-x" size="xs" color="error" variant="ghost" @click="exitTab(tab)" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
+                    <UButton icon="i-lucide-x" size="xs" color="error" variant="ghost" @click="tab.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
                 </div>
                 <template v-if="unref(tabs).length == 0">
                     <UButton variant="subtle" color="primary" size="sm" label="Empty Tab"/>
@@ -86,7 +115,12 @@ async function exitTab(tab: ActiveTab) {
                 class="flex-1 bg-accented rounded-lg"
             />
         </ScrollAreaScrollbar>
-        <div class="absolute right-0 top-0 bottom-0 bg-gradient-to-r from-transparent to-muted h-full w-4 z-10"/>
+        <div :class="`absolute transition-all duration-300 right-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} h-full w-fit z-10 pl-4 inline-flex justify-end items-center gap-1`">
+            <UDropdownMenu :items="dropdownItems" size="sm">
+                <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm"/>
+            </UDropdownMenu>
+            <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
+        </div>
     </ScrollAreaRoot>
 </template>
 
