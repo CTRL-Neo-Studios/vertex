@@ -106,7 +106,7 @@ onBeforeUnmount(async () => {
             <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
         </UDashboardSidebar>
         <UDashboardPanel id="content" :ui="{
-            body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 drop-shadow-xl ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
+            body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
             root: `lg:not-last:border-r-0`
         }">
             <template #header>

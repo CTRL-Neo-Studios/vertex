@@ -182,7 +182,7 @@ console.log(getFileByUuid(tabId)?.relativePath)
             </div>
             <ScrollAreaViewport class="w-full flex-none h-full">
                 <!-- This div can add padding or alignment for the editor -->
-                <div class="flex flex-col items-center justify-start md:p-0 mb-16 mt-10">
+                <div class="flex flex-col items-center justify-start md:p-0 mb-32 mt-10">
                     <!-- The editor is free to be as tall as its content requires -->
                     <Editor
                         v-model="content"

@@ -17,7 +17,8 @@ const {
     openTab,
     activeTabUuid,
     tabs,
-    getActiveTab
+    getActiveTab,
+    clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {
     getFileByUuid
@@ -53,12 +54,12 @@ async function exitTab(tab: ActiveTab) {
     }
 }
 
-const dropdownItems = computed<DropdownMenuItem[]>(() => {
-    const items: DropdownMenuItem[] = []
+const dropdownItems = computed<DropdownMenuItem[][]>(() => {
+    const items: DropdownMenuItem[][] = [[]]
     unref(tabs)?.forEach(i => {
         const node = getFileByUuid(i.fileUuid)
         if(node) {
-            items.push({
+            items[0]?.push({
                 label: node.fileName,
                 icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
@@ -74,6 +75,18 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
             })
         }
     })
+
+    items.push([
+        {
+            label: 'Clear All Tabs',
+            icon: 'i-lucide-x',
+            color: 'error',
+            async onSelect(e: Event) {
+                await $navi.toWorkspaceEmptyTab(sessionId)
+                clearTabs()
+            }
+        }
+    ])
     return items
 })
 </script>
@@ -87,13 +100,13 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
         <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
             <div class="w-full inline-flex items-center justify-center gap-1.5">
                 <div
-                    v-for="(tab, index) in dropdownItems"
-                    class="w-fit h-fit relative flex items-center justify-center group"
+                    v-for="(tab, index) in dropdownItems[0]"
+                    :class="['w-fit h-fit relative inline-flex items-center justify-center group']"
                 >
                     <UButton
                         :key="index"
                         size="sm"
-                        :class="['cursor-pointer pr-8', tabId == tab.id ? '' : 'text-muted']"
+                        :class="['cursor-pointer transition-all duration-300', tabId == tab.id ? 'pr-8 w-fit' : 'text-muted w-24 pr-6']"
                         :color="tabId == tab.id ? 'primary' : 'neutral'"
                         :variant="tabId == tab.id ? 'subtle' : 'soft'"
                         :label="tab.label"

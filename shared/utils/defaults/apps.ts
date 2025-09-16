@@ -2,6 +2,7 @@ import type {AppRecents} from "#shared/types/app/recents";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import useUuid from "~/composables/utility/useUuid";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {AppConfig} from "#shared/types/app/config";
 
 export function defaultAppRecents(data?: Partial<AppRecents>): AppRecents {
     return {
@@ -22,4 +23,10 @@ export function defaultActiveSession(data?: Partial<ActiveSession>): ActiveSessi
         workspaceSession: data?.workspaceSession ?? false,
         rootPath: data?.rootPath || ''
     } satisfies ActiveSession
+}
+
+export function defaultAppConfig(data?: Partial<AppConfig>): AppConfig {
+    return {
+        openLastOpenedWindows: data?.openLastOpenedWindows ?? false
+    } satisfies AppConfig
 }

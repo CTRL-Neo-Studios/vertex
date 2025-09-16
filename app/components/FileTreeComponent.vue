@@ -3,19 +3,37 @@ import { computed } from 'vue';
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
 import useUuid from "~/composables/utility/useUuid";
+import NewFileModal from "~/components/Modals/NewFileModal.vue";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 
 const props = defineProps<{
     nodes: UITreeNode[],
     sessionId?: string
 }>();
-
 const modelValue = defineModel<string | null>()
-
 const emit = defineEmits<{
     (e: 'file-click', value: UITreeNode): void,
     (e: 'folder-toggle', path: string): void
 }>();
+const $ovl = useOverlay()
+const $navi = useAppNavigator()
+const $route = useRoute()
+const $sessionId = computed<string>(() => $route.params.sessionId as string)
+const {
+    getSession
+} = useActiveSessions()
+const {
+    openTab
+} = useActiveTabs(getSession($sessionId))
+const {
+    getFileByUuid
+} = useActiveWorkspaceIndex(getSession($sessionId))
 
+const newFileModal = $ovl.create(NewFileModal)
 const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
 
 const formattedTreeData = computed(() => {
@@ -55,48 +73,152 @@ function onItemClick(item: TreeItem) {
     modelValue.value = item.id
 }
 
-function getItemContextMenu(item: TreeItem, isFolder: boolean = false): ContextMenuItem[][] {
+function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean = false): ContextMenuItem[][] {
     return [
         [
             {
-                label: 'New Markdown File',
-                icon: 'i-lucide-file-plus'
+                label: 'New Markdown File...',
+                icon: 'i-lucide-file-plus',
+                children: [
+                    {
+                        label: 'Above Level',
+                        icon: 'i-lucide-folder-up',
+                        disabled: itemLevel <= 1,
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Markdown File',
+                                asFolder: false,
+                                asLevel: 'above',
+                                fileExt: 'md'
+                            })
+                        },
+                    },
+                    {
+                        label: 'This Level',
+                        icon: 'i-lucide-folder-dot',
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Markdown File',
+                                asFolder: false,
+                                asLevel: 'same',
+                                fileExt: 'md'
+                            })
+                        },
+                    },
+                    {
+                        label: 'Under Level',
+                        icon: 'i-lucide-folder-down',
+                        disabled: !isFolder,
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Markdown File',
+                                asFolder: false,
+                                asLevel: 'below',
+                                fileExt: 'md'
+                            })
+                        },
+                    }
+                ]
             },
             {
-                label: 'New Folder',
-                icon: 'i-lucide-file-plus'
+                label: 'New Folder...',
+                icon: 'i-lucide-file-plus',
+                children: [
+                    {
+                        label: 'Above Level',
+                        icon: 'i-lucide-folder-up',
+                        disabled: itemLevel <= 1,
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Folder',
+                                asFolder: true,
+                                asLevel: 'above'
+                            })
+                        },
+                    },
+                    {
+                        label: 'This Level',
+                        icon: 'i-lucide-folder-dot',
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Folder',
+                                asFolder: true,
+                                asLevel: 'same'
+                            })
+                        },
+                    },
+                    {
+                        label: 'Under Level',
+                        icon: 'i-lucide-folder-down',
+                        disabled: !isFolder,
+                        onSelect(e) {
+                            newFileModal.open({
+                                isFolder: isFolder,
+                                atFileIndexId: item.id,
+                                modalTitle: 'New Folder',
+                                asFolder: true,
+                                asLevel: 'below'
+                            })
+                        },
+                    }
+                ]
             },
             {
                 label: 'New Canvas',
-                icon: 'i-lucide-file-plus'
+                icon: 'i-lucide-file-plus',
+                disabled: true,
             },
             {
                 label: 'New Table',
-                icon: 'i-lucide-file-plus'
+                icon: 'i-lucide-file-plus',
+                disabled: true,
             },
         ],
         [
             {
                 label: 'Open in New Tab',
-                icon: 'i-lucide-square-plus'
+                icon: 'i-lucide-square-plus',
+                disabled: isFolder,
+                async onSelect(e: Event) {
+                    const tab = openTab(item.id)
+                    await $navi.toWorkspaceTab($sessionId, tab)
+                }
             },
             {
                 label: 'Open in Default App',
-                icon: 'i-lucide-square-arrow-out-up-right'
+                icon: 'i-lucide-square-arrow-out-up-right',
+                disabled: true
             }
         ],
         [
             {
                 label: 'Copy full path',
-                icon: 'i-lucide-copy'
+                icon: 'i-lucide-copy',
+                async onSelect(e: Event) {
+                    await writeText(getFileByUuid(item.id)?.fullPath ?? '')
+                }
             },
             {
                 label: 'Copy relative path',
-                icon: 'i-lucide-copy'
+                icon: 'i-lucide-copy',
+                async onSelect(e: Event) {
+                    await writeText(getFileByUuid(item.id)?.relativePath ?? '')
+                }
             },
             {
                 label: 'Reveal in File Explorer',
-                icon: 'i-lucide-copy'
+                icon: 'i-lucide-copy',
+                disabled: true
             }
         ],
         [
@@ -131,17 +253,17 @@ function getItemContextMenu(item: TreeItem, isFolder: boolean = false): ContextM
         value-key="id"
         :ui="{
             itemWithChildren: 'ps-0',
-            listWithChildren: 'ms-4.5 pl-2'
+            listWithChildren: `ms-4.5 pl-2 dark:border-neutral-700`
         }"
         size="sm"
     >
-        <template #file-wrapper="{item}">
-            <UContextMenu :items="getItemContextMenu(item)" size="sm">
+        <template #file-wrapper="{item, level}">
+            <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
                 <UButton size="sm" :label="item.label" :variant="item.id == modelValue ? 'subtle' : 'ghost'" :color="item.id == modelValue ? 'primary' : 'neutral'" class="w-full select-none" @click="onItemClick(item)"/>
             </UContextMenu>
         </template>
-        <template #folder="{item, expanded}" class="p-0">
-            <UContextMenu :items="getItemContextMenu(item)" size="sm">
+        <template #folder="{item, expanded, level}" class="p-0">
+            <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
                     <span class="truncate text-xs overflow-ellipsis">{{ item?.label }}</span>

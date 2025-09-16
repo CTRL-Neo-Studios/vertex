@@ -34,6 +34,7 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-store",
                 "@tauri-apps/plugin-fs",
                 "@tauri-apps/plugin-dialog",
+                "@tauri-apps/plugin-clipboard-manager",
                 "@tauri-apps/api/path",
                 "@type32/codemirror-rich-obsidian-editor",
                 "reka-ui"
