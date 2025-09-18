@@ -23,7 +23,8 @@ const {
     on,
     getFileByUuid,
     moveFileInIndex,
-    fileIndex
+    fileIndex,
+    updateIndex
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     closeTab,
@@ -34,6 +35,7 @@ const {
     openTab,
     tabs
 } = useActiveTabs($sesh.getSession(sessionId))
+const $du = useDocumentUtils()
 const cachedFileIndex = getFileByUuid(unref(tabId))
 const INVALID_CHARS = /[\\/:*?"<>|]/;
 
@@ -42,9 +44,10 @@ const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
     for (const path in unref(fileIndex)) {
         const f = unref(fileIndex)[path]
-        if(!f) continue;
+        if (!f) continue;
         const fn = f.fileName
-        if(!fn) continue;
+        if (!fn) continue;
+        if (f.isFolder) continue;
 
         list.push({
             internalLinkName: $fileio.processFileNameFromPath(fn, true),
@@ -79,8 +82,15 @@ debouncedWatch(content, async () => {
 
     try {
         await until(isRenaming).toMatch(i => i == false)
-        await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
-        isContentSaved.value = true;
+        // await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
+        const fp = getFileByUuid(tabId)?.fullPath
+        if (fp)
+            Promise.all([
+                $fileio.writeTextToFile(fp, unref(content)),
+                updateIndex(fp, unref(content))
+            ]).then(() => {
+                isContentSaved.value = true
+            });
     } catch (error) {
         console.error("Auto-save failed:", error);
     }
@@ -173,7 +183,7 @@ console.log(getFileByUuid(tabId)?.relativePath)
             class="w-full h-full flex flex-col relative"
             :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.7rem)' }"
         >
-            <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-lg">
+            <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-xl">
                 <div class="w-full flex items-center justify-center p-2">
                     <div class="flex-grow flex items-center justify-center">
                         <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(tabId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
@@ -193,17 +203,20 @@ console.log(getFileByUuid(tabId)?.relativePath)
                     />
                 </div>
             </ScrollAreaViewport>
+            <div class="absolute z-10 bg-gradient-to-b from-transparent to-default left-0 right-0 bottom-0 h-fit rounded-b-xl inline-flex justify-center items-center p-1">
+                <div class="flex-grow"/>
+                <UTooltip :content="{side: 'left'}" :text="`${$du.getWordCount(content || '')} Words, ${$du.getLineCount(content || '')} Lines`" :delay-duration="100">
+                    <UButton size="xs" variant="ghost" icon="i-lucide-info"/>
+                </UTooltip>
+            </div>
             <ScrollAreaScrollbar
-                class="select-none touch-none z-20 w-2 m-2"
+                class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
                 orientation="vertical"
             >
                 <ScrollAreaThumb
                     class="flex-1 bg-accented rounded-lg"
                 />
             </ScrollAreaScrollbar>
-            <div class="absolute z-10 bg-gradient-to-b from-transparent to-default left-0 right-0 bottom-0 h-6 rounded-b-lg inline-flex justify-center items-center">
-
-            </div>
         </ScrollAreaRoot>
     </div>
 

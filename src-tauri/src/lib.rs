@@ -5,6 +5,7 @@ use tauri_plugin_decorum::WebviewWindowExt; // adds helper methods to WebviewWin
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -19,7 +20,8 @@ pub fn run() {
             main_window.create_overlay_titlebar().unwrap();
 
             // Some macOS-specific helpers
-            #[cfg(target_os = "macos")] {
+            #[cfg(target_os = "macos")]
+            {
                 // Set a custom inset to the traffic lights
                 main_window.set_traffic_lights_inset(14.0, 16.0).unwrap();
 

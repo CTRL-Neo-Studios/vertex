@@ -29,3 +29,4 @@ tauri-plugin-dialog = { version = "2.4.0", features = [] }
 tauri-plugin-store = { version = "2.4.0", features = [] }
 tauri-plugin-clipboard-manager = { version = "2.3.0", features = [] }
 tauri-plugin-opener = { version = "2.2.3", features = [] }
+tauri-plugin-os = "2"

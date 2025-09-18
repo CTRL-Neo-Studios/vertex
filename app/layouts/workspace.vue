@@ -8,12 +8,34 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
+import ReferenceLinksListComponent from "~/components/ReferenceLinksListComponent.vue";
+import type {TabsItem} from "@nuxt/ui";
+import {useOsPlatform} from "~/composables/utility/useOsPlatform";
+import SpaceOnOs from "~/components/SpaceOnOs.vue";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const activeTreeItem = ref()
+const activeRightPanel = ref('forelinks')
+const rightPanelItems: TabsItem[] = [
+    {
+        value: 'forelinks',
+        label: 'Forelinks',
+        icon: 'i-lucide-link'
+    },
+    {
+        value: 'writer',
+        label: 'Writer\'s Tools',
+        icon: 'i-lucide-pencil'
+    },
+    {
+        value: 'toc',
+        label: 'Table of Contents',
+        icon: 'i-lucide-table-of-contents'
+    }
+]
 
 await until($sessionId).toMatch(v => v != undefined)
 
@@ -70,7 +92,7 @@ onBeforeUnmount(async () => {
 
 <template>
     <UDashboardGroup
-        :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-muted']"
+        :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-submuted']"
         unit="rem"
     >
         <UDashboardSidebar
@@ -99,31 +121,32 @@ onBeforeUnmount(async () => {
                 />
             </template>
             <template #header>
+                <SpaceOnOs detect-os="macos" :show-on-os="false"/>
                 <div class="flex-grow">
 
                 </div>
                 <SidebarCollapserButton side="left"/>
             </template>
             <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
-                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-muted h-4 w-full z-10 inline-flex justify-start items-center`"/>
+                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`"/>
                 <ScrollAreaViewport class="h-full">
                     <div class="w-full">
                         <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
                     </div>
                 </ScrollAreaViewport>
                 <ScrollAreaScrollbar
-                    class="select-none touch-none z-20 w-2 m-2"
+                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
                     orientation="vertical"
                 >
                     <ScrollAreaThumb
                         class="flex-1 bg-accented rounded-lg"
                     />
                 </ScrollAreaScrollbar>
-                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-muted to-muted h-4 w-full z-10 inline-flex justify-end items-center gap-1`"/>
+                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
             </ScrollAreaRoot>
         </UDashboardSidebar>
         <UDashboardPanel id="content" :ui="{
-            body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
+            body: `relative sm:p-0 bg-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
             root: `lg:not-last:border-r-0`
         }">
             <template #header>
@@ -150,7 +173,7 @@ onBeforeUnmount(async () => {
             resizable
             :ui="{
                 root: 'border-r-0',
-                body: 'px-2',
+                body: 'pl-1 pr-3',
                 header: 'px-2'
             }"
         >
@@ -164,7 +187,31 @@ onBeforeUnmount(async () => {
             </template>
             <template #header>
                 <SidebarCollapserButton side="right" v-if="!rightPanelCollapsed"/>
+                <div class="flex-grow"/>
+                <UTabs label-key="title" v-model="activeRightPanel" :content="false" :items="rightPanelItems" default-value="forelinks" size="sm" variant="pill"/>
+                <SpaceOnOs detect-os="macos" show-on-os/>
             </template>
+            <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
+                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`">
+                    <div class="text-sm text-muted text-left select-none">{{ rightPanelItems.find(i => i.value == activeRightPanel)?.label }}</div>
+                </div>
+                <ScrollAreaViewport class="h-full">
+                    <div class="w-full">
+                        <template v-if="activeRightPanel == 'forelinks'">
+                            <ReferenceLinksListComponent class="w-full h-full mt-5"/>
+                        </template>
+                    </div>
+                </ScrollAreaViewport>
+                <ScrollAreaScrollbar
+                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
+                    orientation="vertical"
+                >
+                    <ScrollAreaThumb
+                        class="flex-1 bg-accented rounded-lg"
+                    />
+                </ScrollAreaScrollbar>
+                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
+            </ScrollAreaRoot>
         </UDashboardSidebar>
     </UDashboardGroup>
 </template>

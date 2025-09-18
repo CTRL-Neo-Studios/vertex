@@ -75,6 +75,14 @@
           "path": "**/*"
         }
       ]
-    }
+    },
+    "os:default",
+    "os:allow-arch",
+    "os:allow-exe-extension",
+    "os:allow-family",
+    "os:allow-locale",
+    "os:allow-os-type",
+    "os:allow-platform",
+    "os:allow-version"
   ]
 }

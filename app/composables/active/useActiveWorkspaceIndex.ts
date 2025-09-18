@@ -18,6 +18,7 @@ import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/
 import useUuid from "~/composables/utility/useUuid";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
 // NEW: A registry for our event listeners, mapping session ID to a Set of callbacks.
@@ -81,22 +82,26 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     isFolder: entry.isDirectory,
                     children: [],
                     frontmatterProperties: {},
+                    forelinks: []
                 });
 
                 if (entry.isDirectory) {
                     newIndex[entryPath].children = (await processDirectory(entryPath)).sort();
-                } else {
-                    // MODIFIED: Parse frontmatter immediately for files
-                    if (entry.name.endsWith(".md"))
-                        await updateFrontmatterForPath(entryPath, newIndex);
                 }
             }
             return childrenPaths;
         }
 
         await processDirectory(workspaceRoot);
+
+        for (const path in newIndex) {
+            if (path.endsWith(".md") || path.endsWith(".mdx")) {
+                await preparseDocument(path, newIndex);
+            }
+        }
+
         fileIndex.value = newIndex;
-        console.log((new Date()).getTime() - time)
+        console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
     }
 
     /**
@@ -131,6 +136,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 isFolder: isDirectory,
                 children: [], // New files/folders have no children initially
                 frontmatterProperties: {}, // Later, you could parse this here
+                forelinks: []
             });
             unref(fileIndex)[path] = newEntry;
 
@@ -142,7 +148,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
 
             // MODIFIED: Also parse frontmatter when a new file is added
-            await updateFrontmatterForPath(path);
+            if (!isDirectory && path.endsWith('.md')) {
+                await preparseDocument(path);
+            }
 
             console.log(`Added to index: ${path}`);
             return newEntry;
@@ -268,6 +276,57 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // if you were mutating deeply without Vue's reactivity system catching it,
         // but since we are adding/deleting keys, it should be fine.
         // fileIndex.value = { ...fileIndexState }; // Use if reactivity fails
+    }
+
+    async function updateIndex(path: string, content: string) {
+        const index = unref(fileIndex);
+        const node = index[path];
+        if (!node || node.isFolder) return;
+
+        const fmResult = parseFrontmatter(content);
+        if (fmResult.error) {
+            console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
+        } else {
+            node.frontmatterProperties = fmResult.data || {};
+        }
+
+        const internalLinks: InternalLinkNode[] = getInternalLinks(content);
+        const forelinks = new Set<string>();
+        const linkTargetToUuidMap = new Map<string, string>();
+
+        for (const p in index) {
+            const file = index[p];
+            if (file && !file.isFolder) {
+                const baseName = file.fileName.substring(0, file.fileName.lastIndexOf('.')) || file.fileName;
+                if (!linkTargetToUuidMap.has(baseName)) {
+                    linkTargetToUuidMap.set(baseName, file.uuid);
+                }
+                const relativePathWithoutExt = file.relativePath.substring(0, file.relativePath.lastIndexOf('.')) || file.relativePath;
+                if (!linkTargetToUuidMap.has(relativePathWithoutExt)) {
+                    linkTargetToUuidMap.set(relativePathWithoutExt, file.uuid);
+                }
+            }
+        }
+
+        for (const linkNode of internalLinks) {
+            const linkTarget = linkNode.path;
+            if (linkTargetToUuidMap.has(linkTarget)) {
+                forelinks.add(linkTargetToUuidMap.get(linkTarget)!);
+            }
+        }
+        node.forelinks = Array.from(forelinks);
+    }
+
+    async function preparseDocument(path: string, index = fileIndex.value) {
+        const node = index[path];
+        if (!node || node.isFolder) return;
+
+        try {
+            const content = await readTextFile(path);
+            await updateIndex(path, content);
+        } catch (readError) {
+            console.error(`Failed to read file for preparsing: ${path}`, readError);
+        }
     }
 
     function _broadcast(event: WorkspaceIndexEvent) {
@@ -501,6 +560,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         startWatcher,
         stopWatcher,
         clearIndex,
-        on
+        on,
+        updateIndex
     };
 }

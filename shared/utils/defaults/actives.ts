@@ -9,7 +9,8 @@ export function defaultActiveWorkspaceFileIndex(data?: Partial<ActiveWorkspaceFi
         uuid: data?.uuid ?? useUuid(),
         fullPath: data?.fullPath ?? '',
         isFolder: data?.isFolder ?? false,
-        relativePath: data?.relativePath ?? ''
+        relativePath: data?.relativePath ?? '',
+        forelinks: data?.forelinks ?? []
     } satisfies ActiveWorkspaceFileIndex
 }
 
@@ -21,6 +22,7 @@ export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {
         uuid: data?.uuid ?? useUuid(),
         fullPath: data?.fullPath ?? '',
         isFolder: data?.isFolder ?? false,
-        relativePath: data?.relativePath ?? ''
+        relativePath: data?.relativePath ?? '',
+        forelinks: data?.forelinks ?? []
     } satisfies UITreeNode
 }

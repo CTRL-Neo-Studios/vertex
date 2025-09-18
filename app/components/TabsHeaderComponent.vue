@@ -93,7 +93,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 
 <template>
     <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px">
-        <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} h-full w-fit z-10 inline-flex justify-start items-center`">
+        <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 inline-flex justify-start items-center`">
             <div class="w-14"/>
             <SidebarCollapserButton side="left" v-if="leftPanelCollapsed"/>
         </div>
@@ -128,7 +128,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                 class="flex-1 bg-accented rounded-lg"
             />
         </ScrollAreaScrollbar>
-        <div :class="`absolute transition-all duration-300 right-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'muted'} h-full w-fit z-10 pl-4 inline-flex justify-end items-center gap-1`">
+        <div :class="`absolute transition-all duration-300 right-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 pl-4 inline-flex justify-end items-center gap-1`">
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm"/>
             </UDropdownMenu>

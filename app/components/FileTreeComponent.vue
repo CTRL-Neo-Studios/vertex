@@ -9,6 +9,9 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
+import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
+import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
+import {useFileIO} from "~/composables/io/useFileIO";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -24,6 +27,7 @@ const emit = defineEmits<{
 const $ovl = useOverlay()
 const $navi = useAppNavigator()
 const $route = useRoute()
+const $fileio = useFileIO()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const {
     getSession
@@ -36,6 +40,8 @@ const {
 } = useActiveWorkspaceIndex(getSession($sessionId))
 
 const newFileModal = $ovl.create(NewFileModal)
+const deleteFilesModal = $ovl.create(DeleteFilesModal)
+const renameFileModal = $ovl.create(RenameFileModal)
 const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
 
 const formattedTreeData = computed(() => {
@@ -257,12 +263,23 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             },
             {
                 label: 'Rename',
-                icon: 'i-lucide-pen-line'
+                icon: 'i-lucide-pen-line',
+                async onSelect(e: Event) {
+                    renameFileModal.open({
+                        fileIndexId: item.id,
+                        currentFileName: $fileio.processFileNameFromPath(item.label)
+                    })
+                }
             },
             {
                 label: 'Delete',
                 color: 'error',
-                icon: 'i-lucide-trash-2'
+                icon: 'i-lucide-trash-2',
+                async onSelect(e: Event) {
+                    deleteFilesModal.open({
+                        fileIndexIds: [item.id]
+                    })
+                }
             }
         ]
     ]
