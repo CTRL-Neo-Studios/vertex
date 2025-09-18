@@ -12,7 +12,9 @@ import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 
 const props = defineProps<{
     nodes: UITreeNode[],
-    sessionId?: string
+    sessionId?: string,
+    onlyFolders?: boolean,
+    noContextMenu?: boolean
 }>();
 const modelValue = defineModel<string | null>()
 const emit = defineEmits<{
@@ -37,27 +39,49 @@ const newFileModal = $ovl.create(NewFileModal)
 const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
 
 const formattedTreeData = computed(() => {
-    const mapNodeToTreeItem = (node: UITreeNode): TreeItem => {
-        const treeItem: TreeItem = {
-            id: node.uuid,
-            label: node.fileName,
-            icon: node.isFolder ? undefined : 'i-lucide-file',
-            children: node.children?.map(mapNodeToTreeItem),
-            onSelect(e) {
-                e?.preventDefault();
-                onItemClick(treeItem)
-            },
-            onToggle(e) {
-                // onItemClick(treeItem)
-            },
-            slot: node.isFolder ? 'folder' as const : 'file' as const,
-            originalNodeData: node
-        };
+    // A single, powerful recursive function to build the tree.
+    const buildTree = (nodes: UITreeNode[]): TreeItem[] => {
+        return nodes.reduce((accumulator, node) => {
+            // Condition: Include the node if we are showing all items OR if the item is a folder.
+            if (!props?.onlyFolders || node.isFolder) {
 
-        return treeItem;
+                // Note: The `treeItem` needs to be declared so it can be referenced in its own event handlers.
+                let treeItem: TreeItem;
+
+                treeItem = {
+                    id: node.uuid,
+                    label: node.fileName,
+                    icon: node.isFolder ? undefined : 'i-lucide-file',
+
+                    // The recursive call correctly applies the same logic to children.
+                    children: node.children ? buildTree(node.children) : undefined,
+
+                    onSelect(e) {
+                        e?.preventDefault();
+                        onItemClick(treeItem);
+                    },
+
+                    // === The key conditional logic for onToggle ===
+                    onToggle(e) {
+                        // If "folders only" mode is active, the toggle action
+                        // should also trigger the primary item click behavior.
+                        if (props?.onlyFolders) {
+                            onItemClick(treeItem);
+                        }
+                        // Otherwise, when showing files and folders, toggling does nothing.
+                    },
+
+                    slot: node.isFolder ? 'folder' as const : 'file' as const,
+                    originalNodeData: node
+                };
+
+                accumulator.push(treeItem);
+            }
+            return accumulator;
+        }, [] as TreeItem[]);
     };
 
-    return props.nodes.map(mapNodeToTreeItem);
+    return buildTree(props.nodes);
 });
 
 function onItemClick(item: TreeItem) {
@@ -74,6 +98,7 @@ function onItemClick(item: TreeItem) {
 }
 
 function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean = false): ContextMenuItem[][] {
+    if (props?.noContextMenu) return [];
     return [
         [
             {
@@ -264,7 +289,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         </template>
         <template #folder="{item, expanded, level}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
-                <div class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
+                <div :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
                     <span class="truncate text-xs overflow-ellipsis">{{ item?.label }}</span>
                     <span class="flex-grow"/>

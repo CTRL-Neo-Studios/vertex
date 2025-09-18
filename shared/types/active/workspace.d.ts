@@ -1,5 +1,6 @@
 import type {FrontmatterProperties} from "#shared/types/types";
 import {type TreeItem} from "@nuxt/ui";
+import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types" // Look here: new type for plugin
 
 /*
 Usage Scope: Active Workspaces
@@ -11,7 +12,8 @@ export interface ActiveWorkspaceFileIndex { // Using the Hybrid ID Approach: uui
     fileName: string,
     isFolder: boolean,
     children: string[] // Contains the `fullPath` of children
-    frontmatterProperties: FrontmatterProperties
+    frontmatterProperties: FrontmatterProperties,
+    forelinks: string[] // Referenced links, in terms of uuids in this file
 }
 
 export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {

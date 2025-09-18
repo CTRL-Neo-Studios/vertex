@@ -7,6 +7,7 @@ import type {UITreeNode} from "#shared/types/active/workspace";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
+import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -103,7 +104,23 @@ onBeforeUnmount(async () => {
                 </div>
                 <SidebarCollapserButton side="left"/>
             </template>
-            <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+            <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
+                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-muted h-4 w-full z-10 inline-flex justify-start items-center`"/>
+                <ScrollAreaViewport class="h-full">
+                    <div class="w-full">
+                        <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+                    </div>
+                </ScrollAreaViewport>
+                <ScrollAreaScrollbar
+                    class="select-none touch-none z-20 w-2 m-2"
+                    orientation="vertical"
+                >
+                    <ScrollAreaThumb
+                        class="flex-1 bg-accented rounded-lg"
+                    />
+                </ScrollAreaScrollbar>
+                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-muted to-muted h-4 w-full z-10 inline-flex justify-end items-center gap-1`"/>
+            </ScrollAreaRoot>
         </UDashboardSidebar>
         <UDashboardPanel id="content" :ui="{
             body: `relative sm:p-0 bg-default rounded-lg border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
