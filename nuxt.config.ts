@@ -38,6 +38,7 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/path",
                 "@tauri-apps/plugin-os",
                 "@type32/codemirror-rich-obsidian-editor",
+                "compromise",
                 "reka-ui"
             ]
         }

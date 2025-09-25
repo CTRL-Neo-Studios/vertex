@@ -1,61 +1,28 @@
 <script setup lang="ts">
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import FileTreeComponent from "~/components/FileTreeComponent.vue";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import type {UITreeNode} from "#shared/types/active/workspace";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
-import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
-import ReferenceLinksListComponent from "~/components/ReferenceLinksListComponent.vue";
-import type {TabsItem} from "@nuxt/ui";
-import {useOsPlatform} from "~/composables/utility/useOsPlatform";
-import SpaceOnOs from "~/components/SpaceOnOs.vue";
+import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const activeTreeItem = ref()
-const activeRightPanel = ref('forelinks')
-const rightPanelItems: TabsItem[] = [
-    {
-        value: 'forelinks',
-        label: 'Forelinks',
-        icon: 'i-lucide-link'
-    },
-    {
-        value: 'writer',
-        label: 'Writer\'s Tools',
-        icon: 'i-lucide-pencil'
-    },
-    {
-        value: 'toc',
-        label: 'Table of Contents',
-        icon: 'i-lucide-table-of-contents'
-    }
-]
 
 await until($sessionId).toMatch(v => v != undefined)
 
 const {
     buildIndex,
-    fileIndex,
-    fileTree,
-    getFileByUuid,
     startWatcher,
     stopWatcher,
     clearIndex
 } = useActiveWorkspaceIndex($sesh.getSession($sessionId))
 const {
-    isTabOpened,
-    openTab,
-    closeTab,
-    tabs,
     activeTabUuid,
-    setActiveTab,
-    getActiveTab,
     clearTabs
 } = useActiveTabs($sesh.getSession($sessionId))
 const {
@@ -77,11 +44,6 @@ onMounted(async () => {
     await startWatcher(rootPath || '')
 })
 
-async function onClickFile(item: UITreeNode) {
-    const tab = openTab(item.uuid)
-    await $navi.toWorkspaceTab($sesh.getSession($sessionId)?.uuid || '', tab)
-}
-
 onBeforeUnmount(async () => {
     clearTabs()
     await stopWatcher()
@@ -95,124 +57,8 @@ onBeforeUnmount(async () => {
         :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-submuted']"
         unit="rem"
     >
-        <UDashboardSidebar
-            v-if="!leftPanelCollapsed"
-            side="left"
-            v-model:collapsed="leftPanelCollapsed"
-            data-tauri-drag-region
-            :min-size="10"
-            :max-size="30"
-            :default-size="15"
-            :collapsed-size="0"
-            collapsible
-            resizable
-            :ui="{
-                root: 'border-r-0',
-                body: 'px-2',
-                header: 'px-2'
-            }"
-        >
-            <template #resize-handle="{ onMouseDown, onTouchStart, onDoubleClick }">
-                <UDashboardResizeHandle
-                    class="after:absolute after:inset-y-0 after:right-0 after:w-1 after:top-1/2 after:bottom-1/2 after:rounded-lg hover:after:bg-(--ui-border-accented) hover:after:h-20 after:justify-self-center after:items-center transition-all duration-300 after:transition-all after:duration-300"
-                    @mousedown="onMouseDown"
-                    @touchstart="onTouchStart"
-                    @dblclick="onDoubleClick"
-                />
-            </template>
-            <template #header>
-                <SpaceOnOs detect-os="macos" :show-on-os="false"/>
-                <div class="flex-grow">
-
-                </div>
-                <SidebarCollapserButton side="left"/>
-            </template>
-            <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
-                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`"/>
-                <ScrollAreaViewport class="h-full">
-                    <div class="w-full">
-                        <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
-                    </div>
-                </ScrollAreaViewport>
-                <ScrollAreaScrollbar
-                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
-                    orientation="vertical"
-                >
-                    <ScrollAreaThumb
-                        class="flex-1 bg-accented rounded-lg"
-                    />
-                </ScrollAreaScrollbar>
-                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
-            </ScrollAreaRoot>
-        </UDashboardSidebar>
-        <UDashboardPanel id="content" :ui="{
-            body: `relative sm:p-0 bg-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
-            root: `lg:not-last:border-r-0`
-        }">
-            <template #header>
-                <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
-                    <template #default>
-                        <TabsHeaderComponent class="w-full"/>
-                    </template>
-                </UDashboardNavbar>
-            </template>
-            <template #body>
-                <slot/>
-            </template>
-        </UDashboardPanel>
-        <UDashboardSidebar
-            v-if="!rightPanelCollapsed"
-            side="right"
-            v-model:collapsed="rightPanelCollapsed"
-            data-tauri-drag-region
-            :min-size="10"
-            :max-size="30"
-            :default-size="15"
-            :collapsed-size="0"
-            collapsible
-            resizable
-            :ui="{
-                root: 'border-r-0',
-                body: 'pl-1 pr-3',
-                header: 'px-2'
-            }"
-        >
-            <template #resize-handle="{ onMouseDown, onTouchStart, onDoubleClick }">
-                <UDashboardResizeHandle
-                    class="after:absolute after:inset-y-0 after:right-0 after:w-1 after:top-1/2 after:bottom-1/2 after:rounded-lg hover:after:bg-(--ui-border-accented) hover:after:h-20 after:justify-self-center after:items-center transition-all duration-300 after:transition-all after:duration-300"
-                    @mousedown="onMouseDown"
-                    @touchstart="onTouchStart"
-                    @dblclick="onDoubleClick"
-                />
-            </template>
-            <template #header>
-                <SidebarCollapserButton side="right" v-if="!rightPanelCollapsed"/>
-                <div class="flex-grow"/>
-                <UTabs label-key="title" v-model="activeRightPanel" :content="false" :items="rightPanelItems" default-value="forelinks" size="sm" variant="pill"/>
-                <SpaceOnOs detect-os="macos" show-on-os/>
-            </template>
-            <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
-                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`">
-                    <div class="text-sm text-muted text-left select-none">{{ rightPanelItems.find(i => i.value == activeRightPanel)?.label }}</div>
-                </div>
-                <ScrollAreaViewport class="h-full">
-                    <div class="w-full">
-                        <template v-if="activeRightPanel == 'forelinks'">
-                            <ReferenceLinksListComponent class="w-full h-full mt-5"/>
-                        </template>
-                    </div>
-                </ScrollAreaViewport>
-                <ScrollAreaScrollbar
-                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
-                    orientation="vertical"
-                >
-                    <ScrollAreaThumb
-                        class="flex-1 bg-accented rounded-lg"
-                    />
-                </ScrollAreaScrollbar>
-                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
-            </ScrollAreaRoot>
-        </UDashboardSidebar>
+        <DashboardLeftPanelSidebar/>
+        <slot/>
     </UDashboardGroup>
 </template>
 
