@@ -6,7 +6,7 @@
 @theme {
     --font-sans: 'Inter', sans-serif;
 
-    --font-mono: 'Google Sans Code', 'JetBrains Mono', monospace, ui-monospace;
+    --font-mono: 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace;
 
     --font-editor: 'Inter', var(--font-sans, sans-serif);
 

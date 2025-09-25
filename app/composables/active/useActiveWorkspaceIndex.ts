@@ -305,6 +305,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if (!linkTargetToUuidMap.has(relativePathWithoutExt)) {
                     linkTargetToUuidMap.set(relativePathWithoutExt, file.uuid);
                 }
+
+                if (!linkTargetToUuidMap.has(file.relativePath)) {
+                    linkTargetToUuidMap.set(file.relativePath, file.uuid);
+                }
             }
         }
 

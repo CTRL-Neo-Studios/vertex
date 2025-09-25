@@ -64,9 +64,9 @@ const internalLinkList = computed<InternalLink[]>(() => {
         if (f.isFolder) continue;
 
         list.push({
-            internalLinkName: $fileio.processFileNameFromPath(fn, true),
+            name: $fileio.processFileNameFromPath(fn, true),
             filePath: f.relativePath,
-            redirectToPath: f.uuid
+            referenceId: f.uuid
         } satisfies InternalLink)
     }
 
@@ -74,9 +74,9 @@ const internalLinkList = computed<InternalLink[]>(() => {
 })
 
 async function onInternalLinkClick(args: InternalLinkClickDetail) {
-    const {redirectToPath} = args
-    if (redirectToPath) {
-        const tab = openTab(redirectToPath)
+    const {referenceId} = args
+    if (referenceId) {
+        const tab = openTab(referenceId)
         await $navi.toWorkspaceTab(sessionId, tab)
     }
 }

@@ -9,8 +9,8 @@ export default defineNuxtConfig({
 
     fonts: {
         families: [
-            {name: 'SF-Pro', provider: 'local'},
-            {name: 'SF-Mono', provider: 'local'}
+            {name: 'SF Pro', provider: 'local'},
+            {name: 'SF Mono', provider: 'local'}
         ]
     },
 
