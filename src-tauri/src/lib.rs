@@ -23,7 +23,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 // Set a custom inset to the traffic lights
-                main_window.set_traffic_lights_inset(14.0, 16.0).unwrap();
+                // main_window.set_traffic_lights_inset(14.0, 30.0).unwrap();
 
                 // Make window transparent without privateApi
                 // main_window.make_transparent().unwrap();

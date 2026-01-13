@@ -24,7 +24,5 @@ const $route = useRoute()
 <style>
 @reference "~/assets/css/main.css";
 
-div[data-tauri-decorum-tb] {
-    pointer-events: none;
-}
+
 </style>

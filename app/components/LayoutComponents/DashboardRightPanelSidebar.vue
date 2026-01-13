@@ -77,12 +77,12 @@ const rightPanelItems: TabsItem[] = [
         </template>
         <template #header>
             <SidebarCollapserButton side="right" v-if="!rightPanelCollapsed"/>
-            <div class="flex-grow"/>
+            <div class="grow"/>
             <UTabs label-key="title" v-model="activeRightPanel" :content="false" :items="rightPanelItems" size="sm" variant="pill"/>
             <SpaceOnOs detect-os="macos" show-on-os/>
         </template>
         <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
-            <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`">
+            <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-linear-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`">
                 <div class="text-sm text-muted text-left select-none">{{ rightPanelItems.find(i => i.value == activeRightPanel)?.label }}</div>
             </div>
             <ScrollAreaViewport class="h-full">
@@ -106,7 +106,7 @@ const rightPanelItems: TabsItem[] = [
                     class="flex-1 bg-accented rounded-lg"
                 />
             </ScrollAreaScrollbar>
-            <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
+            <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-linear-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
         </ScrollAreaRoot>
     </UDashboardSidebar>
 </template>

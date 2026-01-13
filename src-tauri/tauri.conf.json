@@ -20,7 +20,11 @@
         "resizable": true,
         "fullscreen": false,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 21
+        }
       }
     ],
     "security": {
@@ -46,9 +50,18 @@
         "ext": [
           "md"
         ],
-        "mimeType": "text/plain",
+        "mimeType": "text/markdown",
         "name": "Markdown",
         "description": "The Markdown Format",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "txt"
+        ],
+        "mimeType": "text/plain",
+        "name": "Text",
+        "description": "The Plain Text Format",
         "role": "Editor"
       }
     ]

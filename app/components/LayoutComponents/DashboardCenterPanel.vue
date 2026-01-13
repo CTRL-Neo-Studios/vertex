@@ -10,11 +10,15 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
+
+const panelsCollapsed = computed(() => {
+    return $sesh.isSessionWorkspace($sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
+})
 </script>
 
 <template>
     <UDashboardPanel id="content" :ui="{
-            body: `relative sm:p-0 bg-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 shadow-lg shadow-neutral ${leftPanelCollapsed && rightPanelCollapsed ? 'border-0' : 'border'}`,
+            body: `relative sm:p-0 bg-gradient-to-b from-default to-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 ${panelsCollapsed ? 'border-0' : 'border shadow-lg shadow-neutral'}`,
             root: `lg:not-last:border-r-0`
         }">
         <template #header>

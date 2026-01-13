@@ -26,6 +26,13 @@ export function useAppNavigator() {
             await navigateTo(`/error`)
     }
 
+    async function toSinglespaceEmptyTab(sessionId: PossiblyRef<string | undefined>) {
+        if (unref(sessionId))
+            await navigateTo(`/sessions/${unref(sessionId)}/singlespace/tabs`)
+        else
+            await navigateTo(`/error`)
+    }
+
     async function toHome() {
         await navigateTo('/')
     }
@@ -34,6 +41,7 @@ export function useAppNavigator() {
         toWorkspaceTab,
         toSinglespaceTab,
         toWorkspaceEmptyTab,
+        toSinglespaceEmptyTab,
         toHome
     }
 }

@@ -59,22 +59,29 @@
 :root {
     --color-submuted: var(--ui-bg-muted);
 
+    div[data-tauri-decorum-tb] {
+        pointer-events: none;
+        div[data-tauri-drag-region] {
+            pointer-events: none;
+        }
+    }
+
     .cm-content {
         .cm-line {
             &:has(.cm-heading-1) {
-                @apply mb-4 scroll-mt-[calc(45px+var(--ui-header-height))] lg:scroll-mt-(--ui-header-height);
+                @apply pb-4 scroll-mt-[calc(45px+var(--ui-header-height))] lg:scroll-mt-(--ui-header-height);
             }
 
             &:has(.cm-heading-2) {
-                @apply mt-2 mb-2 scroll-mt-[calc(48px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(48px+var(--ui-header-height))];
+                @apply pb-2 scroll-mt-[calc(48px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(48px+var(--ui-header-height))];
             }
 
             &:has(.cm-heading-3) {
-                @apply mt-2 mb-2 scroll-mt-[calc(32px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(32px+var(--ui-header-height))];
+                @apply pb-1 scroll-mt-[calc(32px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(32px+var(--ui-header-height))];
             }
 
             &:has(.cm-heading-4) {
-                @apply py-2 scroll-mt-[calc(24px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(24px+var(--ui-header-height))];
+                @apply pb-0.5 scroll-mt-[calc(24px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(24px+var(--ui-header-height))];
             }
 
             .cm-heading-4 {
@@ -87,5 +94,5 @@
 }
 
 .dark {
-    --color-submuted: oklch(24.21% 0.008 297.26);
+    --color-submuted: oklch(22.0% 0 0);
 }

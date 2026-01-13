@@ -7,6 +7,8 @@ import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
+import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -21,35 +23,54 @@ const {
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {
-    getFileByUuid
+    getFileByUuid: getWorkspaceFileByUuid
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
+const {
+    getFileByUuid: getSinglespaceFileByUuid
+} = useActiveSinglespaceIndex($sesh.getSession(sessionId))
 const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession(sessionId))
 
+const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
+
+async function navigateTabInContext(sessionId: PossiblyRef<string | undefined>, tab?: ActiveTab) {
+    if (tab) {
+        if (unref(isWorkspace))
+            await $navi.toWorkspaceTab(sessionId, tab)
+        else
+            await $navi.toSinglespaceTab(sessionId, tab)
+    } else {
+        if (unref(isWorkspace))
+            await $navi.toWorkspaceEmptyTab(sessionId)
+        else
+            await $navi.toSinglespaceEmptyTab(sessionId)
+    }
+}
+
 async function toTab(tab: ActiveTab) {
     openTab(tab.fileUuid)
-    await $navi.toWorkspaceTab(sessionId, tab)
+    await navigateTabInContext(sessionId, tab)
 }
 async function exitTab(tab: ActiveTab) {
     closeTab(tab.fileUuid)
-    if (unref(tabs).length == 0)
-        await $navi.toWorkspaceEmptyTab(sessionId)
-    else {
+    if (unref(tabs).length == 0) {
+        await navigateTabInContext(sessionId)
+    } else {
         const uuid = unref(activeTabUuid)
         if (!uuid) {
-            await $navi.toWorkspaceEmptyTab(sessionId)
+            await navigateTabInContext(sessionId)
             return;
         }
 
         const activeTab = getActiveTab(uuid)
         if (activeTab) {
-            await $navi.toWorkspaceTab(sessionId, activeTab)
+            await navigateTabInContext(sessionId, activeTab)
             return;
         }
 
-        await $navi.toWorkspaceEmptyTab(sessionId)
+        await navigateTabInContext(sessionId)
         return;
     }
 }
@@ -57,8 +78,13 @@ async function exitTab(tab: ActiveTab) {
 const dropdownItems = computed<DropdownMenuItem[][]>(() => {
     const items: DropdownMenuItem[][] = [[]]
     unref(tabs)?.forEach(i => {
-        const node = getFileByUuid(i.fileUuid)
-        if(node) {
+        let node: ActiveSinglespaceFileIndex | ActiveWorkspaceFileIndex | null
+        if ($sesh.isSessionWorkspace(sessionId))
+            node = getWorkspaceFileByUuid(i.fileUuid)
+        else
+            node = getSinglespaceFileByUuid(i.fileUuid)
+
+        if (node) {
             items[0]?.push({
                 label: node.fileName,
                 icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
@@ -82,20 +108,24 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             icon: 'i-lucide-x',
             color: 'error',
             async onSelect(e: Event) {
-                await $navi.toWorkspaceEmptyTab(sessionId)
+                await navigateTabInContext(sessionId)
                 clearTabs()
             }
         }
     ])
     return items
 })
+
+const panelsCollapsed = computed(() => {
+    return $sesh.isSessionWorkspace(sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
+})
 </script>
 
 <template>
     <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px">
-        <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-gradient-to-l from-transparent to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 inline-flex justify-start items-center`">
+        <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-linear-to-l from-transparent to-${panelsCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 inline-flex justify-start items-center`">
             <div class="w-14"/>
-            <SidebarCollapserButton side="left" v-if="leftPanelCollapsed"/>
+            <SidebarCollapserButton side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
         </div>
         <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
             <div class="w-full inline-flex items-center justify-center gap-1.5">
@@ -128,7 +158,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                 class="flex-1 bg-accented rounded-lg"
             />
         </ScrollAreaScrollbar>
-        <div :class="`absolute transition-all duration-300 right-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} to-${rightPanelCollapsed && leftPanelCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 pl-4 inline-flex justify-end items-center gap-1`">
+        <div :class="`absolute transition-all duration-300 right-0 top-0 bottom-0 bg-linear-to-r from-transparent via-${panelsCollapsed ? 'default' : 'submuted'} to-${panelsCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 pl-4 inline-flex justify-end items-center gap-1`">
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm"/>
             </UDropdownMenu>

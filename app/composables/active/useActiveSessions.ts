@@ -25,12 +25,17 @@ export function useActiveSessions() {
         return sessions.value.findIndex(i => i.rootPath == unref(fullFilePath)) != -1
     }
 
+    function isSessionWorkspace(sessionId: PossiblyRef<string>) {
+        return sessions.value.find(i => i.uuid == unref(sessionId) && i.workspaceSession) != null;
+    }
+
     return {
         sessions,
         addSession,
         removeSession,
         getSession,
         hasSessionWithId,
-        hasSessionWithPath
+        hasSessionWithPath,
+        isSessionWorkspace
     }
 }

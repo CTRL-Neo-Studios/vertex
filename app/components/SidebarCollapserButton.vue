@@ -2,9 +2,12 @@
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 
-const props = defineProps<{
-    side: "left" | "right"
-}>()
+const props = withDefaults(defineProps<{
+    side: "left" | "right",
+    disabled?: boolean
+}>(), {
+    disabled: false
+})
 
 const $route = useRoute()
 const $sesh = useActiveSessions()
@@ -23,7 +26,7 @@ function toggleSidebar() {
 </script>
 
 <template>
-    <UButton :icon="`i-lucide-panel-${props.side}`" variant="ghost" size="sm" @click="toggleSidebar"/>
+    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" size="sm" @click="toggleSidebar"/>
 </template>
 
 <style scoped>

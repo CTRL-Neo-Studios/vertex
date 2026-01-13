@@ -50,6 +50,7 @@ onBeforeUnmount(async () => {
     clearIndex()
     $sesh.removeSession($sessionId)
 })
+
 </script>
 
 <template>

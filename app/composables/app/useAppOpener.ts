@@ -5,6 +5,8 @@ import {defaultActiveSession} from "#shared/utils/defaults/apps";
 import useUuid from "~/composables/utility/useUuid";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {dirname} from "@tauri-apps/api/path"
+import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 
 export function useAppOpener() {
     const $sesh = useActiveSessions()
@@ -12,7 +14,7 @@ export function useAppOpener() {
 
     async function openFolderOrFile() {
         const path = await open({
-            directory: true,
+            // directory: true,
             filters: [{
                 name: 'Markdown Files',
                 extensions: ['md', 'mdx']
@@ -39,20 +41,28 @@ export function useAppOpener() {
             } else {
                 // TODO: jump to that window
             }
-        } else {
-            if (!$sesh.hasSessionWithPath(path)) {
+        } else if (results.isFile) {
+            const parentPath: string = await dirname(path)
+            if (!$sesh.hasSessionWithPath(path) && !$sesh.hasSessionWithPath(parentPath)) {
                 const sesh = $sesh.addSession(defaultActiveSession({
                     uuid: sessionId,
-                    workspaceSession: false
+                    workspaceSession: false,
+                    rootPath: parentPath
                 }))
+
+                const {initializeIndex} = useActiveSinglespaceIndex(sesh)
+
+                const index = await initializeIndex(path)
 
                 const {
                     openTab
                 } = useActiveTabs(sesh)
-                await $navi.toSinglespaceTab(sessionId, openTab(useUuid()))
+                await $navi.toSinglespaceTab(sessionId, openTab(index.uuid))
             } else {
-                // TODO: jump to that window
+                // TODO: jump to that window; Since we're using the parent dir as a reference, it might be a workspace window or a singlespace window
             }
+        } else {
+            console.error("[Reptilian Brain] Never ever ever baby!")
         }
     }
 

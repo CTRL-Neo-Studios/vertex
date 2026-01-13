@@ -22,14 +22,14 @@ async function openFile() {
             <div class="grid grid-cols-1 gap-2 select-none">
                 <NuxtImg src="icon.png" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
-                <UButton label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
-                <UButton label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
-                <UButton label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
+                <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
+                <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
+                <UButton color="neutral" label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
             </div>
         </div>
-        <div class="bg-muted border-l border-l-default flex flex-col w-full h-full">
+        <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">
             <ScrollAreaRoot class="max-h-screen relative" style="--scrollbar-size: 10px">
-                <div class="text-xs text-muted/50 absolute top-0 bg-gradient-to-t from-transparent via-muted to-muted h-12 p-3 w-full z-10">Recently Opened</div>
+                <div class="text-xs text-muted/50 absolute top-0 bg-linear-to-t from-transparent via-submuted to-submuted h-12 p-3 w-full z-10">Recently Opened</div>
                 <ScrollAreaViewport class="w-full h-full">
                     <div class="grid-cols-1 grid gap-1 p-3 pt-8">
                         <UButton v-for="(record, index) in unref($recents.recents)?.recentRecords" :key="index" class="cursor-pointer" :icon="record.isWorkspace ? 'i-lucide-folder' : 'i-lucide-file'" color="neutral" variant="ghost">
@@ -48,7 +48,7 @@ async function openFile() {
                         class="flex-1 bg-accented rounded-lg"
                     />
                 </ScrollAreaScrollbar>
-                <div class="text-xs text-muted/50 absolute bottom-0 bg-gradient-to-b from-transparent to-muted h-3 p-3 w-full z-10"/>
+                <div class="text-xs text-muted/50 absolute bottom-0 bg-linear-to-b from-transparent to-submuted h-3 p-3 w-full z-10"/>
             </ScrollAreaRoot>
         </div>
     </div>

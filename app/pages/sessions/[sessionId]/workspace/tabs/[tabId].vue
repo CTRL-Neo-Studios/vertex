@@ -198,9 +198,9 @@ console.log(getFileByUuid(tabId)?.relativePath)
                 class="w-full h-full flex flex-col relative"
                 :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.7rem)' }"
             >
-                <div class="absolute z-10 bg-gradient-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-xl">
+                <div class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-xl">
                     <div class="w-full flex items-center justify-center p-2">
-                        <div class="flex-grow flex items-center justify-center">
+                        <div class="grow flex items-center justify-center">
                             <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(tabId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>
                         </div>
                     </div>
@@ -219,8 +219,8 @@ console.log(getFileByUuid(tabId)?.relativePath)
                         />
                     </div>
                 </ScrollAreaViewport>
-                <div class="absolute z-10 bg-gradient-to-b from-transparent to-default left-0 right-0 bottom-0 h-fit rounded-b-xl inline-flex justify-center items-center p-1">
-                    <div class="flex-grow"/>
+                <div class="absolute z-10 bg-linear-to-b from-transparent to-default left-0 right-0 bottom-0 h-fit rounded-b-xl inline-flex justify-center items-center p-1">
+                    <div class="grow"/>
                     <UTooltip :content="{side: 'left'}" :text="`${$du.getWordCount(content || '')} Words, ${$du.getLineCount(content || '')} Lines`" :delay-duration="100">
                         <UButton size="xs" variant="ghost" icon="i-lucide-info"/>
                     </UTooltip>
