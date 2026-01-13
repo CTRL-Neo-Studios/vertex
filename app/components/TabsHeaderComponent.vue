@@ -26,7 +26,9 @@ const {
     getFileByUuid: getWorkspaceFileByUuid
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
-    getFileByUuid: getSinglespaceFileByUuid
+    getFileByUuid: getSinglespaceFileByUuid,
+    isIndexTemporary: isSinglespaceIndexTemporary,
+    setTemporaryIndex: setSinglespaceTempIndex
 } = useActiveSinglespaceIndex($sesh.getSession(sessionId))
 const {
     leftPanelCollapsed,
@@ -76,7 +78,25 @@ async function exitTab(tab: ActiveTab) {
 }
 
 const dropdownItems = computed<DropdownMenuItem[][]>(() => {
-    const items: DropdownMenuItem[][] = [[]]
+    let items: DropdownMenuItem[][] = [
+        [{
+            label: 'New Tab',
+            icon: 'i-lucide-plus',
+            async onSelect() {
+                openTab(setSinglespaceTempIndex().uuid)
+            },
+            disabled: $sesh.isSessionWorkspace(sessionId)
+        }], [], [{
+            label: 'Clear All Tabs',
+            icon: 'i-lucide-x',
+            color: 'error',
+            async onSelect(e: Event) {
+                await navigateTabInContext(sessionId)
+                clearTabs()
+            }
+        }]
+    ]
+
     unref(tabs)?.forEach(i => {
         let node: ActiveSinglespaceFileIndex | ActiveWorkspaceFileIndex | null
         if ($sesh.isSessionWorkspace(sessionId))
@@ -85,7 +105,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             node = getSinglespaceFileByUuid(i.fileUuid)
 
         if (node) {
-            items[0]?.push({
+            items[1]?.push({
                 label: node.fileName,
                 icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
@@ -102,17 +122,6 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
         }
     })
 
-    items.push([
-        {
-            label: 'Clear All Tabs',
-            icon: 'i-lucide-x',
-            color: 'error',
-            async onSelect(e: Event) {
-                await navigateTabInContext(sessionId)
-                clearTabs()
-            }
-        }
-    ])
     return items
 })
 
@@ -130,7 +139,7 @@ const panelsCollapsed = computed(() => {
         <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
             <div class="w-full inline-flex items-center justify-center gap-1.5">
                 <div
-                    v-for="(tab, index) in dropdownItems[0]"
+                    v-for="(tab, index) in dropdownItems[1]"
                     :class="['w-fit h-fit relative inline-flex items-center justify-center group']"
                 >
                     <UButton

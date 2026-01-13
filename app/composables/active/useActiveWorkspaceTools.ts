@@ -1,5 +1,5 @@
-import {stat, exists} from "@tauri-apps/plugin-fs"
-import {join, dirname} from "@tauri-apps/api/path"
+import {exists, stat} from "@tauri-apps/plugin-fs"
+import {dirname, join} from "@tauri-apps/api/path"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {useFileIO} from "~/composables/io/useFileIO";
@@ -68,8 +68,8 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             } else {
                 await $fileio.writeTextToFile(newPath, ' ');
             }
-            const newFileNode = await addFileToIndex(newPath, session.rootPath);
 
+            return await addFileToIndex(newPath, session.rootPath)
             // if (!asFolder && newFileNode) {
             //     $tabs.openTab(newFileNode.uuid);
             // }

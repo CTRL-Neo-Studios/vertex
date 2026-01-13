@@ -7,7 +7,8 @@ export function useActiveEditorContent(session?: ActiveSession, tab?: ActiveTab)
         console.error('No session or tab.')
     }
 
-    const content = useState<string>(`active.tabs.currentTab.${unref(session?.uuid)}.${unref(tab?.fileUuid)}.content`)
+    const content = useState<string>(`active.tabs.currentTab.${unref(session?.uuid)}.${unref(tab?.fileUuid)}.content`, () => '')
+
     // const scrollToNodeInView = useState<TocEntry | undefined>(`active.tabs.currentTab.${unref(session?.uuid)}.${unref(tab?.fileUuid)}.scroll-to-node`)
 
     return {

@@ -11,7 +11,13 @@ const {
 
 async function openFile() {
     openingFile.value = true
-    await openFolderOrFile()
+    await openFolderOrFile(true)
+    openingFile.value = false
+}
+
+async function openFolder() {
+    openingFile.value = true
+    await openFolderOrFile(false)
     openingFile.value = false
 }
 </script>
@@ -24,7 +30,8 @@ async function openFile() {
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
                 <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
-                <UButton color="neutral" label="Open..." icon="i-lucide-search" class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
+                <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
+                <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder" :disabled="openingFile"/>
             </div>
         </div>
         <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">

@@ -23,10 +23,66 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
             uuid: useUuid(),
             fullPath: firstFp,
             fileName: await $fio.getFileNameFromPath(firstFp),
-            frontmatterProperties: parseFrontmatter(entryContent),
+            frontmatterProperties: parseFrontmatter(entryContent).data || {},
         })
 
         return fileIndex.value[firstFp]
+    }
+
+    function setTemporaryIndex() {
+        const uuid = useUuid()
+        const illegalPath = getIllegalPath(uuid)
+        fileIndex.value[illegalPath] = defaultActiveSinglespaceFileIndex({
+            uuid: uuid,
+            fullPath: illegalPath,
+            fileName: 'Untitled.md',
+            frontmatterProperties: {}
+        })
+
+        return fileIndex.value[illegalPath]
+    }
+
+    function isIndexTemporary(fileUuid: PossiblyRef<string>) {
+        const uuid = unref(fileUuid)
+        const illegalPath = getIllegalPath(uuid)
+        return unref(fileIndex)[illegalPath] != null && unref(fileIndex)[illegalPath]?.fullPath == illegalPath
+    }
+
+    function getIllegalPath(uuid: PossiblyRef<string>) {
+        return `/!temporary!/-${unref(uuid)}`
+    }
+
+    function fileIndexWithUuidExists(fileUuid: PossiblyRef<string>) {
+        return getFileByUuid(fileUuid) != null
+    }
+
+
+    function fileIndexWithPathExists(absolutePath: PossiblyRef<string>) {
+        return getFileByPath(absolutePath) != null
+    }
+
+    async function convertTemporaryToValidIndex(fileUuid: PossiblyRef<string>, newPath: PossiblyRef<string>, fileContent: PossiblyRef<string>): Promise<ActiveSinglespaceFileIndex | undefined> {
+        if (!isIndexTemporary(fileUuid)) throw new Error('The file is not temporary.'); // return if the targeted file is not marked as temporary
+
+        const np = unref(newPath)
+        const fid = unref(fileUuid)
+
+        if (fileIndexWithPathExists(np)) throw new Error('A file with the same path exists. Please switch to another save path or file name.'); // return if the target path already exists in the index
+
+        const oldIndex = getFileByUuid(fid)
+
+        if (!oldIndex) throw new Error('No such file exists.')
+
+        fileIndex.value[np] = defaultActiveSinglespaceFileIndex({
+            uuid: fid,
+            fileName: await $fio.getFileNameFromPath(np),
+            fullPath: np,
+            frontmatterProperties: parseFrontmatter(unref(fileContent)).data || {}
+        })
+
+        delete unref(fileIndex)[getIllegalPath(fid)] // delete the temporary index
+
+        return unref(fileIndex)[np] // returns the updated index
     }
 
     async function updateIndex(path: string, content: string) {
@@ -51,7 +107,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         if (!nodeToRemove) return [];
         const removedNodes: ActiveSinglespaceFileIndex[] = []
 
-        removedNodes.push(defaultActiveSinglespaceFileIndex(unref(fileIndex)[path]))
+        removedNodes.push(defaultActiveSinglespaceFileIndex(nodeToRemove))
         delete unref(fileIndex)[path];
         console.log(`Removed from index: ${path}`);
 
@@ -102,6 +158,10 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         return null;
     }
 
+    function getFileByPath(absolutePathRef: PossiblyRef<string>) {
+        return unref(fileIndex)[unref(absolutePathRef)]
+    }
+
     /**
      * Clears the File index map.
      */
@@ -115,6 +175,11 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         removeFileFromIndex,
         getFileByUuid,
         moveFileInIndex,
-        clearIndex
+        isIndexTemporary,
+        setTemporaryIndex,
+        clearIndex,
+        convertTemporaryToValidIndex,
+        fileIndexWithPathExists,
+        fileIndexWithUuidExists,
     }
 }

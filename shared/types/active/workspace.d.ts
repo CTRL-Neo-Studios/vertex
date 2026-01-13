@@ -19,7 +19,6 @@ export interface ActiveWorkspaceFileIndex { // Using the Hybrid ID Approach: uui
 export interface ActiveSinglespaceFileIndex { // Using the Hybrid ID Approach: uuid for Stable UI References, fullPath for primary key for fileIndex.
     uuid: string; // The stable UI identifier
     fullPath: string; // The primary key for the index
-    // relativePath: string,
     fileName: string,
     frontmatterProperties: FrontmatterProperties,
 }

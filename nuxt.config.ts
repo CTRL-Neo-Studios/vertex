@@ -5,7 +5,7 @@ export default defineNuxtConfig({
 
     css: ["~/assets/css/main.css"],
 
-    compatibilityDate: "2025-09-04",
+    compatibilityDate: "2026-01-04",
 
     fonts: {
         families: [

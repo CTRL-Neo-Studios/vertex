@@ -18,6 +18,7 @@ import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterP
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
+import {useActiveSinglespaceTools} from "~/composables/active/useActiveSinglespaceTools";
 
 definePageMeta({
     layout: 'singlespace'
@@ -36,6 +37,8 @@ const {
     getFileByUuid,
     updateIndex,
     moveFileInIndex,
+    isIndexTemporary,
+    setTemporaryIndex,
 } = useActiveSinglespaceIndex($sesh.getSession(sessionId))
 const {
     closeTab,
@@ -46,6 +49,9 @@ const {
     openTab,
     tabs
 } = useActiveTabs($sesh.getSession(sessionId))
+const {
+    saveTemporaryFile
+} = useActiveSinglespaceTools($sesh.getSession(sessionId))
 const {content} = useActiveEditorContent($sesh.getSession(sessionId), getActiveTab(tabId))
 
 const editorRef = ref()
@@ -60,12 +66,24 @@ async function onInternalLinkClick(args: InternalLinkClickDetail) {
     // Do nothing
 }
 
+defineShortcuts({
+    'meta_s': {
+        usingInput: true,
+        async handler(e) {
+            isContentSaved.value = false;
+            const newIndex = await saveTemporaryFile(tabId, content)
+            fileName.value = newIndex?.fileName || 'Untitled.md'
+            isContentSaved.value = true;
+        }
+    }
+})
+
 watch(isContentSaved, (newValue) => {
     setTabSavedState(tabId, newValue)
 }, {deep: false})
 
 debouncedWatch(content, async () => {
-    if (!isContentLoaded.value) return;
+    if (!isContentLoaded.value || isIndexTemporary(tabId)) return;
 
     isContentSaved.value = false;
 
@@ -90,13 +108,18 @@ onMounted(async () => {
         await $navi.toSinglespaceEmptyTab(unref(sessionId))
 
     const currentIndexFile = getFileByUuid(tabId)
-    if (currentIndexFile?.fullPath) {
+    if (currentIndexFile && currentIndexFile?.fullPath && !isIndexTemporary(currentIndexFile?.uuid)) {
         content.value = await $fileio.readTextFromFile(currentIndexFile.fullPath)
+        isContentLoaded.value = true
+    } else {
+        isContentSaved.value = false
         isContentLoaded.value = true
     }
 })
 
 async function onRename(oldValue: string) {
+    if (isIndexTemporary(tabId)) return;
+
     isRenaming.value = true;
 
     // Revert to old value if new value is invalid or truly unchanged (case-sensitive check)
@@ -135,6 +158,9 @@ function toTocEntry(entry: TocEntry) {
 </script>
 
 <template>
+    <div>
+
+    </div>
     <DashboardCenterPanel>
         <div class="w-full h-full">
             <ScrollAreaRoot

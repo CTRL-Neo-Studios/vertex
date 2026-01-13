@@ -12,17 +12,28 @@ export function useAppOpener() {
     const $sesh = useActiveSessions()
     const $navi = useAppNavigator()
 
-    async function openFolderOrFile() {
-        const path = await open({
-            // directory: true,
-            filters: [{
-                name: 'Markdown Files',
-                extensions: ['md', 'mdx']
-            }, {
-                name: 'Text Files',
-                extensions: ['txt']
-            }]
-        })
+    /**
+     * Open the selected folder or file.
+     * @param asFile Should select only files or only folders.
+     */
+    async function openFolderOrFile(asFile: boolean) {
+        let path: string | null
+
+        if (asFile)
+            path = await open({
+                directory: false,
+                filters: [{
+                    name: 'Markdown Files',
+                    extensions: ['md', 'mdx']
+                }, {
+                    name: 'Text Files',
+                    extensions: ['txt']
+                }]
+            })
+        else
+            path = await open({
+                directory: true
+            })
 
         if (!path) return;
 
