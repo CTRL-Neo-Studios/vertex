@@ -1,7 +1,7 @@
 export default defineNuxtConfig({
     devtools: {enabled: false},
 
-    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor", "@nuxt/a11y"],
+    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor", "@nuxt/a11y", "@type32/dispatcher", "@type32/nuxt-predicates"],
 
     css: ["~/assets/css/main.css"],
 
@@ -41,7 +41,11 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-os",
                 "@type32/codemirror-rich-obsidian-editor",
                 "compromise",
-                "reka-ui"
+                "reka-ui",
+                "@tauri-apps/api/menu",
+                "@tauri-apps/api/webviewWindow",
+                "@tauri-apps/api/webview",
+                "@tauri-apps/api/window"
             ]
         }
     }

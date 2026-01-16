@@ -131,13 +131,13 @@ const panelsCollapsed = computed(() => {
 </script>
 
 <template>
-    <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px">
+    <ScrollAreaRoot class="w-full relative" style="--scrollbar-size: 10px" data-tauri-drag-region>
         <div :class="`absolute transition-all duration-300 left-0 top-0 bottom-0 bg-linear-to-l from-transparent to-${panelsCollapsed ? 'default' : 'submuted'} h-full w-fit z-10 inline-flex justify-start items-center`">
             <div class="w-14"/>
             <SidebarCollapserButton side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
         </div>
         <ScrollAreaViewport class="grid grid-cols-1 h-full px-3">
-            <div class="w-full inline-flex items-center justify-center gap-1.5">
+            <div class="w-full inline-flex items-center justify-center gap-1.5" data-tauri-drag-region>
                 <div
                     v-for="(tab, index) in dropdownItems[1]"
                     :class="['w-fit h-fit relative inline-flex items-center justify-center group']"

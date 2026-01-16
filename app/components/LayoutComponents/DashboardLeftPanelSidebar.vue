@@ -42,22 +42,20 @@ async function onClickFile(item: UITreeNode) {
 </script>
 
 <template>
-    <UDashboardSidebar
+    <UDashboardPanel
         v-if="!leftPanelCollapsed"
         side="left"
-        v-model:collapsed="leftPanelCollapsed"
         data-tauri-drag-region
         :min-size="10"
         :max-size="30"
         :default-size="15"
         :collapsed-size="0"
-        collapsible
         resizable
         :ui="{
-            root: 'border-r-0',
-            body: 'px-2',
-            header: 'px-2'
+            root: 'border-r-0 border-none',
+            body: 'px-2 sm:px-2 sm:py-0 border-r-0'
         }"
+        class="border-r-0"
     >
         <template #resize-handle="{ onMouseDown, onTouchStart, onDoubleClick }">
             <UDashboardResizeHandle
@@ -68,30 +66,37 @@ async function onClickFile(item: UITreeNode) {
             />
         </template>
         <template #header>
-            <SpaceOnOs detect-os="macos" :show-on-os="false"/>
-            <div class="flex-grow">
-
-            </div>
-            <SidebarCollapserButton side="left"/>
+            <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
+                <template #default>
+                    <SpaceOnOs detect-os="macos" :show-on-os="false"/>
+                    <div class="grow"/>
+                    <SidebarCollapserButton side="left"/>
+                </template>
+            </UDashboardNavbar>
         </template>
-        <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px">
-            <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-gradient-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`"/>
-            <ScrollAreaViewport class="h-full">
-                <div class="w-full">
-                    <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
-                </div>
-            </ScrollAreaViewport>
-            <ScrollAreaScrollbar
-                class="select-none touch-none z-20 w-2 m-2 pointer-events-none"
-                orientation="vertical"
-            >
-                <ScrollAreaThumb
-                    class="flex-1 bg-accented rounded-lg"
-                />
-            </ScrollAreaScrollbar>
-            <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-gradient-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>
-        </ScrollAreaRoot>
-    </UDashboardSidebar>
+        <template #body>
+<!--            <ScrollAreaRoot class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px">-->
+<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-linear-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`"/>-->
+<!--                <ScrollAreaViewport class="h-full" data-tauri-drag-region>-->
+<!--                    <div class="w-full">-->
+<!--                        -->
+<!--                    </div>-->
+<!--                </ScrollAreaViewport>-->
+<!--                <ScrollAreaScrollbar-->
+<!--                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"-->
+<!--                    orientation="vertical"-->
+<!--                >-->
+<!--                    <ScrollAreaThumb-->
+<!--                        class="flex-1 bg-accented rounded-lg"-->
+<!--                    />-->
+<!--                </ScrollAreaScrollbar>-->
+<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-linear-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>-->
+<!--            </ScrollAreaRoot>-->
+            <UScrollArea orientation="vertical" class="no-scrollbar" data-tauri-drag-region>
+                <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+            </UScrollArea>
+        </template>
+    </UDashboardPanel>
 </template>
 
 <style scoped>

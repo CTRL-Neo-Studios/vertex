@@ -3,3 +3,7 @@ export interface ActiveSession {
     workspaceSession: boolean,
     rootPath?: string,
 }
+
+export interface ActiveWindowSession {
+    uuid: string
+}

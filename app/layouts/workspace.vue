@@ -6,6 +6,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -29,6 +30,7 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
+const $menu = useAppWindowMenu()
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -42,6 +44,7 @@ onMounted(async () => {
 
     await buildIndex(rootPath || '')
     await startWatcher(rootPath || '')
+    await $menu.setMenu()
 })
 
 onBeforeUnmount(async () => {
@@ -58,7 +61,6 @@ onBeforeUnmount(async () => {
         :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-submuted']"
         unit="rem"
     >
-        <DashboardLeftPanelSidebar/>
         <slot/>
     </UDashboardGroup>
 </template>

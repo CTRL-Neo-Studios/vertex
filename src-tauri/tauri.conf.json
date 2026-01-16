@@ -21,6 +21,14 @@
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
+        "transparent": true,
+        "center": true,
+        "decorations": true,
+        "windowEffects": {
+          "effects": ["sidebar"],
+          "state": "followsWindowActiveState",
+          "radius": 9
+        },
         "trafficLightPosition": {
           "x": 14,
           "y": 21

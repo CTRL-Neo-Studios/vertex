@@ -20,7 +20,6 @@ export function defaultActiveSinglespaceFileIndex(data?: Partial<ActiveSinglespa
         frontmatterProperties: data?.frontmatterProperties ?? {},
         uuid: data?.uuid ?? useUuid(),
         fullPath: data?.fullPath ?? '',
-        relativePath: data?.relativePath ?? '',
     } satisfies ActiveSinglespaceFileIndex
 }
 

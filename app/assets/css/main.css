@@ -3,6 +3,10 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
+@utility no-scrollbar {
+    @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+}
+
 @theme {
     --font-sans: 'Inter', sans-serif;
 

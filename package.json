@@ -33,6 +33,8 @@
     "@tiptap/extension-collaboration": "^3.15.3",
     "@tiptap/extension-node-range": "^3.15.3",
     "@type32/codemirror-rich-obsidian-editor": "^0.0.29",
+    "@type32/dispatcher": "^0.1.1",
+    "@type32/nuxt-predicates": "^1.0.1",
     "@vueuse/nuxt": "14.1.0",
     "alfaaz": "^1.1.0",
     "compromise": "^14.14.5",

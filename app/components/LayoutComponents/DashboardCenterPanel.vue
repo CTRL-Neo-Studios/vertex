@@ -17,10 +17,14 @@ const panelsCollapsed = computed(() => {
 </script>
 
 <template>
-    <UDashboardPanel id="content" :ui="{
+    <UDashboardPanel
+        id="content"
+        :ui="{
             body: `relative sm:p-0 bg-gradient-to-b from-default to-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 ${panelsCollapsed ? 'border-0' : 'border shadow-lg shadow-neutral'}`,
             root: `lg:not-last:border-r-0`
-        }">
+        }"
+        resizable
+    >
         <template #header>
             <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
                 <template #default>

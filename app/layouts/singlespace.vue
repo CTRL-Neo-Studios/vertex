@@ -7,6 +7,7 @@ import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -28,6 +29,7 @@ const {
 const {
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
+const $menu = useAppWindowMenu()
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -38,6 +40,7 @@ onMounted(async () => {
         await until($sessionId).toMatch(v => v != undefined)
     const rootPath = $sesh.getSession($sessionId)?.rootPath
     if(!rootPath) await $navi.toHome()
+    await $menu.setMenu()
 })
 
 onBeforeUnmount(async () => {

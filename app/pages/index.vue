@@ -2,6 +2,9 @@
 import {useAppRecents} from "~/composables/app/useAppRecents";
 import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
 import {useAppOpener} from "~/composables/app/useAppOpener";
+import useUuid from "~/composables/utility/useUuid";
+import {WebviewWindow} from "@tauri-apps/api/webviewWindow"
+import type { PhysicalPosition } from "@tauri-apps/api/dpi";
 
 const openingFile = ref(false)
 const $recents = useAppRecents()
@@ -20,18 +23,50 @@ async function openFolder() {
     await openFolderOrFile(false)
     openingFile.value = false
 }
+
+const state = useState<string>('dick', () => useUuid())
+
+async function newWindow() {
+    console.log('creating new window')
+    const newwindow = unref(state)
+    const appWindow = new WebviewWindow(`session-${newwindow}-window`, {
+        url: '/',
+        decorations: true,
+        center: true,
+        transparent: true,
+        width: 900,
+        height: 600,
+        title: "Vertex",
+        hiddenTitle: true,
+        titleBarStyle: 'overlay',
+        // @ts-ignore
+        trafficLightPosition: {
+            x: 14,
+            y: 21
+        }
+    })
+    await appWindow.once('tauri://webview-created', function () {
+        console.log(unref(useState<string>('dick', () => useUuid())))
+    })
+    console.log('created new window')
+}
+
+onMounted(() => {
+    console.log(unref(state))
+})
 </script>
 
 <template>
     <div class="w-full h-screen grid grid-cols-2">
-        <div class="w-full flex flex-col items-center justify-center">
-            <div class="grid grid-cols-1 gap-2 select-none">
+        <div class="w-full flex flex-col items-center justify-center" data-tauri-drag-region>
+            <div class="grid grid-cols-1 gap-2 select-none" data-tauri-drag-region>
                 <NuxtImg src="icon.png" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
                 <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder" :disabled="openingFile"/>
+                <UButton @click="newWindow" label="new window"/>
             </div>
         </div>
         <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">

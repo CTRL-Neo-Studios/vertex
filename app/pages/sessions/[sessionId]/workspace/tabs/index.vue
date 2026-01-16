@@ -13,6 +13,7 @@ const $route = useRoute()
 </script>
 
 <template>
+    <DashboardLeftPanelSidebar/>
     <DashboardCenterPanel>
         <div class="w-full h-full flex flex-col items-center justify-center">
             <div class="text-muted">Select a file from left side.</div>

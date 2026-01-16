@@ -30,3 +30,6 @@ tauri-plugin-store = { version = "2.4.2", features = [] }
 tauri-plugin-clipboard-manager = { version = "2.3.2", features = [] }
 tauri-plugin-opener = { version = "2.5.3", features = [] }
 tauri-plugin-os = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
