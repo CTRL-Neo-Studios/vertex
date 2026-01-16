@@ -31,7 +31,7 @@ const emit = defineEmits<{
         <div class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-xl">
             <div class="w-full flex items-center justify-center p-2">
                 <div class="grow flex items-center justify-center">
-                    <EditorHeaderBreadcrumbs :renaming="props.renaming" v-model="fileName" :relativeFilePath="props.relativeFilePath" @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)" class="w-fit"/>
+                    <EditorHeaderBreadcrumbs :renaming="props.renaming" v-model="fileName" :relativeFilePath="props.filePath" @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)" class="w-fit"/>
                 </div>
             </div>
         </div>

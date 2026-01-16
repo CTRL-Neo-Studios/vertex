@@ -1,6 +1,6 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
 import {getCurrentWindow} from '@tauri-apps/api/window';
-import type {ActiveWindowSession} from "#shared/types/active/sessions";
+import type {AppSession} from "#shared/types/active/sessions";
 
 interface MenuState {
     canSave: boolean;
@@ -9,7 +9,7 @@ interface MenuState {
     hasRedo: boolean;
 }
 
-export function useAppWindowMenu(session?: ActiveWindowSession) {
+export function useAppWindowMenu(session?: AppSession) {
     const $route = useRoute();
     const { and, or, evaluate } = usePredicateLogic()
 

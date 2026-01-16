@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import FileTreeComponent from "~/components/FileTreeComponent.vue";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
@@ -8,6 +7,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import useUuid from "~/composables/utility/useUuid";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -29,7 +29,7 @@ const {
 const {
     leftPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
-const activeTreeItem = ref()
+const activeTreeItem = useState<string>(`active.workspace.active-tree-item-${unref($sessionId) ?? useUuid()}`, () => '')
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -93,7 +93,7 @@ async function onClickFile(item: UITreeNode) {
 <!--                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-linear-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>-->
 <!--            </ScrollAreaRoot>-->
             <UScrollArea orientation="vertical" class="no-scrollbar" data-tauri-drag-region>
-                <FileTreeComponent v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+                <FileTreeComponent :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
             </UScrollArea>
         </template>
     </UDashboardPanel>

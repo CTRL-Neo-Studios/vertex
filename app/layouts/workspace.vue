@@ -61,6 +61,7 @@ onBeforeUnmount(async () => {
         :class="['w-full h-full transition-colors duration-200', leftPanelCollapsed && rightPanelCollapsed ? 'bg-default': 'bg-submuted']"
         unit="rem"
     >
+        <DashboardLeftPanelSidebar/>
         <slot/>
     </UDashboardGroup>
 </template>

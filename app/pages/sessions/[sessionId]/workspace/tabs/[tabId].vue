@@ -192,7 +192,6 @@ console.log(getFileByUuid(tabId)?.relativePath)
 </script>
 
 <template>
-    <DashboardLeftPanelSidebar/>
     <DashboardCenterPanel>
         <div class="w-full h-full">
 <!--            <ScrollAreaRoot-->

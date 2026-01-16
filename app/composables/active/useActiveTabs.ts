@@ -23,6 +23,31 @@ export function useActiveTabs(session?: ActiveSession) {
     }
 
     /**
+     * Opens many tabs for the given file UUIDs.
+     * Makes the last opened tab active.
+     */
+    function openTabs(fileUuidsRef: PossiblyRef<string[]>) {
+        const uuids = unref(fileUuidsRef)
+
+        // Iterate through all provided UUIDs
+        uuids.forEach(fileUuid => {
+            const existingTab = unref(tabs).find(t => t.fileUuid === fileUuid);
+
+            // Only push if it doesn't exist yet
+            if (!existingTab) {
+                tabs.value.push(defaultActiveTab({ fileUuid: fileUuid, changesSaved: true }));
+            }
+        });
+
+        // Set the active tab to the last UUID in the list (if the list isn't empty)
+        const uid = uuids[uuids.length - 1]
+        if (uuids.length > 0 && uid) {
+            activeTabUuid.value = uid;
+        }
+    }
+
+
+    /**
      * Closes a tab. If it was the active tab, it activates the next available tab.
      */
     function closeTab(uuidRef: PossiblyRef<string>) {
@@ -91,6 +116,7 @@ export function useActiveTabs(session?: ActiveSession) {
         tabs,
         activeTabUuid,
         openTab,
+        openTabs,
         closeTab,
         setActiveTab,
         isTabOpened,

@@ -7,10 +7,13 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {dirname} from "@tauri-apps/api/path"
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import type {ActiveSession} from "#shared/types/active/sessions";
 
 export function useAppOpener() {
     const $sesh = useActiveSessions()
     const $navi = useAppNavigator()
+    const $win = useAppWebviewWindows()
 
     /**
      * Open the selected folder or file.
@@ -37,20 +40,32 @@ export function useAppOpener() {
 
         if (!path) return;
 
+        await openFolderOrFileFromPath(path)
+    }
+
+    async function openFolderOrFileFromPath(absoluteFilePath: PossiblyRef<string>): Promise<{
+        redirect: 'workspace' | 'singlespace',
+        workingSession: ActiveSession
+    } | undefined> {
+        const path = unref(absoluteFilePath)
         const results = await stat(path)
 
         if (results.isSymlink) return;
         const sessionId = useUuid()
         if (results.isDirectory) {
             if (!$sesh.hasSessionWithPath(path)) {
-                $sesh.addSession(defaultActiveSession({
+                const sesh = $sesh.addSession(defaultActiveSession({
                     uuid: sessionId,
                     workspaceSession: true,
                     rootPath: path
                 }))
                 await $navi.toWorkspaceEmptyTab(sessionId)
+                return {
+                    redirect: 'workspace',
+                    workingSession: sesh
+                }
             } else {
-                // TODO: jump to that window
+                // No longer needed; handled on the use-end
             }
         } else if (results.isFile) {
             const parentPath: string = await dirname(path)
@@ -69,8 +84,13 @@ export function useAppOpener() {
                     openTab
                 } = useActiveTabs(sesh)
                 await $navi.toSinglespaceTab(sessionId, openTab(index.uuid))
+
+                return {
+                    redirect: 'singlespace',
+                    workingSession: sesh
+                }
             } else {
-                // TODO: jump to that window; Since we're using the parent dir as a reference, it might be a workspace window or a singlespace window
+                // No longer needed; handled on the use-end
             }
         } else {
             console.error("[Reptilian Brain] Never ever ever baby!")
@@ -78,6 +98,7 @@ export function useAppOpener() {
     }
 
     return {
-        openFolderOrFile
+        openFolderOrFile,
+        openFolderOrFileFromPath
     }
 }

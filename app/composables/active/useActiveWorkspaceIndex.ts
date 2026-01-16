@@ -534,6 +534,25 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return null;
     }
 
+    /**
+     * Finds a file in the index by its path.
+     * Returns the full file object or null if not found.
+     */
+    function getFileByPath(absoluteFilePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        return unref(fileIndex)[unref(absoluteFilePath)]
+    }
+
+    function getFilesByPaths(absoluteFilePaths: PossiblyRef<string[]>): ActiveWorkspaceFileIndex[] {
+        let results: ActiveWorkspaceFileIndex[] = []
+        for (const fp of unref(absoluteFilePaths)) {
+            const f = getFileByPath(fp)
+            if (f)
+                results.push(f)
+
+        }
+        return results
+    }
+
     function on(listener: WorkspaceIndexListener): () => void {
         // Get or create the listener set for this session.
         if (!listenerRegistry.has(session!.uuid)) {
@@ -565,6 +584,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         stopWatcher,
         clearIndex,
         on,
-        updateIndex
+        updateIndex,
+        getFileByPath,
+        getFilesByPaths
     };
 }

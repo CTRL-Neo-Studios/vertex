@@ -20,7 +20,7 @@ async function openFile() {
 
 async function openFolder() {
     openingFile.value = true
-    await openFolderOrFile(false)
+
     openingFile.value = false
 }
 
@@ -29,7 +29,7 @@ const state = useState<string>('dick', () => useUuid())
 async function newWindow() {
     console.log('creating new window')
     const newwindow = unref(state)
-    const appWindow = new WebviewWindow(`session-${newwindow}-window`, {
+    const appWindow = new WebviewWindow(`session-${newwindow}`, {
         url: '/',
         decorations: true,
         center: true,
