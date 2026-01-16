@@ -1,6 +1,7 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
 import {getCurrentWindow} from '@tauri-apps/api/window';
-import type {AppSession} from "#shared/types/active/sessions";
+
+import type {AppSession} from "#shared/types/app/sessions";
 
 interface MenuState {
     canSave: boolean;

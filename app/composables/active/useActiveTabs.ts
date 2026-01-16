@@ -1,7 +1,7 @@
 import type {ActiveTab} from "#shared/types/active/tabs";
-import {defaultActiveTab} from "#shared/utils/defaults/apps";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
+import {defaultActiveTab} from "#shared/utils/defaults/actives";
 
 export function useActiveTabs(session?: ActiveSession) {
     const tabs = useState<ActiveTab[]>(`active.tabs.${session?.uuid}`, () => [])

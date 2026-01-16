@@ -1,13 +1,9 @@
-import type { AppSession } from "#shared/types/active/sessions";
 import type { PossiblyRef } from "#shared/types/types";
 import { LazyStore } from "@tauri-apps/plugin-store";
-import {defaultActiveWindowSession} from "#shared/utils/defaults/actives";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useAppOpener} from "~/composables/app/useAppOpener";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useFileIO} from "~/composables/io/useFileIO";
+import type {AppSession} from "#shared/types/app/sessions";
+import {defaultAppSession} from "#shared/utils/defaults/apps";
 
 interface AppSessionsStore {
     openedSessions: AppSession[]
@@ -42,8 +38,6 @@ export function useAppSessions() {
     // Ideally, the store filename should be unique or consistent across the app
     const store = new LazyStore('sessions.json');
     const $win = useAppWebviewWindows()
-    const $open = useAppOpener()
-    const $navi = useAppNavigator()
     const $fio = useFileIO()
 
     // State to hold the list of all active sessions (viewable by 'main')
@@ -97,7 +91,7 @@ export function useAppSessions() {
         const index = appSessions.value.findIndex(s => s.uuid === id);
         if (index !== -1) {
             // Merge existing data with new data
-            appSessions.value[index] = defaultActiveWindowSession({
+            appSessions.value[index] = defaultAppSession({
                 ...appSessions.value[index],
                 ...partialSession
             });
@@ -206,8 +200,8 @@ export function useAppSessions() {
         if (unref(appSessions).length <= 0) return;
 
         for (const sesh of unref(appSessions)) {
-            if (sesh.sessionType == 'workspace' && sesh.rootPath)
-                $win.createAppWebviewWindow('/loading', `session-${sesh.uuid}`, await $fio.getFileNameFromPath(sesh.rootPath, true))
+            if (sesh.sessionType == 'workspace' && sesh.rootFileOrFolderAbsolutePath)
+                $win.createAppWebviewWindow('/loading', `session-${sesh.uuid}`, await $fio.getFileNameFromPath(sesh.rootFileOrFolderAbsolutePath, true))
         }
 
         const w = await $win.getCurrentAppWindow()
@@ -216,30 +210,6 @@ export function useAppSessions() {
 
     function getCurrentAppSession() {
         return unref(currentAppSession);
-    }
-
-    /**
-     * This function is used to saturate `session-` windows (recover tabs, recover opened folders, etc.).
-     * Currently only saturates workspace windows.
-     *
-     * This function is in the `recovery` stage.
-     * @param session
-     */
-    async function saturateAppSession(session: AppSession) {
-        if (session?.rootPath) {
-            const redir = await $open.openFolderOrFileFromPath(session.rootPath) // Open folder to enter workspace/singlespace first
-            const window = await $win.getCurrentAppWindow()
-            await window.setFocus()
-
-            if (redir?.workingSession) {
-                if (redir.redirect == 'workspace') { // saturate with the saved context
-                    const {getFilesByPaths} = useActiveWorkspaceIndex(redir.workingSession)
-                    const {openTabs} = useActiveTabs(redir.workingSession)
-                    const files = getFilesByPaths(session.context.openedAbsoluteFilePaths)
-                    openTabs(files.map(i => i.uuid))
-                }
-            }
-        }
     }
 
     return {
@@ -254,7 +224,6 @@ export function useAppSessions() {
         saveAppSessions,
         initializeCurrentAppSession,
         getCurrentAppSession,
-        saturateAppSession,
         recoverSavedAppSessions
     }
 }

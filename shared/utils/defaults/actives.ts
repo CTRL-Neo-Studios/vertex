@@ -1,6 +1,7 @@
 import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
 import useUuid from "~/composables/utility/useUuid";
-import type {AppSession, AppSessionContext} from "#shared/types/active/sessions";
+import type {ActiveTab} from "#shared/types/active/tabs";
+import type {ActiveSession} from "#shared/types/active/sessions";
 
 export function defaultActiveWorkspaceFileIndex(data?: Partial<ActiveWorkspaceFileIndex>): ActiveWorkspaceFileIndex {
     return {
@@ -37,17 +38,17 @@ export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {
     } satisfies UITreeNode
 }
 
-export function defaultActiveWindowSession(data?: Partial<AppSession>): AppSession {
+export function defaultActiveTab(data?: Partial<ActiveTab>): ActiveTab {
     return {
-        uuid: data?.uuid ?? useUuid(),
-        sessionType: data?.sessionType ?? 'workspace',
-        rootPath: data?.rootPath ?? '',
-        context: defaultActiveWindowSessionContext(data?.context)
-    }
+        changesSaved: data?.changesSaved ?? false,
+        fileUuid: data?.fileUuid ?? useUuid()
+    } satisfies ActiveTab
 }
 
-export function defaultActiveWindowSessionContext(data?: Partial<AppSessionContext>): AppSessionContext {
+export function defaultActiveSession(data?: Partial<ActiveSession>): ActiveSession {
     return {
-        openedAbsoluteFilePaths: data?.openedAbsoluteFilePaths ?? []
-    }
+        uuid: data?.uuid ?? useUuid(),
+        workspaceSession: data?.workspaceSession ?? false,
+        rootPath: data?.rootPath || ''
+    } satisfies ActiveSession
 }

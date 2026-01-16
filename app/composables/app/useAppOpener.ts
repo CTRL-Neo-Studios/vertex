@@ -1,7 +1,6 @@
 import {open} from "@tauri-apps/plugin-dialog";
 import {stat} from "@tauri-apps/plugin-fs"
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {defaultActiveSession} from "#shared/utils/defaults/apps";
 import useUuid from "~/composables/utility/useUuid";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
@@ -9,17 +8,14 @@ import {dirname} from "@tauri-apps/api/path"
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import {defaultActiveSession} from "#shared/utils/defaults/actives";
 
 export function useAppOpener() {
     const $sesh = useActiveSessions()
     const $navi = useAppNavigator()
     const $win = useAppWebviewWindows()
 
-    /**
-     * Open the selected folder or file.
-     * @param asFile Should select only files or only folders.
-     */
-    async function openFolderOrFile(asFile: boolean) {
+    async function retrieveFolderOrFileAbsolutePath(asFile: boolean) {
         let path: string | null
 
         if (asFile)
@@ -37,6 +33,16 @@ export function useAppOpener() {
             path = await open({
                 directory: true
             })
+
+        return path
+    }
+
+    /**
+     * Open the selected folder or file.
+     * @param asFile Should select only files or only folders.
+     */
+    async function openFolderOrFile(asFile: boolean) {
+        const path = await retrieveFolderOrFileAbsolutePath(asFile)
 
         if (!path) return;
 
@@ -99,6 +105,7 @@ export function useAppOpener() {
 
     return {
         openFolderOrFile,
-        openFolderOrFileFromPath
+        openFolderOrFileFromPath,
+        retrieveFolderOrFileAbsolutePath
     }
 }

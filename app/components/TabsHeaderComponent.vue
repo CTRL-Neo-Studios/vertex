@@ -85,7 +85,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             async onSelect() {
                 openTab(setSinglespaceTempIndex().uuid)
             },
-            disabled: $sesh.isSessionWorkspace(sessionId)
+            disabled: true // Disabled for now; I'm currently figuring out what's the best experience for using singlespace mode editor.
         }], [], [{
             label: 'Clear All Tabs',
             icon: 'i-lucide-x',

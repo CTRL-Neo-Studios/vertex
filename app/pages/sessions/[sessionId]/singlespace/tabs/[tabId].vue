@@ -152,9 +152,6 @@ function toTocEntry(entry: TocEntry) {
 </script>
 
 <template>
-    <div>
-
-    </div>
     <DashboardCenterPanel>
         <div class="w-full h-full">
 <!--            <ScrollAreaRoot-->

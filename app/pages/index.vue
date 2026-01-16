@@ -5,12 +5,16 @@ import {useAppOpener} from "~/composables/app/useAppOpener";
 import useUuid from "~/composables/utility/useUuid";
 import {WebviewWindow} from "@tauri-apps/api/webviewWindow"
 import type { PhysicalPosition } from "@tauri-apps/api/dpi";
+import {useAppSessions} from "~/composables/app/useAppSessions";
 
 const openingFile = ref(false)
 const $recents = useAppRecents()
 const {
-    openFolderOrFile
+    openFolderOrFile,
 } = useAppOpener()
+const {
+    addAppSession
+} = useAppSessions()
 
 async function openFile() {
     openingFile.value = true
@@ -20,35 +24,8 @@ async function openFile() {
 
 async function openFolder() {
     openingFile.value = true
-
+    await useApp
     openingFile.value = false
-}
-
-const state = useState<string>('dick', () => useUuid())
-
-async function newWindow() {
-    console.log('creating new window')
-    const newwindow = unref(state)
-    const appWindow = new WebviewWindow(`session-${newwindow}`, {
-        url: '/',
-        decorations: true,
-        center: true,
-        transparent: true,
-        width: 900,
-        height: 600,
-        title: "Vertex",
-        hiddenTitle: true,
-        titleBarStyle: 'overlay',
-        // @ts-ignore
-        trafficLightPosition: {
-            x: 14,
-            y: 21
-        }
-    })
-    await appWindow.once('tauri://webview-created', function () {
-        console.log(unref(useState<string>('dick', () => useUuid())))
-    })
-    console.log('created new window')
 }
 
 onMounted(() => {
