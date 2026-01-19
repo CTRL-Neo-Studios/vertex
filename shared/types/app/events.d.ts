@@ -4,9 +4,21 @@ export interface WindowMenuEvents {
     categories: {
         file: {
             new: {
-                newFile: DispatcherEvent<{ windowSessionId: string }>,
-                newFolder
-            }
+                newFile: DispatcherEvent,
+                newFolder: DispatcherEvent
+            },
+            open: {
+                openFile: DispatcherEvent,
+                openFolder: DispatcherEvent
+            },
+            save: DispatcherEvent,
+            saveAs: DispatcherEvent
+        },
+        about: {
+            toRepo: DispatcherEvent,
+            toSoftware: DispatcherEvent,
+            toDocs: DispatcherEvent,
+            toRepoIssues: DispatcherEvent,
         }
     }
 }

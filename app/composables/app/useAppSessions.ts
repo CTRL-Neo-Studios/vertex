@@ -118,6 +118,17 @@ export function useAppSessions() {
         return unref(appSessions).find(i => i.uuid == unref(sessionId));
     }
 
+    /**
+     * Retrieving a session from the local state list.
+     */
+    async function getAppSessionFromAbsolutePath(absoluteFilePath: PossiblyRef<string>, updateStore: boolean = true): Promise<AppSession | undefined> {
+        if (updateStore) {
+            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+        }
+
+        return unref(appSessions).find(i => i.rootFileOrFolderAbsolutePath == unref(absoluteFilePath));
+    }
+
     async function hasAppSessionWithId(sessionId: PossiblyRef<string>, updateStore: boolean = true) {
         if (updateStore) {
             await loadAppSessions(); // Reload to avoid overwriting updates from other windows
@@ -126,8 +137,17 @@ export function useAppSessions() {
         return unref(appSessions).findIndex(i => i.uuid == unref(sessionId)) != -1;
     }
 
+    async function hasAppSessionWithRootPath(absoluteFilePath: PossiblyRef<string>, updateStore: boolean = true) {
+        if (updateStore) {
+            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+        }
+
+        return unref(appSessions).findIndex(i => i.rootFileOrFolderAbsolutePath == unref(absoluteFilePath)) != -1;
+    }
+
     /**
      * Loads the sessions from the on-disk JSON store into the reactive state.
+     * Automatically sanitizes sessions to remove duplicates and invalid entries.
      */
     async function loadAppSessions() {
         await store.init();
@@ -143,6 +163,9 @@ export function useAppSessions() {
             appSessions.value = [];
         } else {
             appSessions.value = data.openedSessions || [];
+            
+            // Automatically sanitize sessions after loading
+            await sanitizeAppSessions();
         }
     }
 
@@ -163,18 +186,17 @@ export function useAppSessions() {
      */
     async function initializeCurrentAppSession() {
         // 1. Get the current Tauri window
-        const currentWindow = await $win.getCurrentAppWindow();
+        await loadAppSessions(); // Ensure store is loaded first
+        const currentWindow = $win.getCurrentAppWindow();
         const label = currentWindow.label;
 
         // 2. Main window doesn't have a "session", usually.
-        if (!(await $win.isCurrentAppWindowMain())) {
+        if ($win.isCurrentAppWindowMain()) {
             currentAppSession.value = null;
             return;
         }
 
         // 3. For session windows, extract UUID and find in store
-        await loadAppSessions(); // Ensure store is loaded first
-
         // Assuming label format: "session-UUID-HERE"
         // Adjust split logic if your UUID logic differs
         if (label.startsWith('session-')) {
@@ -191,25 +213,104 @@ export function useAppSessions() {
     }
 
     /**
+     * Sanitizes the app sessions by:
+     * 1. Removing duplicates (same rootPath + same sessionType)
+     * 2. Removing sessions with missing/invalid paths
+     * 
+     * When duplicates are found, keeps the first occurrence and removes the rest.
+     * This is called automatically during loadAppSessions().
+     * 
+     * @returns The number of sessions removed
+     */
+    async function sanitizeAppSessions(): Promise<number> {
+        const sessions = unref(appSessions);
+        const seen = new Map<string, AppSession>();
+        const toKeep: AppSession[] = [];
+        let removedCount = 0;
+
+        for (const session of sessions) {
+            // Skip sessions with invalid data
+            if (!session.rootFileOrFolderAbsolutePath || !session.sessionType || !session.uuid) {
+                console.warn('[useAppSessions] Removing session with missing required fields:', session);
+                removedCount++;
+                continue;
+            }
+
+            // Create a unique key based on path + type
+            const key = `${session.sessionType}:${session.rootFileOrFolderAbsolutePath}`;
+
+            if (seen.has(key)) {
+                // Duplicate found - skip it
+                console.warn(
+                    `[useAppSessions] Removing duplicate session:`,
+                    `\n  - Type: ${session.sessionType}`,
+                    `\n  - Path: ${session.rootFileOrFolderAbsolutePath}`,
+                    `\n  - UUID: ${session.uuid}`,
+                    `\n  - Keeping: ${seen.get(key)?.uuid}`
+                );
+                removedCount++;
+            } else {
+                // First occurrence - keep it
+                seen.set(key, session);
+                toKeep.push(session);
+            }
+        }
+
+        // Update the sessions if any were removed
+        if (removedCount > 0) {
+            console.log(`[useAppSessions] Sanitization complete: Removed ${removedCount} duplicate/invalid session(s)`);
+            appSessions.value = toKeep;
+            await saveAppSessions();
+        }
+
+        return removedCount;
+    }
+
+    /**
      * Recovers all saved app session windows on app startup.
      * Currently only recovers workspace sessions. Only runs on the main window.
      */
     async function recoverSavedAppSessions() {
         await loadAppSessions()
-        if (!(await $win.isCurrentAppWindowMain())) return
+        if (!($win.isCurrentAppWindowMain())) return
         if (unref(appSessions).length <= 0) return;
 
         for (const sesh of unref(appSessions)) {
             if (sesh.sessionType == 'workspace' && sesh.rootFileOrFolderAbsolutePath)
-                $win.createAppWebviewWindow('/loading', `session-${sesh.uuid}`, await $fio.getFileNameFromPath(sesh.rootFileOrFolderAbsolutePath, true))
+                await createWindowFromAppSession(sesh, false)
         }
 
-        const w = await $win.getCurrentAppWindow()
+        const w = $win.getCurrentAppWindow()
         await w.hide()
     }
 
     function getCurrentAppSession() {
         return unref(currentAppSession);
+    }
+
+    async function createWindowFromAppSession(session: AppSession, hideMainWindow: PossiblyRef<boolean> = true) {
+        if (!session) return;
+        if (!session.rootFileOrFolderAbsolutePath) return;
+
+        const windowTitle = await $fio.getFileNameFromPath(session.rootFileOrFolderAbsolutePath, false)
+        const window = $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
+
+        if (unref(hideMainWindow)) {
+            const mainWindow = $win.getCurrentAppWindow()
+            if ($win.isCurrentAppWindowMain()) {
+                await mainWindow.hide()
+            }
+        }
+
+        return window
+    }
+
+    async function getWebviewWindowWithAppSession(appSession: PossiblyRef<AppSession>, updateStore: boolean = true) {
+        if (updateStore) {
+            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+        }
+
+        return await $win.getAppWindowWithLabel(`session-${unref(appSession).uuid}`)
     }
 
     return {
@@ -222,8 +323,13 @@ export function useAppSessions() {
         hasAppSessionWithId,
         loadAppSessions,
         saveAppSessions,
+        sanitizeAppSessions,
         initializeCurrentAppSession,
         getCurrentAppSession,
-        recoverSavedAppSessions
+        recoverSavedAppSessions,
+        createWindowFromAppSession,
+        hasAppSessionWithRootPath,
+        getAppSessionFromAbsolutePath,
+        getWebviewWindowWithAppSession
     }
 }

@@ -4,6 +4,7 @@ import {useAppOpener} from "~/composables/app/useAppOpener";
 import useUuid from "~/composables/utility/useUuid";
 import {defaultAppSession} from "#shared/utils/defaults/apps";
 import {useFileIO} from "~/composables/io/useFileIO";
+import type {AppSession} from "#shared/types/app/sessions";
 
 /**
  * High-level actions for session/window management.
@@ -39,25 +40,7 @@ export function useAppSessionActions() {
         const path = await $open.retrieveFolderOrFileAbsolutePath(false) // false = folder
         if (!path) return; // User cancelled
 
-        // Step 1: Create and persist the AppSession
-        const session = await $sessions.addAppSession(defaultAppSession({
-            uuid: useUuid(),
-            rootFileOrFolderAbsolutePath: path,
-            sessionType: 'workspace',
-            context: {
-                openedAbsoluteFilePaths: []
-            }
-        }))
-
-        // Step 2: Create the webview window
-        const windowTitle = await $fio.getFileNameFromPath(path, true)
-        $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
-
-        // Step 3: Hide the main window (anchor pattern)
-        const mainWindow = await $win.getCurrentAppWindow()
-        if (await $win.isCurrentAppWindowMain()) {
-            await mainWindow.hide()
-        }
+        return await openWorkspaceFromPath(path)
     }
 
     /**
@@ -68,25 +51,7 @@ export function useAppSessionActions() {
         const path = await $open.retrieveFolderOrFileAbsolutePath(true) // true = file
         if (!path) return; // User cancelled
 
-        // Step 1: Create and persist the AppSession
-        const session = await $sessions.addAppSession(defaultAppSession({
-            uuid: useUuid(),
-            rootFileOrFolderAbsolutePath: path,
-            sessionType: 'singlespace',
-            context: {
-                openedAbsoluteFilePaths: [path] // For singlespace, the file itself is the opened file
-            }
-        }))
-
-        // Step 2: Create the webview window
-        const windowTitle = await $fio.getFileNameFromPath(path, false) // false = include extension for files
-        $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
-
-        // Step 3: Hide the main window (anchor pattern)
-        const mainWindow = await $win.getCurrentAppWindow()
-        if (await $win.isCurrentAppWindowMain()) {
-            await mainWindow.hide()
-        }
+        return await openSinglespaceFromPath(path)
     }
 
     /**
@@ -96,21 +61,33 @@ export function useAppSessionActions() {
      * @param path Absolute path to the folder
      */
     async function openWorkspaceFromPath(path: string) {
-        const session = await $sessions.addAppSession(defaultAppSession({
-            uuid: useUuid(),
-            rootFileOrFolderAbsolutePath: path,
-            sessionType: 'workspace',
-            context: {
-                openedAbsoluteFilePaths: []
+        async function createWindow(path: string, existingSession?: AppSession) {
+            let session
+            if (!existingSession)
+                session = await $sessions.addAppSession(defaultAppSession({
+                    uuid: useUuid(),
+                    rootFileOrFolderAbsolutePath: path,
+                    sessionType: 'workspace',
+                    context: {
+                        openedAbsoluteFilePaths: []
+                    }
+                }))
+            else
+                session = existingSession
+
+            return await $sessions.createWindowFromAppSession(session)
+        }
+
+        const sesh = await $sessions.getAppSessionFromAbsolutePath(path)
+        if (sesh) {
+            const window = await $sessions.getWebviewWindowWithAppSession(sesh)
+            if (window) {
+                await window.setFocus()
+            } else {
+                return await createWindow(path, sesh)
             }
-        }))
-
-        const windowTitle = await $fio.getFileNameFromPath(path, true)
-        $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
-
-        const mainWindow = await $win.getCurrentAppWindow()
-        if (await $win.isCurrentAppWindowMain()) {
-            await mainWindow.hide()
+        } else {
+            return await createWindow(path)
         }
     }
 
@@ -121,21 +98,33 @@ export function useAppSessionActions() {
      * @param path Absolute path to the file
      */
     async function openSinglespaceFromPath(path: string) {
-        const session = await $sessions.addAppSession(defaultAppSession({
-            uuid: useUuid(),
-            rootFileOrFolderAbsolutePath: path,
-            sessionType: 'singlespace',
-            context: {
-                openedAbsoluteFilePaths: [path]
+        async function createWindow(path: string, existingSession?: AppSession) {
+            let session
+            if (!existingSession)
+                session = await $sessions.addAppSession(defaultAppSession({
+                    uuid: useUuid(),
+                    rootFileOrFolderAbsolutePath: path,
+                    sessionType: 'singlespace',
+                    context: {
+                        openedAbsoluteFilePaths: [path]
+                    }
+                }))
+            else
+                session = existingSession
+
+            return await $sessions.createWindowFromAppSession(session)
+        }
+
+        const sesh = await $sessions.getAppSessionFromAbsolutePath(path)
+        if (sesh) {
+            const window = await $sessions.getWebviewWindowWithAppSession(sesh)
+            if (window) {
+                await window.setFocus()
+            } else {
+                return await createWindow(path)
             }
-        }))
-
-        const windowTitle = await $fio.getFileNameFromPath(path, false)
-        $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
-
-        const mainWindow = await $win.getCurrentAppWindow()
-        if (await $win.isCurrentAppWindowMain()) {
-            await mainWindow.hide()
+        } else {
+            return await createWindow(path)
         }
     }
 
@@ -150,6 +139,6 @@ export function useAppSessionActions() {
         
         // Aliases for backward compatibility (if needed)
         openFolderAction: openWorkspaceAction,
-        openFileAction: openSinglespaceAction,
+        openFileAction: openSinglespaceAction
     }
 }

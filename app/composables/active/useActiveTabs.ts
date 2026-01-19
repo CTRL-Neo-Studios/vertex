@@ -43,6 +43,7 @@ export function useActiveTabs(session?: ActiveSession) {
         const uid = uuids[uuids.length - 1]
         if (uuids.length > 0 && uid) {
             activeTabUuid.value = uid;
+            return getActiveTab(uid)
         }
     }
 

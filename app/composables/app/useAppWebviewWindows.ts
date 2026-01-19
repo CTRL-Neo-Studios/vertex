@@ -1,10 +1,11 @@
 import {getAllWebviewWindows, WebviewWindow, getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
+import {exit} from "@tauri-apps/plugin-process"
 
 /*
 This composable serves as a helper for creating or finding windows. It does not do any session management. For that, check on `useActiveWindowSessions`.
  */
 export function useAppWebviewWindows() {
-    async function getCurrentAppWindow(): Promise<WebviewWindow> {
+    function getCurrentAppWindow(): WebviewWindow {
         return getCurrentWebviewWindow();
     }
 
@@ -45,9 +46,23 @@ export function useAppWebviewWindows() {
         return await getAppWindowWithLabel('main')
     }
 
-    async function isCurrentAppWindowMain() {
-        const window = await getCurrentAppWindow()
+    function isCurrentAppWindowMain() {
+        const window = getCurrentAppWindow()
         return window.label == 'main'
+    }
+
+    async function destroyAllWindows() {
+        const windows = await getAllWebviewWindows()
+        for (const window of windows) {
+            await window.destroy()
+        }
+    }
+
+    async function closeAllWindows() {
+        const windows = await getAllWebviewWindows()
+        for (const window of windows) {
+            await window.close()
+        }
     }
 
     return {
@@ -56,6 +71,8 @@ export function useAppWebviewWindows() {
         createAppWebviewWindow,
         getAppWindowWithLabel,
         getMainAppWindow,
-        isCurrentAppWindowMain
+        isCurrentAppWindowMain,
+        closeAllWindows,
+        destroyAllWindows
     }
 }

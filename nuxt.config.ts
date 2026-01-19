@@ -45,7 +45,8 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/menu",
                 "@tauri-apps/api/webviewWindow",
                 "@tauri-apps/api/webview",
-                "@tauri-apps/api/window"
+                "@tauri-apps/api/window",
+                "@tauri-apps/plugin-process"
             ]
         }
     }

@@ -1,36 +1,51 @@
 <script setup lang="ts">
-import {useAppRecents} from "~/composables/app/useAppRecents";
 import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
-import {useAppOpener} from "~/composables/app/useAppOpener";
-import useUuid from "~/composables/utility/useUuid";
-import {WebviewWindow} from "@tauri-apps/api/webviewWindow"
-import type { PhysicalPosition } from "@tauri-apps/api/dpi";
+import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useFileIO} from "~/composables/io/useFileIO";
 
 const openingFile = ref(false)
-const $recents = useAppRecents()
-const {
-    openFolderOrFile,
-} = useAppOpener()
-const {
-    addAppSession
-} = useAppSessions()
+const loadingRecents = ref(true)
+const $act = useAppSessionActions()
+const $menu = useAppWindowMenu()
+const $sessions = useAppSessions()
+const $fio = useFileIO()
+const recentsList = computedAsync(async (onCancel) => {
+    const abortController = new AbortController()
+    onCancel(() => abortController.abort())
+    let results = []
+
+    for (const s of unref($sessions.appSessions)) {
+        results.push({
+            name: await $fio.getFileNameFromPath(s.rootFileOrFolderAbsolutePath || 'Untitled'),
+            path: s.rootFileOrFolderAbsolutePath,
+            workspace: s.sessionType == 'workspace'
+        })
+    }
+
+    return results;
+}, [], loadingRecents)
+
+$menu.dispatcher.on('categories.file.open.openFile', async () => {
+    await openFile()
+})
+$menu.dispatcher.on('categories.file.open.openFolder', async () => {
+    await openFolder()
+})
 
 async function openFile() {
     openingFile.value = true
-    await openFolderOrFile(true)
+    const window = await $act.openSinglespaceAction()
     openingFile.value = false
 }
 
 async function openFolder() {
     openingFile.value = true
-    await useApp
+    const window = await $act.openWorkspaceAction()
     openingFile.value = false
 }
 
-onMounted(() => {
-    console.log(unref(state))
-})
 </script>
 
 <template>
@@ -43,18 +58,20 @@ onMounted(() => {
                 <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder" :disabled="openingFile"/>
-                <UButton @click="newWindow" label="new window"/>
             </div>
         </div>
         <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">
             <ScrollAreaRoot class="max-h-screen relative" style="--scrollbar-size: 10px">
                 <div class="text-xs text-muted/50 absolute top-0 bg-linear-to-t from-transparent via-submuted to-submuted h-12 p-3 w-full z-10">Recently Opened</div>
                 <ScrollAreaViewport class="w-full h-full">
-                    <div class="grid-cols-1 grid gap-1 p-3 pt-8">
-                        <UButton v-for="(record, index) in unref($recents.recents)?.recentRecords" :key="index" class="cursor-pointer" :icon="record.isWorkspace ? 'i-lucide-folder' : 'i-lucide-file'" color="neutral" variant="ghost">
+                    <div class="p-4 h-full w-full" v-if="loadingRecents">
+                        <UProgress class="max-w-lg"/>
+                    </div>
+                    <div class="grid-cols-1 grid gap-1 p-3 pt-8" v-else>
+                        <UButton v-for="(record, index) in recentsList" :key="index" class="cursor-pointer" :icon="record.workspace ? 'i-lucide-folder' : 'i-lucide-file'" color="neutral" variant="ghost">
                             <div class="flex flex-col justify-start items-start">
-                                <div>{{record.name}}</div>
-                                <div class="text-muted text-xs">{{record.fullPath}}</div>
+                                <div class="text-left">{{record.name}}</div>
+                                <div class="text-muted text-xs text-left">{{record.path}}</div>
                             </div>
                         </UButton>
                     </div>

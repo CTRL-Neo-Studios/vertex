@@ -1,9 +1,8 @@
-import { ref, unref } from 'vue';
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { defaultAppConfig } from "#shared/utils/defaults/apps";
 import type { AppConfig } from "#shared/types/app/config";
 
-const STORE_FILENAME = 'vertex_config.json';
+const STORE_FILENAME = 'config.json';
 const STORE_KEY = 'config';
 
 /**
@@ -11,7 +10,7 @@ const STORE_KEY = 'config';
  * It handles loading from and saving to the Tauri store,
  * provides default values, and shares the config reactively across the app.
  */
-export function useAppConfig() {
+export function useAppConfiguration() {
     const config = useState<AppConfig | null>(`${STORE_KEY}.data`, () => null);
 
     const isLoaded = useState<boolean>(`${STORE_KEY}.is_loaded`, () => false);
@@ -35,7 +34,7 @@ export function useAppConfig() {
             config.value = defaultAppConfig(storedData);
 
             if (!storedData) {
-                await fileStore.set(STORE_KEY, config.value);
+                await fileStore.set(STORE_KEY, unref(config));
                 await fileStore.save();
             }
 
@@ -46,7 +45,7 @@ export function useAppConfig() {
             isLoaded.value = true;
         }
 
-        return config.value;
+        return unref(config);
     }
 
     /**
@@ -55,7 +54,7 @@ export function useAppConfig() {
      *                  If not provided, the current state will be saved.
      */
     async function save(newData?: PossiblyRef<Partial<AppConfig>>) {
-        if (!config.value) {
+        if (!unref(config)) {
             console.warn("Attempted to save config before it was loaded. Operation skipped.");
             return;
         }
@@ -63,14 +62,14 @@ export function useAppConfig() {
         const updateData = unref(newData);
 
         if (updateData) {
-            config.value = {
+            config.value = defaultAppConfig({
                 ...config.value,
                 ...updateData,
-            };
+            });
         }
 
         try {
-            await fileStore.set(STORE_KEY, config.value);
+            await fileStore.set(STORE_KEY, unref(config));
             await fileStore.save();
         } catch (error) {
             console.error("Failed to save application config:", error);

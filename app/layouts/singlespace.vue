@@ -8,19 +8,26 @@ import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import type {UnlistenFn} from "@tauri-apps/api/event";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
+const $asesh = useAppSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const activeTreeItem = ref()
+const $win = useAppWebviewWindows()
 
 await until($sessionId).toMatch(v => v != undefined)
 
 const {
     initializeIndex,
     updateIndex,
-    clearIndex
+    clearIndex,
+    getFileByUuid,
+    addWindowCloseCallbacks
 } = useActiveSinglespaceIndex($sesh.getSession($sessionId))
 const {
     activeTabUuid,
@@ -29,7 +36,9 @@ const {
 const {
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
-const $menu = useAppWindowMenu()
+const $menu = useAppWindowMenu($asesh.getCurrentAppSession() || undefined)
+
+let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -38,14 +47,24 @@ watch(activeTabUuid, (newValue) => {
 onMounted(async () => {
     if (!unref($sessionId))
         await until($sessionId).toMatch(v => v != undefined)
-    const rootPath = $sesh.getSession($sessionId)?.rootPath
-    if(!rootPath) await $navi.toHome()
+
+    const activeSesh = $sesh.getSession($sessionId)
+    if (!activeSesh) {
+        await $navi.toHome()
+        return;
+    }
+
+    unlistenedWindows = await addWindowCloseCallbacks()
     await $menu.setMenu()
 })
 
 onBeforeUnmount(async () => {
     clearTabs()
     clearIndex()
+    if (unlistenedWindows) {
+        unlistenedWindows.unlistenClose()
+        unlistenedWindows.unlistenDestroyed()
+    }
     $sesh.removeSession($sessionId)
 })
 

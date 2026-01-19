@@ -1,7 +1,8 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
-import {getCurrentWindow} from '@tauri-apps/api/window';
-
+import {exit} from '@tauri-apps/plugin-process'
 import type {AppSession} from "#shared/types/app/sessions";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import type {WindowMenuEvents} from "#shared/types/app/events";
 
 interface MenuState {
     canSave: boolean;
@@ -12,15 +13,16 @@ interface MenuState {
 
 export function useAppWindowMenu(session?: AppSession) {
     const $route = useRoute();
-    const { and, or, evaluate } = usePredicateLogic()
+    const { and, or, not, evaluate } = usePredicateLogic()
+    const $win = useAppWebviewWindows()
 
-    if (!session) {
-        console.error("useAppWindowMenu was called without a window session!");
-    }
+    // if (!session) {
+    //     console.error("useAppWindowMenu was called without a window session!");
+    // }
 
-    const dispatcher = useEventDispatcher(`window.menu.${session?.uuid}`)
+    const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu`)
 
-    const menuState = useState<MenuState>(`window.menu.${session?.uuid}`, () => ({
+    const menuState = useState<MenuState>(`window.menu.state`, () => ({
         canSave: false,
         hasSelection: false,
         hasUndo: false,
@@ -28,17 +30,25 @@ export function useAppWindowMenu(session?: AppSession) {
     } satisfies MenuState));
 
     const isRoute = definePredicate((path: string) => {
-        const route = useRoute()
-        return route.path === path
+        return $route.path == path
     })
 
-    const $inSinglespace = isRoute('/singlespace')
+    const hasRoute = definePredicate((path: string) => {
+        return $route.path.includes(path)
+    })
 
-    const $inWorkspace = isRoute('/workspace')
+    const $inSinglespace = hasRoute('/singlespace')
 
-    const $canCreateItems = or($inWorkspace, $inSinglespace)
+    const $inWorkspace = hasRoute('/workspace')
+
+    const $inMain = isRoute('/')
+
+    const $inEditingSpace = or($inWorkspace, $inSinglespace)
+
+    const $canCreateItems = and($inEditingSpace, not($inMain))
 
     async function buildMenu() {
+        const aboutMenu = await buildAboutMenu();
         const fileMenu = await buildFileMenu();
         const editMenu = await buildEditMenu();
         const viewMenu = await buildViewMenu();
@@ -46,7 +56,25 @@ export function useAppWindowMenu(session?: AppSession) {
 
         // Create the main menu bar
         return await Menu.new({
-            items: [fileMenu, editMenu, viewMenu, helpMenu],
+            items: [aboutMenu, fileMenu, editMenu, viewMenu, helpMenu],
+        });
+    }
+
+    async function buildAboutMenu() {
+        return await Submenu.new({
+            text: 'About',
+            items: [
+                await MenuItem.new({
+                    id: 'quit',
+                    text: 'Quit',
+                    accelerator: 'CmdOrControl+Q',
+                    async action() {
+                        await $win.closeAllWindows()
+
+                        await exit(0)
+                    },
+                }),
+            ],
         });
     }
 
@@ -54,39 +82,48 @@ export function useAppWindowMenu(session?: AppSession) {
     async function buildFileMenu() {
         const items = [];
 
-        // "New" Submenu
-        const newFileItem = await MenuItem. new({
-            id: 'new-file',
-            text:  'New File',
-            accelerator: 'CmdOrCtrl+N',
-            action: () => handleNewFile(),
-            enabled: evaluate($canCreateItems).value
-        });
-
-        const newFolderItem = await MenuItem.new({
-            id: 'new-folder',
-            text: 'New Folder',
-            accelerator: 'CmdOrCtrl+Shift+N',
-            action:  () => handleNewFolder(),
-            enabled: evaluate($inWorkspace).value
-        });
-
         const newSubmenu = await Submenu.new({
+            id: 'new',
             text: 'New...',
-            items: [newFileItem, newFolderItem],
-            enabled: evaluate($canCreateItems).value
+            items: [
+                await MenuItem.new({
+                    id: 'new-file',
+                    text:  'New File',
+                    accelerator: 'CmdOrCtrl+N',
+                    action: () => handleNewFile(),
+                    // enabled: unref(evaluate(and($canCreateItems, $inWorkspace)))
+                }),
+                await MenuItem.new({
+                    id: 'new-folder',
+                    text: 'New Folder',
+                    accelerator: 'CmdOrCtrl+Shift+N',
+                    action:  () => handleNewFolder(),
+                    // enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),
+                })
+            ]
         });
 
-        items.push(newSubmenu);
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-
-        // Open
-        items.push(await MenuItem.new({
+        const openSubmenu = await Submenu.new({
             id: 'open',
-            text: 'Open.. .',
-            accelerator: 'CmdOrCtrl+O',
-            action: () => handleOpen(),
-        }));
+            text: 'Open...',
+            items: [
+                await MenuItem.new({
+                    id: 'open-file',
+                    text: 'Open File',
+                    accelerator: 'CmdOrCtrl+O',
+                    action: () => handleOpenFile()
+                }),
+                await MenuItem.new({
+                    id: 'open-folder',
+                    text: 'Open folder',
+                    accelerator: 'CmdOrCtrl+Shift+O',
+                    action: () => handleOpenFolder()
+                })
+            ]
+        })
+        // Open
+        items.push(openSubmenu);
+        items.push(newSubmenu);
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
 
@@ -187,13 +224,13 @@ export function useAppWindowMenu(session?: AppSession) {
             text: 'Toggle Fullscreen',
             accelerator: 'F11',
             action: async () => {
-                const window = getCurrentWindow();
+                const window = $win.getCurrentAppWindow()
                 const isFullscreen = await window.isFullscreen();
                 await window.setFullscreen(!isFullscreen);
             },
         }));
 
-        items.push(await PredefinedMenuItem. new({ item: 'Separator' }));
+        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
 
         items.push(await MenuItem.new({
             id: 'zoom-in',
@@ -245,7 +282,7 @@ export function useAppWindowMenu(session?: AppSession) {
         items.push(await MenuItem.new({
             id: 'about',
             text: 'About',
-            action: () => handleAbout(),
+            action: () => handleAboutSoftware(),
         }));
 
         return await Submenu.new({
@@ -256,9 +293,12 @@ export function useAppWindowMenu(session?: AppSession) {
 
     // Set the menu on the window
     async function setMenu() {
+        console.log('Setting Window Menu...')
         const menu = await buildMenu();
-        const window = getCurrentWindow();
+        const window = $win.getCurrentAppWindow();
         await menu.setAsWindowMenu(window)
+        await menu.setAsAppMenu()
+        console.log('Menu set.')
     }
 
     // Update menu when route changes
@@ -268,23 +308,27 @@ export function useAppWindowMenu(session?: AppSession) {
 
     // Action handlers
     function handleNewFile() {
-        emitEvent('new-file');
+        dispatcher.emit('categories.file.new.newFile')
     }
 
     function handleNewFolder() {
-        emitEvent('new-folder')
+        dispatcher.emit('categories.file.new.newFolder')
     }
 
-    function handleOpen() {
-        emitEvent('open')
+    function handleOpenFile() {
+        dispatcher.emit('categories.file.open.openFile')
+    }
+
+    function handleOpenFolder() {
+        dispatcher.emit('categories.file.open.openFolder')
     }
 
     function handleSave() {
-        emitEvent('save')
+        dispatcher.emit('categories.file.save')
     }
 
     function handleSaveAs() {
-        emitEvent('save-as')
+        dispatcher.emit('categories.file.saveAs')
     }
 
     function handleZoomIn() {
@@ -300,15 +344,15 @@ export function useAppWindowMenu(session?: AppSession) {
     }
 
     function handleOpenDocs() {
-        window.open('https://your-docs-url.com', '_blank');
+        dispatcher.emit('categories.about.toDocs')
     }
 
     function handleReportIssue() {
-        window.open('https://github.com/yourorg/yourrepo/issues', '_blank');
+        dispatcher.emit('categories.about.toRepoIssues')
     }
 
-    function handleAbout() {
-        emitEvent('about')
+    function handleAboutSoftware() {
+        dispatcher.emit('categories.about.toSoftware')
     }
 
     // Update menu state and rebuild
@@ -317,14 +361,10 @@ export function useAppWindowMenu(session?: AppSession) {
         await setMenu();
     }
 
-    function emitEvent(eventName: string, data?: any) {
-        const event = new CustomEvent(`menu:${eventName}`, { detail: data });
-        window.dispatchEvent(event);
-    }
-
     return {
         setMenu,
         // updateMenu,
         canCreateItems: $canCreateItems,
+        dispatcher
     }
 }

@@ -5,6 +5,12 @@ import {defaultActiveSinglespaceFileIndex} from "#shared/utils/defaults/actives"
 import {readTextFile} from "@tauri-apps/plugin-fs";
 import {useFileIO} from "~/composables/io/useFileIO";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {WebviewWindow} from "@tauri-apps/api/webviewWindow";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import type {ActiveTab} from "#shared/types/active/tabs";
+import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import type {UnlistenFn} from "@tauri-apps/api/event";
 
 export function useActiveSinglespaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -12,6 +18,8 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
     }
 
     const $fio = useFileIO()
+    const $win = useAppWebviewWindows()
+    const $asesh = useAppSessions()
 
     const fileIndex = useState<Record<string, ActiveSinglespaceFileIndex>>(`active.singlespace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
 
@@ -162,6 +170,40 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         return unref(fileIndex)[unref(absolutePathRef)]
     }
 
+    async function addWindowCloseCallbacks(): Promise<{ unlistenClose: UnlistenFn, unlistenDestroyed: UnlistenFn} | undefined> {
+        const currentWindow = $win.getCurrentAppWindow()
+        const currentAppSession = unref($asesh.currentAppSession)
+
+        if (!currentAppSession) return;
+
+        const unlistenClose = await currentWindow.listen('tauri://close-requested', async function (event) {
+            await $asesh.updateAppSession(currentAppSession.uuid, {
+                context: {
+                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
+                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
+                        .filter(i => i != undefined)
+                }
+            })
+        })
+
+        const unlistenDestroyed = await currentWindow.listen('tauri://destroyed', async function (event) {
+            await $asesh.updateAppSession(currentAppSession.uuid, {
+                context: {
+                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
+                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
+                        .filter(i => i != undefined)
+                }
+            })
+        })
+
+        console.log('Added window callbacks.')
+
+        return {
+            unlistenClose,
+            unlistenDestroyed
+        }
+    }
+
     /**
      * Clears the File index map.
      */
@@ -179,6 +221,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         setTemporaryIndex,
         clearIndex,
         convertTemporaryToValidIndex,
+        addWindowCloseCallbacks,
         fileIndexWithPathExists,
         fileIndexWithUuidExists,
     }

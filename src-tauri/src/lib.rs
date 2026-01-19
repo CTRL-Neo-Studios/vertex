@@ -63,6 +63,7 @@ pub fn run() {
     }
 
     builder
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())

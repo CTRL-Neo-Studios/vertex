@@ -4,15 +4,20 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
-import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
+import type { UnlistenFn } from "@tauri-apps/api/event";
+import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
+const $asesh = useAppSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const activeTreeItem = ref()
+const loading = ref(true)
 
 await until($sessionId).toMatch(v => v != undefined)
 
@@ -20,7 +25,8 @@ const {
     buildIndex,
     startWatcher,
     stopWatcher,
-    clearIndex
+    clearIndex,
+    addWindowCloseCallbacks
 } = useActiveWorkspaceIndex($sesh.getSession($sessionId))
 const {
     activeTabUuid,
@@ -30,7 +36,26 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
-const $menu = useAppWindowMenu()
+const {
+    recoverWorkspaceTabs
+} = useAppSessionRecovery()
+const {
+    getCurrentAppSession
+} = useAppSessions()
+const $menu = useAppWindowMenu($asesh.getCurrentAppSession() || undefined)
+const $act = useAppSessionActions()
+
+let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
+
+$menu.dispatcher.on('categories.file.open.openFile', async () => {
+    await until(loading).toBe(false)
+    await $act.openSinglespaceAction()
+})
+
+$menu.dispatcher.on('categories.file.open.openFolder', async () => {
+    await until(loading).toBe(false)
+    await $act.openWorkspaceAction()
+})
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -39,18 +64,35 @@ watch(activeTabUuid, (newValue) => {
 onMounted(async () => {
     if (!unref($sessionId))
         await until($sessionId).toMatch(v => v != undefined)
-    const rootPath = $sesh.getSession($sessionId)?.rootPath
-    if(!rootPath) await $navi.toHome()
+
+    const activeSesh = $sesh.getSession($sessionId)
+    if (!activeSesh) {
+        await $navi.toHome()
+        return;
+    }
+    const rootPath = activeSesh.rootPath
 
     await buildIndex(rootPath || '')
     await startWatcher(rootPath || '')
+    unlistenedWindows = await addWindowCloseCallbacks()
     await $menu.setMenu()
+
+    const appSesh = getCurrentAppSession()
+
+    if (appSesh)
+        await recoverWorkspaceTabs(activeSesh, appSesh)
+
+    loading.value = false
 })
 
 onBeforeUnmount(async () => {
     clearTabs()
     await stopWatcher()
     clearIndex()
+    if (unlistenedWindows) {
+        unlistenedWindows.unlistenClose()
+        unlistenedWindows.unlistenDestroyed()
+    }
     $sesh.removeSession($sessionId)
 })
 

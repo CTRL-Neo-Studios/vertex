@@ -4,6 +4,7 @@ import { useActiveWorkspaceIndex } from "~/composables/active/useActiveWorkspace
 import { useActiveTabs } from "~/composables/active/useActiveTabs";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
 
 /**
  * Orchestrates the recovery/saturation of session windows.
@@ -18,6 +19,8 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 export function useAppSessionRecovery() {
     const $open = useAppOpener();
     const $win = useAppWebviewWindows();
+    const $navi = useAppNavigator()
+    const lastRedirect = useState<{redirect: "workspace" | "singlespace", workingSession: ActiveSession} | undefined>('app.store.lastRedirected', () => undefined)
 
     /**
      * Saturates a session window by:
@@ -29,7 +32,7 @@ export function useAppSessionRecovery() {
      * 
      * @param appSession The persisted AppSession to recover from
      */
-    async function saturateSessionWindow(appSession: AppSession) {
+    async function redirectAppSessionWindowToEditSpace(appSession: AppSession) {
         if (!appSession?.rootFileOrFolderAbsolutePath) {
             console.warn('[useAppSessionRecovery] Cannot saturate session without rootPath');
             return;
@@ -39,15 +42,12 @@ export function useAppSessionRecovery() {
         const result = await $open.openFolderOrFileFromPath(appSession.rootFileOrFolderAbsolutePath);
         
         // Step 2: Focus the window
-        const window = await $win.getCurrentAppWindow();
+        const window = $win.getCurrentAppWindow();
         await window.setFocus();
 
-        // Step 3: If successfully opened and it's a workspace, recover tabs
-        if (result?.workingSession && result.redirect === 'workspace') {
-            await recoverWorkspaceTabs(result.workingSession, appSession);
-        }
+        lastRedirect.value = result
 
-        // For singlespace, the file is already opened by useAppOpener, no tab recovery needed
+        return result
     }
 
     /**
@@ -57,25 +57,32 @@ export function useAppSessionRecovery() {
      * @param appSession The persisted AppSession containing tab context
      */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
+        console.log(`Recovering App Session ${appSession.uuid} with Active Session ${activeSession.uuid}...`)
         const openedFilePaths = appSession.context?.openedAbsoluteFilePaths || [];
         
         if (openedFilePaths.length === 0) {
-            return; // No tabs to recover
+            await $navi.toWorkspaceEmptyTab(activeSession.uuid)
+        } else {
+            const {getFilesByPaths} = useActiveWorkspaceIndex(activeSession);
+            const {openTabs} = useActiveTabs(activeSession);
+
+            console.log(`Reading saved opened files: ${openedFilePaths}`)
+
+            const files = getFilesByPaths(openedFilePaths);
+            const fileUuids = files.map(file => file.uuid);
+
+            console.log(`Recovered opened tabs: ${fileUuids}`)
+
+            if (fileUuids.length > 0) {
+                await $navi.toWorkspaceTab(activeSession.uuid, openTabs(fileUuids))
+            }
         }
 
-        const { getFilesByPaths } = useActiveWorkspaceIndex(activeSession);
-        const { openTabs } = useActiveTabs(activeSession);
-        
-        const files = getFilesByPaths(openedFilePaths);
-        const fileUuids = files.map(file => file.uuid);
-        
-        if (fileUuids.length > 0) {
-            openTabs(fileUuids);
-        }
+        console.log(`Recovered.`)
     }
 
     return {
-        saturateSessionWindow,
+        redirectAppSessionWindowToEditSpace,
         recoverWorkspaceTabs
     };
 }

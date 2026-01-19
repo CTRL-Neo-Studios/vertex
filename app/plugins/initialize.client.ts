@@ -1,7 +1,8 @@
-import {useAppRecents} from "~/composables/app/useAppRecents";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 import useUuid from "~/composables/utility/useUuid";
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {useAppConfiguration} from "~/composables/app/useAppConfiguration";
 
 export default defineNuxtPlugin({
     name: 'initialize',
@@ -9,22 +10,22 @@ export default defineNuxtPlugin({
         console.log('initializing')
         
         const $asesh = useAppSessions()
-        const $recv = useAppSessionRecovery()
-        
-        await useAppRecents().load()
+
+        const cfg = await useAppConfiguration().load()
 
         // Initialize the current window session
         // Gets whether the current window is a `main` or a `session-` window
-        const currentAppSession = await $asesh.initializeCurrentAppSession()
+        const sesh = await $asesh.initializeCurrentAppSession()
+        const $menu = useAppWindowMenu(sesh)
+        await $menu.setMenu()
         
         // Attempts to recover the saved sessions on the `main` window
         // This function does not run on other windows
-        await $asesh.recoverSavedAppSessions()
+
+        if (cfg?.openLastOpenedWindows)
+            await $asesh.recoverSavedAppSessions()
         
-        // If the current window is a `session-` window, saturate it
-        if (currentAppSession) {
-            await $recv.saturateSessionWindow(currentAppSession)
-        }
+        // Saturation logic moved to /loading
         
         console.log('initialized')
     }
