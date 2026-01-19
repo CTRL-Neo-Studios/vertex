@@ -577,40 +577,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         };
     }
 
-    async function addWindowCloseCallbacks(): Promise<{ unlistenClose: UnlistenFn, unlistenDestroyed: UnlistenFn} | undefined> {
-        const currentWindow = $win.getCurrentAppWindow()
-        const currentAppSession = unref($asesh.currentAppSession)
-
-        if (!currentAppSession) return;
-
-        const unlistenClose = await currentWindow.listen('tauri://close-requested', async function (event) {
-            await $asesh.updateAppSession(currentAppSession.uuid, {
-                context: {
-                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
-                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
-                }
-            })
-        })
-
-        const unlistenDestroyed = await currentWindow.listen('tauri://destroyed', async function (event) {
-            await $asesh.updateAppSession(currentAppSession.uuid, {
-                context: {
-                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
-                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
-                }
-            })
-        })
-
-        console.log('Added window callbacks.')
-
-        return {
-            unlistenClose,
-            unlistenDestroyed
-        }
-    }
-
     return {
         buildIndex,
         fileIndex,
@@ -626,6 +592,5 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         updateIndex,
         getFileByPath,
         getFilesByPaths,
-        addWindowCloseCallbacks
     };
 }

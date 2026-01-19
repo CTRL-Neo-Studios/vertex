@@ -13,8 +13,9 @@ export function defaultAppSession(data?: Partial<AppSession>): AppSession {
         uuid: data?.uuid || useUuid(),
         sessionType: data?.sessionType || 'workspace',
         rootFileOrFolderAbsolutePath: data?.rootFileOrFolderAbsolutePath || '',
-        context: defaultAppSessionContext(data?.context)
-    }
+        context: defaultAppSessionContext(data?.context),
+        lastUpdated: data?.lastUpdated || new Date()
+    } satisfies AppSession
 }
 
 export function defaultAppSessionContext(data?: Partial<AppSessionContext>): AppSessionContext {

@@ -162,7 +162,14 @@ export function useAppSessions() {
             await store.set('data', { openedSessions: [] } as AppSessionsStore);
             appSessions.value = [];
         } else {
-            appSessions.value = data.openedSessions || [];
+            // Sort sessions by lastUpdated (most recent first)
+            // Sessions without lastUpdated are treated as oldest (0)
+            const sessions = data.openedSessions || [];
+            appSessions.value = sessions.sort((a, b) => {
+                const aTime = a?.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+                const bTime = b?.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+                return bTime - aTime; // Descending order (newest first)
+            });
             
             // Automatically sanitize sessions after loading
             await sanitizeAppSessions();
@@ -280,8 +287,7 @@ export function useAppSessions() {
                 await createWindowFromAppSession(sesh, false)
         }
 
-        const w = $win.getCurrentAppWindow()
-        await w.hide()
+        await $win.hideMainWindow()
     }
 
     function getCurrentAppSession() {

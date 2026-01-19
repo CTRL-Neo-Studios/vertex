@@ -1,10 +1,14 @@
 <script setup lang="ts">
-const appCfg = useAppConfig()
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+
+onMounted(async () => {
+
+});
 </script>
 
 <template>
     <UApp>
-<!--        <NuxtLoadingIndicator :color="appCfg.ui.colors.primary"/>-->
         <NuxtLayout>
             <NuxtPage/>
         </NuxtLayout>

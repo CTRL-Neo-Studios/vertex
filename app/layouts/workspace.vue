@@ -10,12 +10,15 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $asesh = useAppSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
+const $win = useAppWebviewWindows()
 const activeTreeItem = ref()
 const loading = ref(true)
 
@@ -26,7 +29,6 @@ const {
     startWatcher,
     stopWatcher,
     clearIndex,
-    addWindowCloseCallbacks
 } = useActiveWorkspaceIndex($sesh.getSession($sessionId))
 const {
     activeTabUuid,
@@ -42,8 +44,9 @@ const {
 const {
     getCurrentAppSession
 } = useAppSessions()
-const $menu = useAppWindowMenu($asesh.getCurrentAppSession() || undefined)
+const $menu = useAppWindowMenu()
 const $act = useAppSessionActions()
+const $aseshNavi = useAppSessionNavigator()
 
 let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
 
@@ -74,13 +77,15 @@ onMounted(async () => {
 
     await buildIndex(rootPath || '')
     await startWatcher(rootPath || '')
-    unlistenedWindows = await addWindowCloseCallbacks()
+    unlistenedWindows = await $aseshNavi.addWindowCloseCallbacks(activeSesh)
     await $menu.setMenu()
 
     const appSesh = getCurrentAppSession()
 
     if (appSesh)
         await recoverWorkspaceTabs(activeSesh, appSesh)
+
+    console.log(`Windows: ${await $win.getAppWindows()}`)
 
     loading.value = false
 })

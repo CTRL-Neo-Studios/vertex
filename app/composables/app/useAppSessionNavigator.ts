@@ -9,11 +9,15 @@ import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespa
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {defaultActiveSession} from "#shared/utils/defaults/actives";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import type {UnlistenFn} from "@tauri-apps/api/event";
 
 export function useAppSessionNavigator() {
     const $sesh = useActiveSessions()
     const $navi = useAppNavigator()
     const $win = useAppWebviewWindows()
+    const $asesh = useAppSessions()
 
     async function retrieveFolderOrFileAbsolutePath(asFile: boolean) {
         let path: string | null
@@ -103,9 +107,76 @@ export function useAppSessionNavigator() {
         }
     }
 
+    /**
+     * Closes the current window and tries to return to the last opened window. It will only return to the main window when there is no more session windows.
+     * @param session
+     */
+    async function destroyWindowAndTryReturnToLastWindow(session: ActiveSession) {
+        if ($win.isCurrentAppWindowMain()) return;
+
+        const currentWindow = $win.getCurrentAppWindow()
+        const currentAppSession = unref($asesh.currentAppSession)
+
+        if (!currentAppSession) return;
+
+        if (currentAppSession.sessionType == 'workspace') {
+            const {getFileByUuid} = useActiveWorkspaceIndex(session)
+            await $asesh.updateAppSession(currentAppSession.uuid, {
+                context: {
+                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
+                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
+                        .filter(i => i != undefined)
+                },
+                lastUpdated: new Date()
+            })
+        } else {
+            const {getFileByUuid} = useActiveSinglespaceIndex(session)
+            await $asesh.updateAppSession(currentAppSession.uuid, {
+                context: {
+                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
+                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
+                        .filter(i => i != undefined)
+                },
+                lastUpdated: new Date()
+            })
+        }
+
+        const lastWindow = await $win.showLatestSessionWindow()
+
+        if ((await $win.getSessionWindows()).length <= 1) {
+            await $win.showMainWindow()
+        }
+
+        await currentWindow.destroy()
+    }
+
+    async function addWindowCloseCallbacks(session: ActiveSession): Promise<{ unlistenClose: UnlistenFn, unlistenDestroyed: UnlistenFn} | undefined> {
+        const currentWindow = $win.getCurrentAppWindow()
+        const currentAppSession = unref($asesh.currentAppSession)
+
+        if (!currentAppSession) return;
+
+        const unlistenClose = await currentWindow.listen('tauri://close-requested', async function (event) {
+            await destroyWindowAndTryReturnToLastWindow(session)
+        })
+
+        const unlistenDestroyed = await currentWindow.listen('tauri://destroyed', async function (event) {
+            await destroyWindowAndTryReturnToLastWindow(session)
+        })
+
+        console.log('Added window callbacks.')
+
+        return {
+            unlistenClose,
+            unlistenDestroyed
+        }
+    }
+
     return {
         openFolderOrFile,
         openFolderOrFileFromPath,
-        retrieveFolderOrFileAbsolutePath
+        retrieveFolderOrFileAbsolutePath,
+        destroyWindowAndTryReturnToLastWindow,
+        addWindowCloseCallbacks
     }
 }

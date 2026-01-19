@@ -1,5 +1,5 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
-import {exit} from '@tauri-apps/plugin-process'
+import {exit, relaunch} from '@tauri-apps/plugin-process'
 import type {AppSession} from "#shared/types/app/sessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {WindowMenuEvents} from "#shared/types/app/events";
@@ -11,14 +11,10 @@ interface MenuState {
     hasRedo: boolean;
 }
 
-export function useAppWindowMenu(session?: AppSession) {
+export function useAppWindowMenu() {
     const $route = useRoute();
-    const { and, or, not, evaluate } = usePredicateLogic()
+    const { and, or, not, evaluate, evaluateUnref } = usePredicateLogic()
     const $win = useAppWebviewWindows()
-
-    // if (!session) {
-    //     console.error("useAppWindowMenu was called without a window session!");
-    // }
 
     const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu`)
 
@@ -43,9 +39,13 @@ export function useAppWindowMenu(session?: AppSession) {
 
     const $inMain = isRoute('/')
 
+    const $inFunctional = hasRoute('/settings')
+
     const $inEditingSpace = or($inWorkspace, $inSinglespace)
 
-    const $canCreateItems = and($inEditingSpace, not($inMain))
+    const $canCreateItems = and($inEditingSpace, not($inMain), not($inFunctional))
+
+    const $canSaveItems = and($inEditingSpace, not($inMain), not($inFunctional))
 
     async function buildMenu() {
         const aboutMenu = await buildAboutMenu();
@@ -64,16 +64,15 @@ export function useAppWindowMenu(session?: AppSession) {
         return await Submenu.new({
             text: 'About',
             items: [
-                await MenuItem.new({
-                    id: 'quit',
-                    text: 'Quit',
-                    accelerator: 'CmdOrControl+Q',
-                    async action() {
-                        await $win.closeAllWindows()
-
-                        await exit(0)
-                    },
-                }),
+                // await MenuItem.new({
+                //     id: 'quit',
+                //     text: 'Quit',
+                //     accelerator: 'CmdOrControl+Q',
+                //     async action() {
+                //         await exit()
+                //     },
+                // }),
+                await PredefinedMenuItem.new({item: 'Quit'})
             ],
         });
     }
@@ -86,6 +85,7 @@ export function useAppWindowMenu(session?: AppSession) {
             id: 'new',
             text: 'New...',
             items: [
+                await PredefinedMenuItem.new({item: 'Separator'}),
                 await MenuItem.new({
                     id: 'new-file',
                     text:  'New File',
@@ -100,7 +100,8 @@ export function useAppWindowMenu(session?: AppSession) {
                     action:  () => handleNewFolder(),
                     // enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),
                 })
-            ]
+            ],
+            enabled: evaluateUnref(and($canCreateItems, $inWorkspace))
         });
 
         const openSubmenu = await Submenu.new({
@@ -119,7 +120,8 @@ export function useAppWindowMenu(session?: AppSession) {
                     accelerator: 'CmdOrCtrl+Shift+O',
                     action: () => handleOpenFolder()
                 })
-            ]
+            ],
+            enabled: evaluateUnref(not($inFunctional))
         })
         // Open
         items.push(openSubmenu);
@@ -133,6 +135,7 @@ export function useAppWindowMenu(session?: AppSession) {
             text: 'Save',
             accelerator: 'CmdOrCtrl+S',
             action: () => handleSave(),
+            enabled: evaluateUnref($canSaveItems)
         }));
 
         items.push(await MenuItem.new({
@@ -140,6 +143,7 @@ export function useAppWindowMenu(session?: AppSession) {
             text: 'Save As...',
             accelerator: 'CmdOrCtrl+Shift+S',
             action: () => handleSaveAs(),
+            enabled: evaluateUnref($canSaveItems)
         }));
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
@@ -216,7 +220,9 @@ export function useAppWindowMenu(session?: AppSession) {
             id: 'reload',
             text: 'Reload',
             accelerator: 'CmdOrCtrl+R',
-            action: () => reloadNuxtApp(),
+            async action() {
+                await relaunch()
+            },
         }));
 
         items.push(await MenuItem.new({

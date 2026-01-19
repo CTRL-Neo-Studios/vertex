@@ -4,6 +4,8 @@ import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useFileIO} from "~/composables/io/useFileIO";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+
 
 const openingFile = ref(false)
 const loadingRecents = ref(true)
@@ -11,6 +13,12 @@ const $act = useAppSessionActions()
 const $menu = useAppWindowMenu()
 const $sessions = useAppSessions()
 const $fio = useFileIO()
+const $win = useAppWebviewWindows()
+
+onMounted(async () => {
+    console.log(`Windows: ${await $win.getAppWindows()}`)
+})
+
 const recentsList = computedAsync(async (onCancel) => {
     const abortController = new AbortController()
     onCancel(() => abortController.abort())
@@ -34,16 +42,29 @@ $menu.dispatcher.on('categories.file.open.openFolder', async () => {
     await openFolder()
 })
 
-async function openFile() {
+async function openFile(path?: string) {
     openingFile.value = true
-    const window = await $act.openSinglespaceAction()
+    if (!path)
+        await $act.openSinglespaceAction()
+    else
+        await $act.openSinglespaceFromPath(path)
     openingFile.value = false
 }
 
-async function openFolder() {
+async function openFolder(path?: string) {
     openingFile.value = true
-    const window = await $act.openWorkspaceAction()
+    if (!path)
+        await $act.openWorkspaceAction()
+    else
+        await $act.openWorkspaceFromPath(path)
     openingFile.value = false
+}
+
+async function openPath(path: string | undefined, workspace: boolean) {
+    if (workspace)
+        await openFolder(path)
+    else
+        await openFile(path)
 }
 
 </script>
@@ -52,12 +73,12 @@ async function openFolder() {
     <div class="w-full h-screen grid grid-cols-2">
         <div class="w-full flex flex-col items-center justify-center" data-tauri-drag-region>
             <div class="grid grid-cols-1 gap-2 select-none" data-tauri-drag-region>
-                <NuxtImg src="icon.png" class="size-24 justify-self-center"/>
+                <img src="/icon.png" alt="vertex icon" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
                 <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
-                <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile" :disabled="openingFile"/>
-                <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder" :disabled="openingFile"/>
+                <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile()" :disabled="openingFile"/>
+                <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder()" :disabled="openingFile"/>
             </div>
         </div>
         <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">
@@ -68,7 +89,15 @@ async function openFolder() {
                         <UProgress class="max-w-lg"/>
                     </div>
                     <div class="grid-cols-1 grid gap-1 p-3 pt-8" v-else>
-                        <UButton v-for="(record, index) in recentsList" :key="index" class="cursor-pointer" :icon="record.workspace ? 'i-lucide-folder' : 'i-lucide-file'" color="neutral" variant="ghost">
+                        <UButton
+                            v-for="(record, index) in recentsList"
+                            :key="index"
+                            class="cursor-pointer"
+                            :icon="record.workspace ? 'i-lucide-folder' : 'i-lucide-file'"
+                            color="neutral"
+                            variant="ghost"
+                            @click="openPath(record.path, record.workspace)"
+                        >
                             <div class="flex flex-col justify-start items-start">
                                 <div class="text-left">{{record.name}}</div>
                                 <div class="text-muted text-xs text-left">{{record.path}}</div>

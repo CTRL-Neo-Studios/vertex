@@ -60,7 +60,9 @@ export function useAppSessionActions() {
      * 
      * @param path Absolute path to the folder
      */
-    async function openWorkspaceFromPath(path: string) {
+    async function openWorkspaceFromPath(path?: string) {
+        if (!path || !(await $fio.pathExists(path))) return;
+
         async function createWindow(path: string, existingSession?: AppSession) {
             let session
             if (!existingSession)
@@ -97,7 +99,9 @@ export function useAppSessionActions() {
      * 
      * @param path Absolute path to the file
      */
-    async function openSinglespaceFromPath(path: string) {
+    async function openSinglespaceFromPath(path?: string) {
+        if (!path || !(await $fio.pathExists(path))) return;
+
         async function createWindow(path: string, existingSession?: AppSession) {
             let session
             if (!existingSession)

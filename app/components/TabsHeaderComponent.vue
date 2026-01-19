@@ -9,11 +9,15 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
+const $aseshNavi = useAppSessionNavigator()
+const $qt = useQuickToasts()
 const {
     closeTab,
     openTab,
@@ -85,7 +89,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             async onSelect() {
                 openTab(setSinglespaceTempIndex().uuid)
             },
-            disabled: true // Disabled for now; I'm currently figuring out what's the best experience for using singlespace mode editor.
+            disabled: true // Disabled for now; I'm currently figuring out what's the best user experience for tabs.
         }], [], [{
             label: 'Clear All Tabs',
             icon: 'i-lucide-x',
@@ -93,7 +97,8 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             async onSelect(e: Event) {
                 await navigateTabInContext(sessionId)
                 clearTabs()
-            }
+            },
+            disabled: !unref(isWorkspace)
         }]
     ]
 
@@ -113,7 +118,19 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                     await toTab(i)
                 },
                 async exitTab() {
-                    await exitTab(i)
+                    if (i.changesSaved) {
+                        if (unref(isWorkspace))
+                            await exitTab(i)
+                        else {
+                            const sesh = $sesh.getSession(sessionId)
+                            if (sesh)
+                                await $aseshNavi.destroyWindowAndTryReturnToLastWindow(sesh)
+                            else
+                                $qt.error('Please restart your app. An error has occurred.')
+                        }
+                    } else {
+                        $qt.warning('Saving file...')
+                    }
                 },
                 async onSelect(e: Event) {
                     await toTab(i);

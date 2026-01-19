@@ -6,5 +6,6 @@ export interface AppSession {
     uuid: string,
     sessionType: 'workspace' | 'singlespace',
     rootFileOrFolderAbsolutePath?: string,
-    context: AppSessionContext
+    context: AppSessionContext,
+    lastUpdated?: Date
 }

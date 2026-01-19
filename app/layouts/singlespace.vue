@@ -11,6 +11,8 @@ import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {UnlistenFn} from "@tauri-apps/api/event";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -20,6 +22,7 @@ const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const activeTreeItem = ref()
 const $win = useAppWebviewWindows()
 
+const loading = ref(true)
 await until($sessionId).toMatch(v => v != undefined)
 
 const {
@@ -27,7 +30,6 @@ const {
     updateIndex,
     clearIndex,
     getFileByUuid,
-    addWindowCloseCallbacks
 } = useActiveSinglespaceIndex($sesh.getSession($sessionId))
 const {
     activeTabUuid,
@@ -36,9 +38,21 @@ const {
 const {
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
-const $menu = useAppWindowMenu($asesh.getCurrentAppSession() || undefined)
+const $menu = useAppWindowMenu()
+const $aseshNavi = useAppSessionNavigator()
+const $act = useAppSessionActions()
 
 let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
+
+$menu.dispatcher.on('categories.file.open.openFile', async () => {
+    await until(loading).toBe(false)
+    await $act.openSinglespaceAction()
+})
+
+$menu.dispatcher.on('categories.file.open.openFolder', async () => {
+    await until(loading).toBe(false)
+    await $act.openWorkspaceAction()
+})
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -54,8 +68,12 @@ onMounted(async () => {
         return;
     }
 
-    unlistenedWindows = await addWindowCloseCallbacks()
+    unlistenedWindows = await $aseshNavi.addWindowCloseCallbacks(activeSesh)
+
+    console.log(`Windows: ${await $win.getAppWindows()}`)
     await $menu.setMenu()
+
+    loading.value = false
 })
 
 onBeforeUnmount(async () => {

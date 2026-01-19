@@ -170,40 +170,6 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         return unref(fileIndex)[unref(absolutePathRef)]
     }
 
-    async function addWindowCloseCallbacks(): Promise<{ unlistenClose: UnlistenFn, unlistenDestroyed: UnlistenFn} | undefined> {
-        const currentWindow = $win.getCurrentAppWindow()
-        const currentAppSession = unref($asesh.currentAppSession)
-
-        if (!currentAppSession) return;
-
-        const unlistenClose = await currentWindow.listen('tauri://close-requested', async function (event) {
-            await $asesh.updateAppSession(currentAppSession.uuid, {
-                context: {
-                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
-                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
-                }
-            })
-        })
-
-        const unlistenDestroyed = await currentWindow.listen('tauri://destroyed', async function (event) {
-            await $asesh.updateAppSession(currentAppSession.uuid, {
-                context: {
-                    openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
-                        .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
-                }
-            })
-        })
-
-        console.log('Added window callbacks.')
-
-        return {
-            unlistenClose,
-            unlistenDestroyed
-        }
-    }
-
     /**
      * Clears the File index map.
      */
@@ -221,7 +187,6 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         setTemporaryIndex,
         clearIndex,
         convertTemporaryToValidIndex,
-        addWindowCloseCallbacks,
         fileIndexWithPathExists,
         fileIndexWithUuidExists,
     }

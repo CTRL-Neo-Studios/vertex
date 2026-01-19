@@ -18,8 +18,11 @@ export default defineNuxtConfig({
 
     // Enable SSG
     ssr: false,
+    ignore: ['**/src-tauri/**'],
     // Enables the development server to be discoverable by other devices when running on iOS physical devices
-    devServer: {host: process.env.TAURI_DEV_HOST || "localhost"},
+    devServer: {
+        host: '0',
+    },
     vite: {
         // Better support for Tauri CLI output
         clearScreen: false,
@@ -46,7 +49,9 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/webviewWindow",
                 "@tauri-apps/api/webview",
                 "@tauri-apps/api/window",
-                "@tauri-apps/plugin-process"
+                "@tauri-apps/plugin-process",
+                "@tauri-apps/api/event",
+                "@tauri-apps/api/core"
             ]
         }
     }

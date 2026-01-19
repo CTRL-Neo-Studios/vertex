@@ -9,8 +9,12 @@ export function useAppWebviewWindows() {
         return getCurrentWebviewWindow();
     }
 
+    async function getAppWindows(): Promise<WebviewWindow[]> {
+        return await getAllWebviewWindows()
+    }
+
     async function getFocusedAppWindow() {
-        const windows = await getAllWebviewWindows()
+        const windows = await getAppWindows()
         for (const window of windows) {
             if (await window.isFocused()) return window
         }
@@ -36,10 +40,8 @@ export function useAppWebviewWindows() {
     }
 
     async function getAppWindowWithLabel(label: PossiblyRef<string>) {
-        const windows = await getAllWebviewWindows()
-        for (const window of windows) {
-            if (window.label == unref(label)) return window
-        }
+        const windows = await getAppWindows()
+        return windows.find(i => i.label == unref(label))
     }
 
     async function getMainAppWindow() {
@@ -52,16 +54,61 @@ export function useAppWebviewWindows() {
     }
 
     async function destroyAllWindows() {
-        const windows = await getAllWebviewWindows()
+        const windows = await getAppWindows()
         for (const window of windows) {
             await window.destroy()
         }
     }
 
     async function closeAllWindows() {
-        const windows = await getAllWebviewWindows()
+        const windows = await getAppWindows()
         for (const window of windows) {
             await window.close()
+        }
+    }
+
+    async function hideMainWindow() {
+        const window = await getMainAppWindow()
+
+        if (!window) return;
+
+        await window.hide()
+    }
+
+    async function showMainWindow() {
+        const window = await getMainAppWindow()
+
+        if (!window) return;
+
+        await window.unminimize()
+        await window.show()
+    }
+
+    async function getSessionWindows() {
+        const windows = await getAppWindows()
+        return windows.filter(i => i.label.startsWith('session-'))
+    }
+
+    async function showLatestSessionWindow(setFocus: boolean = true): Promise<WebviewWindow | undefined> {
+        const windows = await getSessionWindows()
+
+        async function openLastWindow(index: number) {
+            if (index < 0) return;
+
+            const w = windows[index]
+            if (w) {
+                await w.unminimize()
+                await w.show()
+                if (setFocus)
+                    await w.setFocus()
+                return w;
+            } else {
+                return await openLastWindow(index - 1)
+            }
+        }
+
+        if (windows.length > 0) {
+            return await openLastWindow(windows.length - 1);
         }
     }
 
@@ -73,6 +120,11 @@ export function useAppWebviewWindows() {
         getMainAppWindow,
         isCurrentAppWindowMain,
         closeAllWindows,
-        destroyAllWindows
+        destroyAllWindows,
+        getAppWindows,
+        hideMainWindow,
+        showMainWindow,
+        getSessionWindows,
+        showLatestSessionWindow
     }
 }
