@@ -145,7 +145,7 @@ This design prevents confusion between "what's currently happening" (ActiveSessi
    - Extract UUID from window label (`session-{uuid}`)
    - Fetch corresponding AppSession from disk
 
-2. **Open Folder/File** (via `useAppOpener`)
+2. **Open Folder/File** (via `useAppSessionNavigator`)
    - Opens the rootPath from AppSession
    - Creates an ActiveSession for runtime use
    - Navigates to workspace or singlespace route
@@ -223,7 +223,7 @@ To maintain clean code and prevent circular dependencies, Vertex's session manag
 - `recoverSavedAppSessions()` - Create windows (main window only)
 - `initializeCurrentAppSession()` - Get current window's session
 
-### Layer 2: Business Logic - `useAppOpener()`
+### Layer 2: Business Logic - `useAppSessionNavigator()`
 
 **Responsibility**: Opening files/folders and creating runtime sessions.
 
@@ -257,7 +257,7 @@ To maintain clean code and prevent circular dependencies, Vertex's session manag
 
 **What it does**:
 - Takes an AppSession (from Layer 1)
-- Uses useAppOpener (Layer 2) to open folder/file
+- Uses useAppSessionNavigator (Layer 2) to open folder/file
 - Recovers tabs based on AppSession context
 - Focuses the window
 
@@ -278,7 +278,7 @@ graph TB
     
     Recovery["useAppSessionRecovery()<br/><b>Layer 3: Orchestration</b>"]
     Sessions["useAppSessions()<br/><b>Layer 1: Persistence</b>"]
-    Opener["useAppOpener()<br/><b>Layer 2: Business Logic</b>"]
+    Opener["useAppSessionNavigator()<br/><b>Layer 2: Business Logic</b>"]
     
     Plugin -->|orchestrates| Recovery
     Recovery -->|coordinates| Sessions
@@ -324,12 +324,12 @@ graph TB
 ### Why This Architecture Matters
 
 **Problem We Avoided**: 
-Originally, `useAppSessions` called `useAppOpener` directly in a `saturateAppSession()` function. If `useAppOpener` ever needed session information, we'd have a circular dependency:
+Originally, `useAppSessions` called `useAppSessionNavigator` directly in a `saturateAppSession()` function. If `useAppSessionNavigator` ever needed session information, we'd have a circular dependency:
 
 ```
-useAppSessions imports useAppOpener
+useAppSessions imports useAppSessionNavigator
          ↓
-useAppOpener imports useAppSessions
+useAppSessionNavigator imports useAppSessions
          ↓
    CIRCULAR DEPENDENCY ❌
     (Cannot be resolved)
@@ -340,9 +340,9 @@ By creating a separate orchestration layer (`useAppSessionRecovery`), we break t
 
 ```
 useAppSessionRecovery imports useAppSessions
-useAppSessionRecovery imports useAppOpener
+useAppSessionRecovery imports useAppSessionNavigator
          ↓
-useAppSessions ←─→ useAppOpener
+useAppSessions ←─→ useAppSessionNavigator
   (no imports between them) ✅
 ```
 
@@ -386,7 +386,7 @@ sequenceDiagram
     participant Plugin as initialize.client.ts
     participant Sessions as useAppSessions()
     participant Recovery as useAppSessionRecovery()
-    participant Opener as useAppOpener()
+    participant Opener as useAppSessionNavigator()
 
     Win->>Plugin: Window starts
     Plugin->>Sessions: initializeCurrentAppSession()

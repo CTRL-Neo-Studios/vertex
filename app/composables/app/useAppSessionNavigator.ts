@@ -10,7 +10,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {defaultActiveSession} from "#shared/utils/defaults/actives";
 
-export function useAppOpener() {
+export function useAppSessionNavigator() {
     const $sesh = useActiveSessions()
     const $navi = useAppNavigator()
     const $win = useAppWebviewWindows()

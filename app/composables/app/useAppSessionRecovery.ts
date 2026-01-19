@@ -1,4 +1,4 @@
-import { useAppOpener } from "~/composables/app/useAppOpener";
+import { useAppSessionNavigator } from "~/composables/app/useAppSessionNavigator";
 import { useAppWebviewWindows } from "~/composables/app/useAppWebviewWindows";
 import { useActiveWorkspaceIndex } from "~/composables/active/useActiveWorkspaceIndex";
 import { useActiveTabs } from "~/composables/active/useActiveTabs";
@@ -8,16 +8,16 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 
 /**
  * Orchestrates the recovery/saturation of session windows.
- * This composable sits at a higher level than useAppSessions and useAppOpener,
+ * This composable sits at a higher level than useAppSessions and useAppSessionNavigator,
  * coordinating between them to recover window states from persisted AppSessions.
  * 
  * Separation of Concerns:
  * - useAppSessions: Pure persistence layer for AppSession CRUD
- * - useAppOpener: Pure business logic for opening files/folders and creating ActiveSessions
+ * - useAppSessionNavigator: Pure business logic for opening files/folders and creating ActiveSessions
  * - useAppSessionRecovery: Orchestration layer that uses both to recover window state
  */
 export function useAppSessionRecovery() {
-    const $open = useAppOpener();
+    const $open = useAppSessionNavigator();
     const $win = useAppWebviewWindows();
     const $navi = useAppNavigator()
     const lastRedirect = useState<{redirect: "workspace" | "singlespace", workingSession: ActiveSession} | undefined>('app.store.lastRedirected', () => undefined)

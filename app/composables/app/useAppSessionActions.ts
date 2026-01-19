@@ -1,6 +1,6 @@
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppOpener} from "~/composables/app/useAppOpener";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import useUuid from "~/composables/utility/useUuid";
 import {defaultAppSession} from "#shared/utils/defaults/apps";
 import {useFileIO} from "~/composables/io/useFileIO";
@@ -29,7 +29,7 @@ import type {AppSession} from "#shared/types/app/sessions";
 export function useAppSessionActions() {
     const $sessions = useAppSessions()
     const $win = useAppWebviewWindows()
-    const $open = useAppOpener()
+    const $open = useAppSessionNavigator()
     const $fio = useFileIO()
 
     /**
