@@ -27,6 +27,10 @@ export function useAppWindowMenu() {
         hasRedo: false,
     } satisfies MenuState));
 
+    onUnmounted(() => {
+        dispatcher.unmount()
+    })
+
     const isRoute = definePredicate((path: string) => {
         return $route.path == path
     })
