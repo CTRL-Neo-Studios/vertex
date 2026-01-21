@@ -5,6 +5,8 @@ import useUuid from "~/composables/utility/useUuid";
 import {defaultAppSession} from "#shared/utils/defaults/apps";
 import {useFileIO} from "~/composables/io/useFileIO";
 import type {AppSession} from "#shared/types/app/sessions";
+import {save} from "@tauri-apps/plugin-dialog";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 /**
  * High-level actions for session/window management.
@@ -31,6 +33,7 @@ export function useAppSessionActions() {
     const $win = useAppWebviewWindows()
     const $open = useAppSessionNavigator()
     const $fio = useFileIO()
+    const $qt = useQuickToasts()
 
     /**
      * Opens a folder picker and creates a new workspace session window.
@@ -52,6 +55,50 @@ export function useAppSessionActions() {
         if (!path) return; // User cancelled
 
         return await openSinglespaceFromPath(path)
+    }
+
+    async function createNewFileForSinglespace(openImmediately: boolean = true) {
+        let path = await save({
+            filters: [{
+                name: 'Markdown Files',
+                extensions: ['md', 'mdx']
+            }, {
+                name: 'Text Files',
+                extensions: ['txt']
+            }],
+            title: 'Create new Markdown/Text File',
+        })
+
+        if (!path) return;
+
+        if (await $fio.pathExists(path)) {
+            $qt.error('A file already exists in that path.')
+            return;
+        }
+
+        const fileName = await $fio.getFileNameFromPath(path)
+        const allowedExtensions: string[] = [".md", ".txt", "mdx"]
+
+        // If the returned file path does not end with any extensions listed above
+        console.log(`returned path ${path}`)
+        if (allowedExtensions.findIndex(i => fileName.endsWith(i)) == -1) {
+            $qt.error('Your file must be a Markdown/Text file.')
+            return;
+        }
+
+        try {
+            const file = await $fio.createFile(path)
+            await file?.close()
+
+            if (openImmediately) {
+                await openSinglespaceFromPath(path)
+            }
+        } catch(e: any) {
+            console.error(e)
+            $qt.error('Unable to create file', e.message);
+        }
+
+        return path;
     }
 
     /**
@@ -143,6 +190,8 @@ export function useAppSessionActions() {
         
         // Aliases for backward compatibility (if needed)
         openFolderAction: openWorkspaceAction,
-        openFileAction: openSinglespaceAction
+        openFileAction: openSinglespaceAction,
+
+        createNewFileForSinglespace
     }
 }

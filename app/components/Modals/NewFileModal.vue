@@ -7,7 +7,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 const props = defineProps<{
     modalTitle?: string,
-    atFileIndexId: string,
+    atFileIndexId?: string,
     asFolder: boolean,
     isFolder: boolean,
     asLevel: "above" | "same" | "below",

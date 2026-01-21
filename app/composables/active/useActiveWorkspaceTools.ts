@@ -27,7 +27,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
      *                   - "below": Inside the folder specified by `atUuidRef`. If `atUuidRef` is a file, creates at the same level.
      *                   - "same" | "above": In the same directory as the item specified by `atUuidRef`.
      */
-    async function createFile(atUuidRef: PossiblyRef<string>, fileNameRef: PossiblyRef<string>, asFolderRef?: PossiblyRef<boolean>, atLevelRef: PossiblyRef<"above" | "same" | "below"> = "below") {
+    async function createFile(atUuidRef: PossiblyRef<string | undefined>, fileNameRef: PossiblyRef<string>, asFolderRef?: PossiblyRef<boolean>, atLevelRef: PossiblyRef<"above" | "same" | "below"> = "below") {
         if (!session?.rootPath) return;
 
         const atUuid = unref(atUuidRef);
@@ -42,39 +42,49 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
 
         const anchorNode = getFileByUuid(atUuid);
         if (!anchorNode) {
-            console.error(`[createFile] Anchor node with UUID ${atUuid} not found.`);
-            return;
-        }
+            const newPath = await join(session.rootPath, fileName);
+            try {
+                if (asFolder) {
+                    await $fileio.createFolder(newPath);
+                } else {
+                    await $fileio.writeTextToFile(newPath, ' ');
+                }
 
-        let parentDir: string;
-        const anchorStats = await stat(anchorNode.fullPath);
-
-        if (anchorStats.isDirectory && atLevel === 'below') {
-            parentDir = anchorNode.fullPath;
+                return await addFileToIndex(newPath, session.rootPath)
+            } catch (error) {
+                console.error(`[createFile] Error creating file/folder at ${newPath}:`, error);
+            }
         } else {
-            parentDir = await dirname(anchorNode.fullPath);
-        }
+            let parentDir: string;
+            const anchorStats = await stat(anchorNode.fullPath);
 
-        const newPath = await join(parentDir, fileName);
-
-        if (await exists(newPath)) {
-            console.warn(`[createFile] Path already exists: ${newPath}. Aborting.`);
-            return;
-        }
-
-        try {
-            if (asFolder) {
-                await $fileio.createFolder(newPath);
+            if (anchorStats.isDirectory && atLevel === 'below') {
+                parentDir = anchorNode.fullPath;
             } else {
-                await $fileio.writeTextToFile(newPath, ' ');
+                parentDir = await dirname(anchorNode.fullPath);
             }
 
-            return await addFileToIndex(newPath, session.rootPath)
-            // if (!asFolder && newFileNode) {
-            //     $tabs.openTab(newFileNode.uuid);
-            // }
-        } catch (error) {
-            console.error(`[createFile] Error creating file/folder at ${newPath}:`, error);
+            const newPath = await join(parentDir, fileName);
+
+            if (await exists(newPath)) {
+                console.warn(`[createFile] Path already exists: ${newPath}. Aborting.`);
+                return;
+            }
+
+            try {
+                if (asFolder) {
+                    await $fileio.createFolder(newPath);
+                } else {
+                    await $fileio.writeTextToFile(newPath, ' ');
+                }
+
+                return await addFileToIndex(newPath, session.rootPath)
+                // if (!asFolder && newFileNode) {
+                //     $tabs.openTab(newFileNode.uuid);
+                // }
+            } catch (error) {
+                console.error(`[createFile] Error creating file/folder at ${newPath}:`, error);
+            }
         }
     }
 

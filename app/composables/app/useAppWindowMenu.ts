@@ -29,8 +29,8 @@ export function useAppWindowMenu() {
         return $route.path == path
     })
 
-    const hasRoute = definePredicate((path: string) => {
-        return $route.path.includes(path)
+    const hasRoute = definePredicate((...path: string[]) => {
+        return path.find(i => $route.path.includes(i)) != null
     })
 
     const $inSinglespace = hasRoute('/singlespace')
@@ -39,7 +39,7 @@ export function useAppWindowMenu() {
 
     const $inMain = isRoute('/')
 
-    const $inFunctional = hasRoute('/settings')
+    const $inFunctional = hasRoute('/settings', '/loading')
 
     const $inEditingSpace = or($inWorkspace, $inSinglespace)
 
@@ -98,10 +98,10 @@ export function useAppWindowMenu() {
                     text: 'New Folder',
                     accelerator: 'CmdOrCtrl+Shift+N',
                     action:  () => handleNewFolder(),
-                    // enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),
+                    enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),
                 })
             ],
-            enabled: evaluateUnref(and($canCreateItems, $inWorkspace))
+            enabled: evaluateUnref(not($inFunctional))
         });
 
         const openSubmenu = await Submenu.new({
@@ -176,35 +176,15 @@ export function useAppWindowMenu() {
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
 
-        items.push(await MenuItem.new({
-            id: 'cut',
-            text: 'Cut',
-            accelerator: 'CmdOrCtrl+X',
-            action: () => document.execCommand('cut'),
-        }));
+        items.push(await PredefinedMenuItem.new({ item: 'Cut' }));
 
-        items.push(await MenuItem.new({
-            id: 'copy',
-            text: 'Copy',
-            accelerator: 'CmdOrCtrl+C',
-            action: () => document.execCommand('copy'),
-        }));
+        items.push(await PredefinedMenuItem.new({ item: 'Copy' }));
 
-        items.push(await MenuItem.new({
-            id: 'paste',
-            text: 'Paste',
-            accelerator: 'CmdOrCtrl+V',
-            action: () => document.execCommand('paste'),
-        }));
+        items.push(await PredefinedMenuItem.new({ item: 'Paste' }));
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
 
-        items.push(await MenuItem.new({
-            id: 'select-all',
-            text: 'Select All',
-            accelerator: 'CmdOrCtrl+A',
-            action: () => document.execCommand('selectAll'),
-        }));
+        items.push(await PredefinedMenuItem.new({ item: 'SelectAll' }));
 
         return await Submenu.new({
             text: 'Edit',

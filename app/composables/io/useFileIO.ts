@@ -9,7 +9,8 @@ import {
     remove,
     rename,
     stat,
-    writeTextFile
+    writeTextFile,
+    create, FileHandle
 } from "@tauri-apps/plugin-fs";
 import {basename, dirname, join} from "@tauri-apps/api/path";
 
@@ -35,6 +36,15 @@ export function useFileIO() {
 
         if (!fullPath || !data) return;
         await writeTextFile(fullPath, data);
+    }
+
+    async function createFile(
+        fullPathRef: PossiblyRef<string | undefined>
+    ): Promise<FileHandle | undefined> {
+        const fullPath = unref(fullPathRef)
+
+        if (!fullPath) return;
+        return await create(fullPath)
     }
 
     /**
@@ -238,6 +248,7 @@ export function useFileIO() {
         listDirectory,
         moveFileOrFolder,
         getFileNameFromPath,
-        processFileNameFromPath
+        processFileNameFromPath,
+        createFile
     }
 }

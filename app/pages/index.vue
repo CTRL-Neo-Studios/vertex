@@ -36,10 +36,15 @@ const recentsList = computedAsync(async (onCancel) => {
 }, [], loadingRecents)
 
 $menu.dispatcher.on('categories.file.open.openFile', async () => {
+    console.log('openfile')
     await openFile()
 })
 $menu.dispatcher.on('categories.file.open.openFolder', async () => {
+    console.log('openfolder')
     await openFolder()
+})
+$menu.dispatcher.on('categories.file.new.newFile', async () => {
+    await createFile()
 })
 
 async function openFile(path?: string) {
@@ -57,6 +62,12 @@ async function openFolder(path?: string) {
         await $act.openWorkspaceAction()
     else
         await $act.openWorkspaceFromPath(path)
+    openingFile.value = false
+}
+
+async function createFile() {
+    openingFile.value = true
+    await $act.createNewFileForSinglespace()
     openingFile.value = false
 }
 
@@ -81,7 +92,7 @@ async function openPath(path: string | undefined, workspace: boolean) {
                 <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder()" :disabled="openingFile"/>
             </div>
         </div>
-        <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full">
+        <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full select-none">
             <ScrollAreaRoot class="max-h-screen relative" style="--scrollbar-size: 10px">
                 <div class="text-xs text-muted/50 absolute top-0 bg-linear-to-t from-transparent via-submuted to-submuted h-12 p-3 w-full z-10">Recently Opened</div>
                 <ScrollAreaViewport class="w-full h-full">

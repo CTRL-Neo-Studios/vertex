@@ -8,10 +8,13 @@ import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import useUuid from "~/composables/utility/useUuid";
+import type {ContextMenuItem} from "@nuxt/ui";
+import NewFileModal from "~/components/Modals/NewFileModal.vue";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
+const $ovl = useOverlay()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const {
     fileTree,
@@ -30,6 +33,7 @@ const {
     leftPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
 const activeTreeItem = useState<string>(`active.workspace.active-tree-item-${unref($sessionId) ?? useUuid()}`, () => '')
+const newFileModal = $ovl.create(NewFileModal)
 
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
@@ -39,6 +43,36 @@ async function onClickFile(item: UITreeNode) {
     const tab = openTab(item.uuid)
     await $navi.toWorkspaceTab($sesh.getSession($sessionId)?.uuid || '', tab)
 }
+
+const contextMenuItems = ref<ContextMenuItem[][]>([
+    [
+        {
+            label: 'New Markdown File',
+            icon: 'i-lucide-file-plus',
+            onSelect(e) {
+                newFileModal.open({
+                    isFolder: false,
+                    modalTitle: 'New Markdown File',
+                    asFolder: false,
+                    asLevel: 'same',
+                    fileExt: 'md'
+                })
+            }
+        },
+        {
+            label: 'New Folder',
+            icon: 'i-lucide-folder-dot',
+            onSelect(e) {
+                newFileModal.open({
+                    isFolder: true,
+                    modalTitle: 'New Folder',
+                    asFolder: true,
+                    asLevel: 'same'
+                })
+            },
+        }
+    ]
+])
 </script>
 
 <template>
@@ -75,26 +109,11 @@ async function onClickFile(item: UITreeNode) {
             </UDashboardNavbar>
         </template>
         <template #body>
-<!--            <ScrollAreaRoot class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px">-->
-<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-linear-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`"/>-->
-<!--                <ScrollAreaViewport class="h-full" data-tauri-drag-region>-->
-<!--                    <div class="w-full">-->
-<!--                        -->
-<!--                    </div>-->
-<!--                </ScrollAreaViewport>-->
-<!--                <ScrollAreaScrollbar-->
-<!--                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"-->
-<!--                    orientation="vertical"-->
-<!--                >-->
-<!--                    <ScrollAreaThumb-->
-<!--                        class="flex-1 bg-accented rounded-lg"-->
-<!--                    />-->
-<!--                </ScrollAreaScrollbar>-->
-<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-linear-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>-->
-<!--            </ScrollAreaRoot>-->
-            <UScrollArea orientation="vertical" class="no-scrollbar" data-tauri-drag-region>
-                <FileTreeComponent :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
-            </UScrollArea>
+            <UContextMenu :items="contextMenuItems">
+                <UScrollArea orientation="vertical" class="no-scrollbar h-full" data-tauri-drag-region>
+                    <FileTreeComponent :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+                </UScrollArea>
+            </UContextMenu>
         </template>
     </UDashboardPanel>
 </template>

@@ -54,6 +54,11 @@ $menu.dispatcher.on('categories.file.open.openFolder', async () => {
     await $act.openWorkspaceAction()
 })
 
+$menu.dispatcher.on('categories.file.new.newFile', async () => {
+    await until(loading).toBe(false)
+    await $act.createNewFileForSinglespace()
+})
+
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
 }, {deep: false})

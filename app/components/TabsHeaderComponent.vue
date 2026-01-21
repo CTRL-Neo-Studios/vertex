@@ -171,7 +171,7 @@ const panelsCollapsed = computed(() => {
                     />
                     <UButton icon="i-lucide-x" size="xs" color="error" variant="ghost" @click="tab.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
                 </div>
-                <template v-if="unref(tabs).length == 0">
+                <template v-if="tabs.length == 0">
                     <UButton variant="subtle" color="primary" size="sm" label="Empty Tab"/>
                 </template>
             </div>
