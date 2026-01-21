@@ -8,11 +8,11 @@
 }
 
 @theme {
-    --font-sans: 'Inter', sans-serif;
+    --font-sans: 'Geist Sans', 'Inter', sans-serif;
 
-    --font-mono: 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace;
 
-    --font-editor: 'Inter', var(--font-sans, sans-serif);
+    --font-editor: 'Geist Sans', 'Inter', var(--font-sans, sans-serif);
 
     --font-editor-code: var(--font-mono, monospace), monospace, ui-monospace;
 

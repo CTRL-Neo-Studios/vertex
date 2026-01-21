@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 onMounted(async () => {
 
 });
+
 </script>
 
 <template>

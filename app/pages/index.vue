@@ -47,6 +47,11 @@ $menu.dispatcher.on('categories.file.new.newFile', async () => {
     await createFile()
 })
 
+onUnmounted(() => {
+    console.log('unmounted for some reason')
+    $menu.dispatcher.unmount()
+})
+
 async function openFile(path?: string) {
     openingFile.value = true
     if (!path)

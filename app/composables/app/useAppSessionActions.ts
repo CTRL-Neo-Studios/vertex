@@ -172,7 +172,7 @@ export function useAppSessionActions() {
             if (window) {
                 await window.setFocus()
             } else {
-                return await createWindow(path)
+                return await createWindow(path, sesh)
             }
         } else {
             return await createWindow(path)

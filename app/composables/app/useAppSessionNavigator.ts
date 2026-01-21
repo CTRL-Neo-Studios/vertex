@@ -144,7 +144,8 @@ export function useAppSessionNavigator() {
         const lastWindow = await $win.showLatestSessionWindow()
 
         if ((await $win.getSessionWindows()).length <= 1) {
-            await $win.showMainWindow()
+            const mainWindow = await $win.showMainWindow()
+            await mainWindow?.setFocus()
         }
 
         await currentWindow.destroy()

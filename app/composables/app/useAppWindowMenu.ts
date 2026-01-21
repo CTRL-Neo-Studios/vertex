@@ -3,6 +3,7 @@ import {exit, relaunch} from '@tauri-apps/plugin-process'
 import type {AppSession} from "#shared/types/app/sessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {WindowMenuEvents} from "#shared/types/app/events";
+import {useAppSessions} from "~/composables/app/useAppSessions";
 
 interface MenuState {
     canSave: boolean;
@@ -15,10 +16,11 @@ export function useAppWindowMenu() {
     const $route = useRoute();
     const { and, or, not, evaluate, evaluateUnref } = usePredicateLogic()
     const $win = useAppWebviewWindows()
+    const $sessions = useAppSessions()
 
-    const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu`)
+    const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
 
-    const menuState = useState<MenuState>(`window.menu.state`, () => ({
+    const menuState = useState<MenuState>(`window.menu.state.${$sessions.getCurrentAppSession()?.uuid}`, () => ({
         canSave: false,
         hasSelection: false,
         hasUndo: false,

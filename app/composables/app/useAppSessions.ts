@@ -302,10 +302,7 @@ export function useAppSessions() {
         const window = $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
 
         if (unref(hideMainWindow)) {
-            const mainWindow = $win.getCurrentAppWindow()
-            if ($win.isCurrentAppWindowMain()) {
-                await mainWindow.hide()
-            }
+            await $win.hideMainWindow()
         }
 
         return window

@@ -82,6 +82,8 @@ export function useAppWebviewWindows() {
 
         await window.unminimize()
         await window.show()
+
+        return window;
     }
 
     async function getSessionWindows() {
