@@ -8,11 +8,11 @@
 }
 
 @theme {
-    --font-sans: 'Geist Sans', 'Inter', sans-serif;
+    --font-sans: 'Geist', 'Inter', sans-serif;
 
     --font-mono: 'Geist Mono', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace;
 
-    --font-editor: 'Geist Sans', 'Inter', var(--font-sans, sans-serif);
+    --font-editor: 'Geist', 'Inter', var(--font-sans, sans-serif);
 
     --font-editor-code: var(--font-mono, monospace), monospace, ui-monospace;
 
@@ -98,5 +98,9 @@
 }
 
 .dark {
-    --color-submuted: oklch(22.0% 0 0);
+    --color-submuted: oklch(var(--ui-bg-muted));
+
+    .bg-submuted {
+        @apply bg-inverted/2;
+    }
 }

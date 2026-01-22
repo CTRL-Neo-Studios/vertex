@@ -67,7 +67,7 @@ and the UDashboardPanel is used as a lesser alternative that requires more effor
         collapsible
         resizable
         :ui="{
-            root: 'border-l-0 border-none',
+            root: 'border-l-0 border-none bg-submuted',
             body: 'px-2 sm:px-2 sm:py-0 border-l-0'
         }"
     >
@@ -80,7 +80,7 @@ and the UDashboardPanel is used as a lesser alternative that requires more effor
             />
         </template>
         <template #header>
-            <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-2 w-full flex px-0', center: 'w-full px-0 py-0', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
+            <UDashboardNavbar :ui="{ root: 'h-(--ui-header-height) sm:px-1 w-full flex border-b border-default', center: 'w-full p-0', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
                 <div class="flex flex-col items-center justify-center">
                     <SidebarCollapserButton side="right"/>
                 </div>
@@ -89,33 +89,16 @@ and the UDashboardPanel is used as a lesser alternative that requires more effor
             </UDashboardNavbar>
         </template>
         <template #body>
-<!--            <ScrollAreaRoot class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px">-->
-<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 top-0 bg-linear-to-t from-transparent to-submuted h-4 w-full z-10 inline-flex justify-start items-center pointer-events-none`">-->
-<!--                    <div class="text-sm text-muted text-left select-none">{{ rightPanelItems.find(i => i.value == activeRightPanel)?.label }}</div>-->
-<!--                </div>-->
-<!--                <ScrollAreaViewport class="h-full">-->
-
-<!--                </ScrollAreaViewport>-->
-<!--                <ScrollAreaScrollbar-->
-<!--                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"-->
-<!--                    orientation="vertical"-->
-<!--                >-->
-<!--                    <ScrollAreaThumb-->
-<!--                        class="flex-1 bg-accented rounded-lg"-->
-<!--                    />-->
-<!--                </ScrollAreaScrollbar>-->
-<!--                <div :class="`absolute transition-all duration-300 right-0 left-0 bottom-0 bg-linear-to-b from-transparent via-submuted to-submuted h-4 w-full z-10 inline-flex justify-end items-center gap-1 pointer-events-none`"/>-->
-<!--            </ScrollAreaRoot>-->
             <UScrollArea orientation="vertical" class="no-scrollbar" data-tauri-drag-region>
                 <div class="w-full">
                     <template v-if="activeRightPanel == 'reflinks'">
-                        <ReferenceLinksListComponent class="w-full h-full mt-5"/>
+                        <ReferenceLinksListComponent class="w-full h-full mt-2"/>
                     </template>
                     <template v-else-if="activeRightPanel == 'writer'">
-                        <WritersInfoPanelComponent class="w-full h-full mt-5"/>
+                        <WritersInfoPanelComponent class="w-full h-full mt-2"/>
                     </template>
                     <template v-else-if="activeRightPanel == 'toc'">
-                        <TableOfContentsPanelComponent @to-toc="(entry) => emit('to-toc', entry)" class="w-full h-full mt-5"/>
+                        <TableOfContentsPanelComponent @to-toc="(entry) => emit('to-toc', entry)" class="w-full h-full mt-2"/>
                     </template>
                 </div>
             </UScrollArea>

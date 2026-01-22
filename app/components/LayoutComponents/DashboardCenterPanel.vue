@@ -20,15 +20,15 @@ const panelsCollapsed = computed(() => {
     <UDashboardPanel
         id="content"
         :ui="{
-            body: `relative sm:p-0 bg-gradient-to-b from-default to-default rounded-xl border-default overflow-visible mb-2.5 mx-2.5 ${panelsCollapsed ? 'border-0' : 'border shadow-lg shadow-neutral'}`,
-            root: `lg:not-last:border-r-0`
+            body: `relative sm:p-0 bg-default border-default overflow-visible ${panelsCollapsed ? 'border-0' : 'border-0 shadow-none shadow-neutral'}`,
+            root: `lg:not-last:border-r`,
         }"
         resizable
     >
         <template #header>
-            <UDashboardNavbar :ui="{ root: 'border-b-0 h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
+            <UDashboardNavbar :ui="{ root: 'border-b h-(--ui-header-height) sm:p-0 p-0 w-full gap-0', center: 'w-full h-full p-0 sm:p-0 m-0 sm:m-0 gap-0', left: 'pl-0 gap-0', right: 'pr-0 gap-0' }" data-tauri-drag-region>
                 <template #default>
-                    <TabsHeaderComponent class="w-full"/>
+                    <TabsHeaderComponent/>
                 </template>
             </UDashboardNavbar>
         </template>

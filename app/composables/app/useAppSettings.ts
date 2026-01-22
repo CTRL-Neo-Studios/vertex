@@ -1,21 +1,27 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
-import { defaultAppConfig } from "#shared/utils/defaults/apps";
-import type { AppConfig } from "#shared/types/app/config";
+import { defaultAppSettings } from "#shared/utils/defaults/apps";
+import type { AppSettings } from "#shared/types/app/settings";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
+import type {DeepPartial} from "#shared/types/types";
 
-const STORE_FILENAME = 'config.json';
-const STORE_KEY = 'config';
+const STORE_FILENAME = 'settings.json';
+const STORE_KEY = 'settings';
 
 /**
  * A composable for managing the application's configuration.
  * It handles loading from and saving to the Tauri store,
  * provides default values, and shares the config reactively across the app.
  */
-export function useAppConfiguration() {
-    const config = useState<AppConfig | null>(`${STORE_KEY}.data`, () => null);
+export function useAppSettings() {
+    const config = useState<AppSettings | null>(`${STORE_KEY}.data`, () => null);
 
     const isLoaded = useState<boolean>(`${STORE_KEY}.is_loaded`, () => false);
 
     const fileStore = new LazyStore(STORE_FILENAME);
+
+    const $win = useAppWebviewWindows()
+    const $qt = useQuickToasts()
 
     /**
      * Loads the configuration from the Tauri store.
@@ -29,9 +35,9 @@ export function useAppConfiguration() {
 
         try {
             await fileStore.init();
-            const storedData = await fileStore.get<AppConfig>(STORE_KEY);
+            const storedData = await fileStore.get<AppSettings>(STORE_KEY);
 
-            config.value = defaultAppConfig(storedData);
+            config.value = defaultAppSettings(storedData);
 
             if (!storedData) {
                 await fileStore.set(STORE_KEY, unref(config));
@@ -40,7 +46,7 @@ export function useAppConfiguration() {
 
         } catch (error) {
             console.error("Fatal: Failed to load application config:", error);
-            config.value = defaultAppConfig();
+            config.value = defaultAppSettings();
         } finally {
             isLoaded.value = true;
         }
@@ -53,16 +59,19 @@ export function useAppConfiguration() {
      * @param newData - An optional object with partial config values to update.
      *                  If not provided, the current state will be saved.
      */
-    async function save(newData?: PossiblyRef<Partial<AppConfig>>) {
+    async function save(newData?: PossiblyRef<Partial<AppSettings>>): Promise<boolean> {
+        let success: boolean = true
+
         if (!unref(config)) {
             console.warn("Attempted to save config before it was loaded. Operation skipped.");
-            return;
+            success = false
+            return success;
         }
 
         const updateData = unref(newData);
 
         if (updateData) {
-            config.value = defaultAppConfig({
+            config.value = defaultAppSettings({
                 ...config.value,
                 ...updateData,
             });
@@ -73,6 +82,41 @@ export function useAppConfiguration() {
             await fileStore.save();
         } catch (error) {
             console.error("Failed to save application config:", error);
+            success = false
+        }
+
+        return success
+    }
+
+    function set(data: DeepPartial<AppSettings>) {
+        if (config.value)
+            config.value = defaultAppSettings({
+                ...unref(config),
+                ...data
+            })
+    }
+
+    async function createOrFocusSettingsWindow() {
+        const window = await $win.getAppWindowWithLabel('settings')
+        if (window)
+            await $win.showWindowWithLabel('settings')
+        else {
+            const settingsWindow = $win.createAppWebviewWindow('/settings', 'settings', 'Settings')
+
+            const closeUnlisten = await settingsWindow.listen('tauri://close-requested', async function (e) {
+                const success = await save()
+                if (success)
+                    $qt.error('Unable to save settings')
+                else
+                    await settingsWindow.destroy()
+
+                closeUnlisten()
+            })
+
+            const destroyUnlisten = await settingsWindow.listen('tauri://destroyed', async function (e) {
+                const success = await save()
+                destroyUnlisten()
+            })
         }
     }
 
@@ -88,5 +132,7 @@ export function useAppConfiguration() {
         isLoaded,
         load,
         save,
+        set,
+        createOrFocusSettingsWindow
     };
 }

@@ -1,7 +1,7 @@
 export default defineNuxtConfig({
     devtools: {enabled: false},
 
-    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor", "@nuxt/a11y", "@type32/dispatcher", "@type32/nuxt-predicates"],
+    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor", "@type32/dispatcher", "@type32/nuxt-predicates"],
 
     css: ["~/assets/css/main.css"],
 
@@ -9,10 +9,12 @@ export default defineNuxtConfig({
 
     fonts: {
         families: [
-            {name: 'SF Pro', provider: 'local'},
-            {name: 'SF Mono', provider: 'local'},
-            {name: 'SF-Pro', provider: 'local'},
-            {name: 'SF-Mono', provider: 'local'}
+            { name: 'SF Pro', provider: 'local' },
+            { name: 'SF Mono', provider: 'local' },
+            { name: 'SF-Pro', provider: 'local' },
+            { name: 'SF-Mono', provider: 'local' },
+            { name: 'Geist', provider: 'google', global: true },
+            { name: 'Inter', provider: 'google', global: true },
         ]
     },
 
@@ -51,7 +53,8 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/window",
                 "@tauri-apps/plugin-process",
                 "@tauri-apps/api/event",
-                "@tauri-apps/api/core"
+                "@tauri-apps/api/core",
+                "tailwindcss/colors"
             ]
         }
     }

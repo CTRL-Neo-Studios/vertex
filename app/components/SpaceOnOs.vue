@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import {useOsPlatform} from "~/composables/utility/useOsPlatform";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     detectOs: string,
-    showOnOs: boolean
-}>()
+    showOnOs: boolean,
+    class?: string
+}>(), {
+    class: 'w-24'
+})
 
 const $platform = useOsPlatform()
 </script>
 
 <template>
-    <div class="w-fit" v-if="props.showOnOs">
-        <div class="w-24" v-if="$platform != props.detectOs"/>
+    <div class="w-fit" v-if="!props.showOnOs">
+        <div :class="props.class" v-if="$platform != props.detectOs"/>
     </div>
     <div class="w-fit" v-else>
-        <div class="w-24" v-if="$platform == props.detectOs"/>
+        <div :class="props.class" v-if="$platform == props.detectOs"/>
     </div>
 </template>
 

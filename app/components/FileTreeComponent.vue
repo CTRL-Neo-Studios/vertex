@@ -301,7 +301,19 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
     >
         <template #file-wrapper="{item, level}">
             <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
-                <UButton size="sm" :label="item.label" :variant="item.id == modelValue ? 'subtle' : 'ghost'" :color="item.id == modelValue ? 'primary' : 'neutral'" class="w-full select-none" @click="onItemClick(item)"/>
+                <UButton
+                    size="sm"
+                    :label="item.label"
+                    :variant="item.id == modelValue ? 'soft' : 'ghost'"
+                    :color="item.id == modelValue ? 'primary' : 'neutral'"
+                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == modelValue ? 'pl-4' : '']"
+                    block
+                    @click="onItemClick(item)"
+                >
+                    <template #leading>
+                        <div v-if="item.id == modelValue" class="h-1/2 w-0 border-[1.5px] border-primary rounded-lg left-1.5 absolute"/>
+                    </template>
+                </UButton>
             </UContextMenu>
         </template>
         <template #folder="{item, expanded, level}" class="p-0">
@@ -309,7 +321,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 <div :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
                     <span class="truncate text-xs overflow-ellipsis">{{ item?.label }}</span>
-                    <span class="flex-grow"/>
+                    <span class="grow"/>
                     <UIcon :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
                 </div>
             </UContextMenu>

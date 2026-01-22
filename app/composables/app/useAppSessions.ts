@@ -194,28 +194,22 @@ export function useAppSessions() {
     async function initializeCurrentAppSession() {
         // 1. Get the current Tauri window
         await loadAppSessions(); // Ensure store is loaded first
-        const currentWindow = $win.getCurrentAppWindow();
-        const label = currentWindow.label;
 
-        // 2. Main window doesn't have a "session", usually.
-        if ($win.isCurrentAppWindowMain()) {
-            currentAppSession.value = null;
-            return;
-        }
-
-        // 3. For session windows, extract UUID and find in store
-        // Assuming label format: "session-UUID-HERE"
         // Adjust split logic if your UUID logic differs
-        if (label.startsWith('session-')) {
-            const uuidFromLabel = label.replace('session-', '');
+        if ($win.isCurrentAppWindowSession()) {
+            const uuidFromLabel = $win.getCurrentAppWindowSessionIdFromLabel() || ''
 
-            const found                                                                                                                                                                       = await getAppSession(uuidFromLabel);
+            const found = await getAppSession(uuidFromLabel);
             if (found) {
                 currentAppSession.value = found;
                 return found
             } else {
-                console.error(`[useActiveWindowSessions] Current window label is ${label} but no matching session found in store.`);
+                console.error(`[useActiveWindowSessions] Current session window ID is ${uuidFromLabel} but no matching session found in store.`);
             }
+        } else {
+            // For other non-session windows, give null
+            currentAppSession.value = null;
+            return;
         }
     }
 

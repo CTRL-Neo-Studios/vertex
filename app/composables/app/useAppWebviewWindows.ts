@@ -53,6 +53,21 @@ export function useAppWebviewWindows() {
         return window.label == 'main'
     }
 
+    function isCurrentAppWindowSession() {
+        const window = getCurrentAppWindow()
+        return window.label.startsWith('session-')
+    }
+
+    function isCurrentAppWindowSettings() {
+        const window = getCurrentAppWindow()
+        return window.label == 'settings'
+    }
+
+    function getCurrentAppWindowSessionIdFromLabel(): string | undefined {
+        if (isCurrentAppWindowSession())
+            return getCurrentAppWindow().label.replace('session-', '')
+    }
+
     async function destroyAllWindows() {
         const windows = await getAppWindows()
         for (const window of windows) {
@@ -84,6 +99,27 @@ export function useAppWebviewWindows() {
         await window.show()
 
         return window;
+    }
+
+    async function showWindowWithLabel(label: string) {
+        const window = await getAppWindowWithLabel(label)
+
+        if (!window) return;
+
+        await window.unminimize()
+        await window.show()
+
+        return window
+    }
+
+    async function hideWindowWithLabel(label: string) {
+        const window = await getAppWindowWithLabel(label)
+
+        if (!window) return;
+
+        await window.hide()
+
+        return window
     }
 
     async function getSessionWindows() {
@@ -121,12 +157,17 @@ export function useAppWebviewWindows() {
         getAppWindowWithLabel,
         getMainAppWindow,
         isCurrentAppWindowMain,
+        isCurrentAppWindowSession,
+        isCurrentAppWindowSettings,
         closeAllWindows,
         destroyAllWindows,
         getAppWindows,
         hideMainWindow,
         showMainWindow,
         getSessionWindows,
-        showLatestSessionWindow
+        showLatestSessionWindow,
+        getCurrentAppWindowSessionIdFromLabel,
+        showWindowWithLabel,
+        hideWindowWithLabel
     }
 }

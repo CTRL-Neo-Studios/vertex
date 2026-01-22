@@ -2,7 +2,7 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 import useUuid from "~/composables/utility/useUuid";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
-import {useAppConfiguration} from "~/composables/app/useAppConfiguration";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/core";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
@@ -16,7 +16,7 @@ export default defineNuxtPlugin({
         const $asesh = useAppSessions()
         const $win = useAppWebviewWindows()
 
-        const cfg = await useAppConfiguration().load()
+        const cfg = await useAppSettings().load()
 
         // Initialize the current window session
         // Gets whether the current window is a `main` or a `session-` window
@@ -31,7 +31,7 @@ export default defineNuxtPlugin({
         // Attempts to recover the saved sessions on the `main` window
         // This function does not run on other windows
 
-        if (cfg?.openLastOpenedWindows)
+        if (cfg?.openLastOpenedWindows && $win.isCurrentAppWindowMain())
             await $asesh.recoverSavedAppSessions()
 
         await useAppFileStartHandler().initializeOnMain()

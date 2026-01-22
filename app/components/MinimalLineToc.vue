@@ -22,15 +22,23 @@ const toc = computed(() => $eu.getTableOfContents(unref(content)))
 const emit = defineEmits<{
     (e: 'to-toc', value: TocEntry): void
 }>()
+const maxLevel = computed(() => {
+    let max = 0
+    unref(toc).forEach(i => {
+        max = max > i.level ? max : i.level
+    })
+
+    return max
+})
 
 </script>
 
 <template>
-    <div class="w-full h-full">
+    <div class="w-fit h-fit">
         <template v-if="$tabId && $sessionId">
-            <div class="w-full grid grid-cols-1 gap-1.5">
+            <div class="w-full flex flex-col justify-center items-end gap-4">
                 <UTooltip :text="`Jump to Level ${item.level} Content in Editor`" v-for="(item, index) in toc" :key="index">
-                    <UButton variant="soft" color="neutral" size="sm" :label="item.text" :icon="`i-lucide-heading-${item.level}`" @click="() => emit('to-toc', item)"/>
+                    <div :class="`w-${(maxLevel - item.level + 1) * 4} h-1 bg-accented hover:bg-primary hover:scale-105 hover:cursor-pointer transition rounded-lg select-none`" @click="() => emit('to-toc', item)"/>
                 </UTooltip>
             </div>
         </template>

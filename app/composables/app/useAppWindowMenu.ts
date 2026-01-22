@@ -4,6 +4,7 @@ import type {AppSession} from "#shared/types/app/sessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {WindowMenuEvents} from "#shared/types/app/events";
 import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 
 interface MenuState {
     canSave: boolean;
@@ -17,6 +18,7 @@ export function useAppWindowMenu() {
     const { and, or, not, evaluate, evaluateUnref } = usePredicateLogic()
     const $win = useAppWebviewWindows()
     const $sessions = useAppSessions()
+    const $settings = useAppSettings()
 
     const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
 
@@ -45,7 +47,11 @@ export function useAppWindowMenu() {
 
     const $inMain = isRoute('/')
 
-    const $inFunctional = hasRoute('/settings', '/loading')
+    const $inSettings = isRoute('/settings')
+
+    const $inLoading = isRoute('/loading')
+
+    const $inFunctional = or($inSettings, $inLoading)
 
     const $inEditingSpace = or($inWorkspace, $inSinglespace)
 
@@ -54,7 +60,7 @@ export function useAppWindowMenu() {
     const $canSaveItems = and($inEditingSpace, not($inMain), not($inFunctional))
 
     async function buildMenu() {
-        const aboutMenu = await buildAboutMenu();
+        const aboutMenu = await buildVertexMenu();
         const fileMenu = await buildFileMenu();
         const editMenu = await buildEditMenu();
         const viewMenu = await buildViewMenu();
@@ -66,9 +72,9 @@ export function useAppWindowMenu() {
         });
     }
 
-    async function buildAboutMenu() {
+    async function buildVertexMenu() {
         return await Submenu.new({
-            text: 'About',
+            text: 'Vertex',
             items: [
                 // await MenuItem.new({
                 //     id: 'quit',
@@ -78,7 +84,17 @@ export function useAppWindowMenu() {
                 //         await exit()
                 //     },
                 // }),
-                await PredefinedMenuItem.new({item: 'Quit'})
+                await MenuItem.new({
+                    id: 'settings',
+                    text: 'Settings...',
+                    accelerator: 'CmdOrControl+,',
+                    async action() {
+                        await $settings.createOrFocusSettingsWindow()
+                    },
+                    enabled: evaluateUnref(not($inFunctional))
+                }),
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                await PredefinedMenuItem.new({ item: 'Quit' }),
             ],
         });
     }

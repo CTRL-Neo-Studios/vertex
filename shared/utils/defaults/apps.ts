@@ -1,11 +1,15 @@
 import useUuid from "~/composables/utility/useUuid";
-import type {AppConfig} from "#shared/types/app/config";
+import type {AppSettings} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
+import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
+import type {DeepPartial} from "#shared/types/types";
 
-export function defaultAppConfig(data?: Partial<AppConfig>): AppConfig {
+export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings {
     return {
-        openLastOpenedWindows: data?.openLastOpenedWindows || false
-    } satisfies AppConfig
+        openLastOpenedWindows: data?.openLastOpenedWindows || false,
+        themeConfig: defaultAppThemeConfig(data?.themeConfig),
+        advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig)
+    } satisfies AppSettings
 }
 
 export function defaultAppSession(data?: Partial<AppSession>): AppSession {

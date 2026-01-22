@@ -24,7 +24,7 @@ const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
 </script>
 
 <template>
-    <UBreadcrumb :items="breadcrumbItems" size="sm" class="text-sm select-none">
+    <UBreadcrumb :items="breadcrumbItems" size="sm" class="text-sm select-none font-mono">
         <template #separator>
             <span class="select-none text-muted text-center align-middle">/</span>
         </template>

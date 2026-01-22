@@ -193,47 +193,7 @@ console.log(getFileByUuid(tabId)?.relativePath)
 
 <template>
     <DashboardCenterPanel>
-        <div class="w-full h-full">
-<!--            <ScrollAreaRoot-->
-<!--                class="w-full h-full flex flex-col relative"-->
-<!--                :style="{ height: 'calc(100vh - var(&#45;&#45;ui-header-height) - 0.7rem)' }"-->
-<!--            >-->
-<!--                <div class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 rounded-t-xl">-->
-<!--                    <div class="w-full flex items-center justify-center p-2">-->
-<!--                        <div class="grow flex items-center justify-center">-->
-<!--                            <EditorHeaderBreadcrumbs :renaming="isRenaming" v-model="fileName" :relative-file-path="getFileByUuid(tabId)?.relativePath || ''" @on-rename="onRename" class="w-fit"/>-->
-<!--                        </div>-->
-<!--                    </div>-->
-<!--                </div>-->
-<!--                <ScrollAreaViewport class="w-full flex-none h-full">-->
-<!--                    &lt;!&ndash; This div can add padding or alignment for the editor &ndash;&gt;-->
-<!--                    <div class="flex flex-col items-center justify-start md:p-0 mb-32 mt-10">-->
-<!--                        &lt;!&ndash; The editor is free to be as tall as its content requires &ndash;&gt;-->
-<!--                        <Editor-->
-<!--                            ref="editorRef"-->
-<!--                            v-model="content"-->
-<!--                            class="max-w-2xl w-full"-->
-<!--                            :internal-link-map="internalLinkList"-->
-<!--                            @update:model-value="() => isContentSaved = false"-->
-<!--                            @internal-link-click="onInternalLinkClick"-->
-<!--                        />-->
-<!--                    </div>-->
-<!--                </ScrollAreaViewport>-->
-<!--                <div class="absolute z-10 bg-linear-to-b from-transparent to-default left-0 right-0 bottom-0 h-fit rounded-b-xl inline-flex justify-center items-center p-1">-->
-<!--                    <div class="grow"/>-->
-<!--                    <UTooltip :content="{side: 'left'}" :text="`${$du.getWordCount(content || '')} Words, ${$du.getLineCount(content || '')} Lines`" :delay-duration="100">-->
-<!--                        <UButton size="xs" variant="ghost" icon="i-lucide-info"/>-->
-<!--                    </UTooltip>-->
-<!--                </div>-->
-<!--                <ScrollAreaScrollbar-->
-<!--                    class="select-none touch-none z-20 w-2 m-2 pointer-events-none"-->
-<!--                    orientation="vertical"-->
-<!--                >-->
-<!--                    <ScrollAreaThumb-->
-<!--                        class="flex-1 bg-accented rounded-lg"-->
-<!--                    />-->
-<!--                </ScrollAreaScrollbar>-->
-<!--            </ScrollAreaRoot>-->
+        <div class="w-full h-full relative">
             <ContentEditor
                 v-model="content"
                 v-model:content-saved="isContentSaved"
@@ -246,6 +206,7 @@ console.log(getFileByUuid(tabId)?.relativePath)
                 @onClickedInternalLink="onInternalLinkClick"
                 @onRename="onRename"
             />
+            <MinimalLineToc class="absolute right-8 top-1/2 bottom-1/2 z-10"/>
         </div>
     </DashboardCenterPanel>
     <DashboardRightPanelSidebar @to-toc="toTocEntry"/>

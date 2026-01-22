@@ -36,7 +36,9 @@ async function openNewTab(uuid: string) {
 <template>
     <div class="w-full h-full">
         <template v-if="$tabId && $sessionId">
-            <div class="w-full inline-flex items-center justify-center text-muted">This is a WIP view. Features aren't yet enabled for this view, so drop a feature request at the repo for what you'd like to see in this view.</div>
+            <div class="w-full grid grid-cols-1">
+                <UButton label="Analyze Text" block/>
+            </div>
         </template>
     </div>
 </template>
