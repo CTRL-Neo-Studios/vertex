@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
 import useUuid from "~/composables/utility/useUuid";

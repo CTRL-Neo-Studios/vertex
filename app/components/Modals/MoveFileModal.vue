@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import type { FormError, FormSubmitEvent } from '@nuxt/ui'
-import {isValidFilename} from "#shared/utils/fs/filenames";
-import {computed} from "vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
