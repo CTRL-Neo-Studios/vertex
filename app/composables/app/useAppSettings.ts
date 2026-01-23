@@ -98,9 +98,9 @@ export function useAppSettings() {
 
     async function createOrFocusSettingsWindow() {
         const window = await $win.getAppWindowWithLabel('settings')
-        if (window)
+        if (window) {
             await $win.showWindowWithLabel('settings')
-        else {
+        } else {
             const settingsWindow = $win.createAppWebviewWindow('/settings', 'settings', 'Settings')
 
             const closeUnlisten = await settingsWindow.listen('tauri://close-requested', async function (e) {

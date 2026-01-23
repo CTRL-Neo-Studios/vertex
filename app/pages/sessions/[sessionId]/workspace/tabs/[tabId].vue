@@ -4,7 +4,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useFileIO} from "~/composables/io/useFileIO";
-import {ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport, ScrollAreaRoot} from "reka-ui";
+import {convertFileSrc} from "@tauri-apps/api/core"
 import type {
     InternalLink,
     SpecialCodeBlockMapping,
@@ -55,8 +55,16 @@ const $eu = useEditorUtils(editorRef)
 const $du = useDocumentUtils()
 const cachedFileIndex = getFileByUuid(unref(tabId))
 const INVALID_CHARS = /[\\/:*?"<>|]/;
-
 const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', true))
+const fileExt = computed<string>(() => {
+    const fn = $fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', false).split('.')
+    return fn[fn.length - 1] || 'unknown'
+})
+const showEditor = computed(() => {
+    if (isImage(fileExt)) return false;
+    else if (['txt', 'md'].includes(unref(fileExt))) return true;
+    return false;
+})
 const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
     for (const path in unref(fileIndex)) {
@@ -82,6 +90,10 @@ async function onInternalLinkClick(args: InternalLinkClickDetail) {
         const tab = openTab(referenceId)
         await $navi.toWorkspaceTab(sessionId, tab)
     }
+}
+
+function isImage(extension: PossiblyRef<string>) {
+    return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
 }
 
 watch(isContentSaved, (newValue) => {
@@ -200,20 +212,31 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
 
 <template>
     <div class="w-full h-full relative">
-        <ContentEditor
-            v-model="content"
-            v-model:editorInstance="editorRef"
-            v-model:content-saved="isContentSaved"
-            v-model:fileName="fileName"
+        <template v-if="showEditor">
+            <ContentEditor
+                v-model="content"
+                v-model:editorInstance="editorRef"
+                v-model:content-saved="isContentSaved"
+                v-model:fileName="fileName"
 
-            :internalLinkList
-            :filePath="getFileByUuid(tabId)?.relativePath"
-            :renaming="isRenaming"
+                :internalLinkList
+                :filePath="getFileByUuid(tabId)?.relativePath"
+                :renaming="isRenaming"
 
-            @onClickedInternalLink="onInternalLinkClick"
-            @onRename="onRename"
-        />
-        <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+                @onClickedInternalLink="onInternalLinkClick"
+                @onRename="onRename"
+            />
+            <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+        </template>
+        <template v-else>
+            <div class="w-full h-full max-h-svh max-w-svw flex items-center justify-center overflow-hidden" v-if="isImage(fileExt)">
+                <img
+                    :src="convertFileSrc(getFileByUuid(tabId)?.fullPath || '')"
+                    class="max-w-full max-h-full object-contain"
+                    alt="image"
+                />
+            </div>
+        </template>
     </div>
 </template>
 

@@ -5,7 +5,9 @@ import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import type {AppSession} from "#shared/types/app/sessions";
 
+interface RecentRecord {name: string, path: string, workspace: boolean}
 
 const openingFile = ref(false)
 const loadingRecents = ref(true)
@@ -22,12 +24,12 @@ onMounted(async () => {
 const recentsList = computedAsync(async (onCancel) => {
     const abortController = new AbortController()
     onCancel(() => abortController.abort())
-    let results = []
+    let results: RecentRecord[] = []
 
     for (const s of unref($sessions.appSessions)) {
         results.push({
             name: await $fio.getFileNameFromPath(s.rootFileOrFolderAbsolutePath || 'Untitled'),
-            path: s.rootFileOrFolderAbsolutePath,
+            path: s.rootFileOrFolderAbsolutePath || '',
             workspace: s.sessionType == 'workspace'
         })
     }
@@ -86,8 +88,8 @@ async function openPath(path: string | undefined, workspace: boolean) {
 </script>
 
 <template>
-    <div class="w-full h-screen grid grid-cols-2">
-        <div class="w-full flex flex-col items-center justify-center" data-tauri-drag-region>
+    <div class="w-full max-h-screen h-screen grid grid-cols-2">
+        <div class="w-full max-h-screen flex flex-col items-center justify-center" data-tauri-drag-region>
             <div class="grid grid-cols-1 gap-2 select-none" data-tauri-drag-region>
                 <img src="/icon.png" alt="vertex icon" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
@@ -97,40 +99,38 @@ async function openPath(path: string | undefined, workspace: boolean) {
                 <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder()" :disabled="openingFile"/>
             </div>
         </div>
-        <div class="bg-submuted border-l border-l-default flex flex-col w-full h-full select-none">
-            <ScrollAreaRoot class="max-h-screen relative" style="--scrollbar-size: 10px">
-                <div class="text-xs text-muted/50 absolute top-0 bg-linear-to-t from-transparent via-submuted to-submuted h-12 p-3 w-full z-10">Recently Opened</div>
-                <ScrollAreaViewport class="w-full h-full">
-                    <div class="p-4 h-full w-full" v-if="loadingRecents">
-                        <UProgress class="max-w-lg"/>
-                    </div>
-                    <div class="grid-cols-1 grid gap-1 p-3 pt-8" v-else>
-                        <UButton
-                            v-for="(record, index) in recentsList"
-                            :key="index"
-                            class="cursor-pointer"
-                            :icon="record.workspace ? 'i-lucide-folder' : 'i-lucide-file'"
-                            color="neutral"
-                            variant="ghost"
-                            @click="openPath(record.path, record.workspace)"
-                        >
-                            <div class="flex flex-col justify-start items-start">
-                                <div class="text-left">{{record.name}}</div>
-                                <div class="text-muted text-xs text-left">{{record.path}}</div>
-                            </div>
-                        </UButton>
-                    </div>
-                </ScrollAreaViewport>
-                <ScrollAreaScrollbar
-                    class="select-none touch-none z-20 w-2 m-2"
+        <div class="bg-submuted border-l border-l-default flex flex-col w-full max-h-screen select-none relative">
+            <div class="p-4 h-full w-full" v-if="loadingRecents">
+                <UProgress class="max-w-lg"/>
+            </div>
+            <template v-else>
+                <div class="absolute align-middle bottom-0 w-full text-muted bg-default text-xs font-mono border-t border-default z-10">
+                    <div class="flex p-1 px-2 pt-1.5 items-center justify-start align-middle w-full bg-submuted">Recent Files</div>
+                </div>
+                <UScrollArea
+                    data-tauri-drag-region
                     orientation="vertical"
+                    :items="recentsList"
+                    v-slot="{item, index}: {item: RecentRecord, index: number}"
+                    class="w-full h-full"
+                    virtualize
                 >
-                    <ScrollAreaThumb
-                        class="flex-1 bg-accented rounded-lg"
-                    />
-                </ScrollAreaScrollbar>
-                <div class="text-xs text-muted/50 absolute bottom-0 bg-linear-to-b from-transparent to-submuted h-3 p-3 w-full z-10"/>
-            </ScrollAreaRoot>
+                    <UButton
+                        :key="index"
+                        class="cursor-pointer justify-start rounded-none"
+                        :icon="item.workspace ? 'i-lucide-folder' : 'i-lucide-file'"
+                        color="neutral"
+                        variant="ghost"
+                        @click="openPath(item.path, item.workspace)"
+                        block
+                    >
+                        <div class="flex flex-col justify-start items-start">
+                            <div class="text-left">{{item.name}}</div>
+                            <div class="text-muted text-xs text-left">{{item.path}}</div>
+                        </div>
+                    </UButton>
+                </UScrollArea>
+            </template>
         </div>
     </div>
 </template>

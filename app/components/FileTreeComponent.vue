@@ -12,6 +12,7 @@ import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
 import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
 import {useFileIO} from "~/composables/io/useFileIO";
+import {useAppOpener} from "~/composables/app/useAppOpener";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -28,6 +29,7 @@ const $ovl = useOverlay()
 const $navi = useAppNavigator()
 const $route = useRoute()
 const $fileio = useFileIO()
+const $opener = useAppOpener()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const {
     getSession
@@ -207,12 +209,12 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: 'New Canvas',
                 icon: 'i-lucide-file-plus',
-                disabled: true,
+                disabled: true, // TODO: implement functionality
             },
             {
                 label: 'New Table',
                 icon: 'i-lucide-file-plus',
-                disabled: true,
+                disabled: true, // TODO: implement functionality
             },
         ],
         [
@@ -228,7 +230,11 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: 'Open in Default App',
                 icon: 'i-lucide-square-arrow-out-up-right',
-                disabled: true
+                async onSelect(e) {
+                    const file = getFileByUuid(item.id)
+                    if (file)
+                        await $opener.openFileWithDefaultApp(file.fullPath)
+                }
             }
         ],
         [
@@ -249,26 +255,33 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: 'Reveal in File Explorer',
                 icon: 'i-lucide-copy',
-                disabled: true
+                async onSelect(e) {
+                    const file = getFileByUuid(item.id)
+                    if (file)
+                        await $opener.revealFilesInFileManager([file.fullPath])
+                }
             }
         ],
         [
             {
                 label: 'Duplicate',
-                icon: 'i-lucide-files'
+                icon: 'i-lucide-files',
+                disabled: true
             },
             {
                 label: 'Move file to...',
-                icon: 'i-lucide-folder-tree'
+                icon: 'i-lucide-folder-tree',
+                disabled: true
             },
             {
                 label: 'Rename',
                 icon: 'i-lucide-pen-line',
                 async onSelect(e: Event) {
-                    renameFileModal.open({
-                        fileIndexId: item.id,
-                        currentFileName: $fileio.processFileNameFromPath(item.label)
-                    })
+                    if (item?.label)
+                        renameFileModal.open({
+                            fileIndexId: item.id,
+                            currentFileName: $fileio.processFileNameFromPath(item.label)
+                        })
                 }
             },
             {
@@ -299,7 +312,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         }"
         size="sm"
     >
-        <template #file-wrapper="{item, level}">
+        <template #file-wrapper="{item, level}: {item: TreeItem, level: number}">
             <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
                 <UButton
                     size="sm"
@@ -316,7 +329,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 </UButton>
             </UContextMenu>
         </template>
-        <template #folder="{item, expanded, level}" class="p-0">
+        <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />

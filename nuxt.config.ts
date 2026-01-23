@@ -55,5 +55,5 @@ export default defineNuxtConfig({
                 "tailwindcss/colors"
             ]
         }
-    }
+    },
 });

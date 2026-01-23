@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {useAppOpener} from "~/composables/app/useAppOpener";
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
+const {dispatcher} = useAppWindowMenu()
+const $opener = useAppOpener()
 
 const color = computed(() => colorMode.value === 'dark' ? (colors as any)[appConfig.ui.colors.neutral][900] : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)
@@ -26,6 +30,22 @@ useHead({
     htmlAttrs: {
         lang: 'en'
     }
+})
+
+onBeforeUnmount(() => {
+    dispatcher.unmount()
+})
+
+dispatcher.on('categories.about.toRepo', async function () {
+    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex')
+})
+
+dispatcher.on('categories.about.toDocs', async function () {
+    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex/wiki')
+})
+
+dispatcher.on('categories.about.toRepoIssues', async function () {
+    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex/issues')
 })
 </script>
 
