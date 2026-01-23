@@ -13,12 +13,9 @@ const $route = useRoute()
 </script>
 
 <template>
-    <DashboardCenterPanel>
-        <div class="w-full h-full flex flex-col items-center justify-center">
-            <div class="text-muted">Select a file from left side.</div>
-        </div>
-    </DashboardCenterPanel>
-    <DashboardRightPanelSidebar/>
+    <div class="w-full h-full flex flex-col items-center justify-center">
+        <div class="text-muted">Select a file from left side.</div>
+    </div>
 </template>
 
 <style>

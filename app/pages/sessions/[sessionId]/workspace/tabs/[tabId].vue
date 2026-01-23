@@ -17,6 +17,8 @@ import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
+import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import type {ToTocEntryProps} from "#shared/types/active/events";
 
 definePageMeta({
     layout: 'workspace'
@@ -46,6 +48,7 @@ const {
     tabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {content} = useActiveEditorContent($sesh.getSession(sessionId), getActiveTab(tabId))
+const {dispatcher: editorDispatcher} = useActiveEditorDispatcher($sesh.getSession(sessionId))
 
 const editorRef = ref()
 const $eu = useEditorUtils(editorRef)
@@ -144,6 +147,7 @@ const unsubscribe = on(async (event) => {
 })
 
 onBeforeUnmount(() => {
+    editorDispatcher.unmount()
     unsubscribe()
 })
 
@@ -180,36 +184,37 @@ async function onRename(oldValue: string) {
     isRenaming.value = false;
 }
 
-function toTocEntry(entry: TocEntry) {
-    $eu.scrollToNode(entry.node)
+function toTocEntry(props: ToTocEntryProps) {
+    $eu.scrollToNode(props.node.node, props.verticalScrollStrategy, props.verticalMargin)
 }
 
-// watch(fileName, () => {
-//     console.log(unref(fileName))
-// })
+function toTocEntryWithDefaults(node: TocEntry) {
+    $eu.scrollToNode(node.node, 'start', 70)
+}
 
-console.log(getFileByUuid(tabId)?.relativePath)
+editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
+    toTocEntry(props)
+})
+
 </script>
 
 <template>
-    <DashboardCenterPanel>
-        <div class="w-full h-full relative">
-            <ContentEditor
-                v-model="content"
-                v-model:content-saved="isContentSaved"
-                v-model:fileName="fileName"
+    <div class="w-full h-full relative">
+        <ContentEditor
+            v-model="content"
+            v-model:editorInstance="editorRef"
+            v-model:content-saved="isContentSaved"
+            v-model:fileName="fileName"
 
-                :internalLinkList
-                :filePath="getFileByUuid(tabId)?.relativePath"
-                :renaming="isRenaming"
+            :internalLinkList
+            :filePath="getFileByUuid(tabId)?.relativePath"
+            :renaming="isRenaming"
 
-                @onClickedInternalLink="onInternalLinkClick"
-                @onRename="onRename"
-            />
-            <MinimalLineToc class="absolute right-8 top-1/2 bottom-1/2 z-10"/>
-        </div>
-    </DashboardCenterPanel>
-    <DashboardRightPanelSidebar @to-toc="toTocEntry"/>
+            @onClickedInternalLink="onInternalLinkClick"
+            @onRename="onRename"
+        />
+        <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+    </div>
 </template>
 
 <style scoped>

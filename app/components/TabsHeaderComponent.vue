@@ -3,7 +3,6 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
@@ -41,6 +40,15 @@ const {
 } = useActiveLayouts($sesh.getSession(sessionId))
 
 const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
+
+onMounted(() => {
+    // const its = unref(dropdownItems)[1]
+    // if (its && its.length > 0 && unref(activeTabUuid) != null) {
+    //     const index = unref(tabs).findIndex(v => v.fileUuid == unref(activeTabUuid))
+    //     scrollToItem(index)
+    //     console.log(`scroll to ${index}`)
+    // }
+})
 
 async function navigateTabInContext(sessionId: PossiblyRef<string | undefined>, tab?: ActiveTab) {
     if (tab) {
@@ -115,8 +123,10 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                 label: node.fileName,
                 icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
-                async toTab() {
+                async toTab(index?: number) {
                     await toTab(i)
+                    if (index)
+                        scrollToItem(index)
                 },
                 async exitTab() {
                     if (i.changesSaved) {
@@ -143,56 +153,84 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
     return items
 })
 
+const firstTabItem = computed(() => unref(dropdownItems)[1]?.[0])
+
 const panelsCollapsed = computed(() => {
     return $sesh.isSessionWorkspace(sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
 })
+
+const scrollArea = useTemplateRef('scrollArea')
+
+// Scroll to a specific item
+function scrollToItem(index: number) {
+    unref(scrollArea)?.virtualizer?.scrollToIndex(index, { align: 'center' })
+}
 </script>
 
 <template>
-    <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`">
-        <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
-        <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
-    </div>
-    <ScrollAreaRoot class="w-full relative h-full" style="--scrollbar-size: 10px" data-tauri-drag-region>
-        <ScrollAreaViewport class="grid grid-cols-1 h-full">
-            <div class="w-full inline-flex items-center justify-start h-full" data-tauri-drag-region>
-                <div
-                    v-for="(tab, index) in dropdownItems[1]"
-                    :class="['w-fit relative inline-flex items-center justify-center group', !isWorkspace ? 'h-fit' : 'h-full', isWorkspace ? (tabId == tab.id ? 'border-b-2 border-primary' : '') : '']"
-                >
-                    <UButton
-                        :key="index"
-                        size="sm"
-                        :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', !isWorkspace ? '' : 'rounded-none', tabId == tab.id ? 'pr-8 w-fit' : 'text-muted w-fit pr-8']"
-                        :color="tabId == tab.id ? 'primary' : 'neutral'"
-                        :variant="isWorkspace ? (tabId == tab.id ? 'soft' : 'ghost') : 'subtle'"
-                        :label="tab.label"
-                        :icon="tab.icon"
-                        @click="tab.toTab()"
-                    />
-                    <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" @click="tab.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
-                </div>
-                <template v-if="tabs.length == 0">
-                    <div class="w-full items-center text-center">
-                        <span class="text-sm text-dimmed">Select a file...</span>
-                    </div>
-                </template>
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="select-none touch-none z-20 h-0 m-2"
+    <div class="w-full flex items-center">
+        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`">
+            <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
+            <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
+        </div>
+        <UScrollArea
+            ref="scrollArea"
+            v-if="isWorkspace"
+            class="no-scrollbar w-full h-full relative"
+            v-slot="{ item, index }: {item: DropdownMenuItem, index: number}"
+            :items="dropdownItems[1]"
             orientation="horizontal"
+            virtualize
         >
-            <ScrollAreaThumb
-                class="flex-1 bg-accented rounded-lg"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
-    <div :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`">
-        <UDropdownMenu :items="dropdownItems" size="sm">
-            <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm"/>
-        </UDropdownMenu>
-        <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
+            <div v-if="tabs.length == 0" class="w-full items-center text-center">
+                <span class="text-sm text-dimmed">Select a file...</span>
+            </div>
+            <div
+                v-else
+                :class="['w-fit relative inline-flex items-center justify-center group', 'h-full', tabId == item.id ? 'border-b-2 border-primary' : '']"
+            >
+                <UButton
+                    :key="index"
+                    size="sm"
+                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
+                    :color="tabId == item.id ? 'primary' : 'neutral'"
+                    :variant="tabId == item.id ? 'soft' : 'ghost'"
+                    :label="item.label"
+                    :icon="item.icon"
+                    @click="item.toTab()"
+                />
+                <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" @click="item?.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
+            </div>
+        </UScrollArea>
+        <div v-else class="grow">
+            <div class="absolute top-2 left-1/2 -translate-x-1/2">
+                <UDashboardSearchButton
+                    variant="subtle"
+                    :label="firstTabItem?.label"
+                    :icon="firstTabItem?.icon"
+                    size="sm"
+                />
+            </div>
+        </div>
+<!--        <ScrollAreaRoot v-if="isWorkspace" class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px" data-tauri-drag-region>-->
+<!--            <ScrollAreaViewport class="grid grid-cols-1 h-full">-->
+
+<!--            </ScrollAreaViewport>-->
+<!--            <ScrollAreaScrollbar-->
+<!--                class="select-none touch-none z-20 h-0 m-2"-->
+<!--                orientation="horizontal"-->
+<!--            >-->
+<!--                <ScrollAreaThumb-->
+<!--                    class="flex-1 bg-accented rounded-lg"-->
+<!--                />-->
+<!--            </ScrollAreaScrollbar>-->
+<!--        </ScrollAreaRoot>-->
+        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`">
+            <UDropdownMenu :items="dropdownItems" size="sm">
+                <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
+            </UDropdownMenu>
+            <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
+        </div>
     </div>
 </template>
 

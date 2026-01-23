@@ -1,6 +1,7 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {EditorDispatcherEvents, ToTocEntryProps} from "#shared/types/active/events";
 
 export function useActiveEditorContent(session?: ActiveSession, tab?: ActiveTab) {
     if (!session || !tab) {

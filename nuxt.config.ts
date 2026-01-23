@@ -13,8 +13,6 @@ export default defineNuxtConfig({
             { name: 'SF Mono', provider: 'local' },
             { name: 'SF-Pro', provider: 'local' },
             { name: 'SF-Mono', provider: 'local' },
-            { name: 'Geist', provider: 'google', global: true },
-            { name: 'Inter', provider: 'google', global: true },
         ]
     },
 

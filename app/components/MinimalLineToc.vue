@@ -5,6 +5,12 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useActiveEditorContent} from "~/composables/active/useActiveEditorContent";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 
+const props = withDefaults(defineProps<{
+    alignment?: 'left' | 'right'
+}>(), {
+    alignment: 'right'
+})
+
 const $route = useRoute()
 const $sessionId = computed<string>(() => $route.params.sessionId as string), $tabId = computed<string>(() => $route.params.tabId as string)
 const {
@@ -36,9 +42,11 @@ const maxLevel = computed(() => {
 <template>
     <div class="w-fit h-fit">
         <template v-if="$tabId && $sessionId">
-            <div class="w-full flex flex-col justify-center items-end gap-4">
-                <UTooltip :text="`Jump to Level ${item.level} Content in Editor`" v-for="(item, index) in toc" :key="index">
-                    <div :class="`w-${(maxLevel - item.level + 1) * 4} h-1 bg-accented hover:bg-primary hover:scale-105 hover:cursor-pointer transition rounded-lg select-none`" @click="() => emit('to-toc', item)"/>
+            <div :class="['w-full flex flex-col justify-center', props.alignment == 'right' ? 'items-end' : 'items-start']">
+                <UTooltip :delay-duration="100" :text="`${item.text}`" v-for="(item, index) in toc" :key="index">
+                    <div :style="`--lineLevelWidth: ${(maxLevel - item.level + 1) * 0.5}rem`" :class="[`w-full h-fit p-2 select-none group cursor-pointer flex items-center`, props.alignment == 'right' ? 'justify-end' : 'justify-start']" @click="() => emit('to-toc', item)">
+                        <div class="w-(--lineLevelWidth) h-0.5 bg-accented/75 group-hover:bg-primary group-hover:scale-105 transition rounded-lg"/>
+                    </div>
                 </UTooltip>
             </div>
         </template>

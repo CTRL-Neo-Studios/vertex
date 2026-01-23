@@ -13,6 +13,11 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {UnlistenFn} from "@tauri-apps/api/event";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
+import SinglespaceCommandPalette from "~/components/SinglespaceCommandPalette.vue";
+import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
+import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
+import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -41,6 +46,7 @@ const {
 const $menu = useAppWindowMenu()
 const $aseshNavi = useAppSessionNavigator()
 const $act = useAppSessionActions()
+const $editorDispatcher = useActiveEditorDispatcher($sesh.getSession($sessionId))
 
 let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
 
@@ -88,17 +94,31 @@ onBeforeUnmount(async () => {
         unlistenedWindows.unlistenClose()
         unlistenedWindows.unlistenDestroyed()
     }
+    $editorDispatcher.dispatcher.unmount()
+    $menu.dispatcher.unmount()
     $sesh.removeSession($sessionId)
 })
+
+function callToTocEntryWithDefaults(node: TocEntry) {
+    $editorDispatcher.emitToTocEntry({
+        node: node,
+        verticalMargin: 70,
+        verticalScrollStrategy: 'start'
+    })
+}
 
 </script>
 
 <template>
     <UDashboardGroup
-        :class="['w-full h-full transition-colors duration-200', rightPanelCollapsed ? 'bg-default': 'bg-submuted']"
+        :class="['w-full h-full transition-colors duration-200']"
         unit="rem"
     >
-        <slot/>
+        <SinglespaceCommandPalette/>
+        <DashboardCenterPanel>
+            <slot/>
+        </DashboardCenterPanel>
+        <DashboardRightPanelSidebar @to-toc="callToTocEntryWithDefaults"/>
     </UDashboardGroup>
 </template>
 

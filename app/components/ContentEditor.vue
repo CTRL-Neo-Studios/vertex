@@ -4,6 +4,7 @@ import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsid
 
 const $du = useDocumentUtils()
 
+const editorInstance = defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({ default: '' })
 const contentSaved = defineModel<boolean>('contentSaved', {default: false})
@@ -40,7 +41,7 @@ const emit = defineEmits<{
             <div class="flex flex-col items-center justify-start md:p-0 mb-32 mt-10 cursor-text">
                 <!-- The editor is free to be as tall as its content requires -->
                 <Editor
-                    ref="editorRef"
+                    ref="editorInstance"
                     v-model="content"
                     class="max-w-2xl w-full"
                     :internal-link-map="props.internalLinkList"

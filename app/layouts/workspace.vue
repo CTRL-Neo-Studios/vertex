@@ -12,6 +12,11 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
+import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
+import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
+import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
+import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -34,10 +39,10 @@ const {
     activeTabUuid,
     clearTabs
 } = useActiveTabs($sesh.getSession($sessionId))
-const {
-    leftPanelCollapsed,
-    rightPanelCollapsed
-} = useActiveLayouts($sesh.getSession($sessionId))
+// const {
+//     leftPanelCollapsed,
+//     rightPanelCollapsed
+// } = useActiveLayouts($sesh.getSession($sessionId))
 const {
     recoverWorkspaceTabs
 } = useAppSessionRecovery()
@@ -47,6 +52,7 @@ const {
 const $menu = useAppWindowMenu()
 const $act = useAppSessionActions()
 const $aseshNavi = useAppSessionNavigator()
+const $editorDispatcher = useActiveEditorDispatcher($sesh.getSession($sessionId))
 
 let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
 
@@ -98,8 +104,18 @@ onBeforeUnmount(async () => {
         unlistenedWindows.unlistenClose()
         unlistenedWindows.unlistenDestroyed()
     }
+    $editorDispatcher.dispatcher.unmount()
+    $menu.dispatcher.unmount()
     $sesh.removeSession($sessionId)
 })
+
+function callToTocEntryWithDefaults(node: TocEntry) {
+    $editorDispatcher.emitToTocEntry({
+        node: node,
+        verticalMargin: 70,
+        verticalScrollStrategy: 'start'
+    })
+}
 
 </script>
 
@@ -109,7 +125,11 @@ onBeforeUnmount(async () => {
         unit="rem"
     >
         <DashboardLeftPanelSidebar/>
-        <slot/>
+        <WorkspaceCommandPalette/>
+        <DashboardCenterPanel>
+            <slot/>
+        </DashboardCenterPanel>
+        <DashboardRightPanelSidebar @to-toc="callToTocEntryWithDefaults"/>
     </UDashboardGroup>
 </template>
 

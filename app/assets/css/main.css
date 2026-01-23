@@ -73,11 +73,11 @@
     .cm-content {
         .cm-line {
             &:has(.cm-heading-1) {
-                @apply pb-4 scroll-mt-[calc(45px+var(--ui-header-height))] lg:scroll-mt-(--ui-header-height);
+                @apply pb-4 -scroll-mt-36;
             }
 
             &:has(.cm-heading-2) {
-                @apply pb-2 scroll-mt-[calc(48px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(48px+var(--ui-header-height))];
+                @apply pb-2 -scroll-mt-96;
             }
 
             &:has(.cm-heading-3) {
