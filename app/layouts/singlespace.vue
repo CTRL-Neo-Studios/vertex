@@ -16,7 +16,7 @@ import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import SinglespaceCommandPalette from "~/components/SinglespaceCommandPalette.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
-import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 
 const $route = useRoute()

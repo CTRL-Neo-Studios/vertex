@@ -5,20 +5,13 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {convertFileSrc} from "@tauri-apps/api/core"
-import type {
-    InternalLink,
-    SpecialCodeBlockMapping,
-    InternalLinkClickDetail,
-    TocEntry
-} from "#codemirror-rich-obsidian-editor/editor-types"
-import EditorHeaderBreadcrumbs from "~/components/EditorHeaderBreadcrumbs.vue";
-import {useActiveEditorContent} from "~/composables/active/useActiveEditorContent";
-import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
-import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
-import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
-import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
-import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import type {InternalLink, InternalLinkClickDetail, TocEntry} from "#codemirror-rich-obsidian-editor/editor-types"
+import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {ToTocEntryProps} from "#shared/types/active/events";
+import {getFileExtensionFromPath, isImage, isTextFile} from "#shared/utils/fs/filenames";
+import {EditorProseEmbedImageDisplay} from "#components";
+import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 
 definePageMeta({
     layout: 'workspace'
@@ -68,21 +61,37 @@ const showEditor = computed(() => {
 const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
     for (const path in unref(fileIndex)) {
-        const f = unref(fileIndex)[path]
-        if (!f) continue;
-        const fn = f.fileName
-        if (!fn) continue;
-        if (f.isFolder) continue;
+        const file = unref(fileIndex)[path]
+        if (!file) continue;
+        const filename = $fileio.processFileNameFromPath(file.fullPath, false)
+        if (!filename) continue;
+        if (file.isFolder) continue;
 
-        list.push({
-            name: $fileio.processFileNameFromPath(fn, true),
-            filePath: f.relativePath,
-            referenceId: f.uuid
-        } satisfies InternalLink)
+        const fext = getFileExtensionFromPath(filename)
+        const noExtFilename = $fileio.processFileNameFromPath(file.fullPath, true)
+
+        if (isTextFile(fext))
+            list.push({
+                name: noExtFilename,
+                filePath: file.relativePath,
+                referenceId: file.uuid
+            } satisfies InternalLink)
+        else if (isImage(fext))
+            list.push({
+                name: noExtFilename,
+                filePath: file.relativePath,
+                referenceId: file.uuid,
+                embedComponent: EditorProseEmbedImageDisplay,
+                componentProps: {
+                    filePath: convertFileSrc(file.fullPath),
+                    display: noExtFilename
+                }
+            } satisfies InternalLink)
     }
 
     return list
 })
+const codeblockMappings = useActiveEditorCodeblockMappings()
 
 async function onInternalLinkClick(args: InternalLinkClickDetail) {
     const {referenceId} = args
@@ -90,10 +99,6 @@ async function onInternalLinkClick(args: InternalLinkClickDetail) {
         const tab = openTab(referenceId)
         await $navi.toWorkspaceTab(sessionId, tab)
     }
-}
-
-function isImage(extension: PossiblyRef<string>) {
-    return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
 }
 
 watch(isContentSaved, (newValue) => {
@@ -219,7 +224,8 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                 v-model:content-saved="isContentSaved"
                 v-model:fileName="fileName"
 
-                :internalLinkList
+                :specialCodeBlockMapping="codeblockMappings"
+                :internalLinkList="internalLinkList"
                 :filePath="getFileByUuid(tabId)?.relativePath"
                 :renaming="isRenaming"
 

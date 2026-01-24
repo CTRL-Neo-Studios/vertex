@@ -82,3 +82,28 @@ export function isValidFilename(name: string): boolean {
     const baseName = name.split('.')[0];
     return !(!baseName || RESERVED_FILENAMES_REGEX.test(baseName));
 }
+
+export function isImage(extension: PossiblyRef<string>) {
+    return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
+}
+
+export function isTextFile(extension: PossiblyRef<string>) {
+    return ['txt', 'md'].includes(unref(extension))
+}
+
+export function isDataFile(extension: PossiblyRef<string>) {
+    return ['base', 'yml', 'csv'].includes(unref(extension))
+}
+
+export function isPdf(extension: PossiblyRef<string>) {
+    return ['pdf'].includes(unref(extension))
+}
+
+export function isVideo(extension: PossiblyRef<string>) {
+    return ['mp4', 'mov', 'mkv'].includes(unref(extension))
+}
+
+export function getFileExtensionFromPath(path: PossiblyRef<string>) {
+    const fn = unref(path).split('.')
+    return fn[fn.length - 1] || 'unknown'
+}

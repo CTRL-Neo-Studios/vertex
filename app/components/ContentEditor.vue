@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
-import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {
+    InternalLink,
+    InternalLinkClickDetail,
+    SpecialCodeBlockMapping
+} from "#codemirror-rich-obsidian-editor/editor-types";
 
 const $du = useDocumentUtils()
 
@@ -11,11 +15,12 @@ const contentSaved = defineModel<boolean>('contentSaved', {default: false})
 
 const props = withDefaults(defineProps<{
     internalLinkList: InternalLink[],
+    specialCodeBlockMapping: SpecialCodeBlockMapping[]
     renaming: boolean,
     filePath?: string
 }>(), {
     renaming: false,
-    filePath: ''
+    filePath: '',
 })
 
 const emit = defineEmits<{
@@ -44,6 +49,7 @@ const emit = defineEmits<{
                     ref="editorInstance"
                     v-model="content"
                     class="max-w-2xl w-full"
+                    :special-code-block-map="props.specialCodeBlockMapping"
                     :internal-link-map="props.internalLinkList"
                     @update:model-value="() => contentSaved = false"
                     @internal-link-click="(detail) => emit('on-clicked-internal-link', detail)"

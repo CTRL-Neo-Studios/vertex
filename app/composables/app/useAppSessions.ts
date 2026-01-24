@@ -6,7 +6,8 @@ import type {AppSession} from "#shared/types/app/sessions";
 import {defaultAppSession} from "#shared/utils/defaults/apps";
 
 interface AppSessionsStore {
-    openedSessions: AppSession[]
+    openedSessions: AppSession[],
+    lastOpenedSession?: string
 }
 
 /*
@@ -42,6 +43,7 @@ export function useAppSessions() {
 
     // State to hold the list of all active sessions (viewable by 'main')
     const appSessions = useState<AppSession[]>('app.sessions', () => []);
+    const lastOpenedSession = useState<string | undefined>('app.sessions.lastOpened')
 
     // State to hold the session data SPECIFIC to the current running window
     const currentAppSession = useState<AppSession | null>('app.sessions.current', () => null);
@@ -51,12 +53,12 @@ export function useAppSessions() {
      * Ideally called by 'main' right before or after creating a new window.
      */
     async function addAppSession(sesh: AppSession, updateStore: boolean = true) {
-        if (updateStore) await loadAppSessions(); // Sync with latest disk state
+        if (updateStore) await load(); // Sync with latest disk state
 
         // Prevent duplicates by ID
         if (!appSessions.value.find(s => s.uuid === sesh.uuid)) {
             appSessions.value.push(sesh);
-            if (updateStore) await saveAppSessions();
+            if (updateStore) await save();
         }
         return sesh;
     }
@@ -67,10 +69,10 @@ export function useAppSessions() {
      */
     async function removeAppSession(sessionId: PossiblyRef<string>) {
         const id = unref(sessionId);
-        await loadAppSessions(); // Ensure we have the latest list before filtering
+        await load(); // Ensure we have the latest list before filtering
 
         appSessions.value = appSessions.value.filter(i => i.uuid !== id);
-        await saveAppSessions();
+        await save();
     }
 
     /**
@@ -85,7 +87,7 @@ export function useAppSessions() {
         const id = unref(sessionId);
 
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         const index = appSessions.value.findIndex(s => s.uuid === id);
@@ -101,7 +103,7 @@ export function useAppSessions() {
                 currentAppSession.value = appSessions.value[index];
             }
 
-            await saveAppSessions();
+            await save();
         } else {
             console.warn(`[useActiveWindowSessions] Tried to update non-existent session: ${id}`);
         }
@@ -112,7 +114,7 @@ export function useAppSessions() {
      */
     async function getAppSession(sessionId: PossiblyRef<string>, updateStore: boolean = true): Promise<AppSession | undefined> {
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         return unref(appSessions).find(i => i.uuid == unref(sessionId));
@@ -123,7 +125,7 @@ export function useAppSessions() {
      */
     async function getAppSessionFromAbsolutePath(absoluteFilePath: PossiblyRef<string>, updateStore: boolean = true): Promise<AppSession | undefined> {
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         return unref(appSessions).find(i => i.rootFileOrFolderAbsolutePath == unref(absoluteFilePath));
@@ -131,7 +133,7 @@ export function useAppSessions() {
 
     async function hasAppSessionWithId(sessionId: PossiblyRef<string>, updateStore: boolean = true) {
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         return unref(appSessions).findIndex(i => i.uuid == unref(sessionId)) != -1;
@@ -139,7 +141,7 @@ export function useAppSessions() {
 
     async function hasAppSessionWithRootPath(absoluteFilePath: PossiblyRef<string>, updateStore: boolean = true) {
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         return unref(appSessions).findIndex(i => i.rootFileOrFolderAbsolutePath == unref(absoluteFilePath)) != -1;
@@ -149,7 +151,7 @@ export function useAppSessions() {
      * Loads the sessions from the on-disk JSON store into the reactive state.
      * Automatically sanitizes sessions to remove duplicates and invalid entries.
      */
-    async function loadAppSessions() {
+    async function load() {
         await store.init();
 
         if (!(await store.has('data'))) {
@@ -170,6 +172,7 @@ export function useAppSessions() {
                 const bTime = b?.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
                 return bTime - aTime; // Descending order (newest first)
             });
+            lastOpenedSession.value = data.lastOpenedSession
             
             // Automatically sanitize sessions after loading
             await sanitizeAppSessions();
@@ -177,11 +180,12 @@ export function useAppSessions() {
     }
 
     /**
-     * Writes the current reactive state to disk.
+     * Writes the current reactive states to disk.
      */
-    async function saveAppSessions() {
+    async function save() {
         await store.set('data', {
-            openedSessions: unref(appSessions)
+            openedSessions: unref(appSessions),
+            lastOpenedSession: unref(lastOpenedSession)
         } satisfies AppSessionsStore);
         await store.save(); // Crucial: actually writes to the file system
     }
@@ -193,7 +197,7 @@ export function useAppSessions() {
      */
     async function initializeCurrentAppSession() {
         // 1. Get the current Tauri window
-        await loadAppSessions(); // Ensure store is loaded first
+        await load(); // Ensure store is loaded first
 
         // Adjust split logic if your UUID logic differs
         if ($win.isCurrentAppWindowSession()) {
@@ -261,10 +265,14 @@ export function useAppSessions() {
         if (removedCount > 0) {
             console.log(`[useAppSessions] Sanitization complete: Removed ${removedCount} duplicate/invalid session(s)`);
             appSessions.value = toKeep;
-            await saveAppSessions();
+            await save();
         }
 
         return removedCount;
+    }
+
+    async function updateLastOpenedSession(session: AppSession) {
+
     }
 
     /**
@@ -272,7 +280,7 @@ export function useAppSessions() {
      * Currently only recovers workspace sessions. Only runs on the main window.
      */
     async function recoverSavedAppSessions() {
-        await loadAppSessions()
+        await load()
         if (!($win.isCurrentAppWindowMain())) return
         if (unref(appSessions).length <= 0) return;
 
@@ -304,7 +312,7 @@ export function useAppSessions() {
 
     async function getWebviewWindowWithAppSession(appSession: PossiblyRef<AppSession>, updateStore: boolean = true) {
         if (updateStore) {
-            await loadAppSessions(); // Reload to avoid overwriting updates from other windows
+            await load(); // Reload to avoid overwriting updates from other windows
         }
 
         return await $win.getAppWindowWithLabel(`session-${unref(appSession).uuid}`)
@@ -318,8 +326,8 @@ export function useAppSessions() {
         updateAppSession,
         getAppSession,
         hasAppSessionWithId,
-        loadAppSessions,
-        saveAppSessions,
+        load,
+        save,
         sanitizeAppSessions,
         initializeCurrentAppSession,
         getCurrentAppSession,

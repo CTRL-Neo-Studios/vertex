@@ -1,7 +1,18 @@
 export default defineNuxtConfig({
     devtools: {enabled: false},
 
-    modules: ["@nuxt/ui", "nuxt-auth-utils", "@vueuse/nuxt", "@nuxt/image", "@nuxt/icon", "@nuxt/fonts", "@nuxtjs/i18n", "@type32/codemirror-rich-obsidian-editor", "@type32/dispatcher", "@type32/nuxt-predicates"],
+    modules: [
+        "@nuxt/ui",
+        "nuxt-auth-utils",
+        "@vueuse/nuxt",
+        "@nuxt/image",
+        "@nuxt/icon",
+        "@nuxt/fonts",
+        "@nuxtjs/i18n",
+        "@type32/codemirror-rich-obsidian-editor",
+        "@type32/dispatcher",
+        "@type32/nuxt-predicates",
+    ],
 
     css: ["~/assets/css/main.css"],
 
@@ -9,10 +20,10 @@ export default defineNuxtConfig({
 
     fonts: {
         families: [
-            { name: 'SF Pro', provider: 'local' },
-            { name: 'SF Mono', provider: 'local' },
-            { name: 'SF-Pro', provider: 'local' },
-            { name: 'SF-Mono', provider: 'local' },
+            {name: 'SF Pro', provider: 'local'},
+            {name: 'SF Mono', provider: 'local'},
+            {name: 'SF-Pro', provider: 'local'},
+            {name: 'SF-Mono', provider: 'local'},
         ]
     },
 

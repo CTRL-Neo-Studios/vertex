@@ -16,7 +16,7 @@ import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
-import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 
 const $route = useRoute()
 const $navi = useAppNavigator()

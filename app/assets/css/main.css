@@ -63,6 +63,14 @@
 :root {
     --color-submuted: var(--ui-bg-muted);
 
+    --ncm-code-bg: var(--ui-bg-muted);
+    --ncm-code-bg-hover: var(--ui-bg-elevated);
+    --ncm-border: var(--ui-border);
+    --ncm-text: var(--ui-text);
+    --ncm-text-muted: var(--ui-text-muted);
+    --ncm-text-xmuted: var(--ui-text-muted);
+    --ncm-overlay-bg: rgba(var(--ui-bg), 0.98);
+
     div[data-tauri-decorum-tb] {
         pointer-events: none;
         div[data-tauri-drag-region] {
@@ -99,6 +107,14 @@
 
 .dark {
     --color-submuted: oklch(var(--ui-bg-muted));
+
+    --ncm-code-bg: var(--ui-bg-muted);
+    --ncm-code-bg-hover: var(--ui-bg-elevated);
+    --ncm-border: var(--ui-border);
+    --ncm-text: var(--ui-text);
+    --ncm-text-muted: var(--ui-text-muted);
+    --ncm-text-xmuted: var(--ui-text-muted);
+    --ncm-overlay-bg: rgba(var(--ui-bg), 0.98);
 
     .bg-submuted {
         @apply bg-inverted/2;

@@ -5,7 +5,7 @@ import {computed} from "vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useActiveEditorContent} from "~/composables/active/useActiveEditorContent";
+import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 
 const $navi = useAppNavigator()
 const $route = useRoute()

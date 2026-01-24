@@ -9,13 +9,14 @@ import type {
     InternalLinkClickDetail,
     TocEntry
 } from "#codemirror-rich-obsidian-editor/editor-types"
-import {useActiveEditorContent} from "~/composables/active/useActiveEditorContent";
+import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useActiveSinglespaceTools} from "~/composables/active/useActiveSinglespaceTools";
-import {useActiveEditorDispatcher} from "~/composables/active/useActiveEditorDispatcher";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {ToTocEntryProps} from "#shared/types/active/events";
+import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 
 definePageMeta({
     layout: 'singlespace'
@@ -58,6 +59,7 @@ const INVALID_CHARS = /[\\/:*?"<>|]/;
 
 const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', true))
 const internalLinkList = computed<InternalLink[]>(() => [])
+const codeblockMappings = useActiveEditorCodeblockMappings()
 
 async function onInternalLinkClick(args: InternalLinkClickDetail) {
     // Do nothing
@@ -175,6 +177,7 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
             v-model:content-saved="isContentSaved"
             v-model:fileName="fileName"
 
+            :specialCodeBlockMapping="codeblockMappings"
             :internalLinkList
             :filePath="getFileByUuid(tabId)?.fullPath"
             :renaming="isRenaming"
