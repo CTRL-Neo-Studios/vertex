@@ -19,11 +19,15 @@ export default defineNuxtConfig({
     compatibilityDate: "2026-01-14",
 
     fonts: {
+        priority: ['local', 'google'],
         families: [
             {name: 'SF Pro', provider: 'local'},
             {name: 'SF Mono', provider: 'local'},
-            {name: 'SF-Pro', provider: 'local'},
-            {name: 'SF-Mono', provider: 'local'},
+            {name: 'Inter', provider: 'local'},
+            {name: 'Inter Variable', provider: 'local'},
+            {name: 'Inter Display', provider: 'local'},
+            {name: 'Geist', provider: 'local'},
+            {name: 'Geist Mono', provider: 'local'},
         ]
     },
 
