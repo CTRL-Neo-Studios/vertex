@@ -11,6 +11,8 @@ import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
+import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -38,6 +40,8 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession(sessionId))
+const $menu = useAppWindowMenu()
+const $win = useAppWebviewWindows()
 
 const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
 
@@ -48,6 +52,20 @@ onMounted(() => {
     //     scrollToItem(index)
     //     console.log(`scroll to ${index}`)
     // }
+})
+
+$menu.dispatcher.on('categories.view.closeTabOrWindow', async () => {
+    if (unref(tabs).length <= 0 || !unref(isWorkspace)) {
+        await $win.getCurrentAppWindow().close()
+    } else if (unref(tabs).length > 0 && unref(isWorkspace)) {
+        const tab = getActiveTab(tabId)
+        if (tab)
+            await exitTab(tab)
+    }
+})
+
+$menu.dispatcher.on('categories.view.clearTabs', async () => {
+    await clearAllTabs()
 })
 
 async function navigateTabInContext(sessionId: PossiblyRef<string | undefined>, tab?: ActiveTab) {
@@ -62,6 +80,12 @@ async function navigateTabInContext(sessionId: PossiblyRef<string | undefined>, 
         else
             await $navi.toSinglespaceEmptyTab(sessionId)
     }
+}
+
+async function clearAllTabs() {
+    if (!unref(isWorkspace)) return;
+    await navigateTabInContext(sessionId)
+    clearTabs()
 }
 
 async function toTab(tab: ActiveTab) {
@@ -104,8 +128,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             icon: 'i-lucide-x',
             color: 'error',
             async onSelect(e: Event) {
-                await navigateTabInContext(sessionId)
-                clearTabs()
+                await clearAllTabs()
             },
             disabled: !unref(isWorkspace)
         }]
@@ -199,12 +222,15 @@ function scrollToItem(index: number) {
                     :icon="item.icon"
                     @click="item.toTab()"
                 />
-                <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" @click="item?.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
+                <UTooltip text="Close Tab" :kbds="['meta', 'w']">
+                    <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" @click="item?.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
+                </UTooltip>
             </div>
         </UScrollArea>
         <div v-else class="grow">
             <div class="absolute top-2 left-1/2 -translate-x-1/2">
                 <UDashboardSearchButton
+                    :kbs="['meta', 'p']"
                     variant="subtle"
                     :label="firstTabItem?.label"
                     :icon="firstTabItem?.icon"

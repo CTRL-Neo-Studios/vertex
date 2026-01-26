@@ -76,14 +76,6 @@ export function useAppWindowMenu() {
         return await Submenu.new({
             text: 'Vertex',
             items: [
-                // await MenuItem.new({
-                //     id: 'quit',
-                //     text: 'Quit',
-                //     accelerator: 'CmdOrControl+Q',
-                //     async action() {
-                //         await exit()
-                //     },
-                // }),
                 await MenuItem.new({
                     id: 'settings',
                     text: 'Settings...',
@@ -94,7 +86,20 @@ export function useAppWindowMenu() {
                     enabled: evaluateUnref(not($inFunctional))
                 }),
                 await PredefinedMenuItem.new({ item: 'Separator' }),
-                await PredefinedMenuItem.new({ item: 'Quit' }),
+                await MenuItem.new({
+                    id: 'quit',
+                    text: 'Quit',
+                    accelerator: 'CmdOrControl+Q',
+                    async action() {
+                        try {
+                            await $win.closeAllWindows()
+                        } catch(e) {
+
+                        } finally {
+                            await exit()
+                        }
+                    },
+                }),
             ],
         });
     }
@@ -169,7 +174,6 @@ export function useAppWindowMenu() {
         }));
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-        items.push(await PredefinedMenuItem.new({ item: 'CloseWindow' }));
         items.push(await PredefinedMenuItem.new({ item: 'Quit' }));
 
         return await Submenu.new({
@@ -236,6 +240,22 @@ export function useAppWindowMenu() {
                 const isFullscreen = await window.isFullscreen();
                 await window.setFullscreen(!isFullscreen);
             },
+        }));
+
+        items.push(await MenuItem.new({
+            id: 'close-tab',
+            text: 'Close Current Tab/Window',
+            accelerator: 'CmdOrCtrl+W',
+            action: () => handleCloseTabOrWindow(),
+            enabled: evaluateUnref($inEditingSpace)
+        }));
+
+        items.push(await MenuItem.new({
+            id: 'clear-tabs',
+            text: 'Close All Tabs',
+            accelerator: 'CmdOrCtrl+Shift+W',
+            action: () => handleClearTabs(),
+            enabled: evaluateUnref($inWorkspace)
         }));
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
@@ -337,6 +357,14 @@ export function useAppWindowMenu() {
 
     function handleSaveAs() {
         dispatcher.emit('categories.file.saveAs')
+    }
+
+    function handleCloseTabOrWindow() {
+        dispatcher.emit('categories.view.closeTabOrWindow')
+    }
+
+    function handleClearTabs() {
+        dispatcher.emit('categories.view.clearTabs')
     }
 
     function handleZoomIn() {

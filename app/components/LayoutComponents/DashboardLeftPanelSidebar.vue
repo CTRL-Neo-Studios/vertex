@@ -110,7 +110,7 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
                 </template>
             </UDashboardNavbar>
             <UDashboardNavbar :ui="{ root: 'border-b border-default h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full gap-2', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
-                <UDashboardSearchButton class="grow"/>
+                <UDashboardSearchButton :kbds="['meta', 'p']" class="grow"/>
             </UDashboardNavbar>
         </template>
         <template #body>

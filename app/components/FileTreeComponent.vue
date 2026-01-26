@@ -12,6 +12,8 @@ import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
 import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {useAppOpener} from "~/composables/app/useAppOpener";
+import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
+import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -44,8 +46,9 @@ const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
 const renameFileModal = $ovl.create(RenameFileModal)
 const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
+const $ftMemo = useActiveFileTreeMemo(getSession($sessionId))
 
-const formattedTreeData = computed(() => {
+const formattedTreeData = computed<TreeItem[]>(() => {
     // A single, powerful recursive function to build the tree.
     const buildTree = (nodes: UITreeNode[]): TreeItem[] => {
         return nodes.reduce((accumulator, node) => {
@@ -57,7 +60,7 @@ const formattedTreeData = computed(() => {
 
                 treeItem = {
                     id: node.uuid,
-                    label: node.fileName,
+                    label: `${node.fileName}${node.uuid.slice(0,4)}`,
                     icon: node.isFolder ? undefined : 'i-lucide-file',
 
                     // The recursive call correctly applies the same logic to children.
@@ -82,13 +85,16 @@ const formattedTreeData = computed(() => {
                     originalNodeData: node
                 };
 
+                if (treeItem.label)
+                    $ftMemo.put(treeItem.label)
+
                 accumulator.push(treeItem);
             }
             return accumulator;
         }, [] as TreeItem[]);
     };
 
-    return buildTree(props.nodes);
+    return buildTree(props.nodes) || [] as TreeItem[];
 });
 
 function onItemClick(item: TreeItem) {
@@ -315,26 +321,28 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
                 <UButton
                     size="sm"
-                    :label="item.label"
+                    :label="$ftMemo.get(item.label).unextName"
                     :variant="item.id == modelValue ? 'soft' : 'ghost'"
                     :color="item.id == modelValue ? 'primary' : 'neutral'"
-                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == modelValue ? 'pl-4' : '']"
+                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == modelValue ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
                     block
                     @click="onItemClick(item)"
+                    :key="`${item.id}-file-tree-item`"
                 >
-                    <template #leading>
-                        <div v-if="item.id == modelValue" class="h-1/2 w-0 border-[1.5px] border-primary rounded-lg left-1.5 absolute"/>
+                    <template #trailing>
+                        <div class="grow"/>
+                        <UBadge size="xs" color="neutral" variant="soft" :label="`.${$ftMemo.get(item.label).ext}`"/>
                     </template>
                 </UButton>
             </UContextMenu>
         </template>
         <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
-                <div :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
+                <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
-                    <span class="truncate text-xs overflow-ellipsis">{{ item?.label }}</span>
+                    <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.get(item.label).name }}</span>
                     <span class="grow"/>
-                    <UIcon :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
+<!--                    <UIcon :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />-->
                 </div>
             </UContextMenu>
         </template>

@@ -9,9 +9,18 @@ import type {InternalLink, InternalLinkClickDetail, TocEntry} from "#codemirror-
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {ToTocEntryProps} from "#shared/types/active/events";
-import {getFileExtensionFromPath, isImage, isTextFile} from "#shared/utils/fs/filenames";
+import {
+    getFileExtensionFromPath,
+    isDataFile,
+    isImage,
+    isUnreadableAsText,
+    isPdf,
+    isTextFile,
+    isVideo
+} from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
+import TextCodeEditor from "~/components/TextCodeEditor.vue";
 
 definePageMeta({
     layout: 'workspace'
@@ -53,11 +62,26 @@ const fileExt = computed<string>(() => {
     const fn = $fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', false).split('.')
     return fn[fn.length - 1] || 'unknown'
 })
-const showEditor = computed(() => {
-    if (isImage(fileExt)) return false;
+
+const showRichEditor = computed(() => {
+    if (isUnreadableAsText(fileExt)) return false;
     else if (['txt', 'md'].includes(unref(fileExt))) return true;
     return false;
 })
+const showCodeEditor = computed(() => {
+    if (isUnreadableAsText(fileExt)) return false;
+    else return !['txt', 'md'].includes(unref(fileExt));
+})
+const showImageViewer = computed(() => {
+    return isImage(fileExt);
+})
+const showVideoViewer = computed(() => {
+    return isVideo(fileExt)
+})
+const showDataEditor = computed(() => {
+    return isDataFile(fileExt)
+})
+
 const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
     for (const path in unref(fileIndex)) {
@@ -217,7 +241,7 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
 
 <template>
     <div class="w-full h-full relative">
-        <template v-if="showEditor">
+        <template v-if="showRichEditor">
             <ContentEditor
                 v-model="content"
                 v-model:editorInstance="editorRef"
@@ -234,7 +258,7 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
             />
             <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
         </template>
-        <template v-else>
+        <template v-else-if="showImageViewer">
             <div class="w-full h-full max-h-svh max-w-svw flex items-center justify-center overflow-hidden" v-if="isImage(fileExt)">
                 <img
                     :src="convertFileSrc(getFileByUuid(tabId)?.fullPath || '')"
@@ -242,6 +266,18 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                     alt="image"
                 />
             </div>
+        </template>
+        <template v-else-if="showCodeEditor">
+            <TextCodeEditor
+                v-model="content"
+                v-model:editorInstance="editorRef"
+                v-model:content-saved="isContentSaved"
+                v-model:fileName="fileName"
+
+                :filePath="getFileByUuid(tabId)?.relativePath"
+                :renaming="isRenaming"
+                @onRename="onRename"
+            />
         </template>
     </div>
 </template>

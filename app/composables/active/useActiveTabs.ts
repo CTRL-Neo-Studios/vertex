@@ -31,7 +31,7 @@ export function useActiveTabs(session?: ActiveSession) {
 
         // Iterate through all provided UUIDs
         uuids.forEach(fileUuid => {
-            const existingTab = unref(tabs).find(t => t.fileUuid === fileUuid);
+            const existingTab = unref(tabs).find(t => t.fileUuid == fileUuid);
 
             // Only push if it doesn't exist yet
             if (!existingTab) {

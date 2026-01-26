@@ -64,8 +64,11 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-process",
                 "@tauri-apps/api/event",
                 "@tauri-apps/api/core",
-                "tailwindcss/colors"
+                "tailwindcss/colors",
+                "@vueuse/integrations/useSortable",
+                "sortablejs",
+                "vue-mermaid-string"
             ]
-        }
+        },
     },
 });

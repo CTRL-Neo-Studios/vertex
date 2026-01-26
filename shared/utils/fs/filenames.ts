@@ -103,6 +103,10 @@ export function isVideo(extension: PossiblyRef<string>) {
     return ['mp4', 'mov', 'mkv'].includes(unref(extension))
 }
 
+export function isUnreadableAsText(extension: PossiblyRef<string>) {
+    return isImage(extension) || isPdf(extension) || isDataFile(extension) || isVideo(extension)
+}
+
 export function getFileExtensionFromPath(path: PossiblyRef<string>) {
     const fn = unref(path).split('.')
     return fn[fn.length - 1] || 'unknown'
