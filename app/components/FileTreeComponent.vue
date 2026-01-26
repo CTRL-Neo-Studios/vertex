@@ -22,6 +22,7 @@ const props = defineProps<{
     noContextMenu?: boolean
 }>();
 const modelValue = defineModel<string | null>()
+const lastFileItem = defineModel<string | null>('lastFileItem')
 const emit = defineEmits<{
     (e: 'file-click', value: UITreeNode): void,
     (e: 'folder-toggle', path: string): void
@@ -36,7 +37,8 @@ const {
     getSession
 } = useActiveSessions()
 const {
-    openTab
+    openTab,
+    activeTabUuid
 } = useActiveTabs(getSession($sessionId))
 const {
     getFileByUuid
@@ -106,6 +108,7 @@ function onItemClick(item: TreeItem) {
         emit('folder-toggle', originalNode.fullPath);
     } else {
         emit('file-click', originalNode)
+        lastFileItem.value = item.id
     }
     modelValue.value = item.id
 }
@@ -313,7 +316,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         value-key="id"
         :ui="{
             itemWithChildren: 'ps-0',
-            listWithChildren: `ms-4.5 pl-2 dark:border-neutral-700`
+            listWithChildren: `ms-4.5 pl-2 border-muted`
         }"
         size="sm"
     >
@@ -322,23 +325,23 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 <UButton
                     size="sm"
                     :label="$ftMemo.get(item.label).unextName"
-                    :variant="item.id == modelValue ? 'soft' : 'ghost'"
-                    :color="item.id == modelValue ? 'primary' : 'neutral'"
-                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == modelValue ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
+                    :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
+                    :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
+                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == activeTabUuid ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
                     block
                     @click="onItemClick(item)"
                     :key="`${item.id}-file-tree-item`"
                 >
                     <template #trailing>
                         <div class="grow"/>
-                        <UBadge size="xs" color="neutral" variant="soft" :label="`.${$ftMemo.get(item.label).ext}`"/>
+                        <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${$ftMemo.get(item.label).ext}`"/>
                     </template>
                 </UButton>
             </UContextMenu>
         </template>
         <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
-                <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == modelValue ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
+                <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == activeTabUuid ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
                     <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.get(item.label).name }}</span>
                     <span class="grow"/>

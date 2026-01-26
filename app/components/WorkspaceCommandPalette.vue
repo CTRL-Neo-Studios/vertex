@@ -88,7 +88,7 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
 </script>
 
 <template>
-    <UDashboardSearch :groups="commandPaletteGroups"/>
+    <UDashboardSearch shortcut="meta_p" :groups="commandPaletteGroups"/>
 </template>
 
 <style scoped>

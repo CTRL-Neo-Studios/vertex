@@ -40,7 +40,7 @@ const emit = defineEmits<{
             />
         </template>
         <template #status-bar>
-            <ViewerEditorComponentWordCounter v-model="content"/>
+            <ViewerEditorComponentWordCounter v-model="content" :paragraphs="false" :words="false"/>
         </template>
     </ViewerEditorLayoutWrapper>
 </template>

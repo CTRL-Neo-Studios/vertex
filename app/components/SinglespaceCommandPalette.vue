@@ -3,7 +3,7 @@
 </script>
 
 <template>
-    <UDashboardSearch/>
+    <UDashboardSearch shortcut="meta_p"/>
 </template>
 
 <style scoped>
