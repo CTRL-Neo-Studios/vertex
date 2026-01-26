@@ -17,6 +17,8 @@ import {useActiveSinglespaceTools} from "~/composables/active/useActiveSinglespa
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
+import {convertFileSrc} from "@tauri-apps/api/core";
+import {isDataFile, isImage, isUnreadableAsText, isVideo} from "#shared/utils/fs/filenames";
 
 definePageMeta({
     layout: 'singlespace'
@@ -28,7 +30,7 @@ const $sesh = useActiveSessions()
 const $fileio = useFileIO()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const isContentSaved = ref(true)
-const isContentLoaded = ref(false), isRenaming = ref(false);
+const isContentLoaded = ref(false), renaming = ref(false);
 const {
     initializeIndex,
     removeFileFromIndex,
@@ -58,6 +60,31 @@ const $eu = useEditorUtils(editorRef)
 const INVALID_CHARS = /[\\/:*?"<>|]/;
 
 const fileName = ref<string>($fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', true))
+const fileExt = computed<string>(() => {
+    const fn = $fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', false).split('.')
+    return fn[fn.length - 1] || 'unknown'
+})
+const fullFilePath = computed(() => getFileByUuid(unref(tabId))?.fullPath)
+
+const showRichEditor = computed(() => {
+    if (isUnreadableAsText(fileExt)) return false;
+    else if (['txt', 'md'].includes(unref(fileExt))) return true;
+    return false;
+})
+const showCodeEditor = computed(() => {
+    if (isUnreadableAsText(fileExt)) return false;
+    else return !['txt', 'md'].includes(unref(fileExt));
+})
+const showImageViewer = computed(() => {
+    return isImage(fileExt);
+})
+const showVideoViewer = computed(() => {
+    return isVideo(fileExt)
+})
+const showDataEditor = computed(() => {
+    return isDataFile(fileExt)
+})
+
 const internalLinkList = computed<InternalLink[]>(() => [])
 const codeblockMappings = useActiveEditorCodeblockMappings()
 
@@ -87,7 +114,7 @@ debouncedWatch(content, async () => {
     isContentSaved.value = false;
 
     try {
-        await until(isRenaming).toMatch(i => i == false)
+        await until(renaming).toMatch(i => i == false)
         // await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
         const fp = getFileByUuid(tabId)?.fullPath
         if (fp)
@@ -108,8 +135,13 @@ onMounted(async () => {
 
     const currentIndexFile = getFileByUuid(tabId)
     if (currentIndexFile && currentIndexFile?.fullPath && !isIndexTemporary(currentIndexFile?.uuid)) {
-        content.value = await $fileio.readTextFromFile(currentIndexFile.fullPath)
-        isContentLoaded.value = true
+        if (!isUnreadableAsText(fileExt))
+            $fileio.readTextFromFile(currentIndexFile.fullPath).then((value) => {
+                content.value = value
+                isContentLoaded.value = true
+            })
+        else if (isImage(fileExt))
+            isContentLoaded.value = true
     } else {
         isContentSaved.value = false
         isContentLoaded.value = true
@@ -123,12 +155,12 @@ onBeforeUnmount(async () => {
 async function onRename(oldValue: string) {
     if (isIndexTemporary(tabId)) return;
 
-    isRenaming.value = true;
+    renaming.value = true;
 
     // Revert to old value if new value is invalid or truly unchanged (case-sensitive check)
     if (fileName.value == null || INVALID_CHARS.test(fileName.value) || fileName.value === oldValue) {
         fileName.value = oldValue;
-        isRenaming.value = false;
+        renaming.value = false;
         return;
     }
 
@@ -152,7 +184,7 @@ async function onRename(oldValue: string) {
         }
     }
 
-    isRenaming.value = false;
+    renaming.value = false;
 }
 
 function toTocEntry(props: ToTocEntryProps) {
@@ -171,21 +203,76 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
 
 <template>
     <div class="w-full h-full relative">
-        <ContentEditor
-            v-model="content"
-            v-model:editorInstance="editorRef"
-            v-model:content-saved="isContentSaved"
-            v-model:fileName="fileName"
+        <Suspense>
+            <div class="w-full h-full relative">
+                <template v-if="!isContentLoaded">
+                    <div class="h-full max-h-svh w-full flex items-center justify-center">
+                        <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin size-6"/>
+                    </div>
+                </template>
+                <template v-else>
+                    <template v-if="showRichEditor">
+                        <!--            <ContentEditor-->
+                        <!--                v-model="content"-->
+                        <!--                v-model:editorInstance="editorRef"-->
+                        <!--                v-model:content-saved="isContentSaved"-->
+                        <!--                v-model:fileName="fileName"-->
 
-            :specialCodeBlockMapping="codeblockMappings"
-            :internalLinkList
-            :filePath="getFileByUuid(tabId)?.fullPath"
-            :renaming="isRenaming"
+                        <!--                :specialCodeBlockMapping="codeblockMappings"-->
+                        <!--                :internalLinkList="internalLinkList"-->
+                        <!--                :filePath="getFileByUuid(tabId)?.relativePath"-->
+                        <!--                :renaming="renaming"-->
 
-            @onClickedInternalLink="onInternalLinkClick"
-            @onRename="onRename"
-        />
-        <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+                        <!--                @onClickedInternalLink="onInternalLinkClick"-->
+                        <!--                @onRename="onRename"-->
+                        <!--            />-->
+                        <ViewerEditorRichText
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :specialCodeBlockMapping="codeblockMappings"
+                            :internalLinkList="internalLinkList"
+                            :filePath="fullFilePath"
+                            :renaming="renaming"
+
+                            @onClickedInternalLink="onInternalLinkClick"
+                            @onRename="onRename"
+                        />
+                        <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+                    </template>
+                    <template v-else-if="showImageViewer">
+                        <ViewerEditorImageViewer
+                            :imageSrc="convertFileSrc(fullFilePath || '')"
+                            :renaming="renaming"
+                            v-model:fileName="fileName"
+                            :filePath="fullFilePath"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showCodeEditor">
+                        <ViewerEditorCodeText
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :filePath="fullFilePath"
+                            :renaming="renaming"
+                            @onRename="onRename"
+                        />
+                    </template>
+                </template>
+            </div>
+            <template #fallback>
+                <div class="h-full max-h-svh w-full max-w-svh flex items-center justify-center">
+                    <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin"/>
+                </div>
+            </template>
+        </Suspense>
     </div>
 </template>
 

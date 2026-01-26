@@ -31,6 +31,9 @@ export function useAppSessionNavigator() {
                 }, {
                     name: 'Text Files',
                     extensions: ['txt']
+                }, {
+                    name: 'Code Files',
+                    extensions: ['java', 'cs', 'css', 'ts', 'js', 'jsx', 'tsx', 'yaml', 'yml', 'toml', 'json', 'vue', 'html']
                 }]
             })
         else

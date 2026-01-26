@@ -15,12 +15,11 @@ import {
     isImage,
     isUnreadableAsText,
     isPdf,
-    isTextFile,
+    isPlainTextFile,
     isVideo
 } from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
-import TextCodeEditor from "~/components/TextCodeEditor.vue";
 
 definePageMeta({
     layout: 'workspace'
@@ -32,7 +31,7 @@ const $sesh = useActiveSessions()
 const $fileio = useFileIO()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const isContentSaved = ref(true)
-const isContentLoaded = ref(false), isRenaming = ref(false);
+const isContentLoaded = ref(false), renaming = ref(false);
 const {
     on,
     getFileByUuid,
@@ -62,15 +61,16 @@ const fileExt = computed<string>(() => {
     const fn = $fileio.processFileNameFromPath(getFileByUuid(unref(tabId))?.fullPath || '', false).split('.')
     return fn[fn.length - 1] || 'unknown'
 })
+const fullFilePath = computed(() => getFileByUuid(unref(tabId))?.fullPath)
+const relativeFilePath = computed(() => getFileByUuid(unref(tabId))?.relativePath)
 
 const showRichEditor = computed(() => {
     if (isUnreadableAsText(fileExt)) return false;
-    else if (['txt', 'md'].includes(unref(fileExt))) return true;
-    return false;
+    else return isPlainTextFile(fileExt);
 })
 const showCodeEditor = computed(() => {
     if (isUnreadableAsText(fileExt)) return false;
-    else return !['txt', 'md'].includes(unref(fileExt));
+    else return !isPlainTextFile(fileExt);
 })
 const showImageViewer = computed(() => {
     return isImage(fileExt);
@@ -94,7 +94,7 @@ const internalLinkList = computed<InternalLink[]>(() => {
         const fext = getFileExtensionFromPath(filename)
         const noExtFilename = $fileio.processFileNameFromPath(file.fullPath, true)
 
-        if (isTextFile(fext))
+        if (isPlainTextFile(fext))
             list.push({
                 name: noExtFilename,
                 filePath: file.relativePath,
@@ -139,7 +139,7 @@ debouncedWatch(content, async () => {
     isContentSaved.value = false;
 
     try {
-        await until(isRenaming).toMatch(i => i == false)
+        await until(renaming).toMatch(i => i == false)
         // await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
         const fp = getFileByUuid(tabId)?.fullPath
         if (fp)
@@ -160,8 +160,13 @@ onMounted(async () => {
 
     const currentIndexFile = getFileByUuid(tabId)
     if (currentIndexFile?.fullPath) {
-        content.value = await $fileio.readTextFromFile(currentIndexFile.fullPath)
-        isContentLoaded.value = true
+        if (!isUnreadableAsText(fileExt))
+            $fileio.readTextFromFile(currentIndexFile.fullPath).then((value) => {
+                content.value = value
+                isContentLoaded.value = true
+            })
+        else if (isImage(fileExt))
+            isContentLoaded.value = true
     }
 })
 
@@ -193,12 +198,12 @@ onBeforeUnmount(() => {
 })
 
 async function onRename(oldValue: string) {
-    isRenaming.value = true;
+    renaming.value = true;
 
     // Revert to old value if new value is invalid or truly unchanged (case-sensitive check)
     if (fileName.value == null || INVALID_CHARS.test(fileName.value) || fileName.value === oldValue) {
         fileName.value = oldValue;
-        isRenaming.value = false;
+        renaming.value = false;
         return;
     }
 
@@ -222,7 +227,7 @@ async function onRename(oldValue: string) {
         }
     }
 
-    isRenaming.value = false;
+    renaming.value = false;
 }
 
 function toTocEntry(props: ToTocEntryProps) {
@@ -241,44 +246,76 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
 
 <template>
     <div class="w-full h-full relative">
-        <template v-if="showRichEditor">
-            <ContentEditor
-                v-model="content"
-                v-model:editorInstance="editorRef"
-                v-model:content-saved="isContentSaved"
-                v-model:fileName="fileName"
+        <Suspense>
+            <div class="w-full h-full relative">
+                <template v-if="!isContentLoaded">
+                    <div class="h-full max-h-svh w-full flex items-center justify-center">
+                        <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin size-6"/>
+                    </div>
+                </template>
+                <template v-else>
+                    <template v-if="showRichEditor">
+                        <!--            <ContentEditor-->
+                        <!--                v-model="content"-->
+                        <!--                v-model:editorInstance="editorRef"-->
+                        <!--                v-model:content-saved="isContentSaved"-->
+                        <!--                v-model:fileName="fileName"-->
 
-                :specialCodeBlockMapping="codeblockMappings"
-                :internalLinkList="internalLinkList"
-                :filePath="getFileByUuid(tabId)?.relativePath"
-                :renaming="isRenaming"
+                        <!--                :specialCodeBlockMapping="codeblockMappings"-->
+                        <!--                :internalLinkList="internalLinkList"-->
+                        <!--                :filePath="getFileByUuid(tabId)?.relativePath"-->
+                        <!--                :renaming="renaming"-->
 
-                @onClickedInternalLink="onInternalLinkClick"
-                @onRename="onRename"
-            />
-            <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
-        </template>
-        <template v-else-if="showImageViewer">
-            <div class="w-full h-full max-h-svh max-w-svw flex items-center justify-center overflow-hidden" v-if="isImage(fileExt)">
-                <img
-                    :src="convertFileSrc(getFileByUuid(tabId)?.fullPath || '')"
-                    class="max-w-full max-h-full object-contain"
-                    alt="image"
-                />
+                        <!--                @onClickedInternalLink="onInternalLinkClick"-->
+                        <!--                @onRename="onRename"-->
+                        <!--            />-->
+                        <ViewerEditorRichText
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :specialCodeBlockMapping="codeblockMappings"
+                            :internalLinkList="internalLinkList"
+                            :filePath="relativeFilePath"
+                            :renaming="renaming"
+
+                            @onClickedInternalLink="onInternalLinkClick"
+                            @onRename="onRename"
+                        />
+                        <MinimalLineToc @to-toc="toTocEntryWithDefaults" class="absolute right-8 top-1/2 -translate-y-1/2 z-10"/>
+                    </template>
+                    <template v-else-if="showImageViewer">
+                        <ViewerEditorImageViewer
+                            :imageSrc="convertFileSrc(fullFilePath || '')"
+                            :renaming="renaming"
+                            v-model:fileName="fileName"
+                            :filePath="relativeFilePath"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showCodeEditor">
+                        <ViewerEditorCodeText
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :filePath="relativeFilePath"
+                            :renaming="renaming"
+                            @onRename="onRename"
+                        />
+                    </template>
+                </template>
             </div>
-        </template>
-        <template v-else-if="showCodeEditor">
-            <TextCodeEditor
-                v-model="content"
-                v-model:editorInstance="editorRef"
-                v-model:content-saved="isContentSaved"
-                v-model:fileName="fileName"
-
-                :filePath="getFileByUuid(tabId)?.relativePath"
-                :renaming="isRenaming"
-                @onRename="onRename"
-            />
-        </template>
+            <template #fallback>
+                <div class="h-full max-h-svh w-full max-w-svh flex items-center justify-center">
+                    <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin"/>
+                </div>
+            </template>
+        </Suspense>
     </div>
 </template>
 

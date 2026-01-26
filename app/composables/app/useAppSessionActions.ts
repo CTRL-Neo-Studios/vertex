@@ -61,7 +61,7 @@ export function useAppSessionActions() {
         let path = await save({
             filters: [{
                 name: 'Markdown Files',
-                extensions: ['md', 'mdx']
+                extensions: ['md']
             }, {
                 name: 'Text Files',
                 extensions: ['txt']

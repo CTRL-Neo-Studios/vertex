@@ -32,7 +32,7 @@
     "@tauri-apps/plugin-store": "^2.4.2",
     "@tiptap/extension-collaboration": "^3.17.1",
     "@tiptap/extension-node-range": "^3.17.1",
-    "@type32/codemirror-rich-obsidian-editor": "^0.1.6",
+    "@type32/codemirror-rich-obsidian-editor": "^0.1.8",
     "@type32/dispatcher": "^0.1.2",
     "@type32/nuxt-predicates": "^1.1.0",
     "@vueuse/nuxt": "14.1.0",

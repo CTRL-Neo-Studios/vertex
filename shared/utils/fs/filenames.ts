@@ -87,7 +87,7 @@ export function isImage(extension: PossiblyRef<string>) {
     return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
 }
 
-export function isTextFile(extension: PossiblyRef<string>) {
+export function isPlainTextFile(extension: PossiblyRef<string>) {
     return ['txt', 'md'].includes(unref(extension))
 }
 
