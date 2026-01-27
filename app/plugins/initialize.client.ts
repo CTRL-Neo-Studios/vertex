@@ -7,6 +7,7 @@ import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/core";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useAppTheme} from "~/composables/app/useAppTheme";
 
 export default defineNuxtPlugin({
     name: 'initialize',
@@ -15,8 +16,10 @@ export default defineNuxtPlugin({
         
         const $asesh = useAppSessions()
         const $win = useAppWebviewWindows()
+        const $settings = useAppSettings()
 
-        const cfg = await useAppSettings().load()
+        const cfg = await $settings.load()
+        useAppTheme().loadThemeFromConfig()
 
         // Initialize the current window session
         // Gets whether the current window is a `main` or a `session-` window
@@ -26,6 +29,7 @@ export default defineNuxtPlugin({
 
         await $win.getCurrentAppWindow().listen('tauri://focus', async () => {
             await $menu.setMenu()
+            await $settings.load()
         })
         
         // Attempts to recover the saved sessions on the `main` window

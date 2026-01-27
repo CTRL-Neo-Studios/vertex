@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 
 /**
  * Flexible layout wrapper for different viewer/editor types.
@@ -13,8 +14,12 @@ import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport
  */
 
 const fileName = defineModel<string>('fileName')
+const {
+    config
+} = useAppSettings()
+const statusBarDisplayMode = computed(() => unref(config)?.viewConfig.editorPanel.showStatusBar)
 
-type ScrollMode = 'vertical' | 'both' | 'none'
+    type ScrollMode = 'vertical' | 'both' | 'none'
 type ContentAlignment = 'center' | 'start' | 'stretch'
 
 const props = withDefaults(defineProps<{
@@ -189,7 +194,7 @@ const viewportClasses = computed(() => {
         </ScrollAreaViewport>
 
         <!-- Status bar (with scroll) -->
-        <div v-if="showStatusBar" class="bg-default absolute z-10 left-0 right-0 bottom-0 h-fit">
+        <div v-if="showStatusBar" :class="[`bg-default absolute z-10 left-0 right-0 bottom-0 h-fit group`, statusBarDisplayMode == 'show-on-hover' ? 'group-hover:opacity-100 hover:opacity-100 opacity-0' : statusBarDisplayMode == 'always-hidden' ? 'hidden' : '']">
             <div class="bg-submuted inline-flex justify-start items-center w-full border-t border-default p-1 px-3 pb-1.5">
                 <slot name="status-bar"/>
             </div>

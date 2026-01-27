@@ -1,12 +1,8 @@
-
-export interface AppThemeColorPalette {
-
-}
-
 export interface AppSettings {
     openLastOpenedWindows: boolean,
     themeConfig: AppThemeConfig,
-    advancedThemeConfig: AppAdvancedThemeConfig
+    advancedThemeConfig: AppAdvancedThemeConfig,
+    viewConfig: AppViewConfig
 }
 
 export interface AppThemeConfig {
@@ -15,10 +11,26 @@ export interface AppThemeConfig {
     roundedRadius: number,
     appFont: string,
     editorFont: string,
-    codeFont: string,
+    appMonoFont: string,
+    editorMonoFont: string,
     blackAsPrimary: boolean
 }
 
 export interface AppAdvancedThemeConfig {
     customCss: string,
+}
+
+export interface AppViewConfig {
+    fileTree: {
+        showFoldArrows: boolean,
+        showFileExtInName: boolean,
+        showFileExtAsTag: boolean,
+        showFileIcons: boolean,
+        showFolderIcons: boolean,
+        allowCustomFileIcons: boolean,
+        allowCustomFolderIcons: boolean,
+    },
+    editorPanel: {
+        showStatusBar: 'show-on-hover' | 'always-shown' | 'always-hidden',
+    }
 }

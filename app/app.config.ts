@@ -8,8 +8,12 @@ export default defineAppConfig({
     theme: {
         radius: 0.25,
         blackAsPrimary: false,
-        font: 'Geist',
-        monoFont: 'Geist Mono',
+        appFont: 'Geist',
+        appMonoFont: 'Geist Mono',
         editorFont: 'Geist',
+        editorMonoFont: 'Geist Mono',
     },
+    versioning: {
+        version: '0.1.1.'
+    }
 })

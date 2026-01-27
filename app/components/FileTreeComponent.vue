@@ -14,6 +14,7 @@ import {useFileIO} from "~/composables/io/useFileIO";
 import {useAppOpener} from "~/composables/app/useAppOpener";
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -43,6 +44,9 @@ const {
 const {
     getFileByUuid
 } = useActiveWorkspaceIndex(getSession($sessionId))
+const {
+    config
+} = useAppSettings()
 
 const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
@@ -324,15 +328,16 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
                 <UButton
                     size="sm"
-                    :label="$ftMemo.get(item.label).unextName"
+                    :label="config?.viewConfig.fileTree.showFileExtInName ? $ftMemo.get(item.label).name : $ftMemo.get(item.label).unextName"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
                     :class="['select-none relative align-middle items-center justify-start text-left', item.id == activeTabUuid ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
                     block
                     @click="onItemClick(item)"
                     :key="`${item.id}-file-tree-item`"
+                    :icon="`${config?.viewConfig.fileTree.showFileIcons ? 'i-lucide-file' : ''}`"
                 >
-                    <template #trailing>
+                    <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
                         <div class="grow"/>
                         <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${$ftMemo.get(item.label).ext}`"/>
                     </template>
@@ -342,10 +347,10 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == activeTabUuid ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
-                    <UIcon class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
+                    <UIcon v-if="config?.viewConfig.fileTree.showFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
                     <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.get(item.label).name }}</span>
                     <span class="grow"/>
-<!--                    <UIcon :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />-->
+                    <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
                 </div>
             </UContextMenu>
         </template>

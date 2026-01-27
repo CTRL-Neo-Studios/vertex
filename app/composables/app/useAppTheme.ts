@@ -3,10 +3,6 @@ import colors from 'tailwindcss/colors'
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 
-const defaultPrimaryColor = 'indigo'
-const defaultNeutralColor = 'zinc'
-const defaultSansFont = 'Geist'
-
 export function useAppTheme() {
     const appConfig = useAppConfig()
     const colorMode = useColorMode()
@@ -28,19 +24,20 @@ export function useAppTheme() {
     })
 
     const colorsToOmit = ['inherit', 'current', 'transparent', 'black', 'white', ...neutralColors]
-    const primaryColors = Object.keys(omit(colors, colorsToOmit as any))
+    const primaryColors = computed(() => Object.keys(omit(colors, colorsToOmit as any)))
     const primary = computed({
         get() {
             return appConfig.ui.colors.primary
         },
         set(option) {
             appConfig.ui.colors.primary = option
+            appConfig.theme.blackAsPrimary = false
             $settings.set({
                 themeConfig: {
-                    primaryColor: option
+                    primaryColor: option,
+                    blackAsPrimary: false
                 }
-            })
-            setBlackAsPrimary(false)
+            }, 'computed primary')
         }
     })
 
@@ -59,16 +56,55 @@ export function useAppTheme() {
         }
     })
 
-    const fonts = ['Public Sans', 'DM Sans', 'Geist', 'Inter', 'Poppins', 'Outfit', 'Raleway']
-    const font = computed({
+    const fonts = ['Public Sans', 'DM Sans', 'Geist', 'Inter', 'Poppins', 'Outfit', 'Raleway', 'JetBrains Mono', 'Geist Mono', 'Google Sans Code']
+    const appFont = computed({
         get() {
-            return appConfig.theme.font
+            return appConfig.theme.appFont
         },
         set(option) {
-            appConfig.theme.font = option
+            appConfig.theme.appFont = option
             $settings.set({
                 themeConfig: {
                     appFont: option
+                }
+            })
+        }
+    })
+    const appMonoFont = computed({
+        get() {
+            return appConfig.theme.appMonoFont
+        },
+        set(option) {
+            appConfig.theme.appMonoFont = option
+            $settings.set({
+                themeConfig: {
+                    appMonoFont: option
+                }
+            })
+        }
+    })
+    const editorFont = computed({
+        get() {
+            return appConfig.theme.editorFont
+        },
+        set(option) {
+            appConfig.theme.editorFont = option
+            $settings.set({
+                themeConfig: {
+                    editorFont: option
+                }
+            })
+        }
+    })
+    const editorMonoFont = computed({
+        get() {
+            return appConfig.theme.editorMonoFont
+        },
+        set(option) {
+            appConfig.theme.editorMonoFont = option
+            $settings.set({
+                themeConfig: {
+                    editorMonoFont: option
                 }
             })
         }
@@ -94,51 +130,35 @@ export function useAppTheme() {
             themeConfig: {
                 blackAsPrimary: true
             }
-        })
-    }
-
-    function exportCSS(): string {
-        const lines = [
-            '@import "tailwindcss";',
-            '@import "@nuxt/ui";'
-        ]
-
-        if (appConfig.theme.font !== unref($settings.config)?.themeConfig.appFont) {
-            lines.push('', '@theme {', `  --font-sans: '${appConfig.theme.font}', sans-serif;`, '}')
-        }
-
-        const rootLines: string[] = []
-        if (appConfig.theme.radius !== 0.25) {
-            rootLines.push(`  --ui-radius: ${appConfig.theme.radius}rem;`)
-        }
-        if (appConfig.theme.blackAsPrimary) {
-            rootLines.push('  --ui-primary: black;')
-        }
-
-        if (rootLines.length) {
-            lines.push('', ':root {', ...rootLines, '}')
-        }
-
-        if (appConfig.theme.blackAsPrimary) {
-            lines.push('', '.dark {', '  --ui-primary: white;', '}')
-        }
-
-        return lines.join('\n')
+        }, 'setBlackAsPrimary()')
     }
 
     function resetTheme() {
-        // Reset without triggering individual tracking events
-        if (!$settings.config.value) return;
-
         $settings.set({
             themeConfig: defaultAppThemeConfig(),
             advancedThemeConfig: defaultAppAdvancedThemeConfig()
         })
 
+        loadThemeFromConfig()
+    }
+
+    async function saveTheme() {
+        // Note: Individual setters already call $settings.set() for their specific values
+        // This function just ensures everything is in sync and saves to disk
+        // We don't call $settings.set() again here to avoid triggering watchers
+        await $settings.save()
+    }
+
+    function loadThemeFromConfig() {
+        if (!$settings.config.value) return;
+
         appConfig.ui.colors.primary = $settings.config.value.themeConfig.primaryColor
         appConfig.ui.colors.neutral = $settings.config.value.themeConfig.neutralColor
         appConfig.theme.radius = $settings.config.value.themeConfig.roundedRadius
-        appConfig.theme.font = $settings.config.value.themeConfig.appFont
+        appConfig.theme.appFont = $settings.config.value.themeConfig.appFont
+        appConfig.theme.appMonoFont = $settings.config.value.themeConfig.appMonoFont
+        appConfig.theme.editorFont = $settings.config.value.themeConfig.editorFont
+        appConfig.theme.editorMonoFont = $settings.config.value.themeConfig.editorMonoFont
         appConfig.theme.blackAsPrimary = $settings.config.value.themeConfig.blackAsPrimary
     }
 
@@ -151,10 +171,14 @@ export function useAppTheme() {
         radiuses,
         radius,
         fonts,
-        font,
+        appFont,
+        editorFont,
+        appMonoFont,
+        editorMonoFont,
         modes,
         mode,
-        exportCSS,
-        resetTheme
+        resetTheme,
+        saveTheme,
+        loadThemeFromConfig
     }
 }

@@ -21,41 +21,43 @@ const links = [[{
     onSelect: () => {
         open.value = false
     }
+}, {
+    label: 'View',
+    icon: 'i-lucide-layout-grid',
+    to: '/settings/view',
+    onSelect: () => {
+        open.value = false
+    }
 },]] satisfies NavigationMenuItem[][]
 
 const groups = computed(() => [])
 </script>
 
 <template>
-    <UDashboardGroup>
-        <UDashboardSidebar
-            id="default"
-            v-model:open="open"
-            collapsible
-            resizable
-            class="bg-elevated/25"
-            :ui="{ footer: 'lg:border-t lg:border-default' }"
-        >
-            <template #header>
-                <SpaceOnOs detectOs="macos" :showOnOs="true"/>
-            </template>
+    <div class="w-full h-screen max-h-screen overflow-hidden">
+        <div class="w-full h-full grid grid-cols-4">
+            <!-- Sidebar -->
+            <div class="col-span-1 bg-submuted border-r border-r-default h-full overflow-hidden flex flex-col" data-tauri-drag-region>
+                <SpaceOnOs detectOs="macos" showOnOs class="h-(--ui-header-height)"/>
+                
+                <UContainer class="w-full flex-1 overflow-y-auto">
+                    <UDashboardSearchButton class="bg-transparent ring-default w-full mb-4" />
 
-            <template #default="{ collapsed }">
-                <UDashboardSearchButton :collapsed="collapsed" class="bg-transparent ring-default" />
-
-                <UNavigationMenu
-                    :collapsed="collapsed"
-                    :items="links[0]"
-                    orientation="vertical"
-                    tooltip
-                    popover
-                />
-            </template>
-
-            <template #footer="{ collapsed }">
-            </template>
-        </UDashboardSidebar>
-    </UDashboardGroup>
+                    <UNavigationMenu
+                        :items="links[0]"
+                        orientation="vertical"
+                        tooltip
+                        popover
+                    />
+                </UContainer>
+            </div>
+            
+            <!-- Content area (non-scrollable container) -->
+            <div class="col-span-3 h-screen">
+                <slot/>
+            </div>
+        </div>
+    </div>
 </template>
 
 <style scoped>

@@ -11,9 +11,10 @@ const $opener = useAppOpener()
 const color = computed(() => colorMode.value === 'dark' ? (colors as any)[appConfig.ui.colors.neutral][900] : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)
 const blackAsPrimary = computed(() => appConfig.theme.blackAsPrimary ? `:root { --ui-primary: black; } .dark { --ui-primary: white; }` : ':root {}')
-const appFont = computed(() => `:root { --font-sans: '${appConfig.theme.font}', 'Geist', 'Inter', sans-serif; }`)
-// const monoFont = computed(() => `:root { --font-mono: '${appConfig.theme.font}', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace; }`)
-const editorFont = computed(() => `:root { --font-editor: '${appConfig.theme.font}', 'Geist', 'Inter', var(--font-sans, sans-serif); }`)
+const appFont = computed(() => `:root { --font-sans: '${appConfig.theme.appFont}', 'Geist', 'Inter', sans-serif; }`)
+const appMonoFont = computed(() => `:root { --font-mono: '${appConfig.theme.appMonoFont}', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace; }`)
+const editorFont = computed(() => `:root { --font-editor: '${appConfig.theme.editorFont}', '${appConfig.theme.appFont}', 'Geist', 'Inter', var(--font-sans, sans-serif); }`)
+const editorMonoFont = computed(() => `:root { --font-editor-code: '${appConfig.theme.editorMonoFont}', '${appConfig.theme.appMonoFont}', 'JetBrains Mono', monospace, ui-monospace; }`)
 
 useHead({
     meta: [
@@ -25,7 +26,9 @@ useHead({
         { innerHTML: radius, id: 'nuxt-ui-radius', tagPriority: -2 },
         { innerHTML: blackAsPrimary, id: 'nuxt-ui-black-as-primary', tagPriority: -2 },
         { innerHTML: appFont, id: 'nuxt-ui-app-font', tagPriority: -2 },
-        { innerHTML: editorFont, id: 'nuxt-ui-editor-font', tagPriority: -2 }
+        { innerHTML: appMonoFont, id: 'nuxt-ui-app-mono-font', tagPriority: -2 },
+        { innerHTML: editorFont, id: 'nuxt-ui-editor-font', tagPriority: -2 },
+        { innerHTML: editorMonoFont, id: 'nuxt-ui-editor-mono-font', tagPriority: -2 }
     ],
     htmlAttrs: {
         lang: 'en'

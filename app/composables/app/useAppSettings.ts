@@ -88,12 +88,14 @@ export function useAppSettings() {
         return success
     }
 
-    function set(data: DeepPartial<AppSettings>) {
+    function set(data: DeepPartial<AppSettings>, source?: string) {
+        // console.log('Old', source, unref(config))
         if (config.value)
             config.value = defaultAppSettings({
                 ...unref(config),
                 ...data
             })
+        // console.log('New', source, unref(config))
     }
 
     async function createOrFocusSettingsWindow() {
@@ -104,17 +106,12 @@ export function useAppSettings() {
             const settingsWindow = $win.createAppWebviewWindow('/settings', 'settings', 'Settings')
 
             const closeUnlisten = await settingsWindow.listen('tauri://close-requested', async function (e) {
-                const success = await save()
-                if (success)
-                    $qt.error('Unable to save settings')
-                else
-                    await settingsWindow.destroy()
-
+                await settingsWindow.destroy()
                 closeUnlisten()
             })
 
             const destroyUnlisten = await settingsWindow.listen('tauri://destroyed', async function (e) {
-                const success = await save()
+                await settingsWindow.destroy()
                 destroyUnlisten()
             })
         }

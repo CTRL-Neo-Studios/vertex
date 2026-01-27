@@ -6,7 +6,8 @@ export function defaultAppThemeConfig(data?: Partial<AppThemeConfig>): AppThemeC
         neutralColor: data?.neutralColor || 'zinc',
         appFont: data?.appFont || 'Geist',
         editorFont: data?.editorFont || 'Geist',
-        codeFont: data?.codeFont || 'Geist Mono',
+        appMonoFont: data?.appMonoFont || 'Geist Mono',
+        editorMonoFont: data?.editorMonoFont || 'Geist Mono',
         blackAsPrimary: data?.blackAsPrimary == undefined ? false : data?.blackAsPrimary,
         roundedRadius: data?.roundedRadius || 0.25
     } satisfies AppThemeConfig
