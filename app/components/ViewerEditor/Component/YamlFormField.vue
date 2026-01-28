@@ -16,6 +16,7 @@
 
 import { CalendarDate, CalendarDateTime, Time, parseDate, parseDateTime, parseTime } from '@internationalized/date'
 import type {DropdownMenuItem} from "@nuxt/ui";
+import Collapsible from "~/components/Utility/Collapsible.vue";
 
 type YamlValue = string | number | boolean | null | Date | YamlValue[] | { [key: string]: YamlValue }
 
@@ -251,12 +252,41 @@ function convertType(newType: string) {
 }
 
 // Array operations
-function addArrayItem() {
+function addArrayItem(itemType?: string) {
     if (!Array.isArray(modelValue.value)) return
     
-    // If array is empty, default to string
+    // If type is specified, add that type
+    if (itemType) {
+        switch (itemType) {
+            case 'string':
+                modelValue.value.push('')
+                break
+            case 'number':
+                modelValue.value.push(0)
+                break
+            case 'boolean':
+                modelValue.value.push(false)
+                break
+            case 'null':
+                modelValue.value.push(null)
+                break
+            case 'array':
+                modelValue.value.push([])
+                break
+            case 'object':
+                modelValue.value.push({})
+                break
+            default:
+                modelValue.value.push('')
+        }
+        return
+    }
+    
+    // If array is empty, check if this is a string-array (tags) or regular array
+    // For string-array, the parent already handles it, so this should only happen for regular arrays
     if (modelValue.value.length === 0) {
-        modelValue.value.push('')
+        // Default to empty object for empty arrays (most common use case)
+        modelValue.value.push({})
         return
     }
     
@@ -286,12 +316,44 @@ function removeArrayItem(index: number) {
 }
 
 // Object operations
-function addObjectField() {
+function addObjectField(fieldType?: string) {
     if (typeof modelValue.value !== 'object' || Array.isArray(modelValue.value) || !modelValue.value || isDateObject(modelValue.value)) return
     
     const obj = modelValue.value as Record<string, YamlValue>
     const newKey = `field_${Object.keys(obj).length + 1}`
-    obj[newKey] = ''
+    
+    // Set initial value based on type
+    switch (fieldType) {
+        case 'string':
+            obj[newKey] = ''
+            break
+        case 'number':
+            obj[newKey] = 0
+            break
+        case 'boolean':
+            obj[newKey] = false
+            break
+        case 'date':
+            obj[newKey] = new Date().toISOString().split('T')[0]!
+            break
+        case 'datetime':
+            obj[newKey] = new Date().toISOString()
+            break
+        case 'null':
+            obj[newKey] = null
+            break
+        case 'string-array':
+            obj[newKey] = []
+            break
+        case 'array':
+            obj[newKey] = []
+            break
+        case 'object':
+            obj[newKey] = {}
+            break
+        default:
+            obj[newKey] = ''
+    }
 }
 
 function removeObjectField(key: string) {
@@ -305,7 +367,7 @@ const isCollapsed = ref(false)
 
 // Indentation based on depth
 const indentClass = computed(() => {
-    return props.depth > 0 ? 'ml-4 pl-4 border-l border-default/50' : ''
+    return props.depth > 0 ? 'pl-2' : ''
 })
 
 // Type options for dropdown - filtered by valid conversions
@@ -351,175 +413,90 @@ const selectedType = computed(() => {
         icon: iconMap[valueType.value] || 'i-heroicons-question-mark-circle'
     }
 })
+
+// Add field options (for creating new fields in objects)
+const addFieldOptions: DropdownMenuItem[] = [
+    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => addObjectField('string') },
+    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => addObjectField('number') },
+    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => addObjectField('boolean') },
+    { label: 'Date', icon: 'i-heroicons-calendar', onSelect: () => addObjectField('date') },
+    { label: 'Date & Time', icon: 'i-heroicons-clock', onSelect: () => addObjectField('datetime') },
+    { label: 'Tags', icon: 'i-heroicons-tag', onSelect: () => addObjectField('string-array') },
+    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => addObjectField('array') },
+    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => addObjectField('object') },
+    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => addObjectField('null') },
+]
+
+// Add array item options (for creating new items in arrays)
+const addArrayItemOptions: DropdownMenuItem[] = [
+    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => addArrayItem('string') },
+    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => addArrayItem('number') },
+    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => addArrayItem('boolean') },
+    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => addArrayItem('array') },
+    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => addArrayItem('object') },
+    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => addArrayItem('null') },
+]
 </script>
 
 <template>
     <div :class="indentClass" class="space-y-1">
-        <!-- Field Header (Key + Type + Actions) -->
-        <div class="flex items-center gap-2">
-            <!-- Field Key (editable) -->
-            <div class="flex-1 min-w-0">
-                <UInput
-                    v-if="isEditingKey"
-                    v-model="editingKeyValue"
-                    size="sm"
-                    autofocus
-                    @blur="saveKey"
-                    @keydown.enter="saveKey"
-                    @keydown.esc="isEditingKey = false"
-                />
-                <UButton
-                    v-else
-                    class="text-sm font-medium text-left justify-start px-0 py-0 truncate"
-                    :class="{ 'cursor-not-allowed': readonly }"
-                    @click="startEditingKey"
-                    :label="fieldKey"
-                    block
-                    variant="link"
-                    color="neutral"
-                />
-            </div>
-
-            <!-- Collapse toggle for objects/arrays -->
-            <UButton
-                v-if="valueType === 'object' || valueType === 'array'"
-                :icon="isCollapsed ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-down'"
-                variant="ghost"
-                size="xs"
-                color="neutral"
-                @click="isCollapsed = !isCollapsed"
-            />
-
-            <!-- Type selector -->
-            <UDropdownMenu
-                :items="[typeOptions]"
-                :disabled="readonly"
-                size="xs"
-            >
-                <UButton
-                    :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
-                    variant="soft"
-                    size="xs"
-                    :disabled="readonly"
-                />
-            </UDropdownMenu>
-
-            <!-- Remove button -->
-            <UButton
-                v-if="!readonly"
-                icon="i-heroicons-trash"
-                variant="ghost"
-                size="xs"
-                color="error"
-                @click="emit('remove')"
-            />
-        </div>
-
-        <!-- Value Input (collapsed check) -->
-        <div v-if="!isCollapsed" class="space-y-2">
-            <!-- String -->
+        <!-- For Objects and Arrays: Use Collapsible -->
+        <template v-if="valueType === 'object' || valueType === 'array'">
+            <!-- Edit mode for field key -->
             <UInput
-                v-if="valueType === 'string'"
-                :model-value="String(modelValue)"
+                v-if="isEditingKey"
+                v-model="editingKeyValue"
                 size="xs"
-                :disabled="readonly"
-                placeholder="Enter text..."
-                @update:model-value="(val: string) => modelValue = val"
+                autofocus
+                class="mb-1"
+                @blur="saveKey"
+                @keydown.enter="saveKey"
+                @keydown.esc="isEditingKey = false"
             />
+            
+            <!-- Collapsible for non-edit mode -->
+            <Collapsible v-else v-model:open="isCollapsed" :default-open="true" :label="fieldKey">
+                <template #actions>
+                    <div class="flex items-center gap-1">
+                        <!-- Edit key button -->
+                        <UButton
+                            v-if="!readonly && !isEditingKey"
+                            icon="i-lucide-pencil"
+                            variant="ghost"
+                            size="xs"
+                            color="neutral"
+                            @click.stop="startEditingKey"
+                        />
 
-            <!-- Number -->
-            <UInputNumber
-                v-else-if="valueType === 'number'"
-                :model-value="Number(modelValue)"
-                size="xs"
-                :disabled="readonly"
-                @update:model-value="(val: number | null) => modelValue = val ?? 0"
-            />
+                        <!-- Type selector -->
+                        <UDropdownMenu
+                            :items="[typeOptions]"
+                            :disabled="readonly"
+                            size="xs"
+                        >
+                            <UButton
+                                :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
+                                variant="soft"
+                                size="xs"
+                                :disabled="readonly"
+                            />
+                        </UDropdownMenu>
 
-            <!-- Boolean -->
-            <USwitch
-                v-else-if="valueType === 'boolean'"
-                :model-value="Boolean(modelValue)"
-                :disabled="readonly"
-                size="sm"
-                @update:model-value="(val: boolean) => modelValue = val"
-            />
+                        <!-- Remove button -->
+                        <UButton
+                            v-if="!readonly"
+                            icon="i-lucide-trash"
+                            variant="ghost"
+                            size="xs"
+                            color="error"
+                            @click.stop="emit('remove')"
+                        />
+                    </div>
+                </template>
 
-            <!-- Date (Date only, no time) -->
-            <UInputDate
-                v-else-if="valueType === 'date'"
-                :model-value="typeof modelValue === 'string' ? stringToCalendarDate(modelValue) : jsDateToCalendarDate(new Date())"
-                size="xs"
-                :disabled="readonly"
-                @update:model-value="(val) => {
-                    if (val && 'year' in val) {
-                        modelValue = `${val.year}-${String(val.month).padStart(2, '0')}-${String(val.day).padStart(2, '0')}`
-                    }
-                }"
-            />
-
-            <!-- DateTime (Date + Time) -->
-            <div v-else-if="valueType === 'datetime'" class="space-y-2">
-                <UInputDate
-                    :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                    size="xs"
-                    :disabled="readonly"
-                    granularity="second"
-                    @update:model-value="(val) => {
-                        if (val && 'year' in val && 'month' in val && 'day' in val) {
-                            // Parse current time if exists
-                            const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
-                            const hour = 'hour' in val ? val.hour : currentDateTime.hour
-                            const minute = 'minute' in val ? val.minute : currentDateTime.minute
-                            const second = 'second' in val ? val.second : currentDateTime.second
-                            
-                            const newDateTime = new CalendarDateTime(val.year, val.month, val.day, hour, minute, second)
-                            modelValue = newDateTime.toString()
-                        }
-                    }"
-                />
-                <UInputTime
-                    :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                    size="xs"
-                    :disabled="readonly"
-                    granularity="second"
-                    @update:model-value="(val) => {
-                        if (val && 'hour' in val && 'minute' in val) {
-                            // Parse current date if exists
-                            const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
-                            const second = 'second' in val ? val.second : currentDateTime.second
-                            
-                            const newDateTime = new CalendarDateTime(
-                                currentDateTime.year,
-                                currentDateTime.month,
-                                currentDateTime.day,
-                                val.hour,
-                                val.minute,
-                                second
-                            )
-                            modelValue = newDateTime.toString()
-                        }
-                    }"
-                />
-            </div>
-
-            <!-- String Array (Tags) -->
-            <UInputTags
-                v-else-if="valueType === 'string-array'"
-                :model-value="Array.isArray(modelValue) ? modelValue as string[] : []"
-                size="xs"
-                :disabled="readonly"
-                placeholder="Add tags..."
-                @update:model-value="(val: string[]) => modelValue = val"
-            />
-
-            <!-- Null -->
-            <div v-else-if="valueType === 'null'" class="text-sm text-muted italic">
-                null
-            </div>
-
+                <!-- Content inside collapsible - only arrays and objects -->
             <!-- Array (Complex items - objects/arrays) -->
-            <div v-else-if="valueType === 'array'" class="space-y-2">
+            <div v-if="valueType === 'array'" class="space-y-2">
                 <div
                     v-if="Array.isArray(modelValue) && modelValue.length === 0"
                     class="text-center py-4 text-sm text-muted border border-dashed border-default rounded-lg"
@@ -550,17 +527,19 @@ const selectedType = computed(() => {
                     </div>
                 </template>
 
-                <div class="pl-4">
+                <UDropdownMenu
+                    v-if="!readonly"
+                    :items="[addArrayItemOptions]"
+                    size="xs"
+                >
                     <UButton
-                        v-if="!readonly"
                         icon="i-lucide-plus"
                         label="Add Item"
-                        variant="ghost"
+                        variant="link"
                         size="xs"
                         color="neutral"
-                        @click="addArrayItem"
                     />
-                </div>
+                </UDropdownMenu>
             </div>
 
             <!-- Object -->
@@ -599,18 +578,175 @@ const selectedType = computed(() => {
                     </template>
                 </template>
 
-                <div class="pl-4">
+                <UDropdownMenu
+                    v-if="!readonly"
+                    :items="[addFieldOptions]"
+                    size="xs"
+                >
                     <UButton
-                        v-if="!readonly"
                         icon="i-lucide-plus"
                         label="Add Field"
-                        variant="ghost"
+                        variant="link"
                         size="xs"
                         color="neutral"
-                        @click="addObjectField"
+                    />
+                </UDropdownMenu>
+            </div>
+            </Collapsible>
+        </template>
+
+        <!-- For Simple Types: Regular Layout -->
+        <template v-else>
+            <div class="flex items-center gap-2">
+                <!-- Field Key (editable) -->
+                <div class="flex-1 min-w-0">
+                    <UInput
+                        v-if="isEditingKey"
+                        v-model="editingKeyValue"
+                        size="xs"
+                        autofocus
+                        @blur="saveKey"
+                        @keydown.enter="saveKey"
+                        @keydown.esc="isEditingKey = false"
+                    />
+                    <UButton
+                        v-else
+                        class="text-xs font-medium text-left justify-start px-0 py-0 truncate"
+                        :class="{ 'cursor-not-allowed': readonly }"
+                        @click="startEditingKey"
+                        :label="fieldKey"
+                        block
+                        variant="link"
+                        color="neutral"
                     />
                 </div>
+
+                <!-- Type selector -->
+                <UDropdownMenu
+                    :items="[typeOptions]"
+                    :disabled="readonly"
+                    size="xs"
+                >
+                    <UButton
+                        :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
+                        variant="soft"
+                        size="xs"
+                        :disabled="readonly"
+                    />
+                </UDropdownMenu>
+
+                <!-- Remove button -->
+                <UButton
+                    v-if="!readonly"
+                    icon="i-lucide-trash"
+                    variant="ghost"
+                    size="xs"
+                    color="error"
+                    @click="emit('remove')"
+                />
             </div>
-        </div>
+
+            <!-- Value Input for simple types -->
+            <div class="space-y-2">
+                <!-- String -->
+                <UInput
+                    v-if="valueType === 'string'"
+                    :model-value="String(modelValue)"
+                    size="xs"
+                    :disabled="readonly"
+                    placeholder="Enter text..."
+                    @update:model-value="(val: string) => modelValue = val"
+                />
+
+                <!-- Number -->
+                <UInputNumber
+                    v-else-if="valueType === 'number'"
+                    :model-value="Number(modelValue)"
+                    size="xs"
+                    :disabled="readonly"
+                    @update:model-value="(val: number | null) => modelValue = val ?? 0"
+                />
+
+                <!-- Boolean -->
+                <USwitch
+                    v-else-if="valueType === 'boolean'"
+                    :model-value="Boolean(modelValue)"
+                    :disabled="readonly"
+                    size="sm"
+                    @update:model-value="(val: boolean) => modelValue = val"
+                />
+
+                <!-- Date (Date only, no time) -->
+                <UInputDate
+                    v-else-if="valueType === 'date'"
+                    :model-value="typeof modelValue === 'string' ? stringToCalendarDate(modelValue) : jsDateToCalendarDate(new Date())"
+                    size="xs"
+                    :disabled="readonly"
+                    @update:model-value="(val) => {
+                        if (val && 'year' in val) {
+                            modelValue = `${val.year}-${String(val.month).padStart(2, '0')}-${String(val.day).padStart(2, '0')}`
+                        }
+                    }"
+                />
+
+                <!-- DateTime (Date + Time) -->
+                <div v-else-if="valueType === 'datetime'" class="space-y-2">
+                    <UInputDate
+                        :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
+                        size="xs"
+                        :disabled="readonly"
+                        granularity="second"
+                        @update:model-value="(val) => {
+                            if (val && 'year' in val && 'month' in val && 'day' in val) {
+                                const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
+                                const hour = 'hour' in val ? val.hour : currentDateTime.hour
+                                const minute = 'minute' in val ? val.minute : currentDateTime.minute
+                                const second = 'second' in val ? val.second : currentDateTime.second
+                                
+                                const newDateTime = new CalendarDateTime(val.year, val.month, val.day, hour, minute, second)
+                                modelValue = newDateTime.toString()
+                            }
+                        }"
+                    />
+                    <UInputTime
+                        :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
+                        size="xs"
+                        :disabled="readonly"
+                        granularity="second"
+                        @update:model-value="(val) => {
+                            if (val && 'hour' in val && 'minute' in val) {
+                                const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
+                                const second = 'second' in val ? val.second : currentDateTime.second
+                                
+                                const newDateTime = new CalendarDateTime(
+                                    currentDateTime.year,
+                                    currentDateTime.month,
+                                    currentDateTime.day,
+                                    val.hour,
+                                    val.minute,
+                                    second
+                                )
+                                modelValue = newDateTime.toString()
+                            }
+                        }"
+                    />
+                </div>
+
+                <!-- String Array (Tags) -->
+                <UInputTags
+                    v-else-if="valueType === 'string-array'"
+                    :model-value="Array.isArray(modelValue) ? modelValue as string[] : []"
+                    size="xs"
+                    :disabled="readonly"
+                    placeholder="Add tags..."
+                    @update:model-value="(val: string[]) => modelValue = val"
+                />
+
+                <!-- Null -->
+                <div v-else-if="valueType === 'null'" class="text-xs text-muted italic">
+                    null
+                </div>
+            </div>
+        </template>
     </div>
 </template>
