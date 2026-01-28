@@ -2,16 +2,21 @@
 import type {YamlFormData} from "#shared/types/types";
 import YamlFormField from "~/components/ViewerEditor/Component/YamlFormField.vue";
 import LayoutWrapper from "~/components/ViewerEditor/LayoutWrapper.vue";
+import { useYamlFieldTypes, type YamlFieldType } from '~/composables/editor/useYamlFieldTypes'
 
 /**
  * YAML Form Data Editor
  * 
- * A recursive form editor for YAML/frontmatter data.
- * Supports:
+ * Schema-driven form editor for YAML/frontmatter data.
+ * Supports custom field types through the fieldTypes prop.
+ * 
+ * Features:
  * - Primitive types (string, number, boolean, null)
+ * - Complex types (date, datetime, string-array)
  * - Objects (nested structures)
  * - Arrays (primitives and objects)
  * - Recursive structures
+ * - Custom field types with custom components
  * 
  * Can be used standalone or embedded in the rich text editor for frontmatter editing.
  */
@@ -23,10 +28,15 @@ const props = withDefaults(defineProps<{
     filePath?: string,
     embedded?: boolean, // When true, used as frontmatter editor (no layout wrapper)
     readonly?: boolean,
+    /** Custom field type definitions (merged with defaults) */
+    fieldTypes?: YamlFieldType[],
 }>(), {
     embedded: false,
     readonly: false,
 })
+
+// Initialize field types composable with custom types
+const { getDefaultValue, getTypeMenuItems } = useYamlFieldTypes(props.fieldTypes)
 
 // Track if data has unsaved changes
 const isDirty = ref(false)
@@ -36,44 +46,12 @@ watch(data, () => {
     isDirty.value = true
 }, { deep: true })
 
-// Add new field to root
+// Add new field to root using schema-based default value
 function addField(fieldType: string = 'string') {
     if (!data.value) data.value = {}
     
     const newKey = `field_${Object.keys(data.value).length + 1}`
-    
-    // Set initial value based on type
-    switch (fieldType) {
-        case 'string':
-            data.value[newKey] = ''
-            break
-        case 'number':
-            data.value[newKey] = 0
-            break
-        case 'boolean':
-            data.value[newKey] = false
-            break
-        case 'date':
-            data.value[newKey] = new Date()
-            break
-        case 'datetime':
-            data.value[newKey] = new Date()
-            break
-        case 'string-array':
-            data.value[newKey] = []
-            break
-        case 'array':
-            data.value[newKey] = []
-            break
-        case 'object':
-            data.value[newKey] = {}
-            break
-        case 'null':
-            data.value[newKey] = null
-            break
-        default:
-            data.value[newKey] = ''
-    }
+    data.value[newKey] = getDefaultValue(fieldType)
 }
 
 // Remove field from root
@@ -83,18 +61,10 @@ function removeField(key: string) {
     }
 }
 
-// Dropdown options for adding fields
-const addFieldOptions = [
-    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addField('string') },
-    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addField('number') },
-    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addField('boolean') },
-    { label: 'Date', icon: 'i-lucide-calendar', onSelect: () => addField('date') },
-    { label: 'Date & Time', icon: 'i-lucide-calendar-clock', onSelect: () => addField('datetime') },
-    { label: 'Tags', icon: 'i-lucide-tags', onSelect: () => addField('string-array') },
-    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addField('array') },
-    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addField('object') },
-    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addField('null') },
-]
+// Schema-based dropdown options for adding fields
+const addFieldOptions = computed(() => {
+    return getTypeMenuItems((type) => addField(type))
+})
 </script>
 
 <template>
@@ -107,6 +77,7 @@ const addFieldOptions = [
                 v-model="data[key]"
                 :field-key="String(key)"
                 :readonly="readonly"
+                :field-types="fieldTypes"
                 @remove="removeField(String(key))"
                 @update:field-key="(newKey: string) => {
                     if (newKey !== key) {
@@ -182,6 +153,7 @@ const addFieldOptions = [
                                 v-model="data[key]"
                                 :field-key="String(key)"
                                 :readonly="readonly"
+                                :field-types="fieldTypes"
                                 @remove="removeField(String(key))"
                                 @update:field-key="(newKey: string) => {
                                     if (newKey !== key) {

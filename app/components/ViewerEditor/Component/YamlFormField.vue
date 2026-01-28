@@ -2,21 +2,25 @@
 /**
  * YAML Form Field - Recursive Component
  * 
- * Renders appropriate input based on value type:
- * - string → UInput
- * - number → UInputNumber
- * - boolean → USwitch
- * - date → UInputDate
- * - datetime → UInputDate + UInputTime
- * - null → UInput (nullable)
- * - string-array → UInputTags
- * - array → Expandable list of items
- * - object → Nested fields
+ * Schema-driven field renderer with support for custom components.
+ * Uses centralized field type registry for extensibility.
+ * 
+ * To add custom field types:
+ * 1. Define your field type in the fieldTypes prop
+ * 2. Provide a custom component via slot: #field-{component}
+ * 
+ * Example:
+ * <YamlFormField :fieldTypes="[{ type: 'image', label: 'Image', icon: 'i-lucide-image', defaultValue: '', component: 'image' }]">
+ *   <template #field-image="{ modelValue, readonly }">
+ *     <MyImagePicker v-model="modelValue" :disabled="readonly" />
+ *   </template>
+ * </YamlFormField>
  */
 
 import { CalendarDate, CalendarDateTime, Time, parseDate, parseDateTime, parseTime } from '@internationalized/date'
 import type {DropdownMenuItem} from "@nuxt/ui";
 import Collapsible from "~/components/Utility/Collapsible.vue";
+import { useYamlFieldTypes, type YamlFieldType } from '~/composables/editor/useYamlFieldTypes'
 
 type YamlValue = string | number | boolean | null | Date | YamlValue[] | { [key: string]: YamlValue }
 
@@ -26,6 +30,8 @@ const props = withDefaults(defineProps<{
     fieldKey: string,
     readonly?: boolean,
     depth?: number,
+    /** Custom field type definitions (merged with defaults) */
+    fieldTypes?: YamlFieldType[],
 }>(), {
     readonly: false,
     depth: 0,
@@ -36,7 +42,17 @@ const emit = defineEmits<{
     'update:fieldKey': [newKey: string]
 }>()
 
-// Utility functions for type detection
+// Initialize field types composable with custom types
+const { 
+    fieldTypes, 
+    getFieldType, 
+    detectFieldType, 
+    getDefaultValue, 
+    getIcon,
+    getTypeMenuItems 
+} = useYamlFieldTypes(props.fieldTypes)
+
+// Utility functions for type detection (kept for backward compatibility)
 function isDateObject(val: any): val is Date {
     return val instanceof Date && !isNaN(val.getTime())
 }
@@ -73,19 +89,10 @@ function isPrimitiveArray(val: any): boolean {
     )
 }
 
-// Determine the type of the current value
+// Determine the type of the current value using schema-based detection
 const valueType = computed(() => {
-    const val = modelValue.value
-    
-    if (val === null) return 'null'
-    if (isDateObject(val)) return 'datetime'
-    if (isDateTimeString(val)) return 'datetime'
-    if (isDateString(val)) return 'date'
-    if (isStringArray(val)) return 'string-array'
-    if (Array.isArray(val)) return 'array'
-    if (typeof val === 'object') return 'object'
-    
-    return typeof val
+    const detectedType = detectFieldType(modelValue.value)
+    return detectedType.type
 })
 
 // For editing field key
@@ -174,7 +181,7 @@ function isValidConversion(fromType: string, toType: string): boolean {
     return allowedConversions.includes(toType)
 }
 
-// Type conversion
+// Type conversion using schema-based defaults
 function convertType(newType: string) {
     const currentType = valueType.value
     
@@ -184,130 +191,75 @@ function convertType(newType: string) {
         return
     }
     
-    // If converting FROM an array with items to a non-array type, get first item or clear
+    // Special handling for preserving data during certain conversions
     const isCurrentlyArray = Array.isArray(modelValue.value)
     const isConvertingToNonArray = !['array', 'string-array'].includes(newType)
     
-    let baseValue: YamlValue = modelValue.value
+    // Special case: string-array conversion (preserve/convert array items)
+    if (newType === 'string-array') {
+        if (Array.isArray(modelValue.value)) {
+            modelValue.value = modelValue.value.map(item => String(item))
+        } else {
+            modelValue.value = [String(modelValue.value || '')]
+        }
+        return
+    }
     
-    // When converting from array to non-array, use first item if it exists
+    // Special case: converting from array to non-array (try to preserve first item)
     if (isCurrentlyArray && isConvertingToNonArray) {
         const arr = modelValue.value as YamlValue[]
-        baseValue = arr.length > 0 && arr[0] !== undefined ? arr[0] : ''
+        const firstItem = arr.length > 0 && arr[0] !== undefined ? arr[0] : null
+        
+        // Try to convert first item to target type
+        if (firstItem !== null) {
+            switch (newType) {
+                case 'string':
+                    modelValue.value = isDateObject(firstItem) 
+                        ? (firstItem as Date).toISOString() 
+                        : String(firstItem)
+                    return
+                case 'number':
+                    modelValue.value = Number(firstItem) || 0
+                    return
+                case 'boolean':
+                    modelValue.value = Boolean(firstItem)
+                    return
+                case 'date':
+                    const dateVal = typeof firstItem === 'string' ? new Date(firstItem) : new Date()
+                    modelValue.value = dateVal.toISOString().split('T')[0]!
+                    return
+                case 'datetime':
+                    const dateTimeVal = typeof firstItem === 'string' ? new Date(firstItem) : new Date()
+                    modelValue.value = dateTimeVal.toISOString()
+                    return
+            }
+        }
     }
     
-    switch (newType) {
-        case 'string':
-            if (isDateObject(baseValue)) {
-                modelValue.value = (baseValue as Date).toISOString()
-            } else {
-                modelValue.value = String(baseValue || '')
-            }
-            break
-        case 'number':
-            modelValue.value = Number(baseValue) || 0
-            break
-        case 'boolean':
-            modelValue.value = Boolean(baseValue)
-            break
-        case 'null':
-            modelValue.value = null
-            break
-        case 'date':
-            // Convert to date-only ISO string (YYYY-MM-DD)
-            const dateVal = typeof baseValue === 'string' 
-                ? new Date(baseValue) 
-                : new Date()
-            modelValue.value = dateVal.toISOString().split('T')[0]!
-            break
-        case 'datetime':
-            // Convert to full ISO datetime string
-            const dateTimeVal = typeof baseValue === 'string' 
-                ? new Date(baseValue) 
-                : new Date()
-            modelValue.value = dateTimeVal.toISOString()
-            break
-        case 'string-array':
-            // Convert current value to a string array
-            if (Array.isArray(modelValue.value)) {
-                // If already an array, convert items to strings
-                modelValue.value = modelValue.value.map(item => String(item))
-            } else {
-                // Create new array with single item
-                modelValue.value = [String(modelValue.value || '')]
-            }
-            break
-        case 'array':
-            // Clear array if converting from string-array, otherwise create empty
-            if (Array.isArray(modelValue.value) && isStringArray(modelValue.value)) {
-                modelValue.value = []
-            } else if (!Array.isArray(modelValue.value)) {
-                modelValue.value = []
-            }
-            break
-        case 'object':
-            modelValue.value = {}
-            break
-    }
+    // Default: use schema-defined default value
+    modelValue.value = getDefaultValue(newType)
 }
 
 // Array operations
 function addArrayItem(itemType?: string) {
     if (!Array.isArray(modelValue.value)) return
     
-    // If type is specified, add that type
+    // If itemType is provided, create item of that type using schema
     if (itemType) {
-        switch (itemType) {
-            case 'string':
-                modelValue.value.push('')
-                break
-            case 'number':
-                modelValue.value.push(0)
-                break
-            case 'boolean':
-                modelValue.value.push(false)
-                break
-            case 'null':
-                modelValue.value.push(null)
-                break
-            case 'array':
-                modelValue.value.push([])
-                break
-            case 'object':
-                modelValue.value.push({})
-                break
-            default:
-                modelValue.value.push('')
-        }
+        modelValue.value.push(getDefaultValue(itemType))
         return
     }
     
-    // If array is empty, check if this is a string-array (tags) or regular array
-    // For string-array, the parent already handles it, so this should only happen for regular arrays
+    // If array is empty, default to empty object (most common use case)
     if (modelValue.value.length === 0) {
-        // Default to empty object for empty arrays (most common use case)
         modelValue.value.push({})
         return
     }
     
-    // Determine type of new item based on existing items
+    // Determine type of new item based on existing items using schema detection
     const firstItem = modelValue.value[0]
-    
-    if (firstItem === null) {
-        modelValue.value.push(null)
-    } else if (Array.isArray(firstItem)) {
-        modelValue.value.push([])
-    } else if (typeof firstItem === 'object') {
-        modelValue.value.push({})
-    } else if (typeof firstItem === 'string') {
-        modelValue.value.push('')
-    } else if (typeof firstItem === 'number') {
-        modelValue.value.push(0)
-    } else if (typeof firstItem === 'boolean') {
-        modelValue.value.push(false)
-    } else {
-        modelValue.value.push('')
-    }
+    const detectedType = detectFieldType(firstItem)
+    modelValue.value.push(getDefaultValue(detectedType.type))
 }
 
 function removeArrayItem(index: number) {
@@ -340,22 +292,9 @@ function addArrayItemFromTemplate() {
         for (const key in templateObject) {
             const value = templateObject[key]
             
-            // Set default value based on type
-            if (value === null) {
-                newObject[key] = null
-            } else if (Array.isArray(value)) {
-                newObject[key] = []
-            } else if (typeof value === 'object') {
-                newObject[key] = {}
-            } else if (typeof value === 'string') {
-                newObject[key] = ''
-            } else if (typeof value === 'number') {
-                newObject[key] = 0
-            } else if (typeof value === 'boolean') {
-                newObject[key] = false
-            } else {
-                newObject[key] = ''
-            }
+            // Use schema-based detection and default value
+            const detectedType = detectFieldType(value)
+            newObject[key] = getDefaultValue(detectedType.type)
         }
         
         modelValue.value.push(newObject)
@@ -378,44 +317,14 @@ const hasObjectTemplate = computed(() => {
 })
 
 // Object operations
-function addObjectField(fieldType?: string) {
+function addObjectField(fieldType: string = 'string') {
     if (typeof modelValue.value !== 'object' || Array.isArray(modelValue.value) || !modelValue.value || isDateObject(modelValue.value)) return
     
     const obj = modelValue.value as Record<string, YamlValue>
     const newKey = `field_${Object.keys(obj).length + 1}`
     
-    // Set initial value based on type
-    switch (fieldType) {
-        case 'string':
-            obj[newKey] = ''
-            break
-        case 'number':
-            obj[newKey] = 0
-            break
-        case 'boolean':
-            obj[newKey] = false
-            break
-        case 'date':
-            obj[newKey] = new Date().toISOString().split('T')[0]!
-            break
-        case 'datetime':
-            obj[newKey] = new Date().toISOString()
-            break
-        case 'null':
-            obj[newKey] = null
-            break
-        case 'string-array':
-            obj[newKey] = []
-            break
-        case 'array':
-            obj[newKey] = []
-            break
-        case 'object':
-            obj[newKey] = {}
-            break
-        default:
-            obj[newKey] = ''
-    }
+    // Use schema-based default value
+    obj[newKey] = getDefaultValue(fieldType)
 }
 
 function removeObjectField(key: string) {
@@ -448,71 +357,36 @@ const indentClass = computed(() => {
 })
 
 // Type options for dropdown - filtered by valid conversions
+// Schema-based dropdown options for type conversion
 const typeOptions = computed(() => {
     const currentType = valueType.value
     
-    const allOptions = [
-        { label: 'Text', value: 'string', icon: 'i-lucide-type' },
-        { label: 'Number', value: 'number', icon: 'i-lucide-hash' },
-        { label: 'Boolean', value: 'boolean', icon: 'i-lucide-circle-check' },
-        { label: 'Date', value: 'date', icon: 'i-lucide-calendar' },
-        { label: 'Date & Time', value: 'datetime', icon: 'i-lucide-calendar-clock' },
-        { label: 'Tags', value: 'string-array', icon: 'i-lucide-tags' },
-        { label: 'Array', value: 'array', icon: 'i-lucide-list' },
-        { label: 'Object', value: 'object', icon: 'i-lucide-box' },
-        { label: 'Null', value: 'null', icon: 'i-lucide-circle-slash' },
-    ]
-    
-    // Filter and map to dropdown items with onSelect
-    return allOptions
-        .filter(opt => isValidConversion(currentType, opt.value))
-        .map(opt => ({
-            label: opt.label,
-            icon: opt.icon,
-            onSelect: () => convertType(opt.value)
+    // Filter field types for valid conversions and map to dropdown items
+    return fieldTypes.value
+        .filter(ft => isValidConversion(currentType, ft.type))
+        .map(ft => ({
+            label: ft.label,
+            icon: ft.icon,
+            onSelect: () => convertType(ft.type)
         })) as DropdownMenuItem[]
 })
 
-// Get icon for current type
+// Get icon for current type using schema
 const selectedType = computed(() => {
-    const iconMap: Record<string, string> = {
-        'string': 'i-lucide-type',
-        'number': 'i-lucide-hash',
-        'boolean': 'i-lucide-circle-check',
-        'date': 'i-lucide-calendar',
-        'datetime': 'i-lucide-calendar-clock',
-        'string-array': 'i-lucide-tags',
-        'array': 'i-lucide-list',
-        'object': 'i-lucide-box',
-        'null': 'i-lucide-circle-slash',
-    }
     return {
-        icon: iconMap[valueType.value] || 'i-lucide-circle-question-mark'
+        icon: getIcon(valueType.value)
     }
 })
 
-// Add field options (for creating new fields in objects)
-const addFieldOptions: DropdownMenuItem[] = [
-    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addObjectField('string') },
-    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addObjectField('number') },
-    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addObjectField('boolean') },
-    { label: 'Date', icon: 'i-lucide-calendar', onSelect: () => addObjectField('date') },
-    { label: 'Date & Time', icon: 'i-lucide-calendar-clock', onSelect: () => addObjectField('datetime') },
-    { label: 'Tags', icon: 'i-lucide-tags', onSelect: () => addObjectField('string-array') },
-    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addObjectField('array') },
-    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addObjectField('object') },
-    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addObjectField('null') },
-]
+// Schema-based dropdown options for adding object fields
+const addFieldOptions = computed(() => {
+    return getTypeMenuItems((type) => addObjectField(type))
+})
 
-// Add array item options (for creating new items in arrays)
-const addArrayItemOptions: DropdownMenuItem[] = [
-    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addArrayItem('string') },
-    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addArrayItem('number') },
-    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addArrayItem('boolean') },
-    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addArrayItem('array') },
-    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addArrayItem('object') },
-    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addArrayItem('null') },
-]
+// Schema-based dropdown options for adding array items
+const addArrayItemOptions = computed(() => {
+    return getTypeMenuItems((type) => addArrayItem(type))
+})
 </script>
 
 <template>
@@ -600,6 +474,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                                 :field-key="`[${index}]`"
                                 :readonly="readonly"
                                 :depth="depth + 1"
+                                :field-types="fieldTypes"
                                 @update:model-value="(val: YamlValue) => { 
                                     if (Array.isArray(modelValue)) modelValue[index] = val 
                                 }"
@@ -656,6 +531,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                             :field-key="String(key)"
                             :readonly="readonly"
                             :depth="depth + 1"
+                            :field-types="fieldTypes"
                             @update:model-value="(val: YamlValue) => { 
                                 if (typeof modelValue === 'object' && !Array.isArray(modelValue) && modelValue !== null && !isDateObject(modelValue)) {
                                     (modelValue as Record<string, YamlValue>)[key] = val
@@ -786,7 +662,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                 />
 
                 <!-- DateTime (Date + Time) -->
-                <div v-else-if="valueType === 'datetime'" class="space-y-2">
+                <div v-else-if="valueType === 'datetime'" class="space-y-2 space-x-2">
                     <UInputDate
                         :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
                         size="xs"
@@ -813,7 +689,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                             if (val && 'hour' in val && 'minute' in val) {
                                 const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
                                 const second = 'second' in val ? val.second : currentDateTime.second
-                                
+
                                 const newDateTime = new CalendarDateTime(
                                     currentDateTime.year,
                                     currentDateTime.month,
