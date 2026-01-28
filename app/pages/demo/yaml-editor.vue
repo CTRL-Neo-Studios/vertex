@@ -44,7 +44,7 @@ watch(yamlData, (newVal) => {
                     </div>
                 </template>
 
-                <YamlForm v-model="yamlData" embedded />
+                <YamlForm v-model="yamlData" />
             </UCard>
 
             <UCard>
