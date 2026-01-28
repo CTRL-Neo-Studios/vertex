@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-    devtools: {enabled: false},
+    devtools: {enabled: true},
 
     modules: [
         "@nuxt/ui",
@@ -71,7 +71,11 @@ export default defineNuxtConfig({
                 "tailwindcss/colors",
                 "@vueuse/integrations/useSortable",
                 "sortablejs",
-                "vue-mermaid-string"
+                "vue-mermaid-string",
+                "yaml",
+                "@vue/devtools-core",
+                "@vue/devtools-kit",
+                "@internationalized/date"
             ]
         },
     },

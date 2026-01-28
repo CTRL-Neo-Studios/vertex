@@ -21,7 +21,10 @@ Please check out [Concepts and Structures.md](Concepts%20and%20Structures.md) to
 - [ ] Usage Timer (starts whenever a session window is focused, pauses when out of focus, just there to notify you about how long you've been working or smth)
 - [ ] Writing Analyzer (using `compromise`)
 - [ ] Code Prose components (e.g. render `mermaid` code blocks as a Mermaid Graph, `base` code blocks as a Base view, etc.)
+  - [X] `mermaid`
+  - [ ] `base`
 - [ ] Obsidian Bases support (including base views, edit, sort, all kinds of functions)
+- [ ] Simple AI completion stuff
 - [ ] Image/Asset Upload & Insert
 - [ ] Asset Viewing (e.g. open images/pdfs/videos in tabs)
 
