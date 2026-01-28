@@ -140,8 +140,49 @@ function stringToCalendarDateTime(str: string): CalendarDateTime {
     }
 }
 
+// Check if a type conversion is valid
+function isValidConversion(fromType: string, toType: string): boolean {
+    // Same type is always valid
+    if (fromType === toType) return true
+    
+    // Null can convert to anything
+    if (fromType === 'null') return true
+    
+    // Define conversion rules
+    const conversionRules: Record<string, string[]> = {
+        // Primitives can convert to other primitives and arrays
+        'string': ['number', 'boolean', 'date', 'datetime', 'string-array', 'null'],
+        'number': ['string', 'boolean', 'null'],
+        'boolean': ['string', 'number', 'null'],
+        
+        // Dates can convert to strings and each other
+        'date': ['string', 'datetime', 'null'],
+        'datetime': ['string', 'date', 'null'],
+        
+        // String arrays can convert to regular arrays and back to string
+        'string-array': ['array', 'string', 'null'],
+        
+        // Arrays can only convert to string-array or null (converting to primitives is unsafe)
+        'array': ['string-array', 'null'],
+        
+        // Objects can only convert to null (converting to primitives is useless)
+        'object': ['null'],
+    }
+    
+    const allowedConversions = conversionRules[fromType] || []
+    return allowedConversions.includes(toType)
+}
+
 // Type conversion
 function convertType(newType: string) {
+    const currentType = valueType.value
+    
+    // Check if conversion is valid
+    if (!isValidConversion(currentType, newType)) {
+        console.warn(`Invalid conversion from ${currentType} to ${newType}`)
+        return
+    }
+    
     // If converting FROM an array with items to a non-array type, get first item or clear
     const isCurrentlyArray = Array.isArray(modelValue.value)
     const isConvertingToNonArray = !['array', 'string-array'].includes(newType)
@@ -267,18 +308,31 @@ const indentClass = computed(() => {
     return props.depth > 0 ? 'ml-4 pl-4 border-l border-default/50' : ''
 })
 
-// Type options for dropdown
-const typeOptions: DropdownMenuItem[] = [
-    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => convertType('string') },
-    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => convertType('number') },
-    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => convertType('boolean') },
-    { label: 'Date', icon: 'i-heroicons-calendar', onSelect: () => convertType('date') },
-    { label: 'Date & Time', icon: 'i-heroicons-clock', onSelect: () => convertType('datetime') },
-    { label: 'Tags', icon: 'i-heroicons-tag', onSelect: () => convertType('string-array') },
-    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => convertType('array') },
-    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => convertType('object') },
-    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => convertType('null') },
-]
+// Type options for dropdown - filtered by valid conversions
+const typeOptions = computed(() => {
+    const currentType = valueType.value
+    
+    const allOptions = [
+        { label: 'Text', value: 'string', icon: 'i-heroicons-bars-3-bottom-left' },
+        { label: 'Number', value: 'number', icon: 'i-heroicons-hashtag' },
+        { label: 'Boolean', value: 'boolean', icon: 'i-heroicons-check-circle' },
+        { label: 'Date', value: 'date', icon: 'i-heroicons-calendar' },
+        { label: 'Date & Time', value: 'datetime', icon: 'i-heroicons-clock' },
+        { label: 'Tags', value: 'string-array', icon: 'i-heroicons-tag' },
+        { label: 'Array', value: 'array', icon: 'i-heroicons-list-bullet' },
+        { label: 'Object', value: 'object', icon: 'i-heroicons-cube' },
+        { label: 'Null', value: 'null', icon: 'i-heroicons-minus-circle' },
+    ]
+    
+    // Filter and map to dropdown items with onSelect
+    return allOptions
+        .filter(opt => isValidConversion(currentType, opt.value))
+        .map(opt => ({
+            label: opt.label,
+            icon: opt.icon,
+            onSelect: () => convertType(opt.value)
+        })) as DropdownMenuItem[]
+})
 
 // Get icon for current type
 const selectedType = computed(() => {
@@ -314,14 +368,16 @@ const selectedType = computed(() => {
                     @keydown.enter="saveKey"
                     @keydown.esc="isEditingKey = false"
                 />
-                <button
+                <UButton
                     v-else
-                    class="text-sm font-medium text-left w-full hover:text-primary transition-colors truncate"
+                    class="text-sm font-medium text-left justify-start px-0 py-0 truncate"
                     :class="{ 'cursor-not-allowed': readonly }"
                     @click="startEditingKey"
-                >
-                    {{ fieldKey }}
-                </button>
+                    :label="fieldKey"
+                    block
+                    variant="link"
+                    color="neutral"
+                />
             </div>
 
             <!-- Collapse toggle for objects/arrays -->
@@ -364,7 +420,7 @@ const selectedType = computed(() => {
             <UInput
                 v-if="valueType === 'string'"
                 :model-value="String(modelValue)"
-                size="sm"
+                size="xs"
                 :disabled="readonly"
                 placeholder="Enter text..."
                 @update:model-value="(val: string) => modelValue = val"
@@ -374,7 +430,7 @@ const selectedType = computed(() => {
             <UInputNumber
                 v-else-if="valueType === 'number'"
                 :model-value="Number(modelValue)"
-                size="sm"
+                size="xs"
                 :disabled="readonly"
                 @update:model-value="(val: number | null) => modelValue = val ?? 0"
             />
@@ -384,6 +440,7 @@ const selectedType = computed(() => {
                 v-else-if="valueType === 'boolean'"
                 :model-value="Boolean(modelValue)"
                 :disabled="readonly"
+                size="sm"
                 @update:model-value="(val: boolean) => modelValue = val"
             />
 
@@ -391,7 +448,7 @@ const selectedType = computed(() => {
             <UInputDate
                 v-else-if="valueType === 'date'"
                 :model-value="typeof modelValue === 'string' ? stringToCalendarDate(modelValue) : jsDateToCalendarDate(new Date())"
-                size="sm"
+                size="xs"
                 :disabled="readonly"
                 @update:model-value="(val) => {
                     if (val && 'year' in val) {
@@ -404,7 +461,7 @@ const selectedType = computed(() => {
             <div v-else-if="valueType === 'datetime'" class="space-y-2">
                 <UInputDate
                     :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                    size="sm"
+                    size="xs"
                     :disabled="readonly"
                     granularity="second"
                     @update:model-value="(val) => {
@@ -422,7 +479,7 @@ const selectedType = computed(() => {
                 />
                 <UInputTime
                     :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                    size="sm"
+                    size="xs"
                     :disabled="readonly"
                     granularity="second"
                     @update:model-value="(val) => {
@@ -449,7 +506,7 @@ const selectedType = computed(() => {
             <UInputTags
                 v-else-if="valueType === 'string-array'"
                 :model-value="Array.isArray(modelValue) ? modelValue as string[] : []"
-                size="sm"
+                size="xs"
                 :disabled="readonly"
                 placeholder="Add tags..."
                 @update:model-value="(val: string[]) => modelValue = val"
