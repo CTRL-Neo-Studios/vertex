@@ -362,8 +362,13 @@ function removeObjectField(key: string) {
     delete obj[key]
 }
 
-// Collapsed state for objects and arrays
-const isCollapsed = ref(false)
+// Open state for objects and arrays (true = expanded, false = collapsed)
+const isOpen = ref(true)
+
+// Check if this field is an array item (has bracket notation like [0], [1], etc.)
+const isArrayItem = computed(() => {
+    return /^\[\d+\]$/.test(props.fieldKey)
+})
 
 // Indentation based on depth
 const indentClass = computed(() => {
@@ -455,16 +460,17 @@ const addArrayItemOptions: DropdownMenuItem[] = [
             />
             
             <!-- Collapsible for non-edit mode -->
-            <Collapsible v-else v-model:open="isCollapsed" :default-open="true" :label="fieldKey">
+            <Collapsible v-else :default-open="isOpen" :label="fieldKey">
                 <template #actions>
                     <div class="flex items-center gap-1">
-                        <!-- Edit key button -->
+                        <!-- Edit key button (hidden for array items) -->
                         <UButton
-                            v-if="!readonly && !isEditingKey"
+                            v-if="!readonly && !isEditingKey && !isArrayItem"
                             icon="i-lucide-pencil"
                             variant="ghost"
                             size="xs"
                             color="neutral"
+                            class="text-muted"
                             @click.stop="startEditingKey"
                         />
 
@@ -597,7 +603,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
 
         <!-- For Simple Types: Regular Layout -->
         <template v-else>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
                 <!-- Field Key (editable) -->
                 <div class="flex-1 min-w-0">
                     <UInput
@@ -612,12 +618,13 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                     <UButton
                         v-else
                         class="text-xs font-medium text-left justify-start px-0 py-0 truncate"
-                        :class="{ 'cursor-not-allowed': readonly }"
-                        @click="startEditingKey"
+                        :class="{ 'cursor-not-allowed': readonly || isArrayItem }"
+                        @click="isArrayItem ? undefined : startEditingKey"
                         :label="fieldKey"
                         block
                         variant="link"
                         color="neutral"
+                        :disabled="isArrayItem"
                     />
                 </div>
 
@@ -628,7 +635,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                     size="xs"
                 >
                     <UButton
-                        :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
+                        :icon="selectedType?.icon || 'i-lucide-circle-question-mark'"
                         variant="soft"
                         size="xs"
                         :disabled="readonly"
