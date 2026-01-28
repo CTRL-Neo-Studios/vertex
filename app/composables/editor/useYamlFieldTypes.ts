@@ -32,6 +32,13 @@ export const DEFAULT_FIELD_TYPES: YamlFieldType[] = [
         detect: (value) => typeof value === 'string' && !isDateString(value) && !isDateTimeString(value)
     },
     {
+        type: 'textarea',
+        label: 'Long Text',
+        icon: 'i-lucide-align-left',
+        defaultValue: '',
+        component: 'textarea'
+    },
+    {
         type: 'number',
         label: 'Number',
         icon: 'i-lucide-hash',

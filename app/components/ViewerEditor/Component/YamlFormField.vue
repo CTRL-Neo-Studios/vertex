@@ -17,7 +17,7 @@
  * </YamlFormField>
  */
 
-import { CalendarDate, CalendarDateTime, Time, parseDate, parseDateTime, parseTime } from '@internationalized/date'
+import { CalendarDate, CalendarDateTime, parseDate, parseDateTime } from '@internationalized/date'
 import type {DropdownMenuItem} from "@nuxt/ui";
 import Collapsible from "~/components/Utility/Collapsible.vue";
 import { useYamlFieldTypes, type YamlFieldType } from '~/composables/editor/useYamlFieldTypes'
@@ -126,10 +126,6 @@ function jsDateToCalendarDateTime(date: Date): CalendarDateTime {
         date.getMinutes(),
         date.getSeconds()
     )
-}
-
-function jsDateToTime(date: Date): Time {
-    return new Time(date.getHours(), date.getMinutes(), date.getSeconds())
 }
 
 function stringToCalendarDate(str: string): CalendarDate {
@@ -630,6 +626,18 @@ const addArrayItemOptions = computed(() => {
                     @update:model-value="(val: string) => modelValue = val"
                 />
 
+                <!-- Textarea (Long Text) -->
+                <UTextarea
+                    v-else-if="valueType === 'textarea'"
+                    :model-value="String(modelValue)"
+                    size="xs"
+                    :disabled="readonly"
+                    placeholder="Enter long text..."
+                    :rows="4"
+                    autoresize
+                    @update:model-value="(val: string) => modelValue = val"
+                />
+
                 <!-- Number -->
                 <UInputNumber
                     v-else-if="valueType === 'number'"
@@ -661,48 +669,27 @@ const addArrayItemOptions = computed(() => {
                     }"
                 />
 
-                <!-- DateTime (Date + Time) -->
-                <div v-else-if="valueType === 'datetime'" class="space-y-2 space-x-2">
-                    <UInputDate
-                        :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                        size="xs"
-                        :disabled="readonly"
-                        granularity="second"
-                        @update:model-value="(val) => {
-                            if (val && 'year' in val && 'month' in val && 'day' in val) {
-                                const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
-                                const hour = 'hour' in val ? val.hour : currentDateTime.hour
-                                const minute = 'minute' in val ? val.minute : currentDateTime.minute
-                                const second = 'second' in val ? val.second : currentDateTime.second
-                                
-                                const newDateTime = new CalendarDateTime(val.year, val.month, val.day, hour, minute, second)
-                                modelValue = newDateTime.toString()
-                            }
-                        }"
-                    />
-                    <UInputTime
-                        :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                        size="xs"
-                        :disabled="readonly"
-                        granularity="second"
-                        @update:model-value="(val) => {
-                            if (val && 'hour' in val && 'minute' in val) {
-                                const currentDateTime = typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())
-                                const second = 'second' in val ? val.second : currentDateTime.second
-
-                                const newDateTime = new CalendarDateTime(
-                                    currentDateTime.year,
-                                    currentDateTime.month,
-                                    currentDateTime.day,
-                                    val.hour,
-                                    val.minute,
-                                    second
-                                )
-                                modelValue = newDateTime.toString()
-                            }
-                        }"
-                    />
-                </div>
+                <!-- DateTime (Date + Time) - UInputDate handles both with granularity -->
+                <UInputDate
+                    v-else-if="valueType === 'datetime'"
+                    :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
+                    size="xs"
+                    :disabled="readonly"
+                    granularity="second"
+                    @update:model-value="(val: any) => {
+                        if (val && 'year' in val && 'month' in val && 'day' in val) {
+                            // UInputDate with granularity='second' provides hour, minute, second
+                            const hour = 'hour' in val ? val.hour : 0
+                            const minute = 'minute' in val ? val.minute : 0
+                            const second = 'second' in val ? val.second : 0
+                            
+                            const newDateTime = new CalendarDateTime(val.year, val.month, val.day, hour, minute, second)
+                            // Convert to ISO 8601 format
+                            const isoString = `${newDateTime.year}-${String(newDateTime.month).padStart(2, '0')}-${String(newDateTime.day).padStart(2, '0')}T${String(newDateTime.hour).padStart(2, '0')}:${String(newDateTime.minute).padStart(2, '0')}:${String(newDateTime.second).padStart(2, '0')}`
+                            modelValue = isoString
+                        }
+                    }"
+                />
 
                 <!-- String Array (Tags) -->
                 <UInputTags
