@@ -142,47 +142,64 @@ function stringToCalendarDateTime(str: string): CalendarDateTime {
 
 // Type conversion
 function convertType(newType: string) {
+    // If converting FROM an array with items to a non-array type, get first item or clear
+    const isCurrentlyArray = Array.isArray(modelValue.value)
+    const isConvertingToNonArray = !['array', 'string-array'].includes(newType)
+    
+    let baseValue: YamlValue = modelValue.value
+    
+    // When converting from array to non-array, use first item if it exists
+    if (isCurrentlyArray && isConvertingToNonArray) {
+        const arr = modelValue.value as YamlValue[]
+        baseValue = arr.length > 0 && arr[0] !== undefined ? arr[0] : ''
+    }
+    
     switch (newType) {
         case 'string':
-            if (isDateObject(modelValue.value)) {
-                modelValue.value = (modelValue.value as Date).toISOString()
+            if (isDateObject(baseValue)) {
+                modelValue.value = (baseValue as Date).toISOString()
             } else {
-                modelValue.value = String(modelValue.value || '')
+                modelValue.value = String(baseValue || '')
             }
             break
         case 'number':
-            modelValue.value = Number(modelValue.value) || 0
+            modelValue.value = Number(baseValue) || 0
             break
         case 'boolean':
-            modelValue.value = Boolean(modelValue.value)
+            modelValue.value = Boolean(baseValue)
             break
         case 'null':
             modelValue.value = null
             break
         case 'date':
             // Convert to date-only ISO string (YYYY-MM-DD)
-            const dateVal = typeof modelValue.value === 'string' 
-                ? new Date(modelValue.value) 
+            const dateVal = typeof baseValue === 'string' 
+                ? new Date(baseValue) 
                 : new Date()
             modelValue.value = dateVal.toISOString().split('T')[0]!
             break
         case 'datetime':
             // Convert to full ISO datetime string
-            const dateTimeVal = typeof modelValue.value === 'string' 
-                ? new Date(modelValue.value) 
+            const dateTimeVal = typeof baseValue === 'string' 
+                ? new Date(baseValue) 
                 : new Date()
             modelValue.value = dateTimeVal.toISOString()
             break
         case 'string-array':
             // Convert current value to a string array
             if (Array.isArray(modelValue.value)) {
+                // If already an array, convert items to strings
                 modelValue.value = modelValue.value.map(item => String(item))
             } else {
+                // Create new array with single item
                 modelValue.value = [String(modelValue.value || '')]
             }
             break
         case 'array':
-            if (!Array.isArray(modelValue.value)) {
+            // Clear array if converting from string-array, otherwise create empty
+            if (Array.isArray(modelValue.value) && isStringArray(modelValue.value)) {
+                modelValue.value = []
+            } else if (!Array.isArray(modelValue.value)) {
                 modelValue.value = []
             }
             break
@@ -252,32 +269,34 @@ const indentClass = computed(() => {
 
 // Type options for dropdown
 const typeOptions: DropdownMenuItem[] = [
-    { label: 'Text', value: 'string', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => handleTypeChangeSelected('string') },
-    { label: 'Number', value: 'number', icon: 'i-heroicons-hashtag', onSelect: () => handleTypeChangeSelected('number') },
-    { label: 'Boolean', value: 'boolean', icon: 'i-heroicons-check-circle', onSelect: () => handleTypeChangeSelected('boolean') },
-    { label: 'Date', value: 'date', icon: 'i-heroicons-calendar', onSelect: () => handleTypeChangeSelected('date') },
-    { label: 'Date & Time', value: 'datetime', icon: 'i-heroicons-clock', onSelect: () => handleTypeChangeSelected('datetime') },
-    { label: 'Tags', value: 'string-array', icon: 'i-heroicons-tag', onSelect: () => handleTypeChangeSelected('string-array') },
-    { label: 'Array', value: 'array', icon: 'i-heroicons-list-bullet', onSelect: () => handleTypeChangeSelected('array') },
-    { label: 'Object', value: 'object', icon: 'i-heroicons-cube', onSelect: () => handleTypeChangeSelected('object') },
-    { label: 'Null', value: 'null', icon: 'i-heroicons-minus-circle', onSelect: () => handleTypeChangeSelected('null') },
+    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => convertType('string') },
+    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => convertType('number') },
+    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => convertType('boolean') },
+    { label: 'Date', icon: 'i-heroicons-calendar', onSelect: () => convertType('date') },
+    { label: 'Date & Time', icon: 'i-heroicons-clock', onSelect: () => convertType('datetime') },
+    { label: 'Tags', icon: 'i-heroicons-tag', onSelect: () => convertType('string-array') },
+    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => convertType('array') },
+    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => convertType('object') },
+    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => convertType('null') },
 ]
 
-// Selected type for the dropdown
-const selectedType = computed(() => typeOptions.find(t => t.value === valueType.value))
-
-// Handle type change
-function handleTypeChange(option: typeof typeOptions[0] | null) {
-    if (option && option.value !== unref(valueType)) {
-        convertType(option.value)
+// Get icon for current type
+const selectedType = computed(() => {
+    const iconMap: Record<string, string> = {
+        'string': 'i-heroicons-bars-3-bottom-left',
+        'number': 'i-heroicons-hashtag',
+        'boolean': 'i-heroicons-check-circle',
+        'date': 'i-heroicons-calendar',
+        'datetime': 'i-heroicons-clock',
+        'string-array': 'i-heroicons-tag',
+        'array': 'i-heroicons-list-bullet',
+        'object': 'i-heroicons-cube',
+        'null': 'i-heroicons-minus-circle',
     }
-}
-
-function handleTypeChangeSelected(typeOption: string | null) {
-    if (typeOption && typeOption !== unref(valueType)) {
-        convertType(typeOption)
+    return {
+        icon: iconMap[valueType.value] || 'i-heroicons-question-mark-circle'
     }
-}
+})
 </script>
 
 <template>
@@ -316,9 +335,17 @@ function handleTypeChangeSelected(typeOption: string | null) {
 
             <!-- Type selector -->
             <UDropdownMenu
-                :items="typeOptions"
+                :items="[typeOptions]"
                 :disabled="readonly"
-            />
+                size="xs"
+            >
+                <UButton
+                    :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
+                    variant="soft"
+                    size="xs"
+                    :disabled="readonly"
+                />
+            </UDropdownMenu>
 
             <!-- Remove button -->
             <UButton
