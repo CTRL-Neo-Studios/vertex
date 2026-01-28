@@ -4,6 +4,7 @@ import {useFileIO} from "~/composables/io/useFileIO";
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 
 interface FileTreeMemo { ext: string, name: string, unextName: string }
+interface FileTreeIdMemo {fid: string}
 
 export function useActiveFileTreeMemo(session?: ActiveSession) {
     if (!session) {
@@ -13,8 +14,9 @@ export function useActiveFileTreeMemo(session?: ActiveSession) {
     const $fio = useFileIO()
 
     const fileNameCache = useState<Map<string, FileTreeMemo>>(`active.workspace.${session?.uuid ?? useUuid()}.processed-file-labels`, () => new Map())
+    const fileNameIdCache = useState<Map<string, FileTreeIdMemo>>(`active.workspace.${session?.uuid ?? useUuid()}.processed-file-label-id-meta`, () => new Map())
 
-    function put(fullLabel: string): FileTreeMemo {
+    function putToLabel(fullLabel: string): FileTreeMemo {
         const name = fullLabel.slice(0, fullLabel.length - 4)
         const memo: FileTreeMemo = {
             name,
@@ -25,14 +27,29 @@ export function useActiveFileTreeMemo(session?: ActiveSession) {
         return memo
     }
 
-    function get(fullLabel?: string): FileTreeMemo  {
+    function getFromLabel(fullLabel?: string): FileTreeMemo  {
         if(!fullLabel) return {ext: '?', name: '?', unextName: '?'}
-        if (!unref(fileNameCache).has(fullLabel)) return put(fullLabel)
+        if (!unref(fileNameCache).has(fullLabel)) return putToLabel(fullLabel)
         else return unref(fileNameCache).get(fullLabel) as FileTreeMemo
     }
 
+    function putToIdMeta(fullLabel: string, fileId: string): FileTreeIdMemo {
+        const memo: FileTreeIdMemo = {
+            fid: fileId,
+        }
+        unref(fileNameIdCache).set(fullLabel, memo)
+        return memo
+    }
+
+    function getFromIdMeta(fullLabel?: string): FileTreeIdMemo | undefined {
+        if (!fullLabel) return;
+        return unref(fileNameIdCache).get(fullLabel) as FileTreeIdMemo
+    }
+
     return {
-        get,
-        put
+        getFromLabel,
+        putToLabel,
+        putToIdMeta,
+        getFromIdMeta
     }
 }

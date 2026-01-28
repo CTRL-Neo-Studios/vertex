@@ -12,6 +12,7 @@ import {defaultActiveSession} from "#shared/utils/defaults/actives";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {UnlistenFn} from "@tauri-apps/api/event";
+import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 
 export function useAppSessionNavigator() {
     const $sesh = useActiveSessions()
@@ -118,17 +119,38 @@ export function useAppSessionNavigator() {
         if ($win.isCurrentAppWindowMain()) return;
 
         const currentWindow = $win.getCurrentAppWindow()
+
+        await updateAppSessionContexts(session)
+
+        if ((await $win.getSessionWindows()).length <= 1) {
+            const mainWindow = await $win.showMainWindow()
+            await mainWindow?.setFocus()
+        }
+
+        await currentWindow.destroy()
+    }
+
+    async function updateAppSessionContexts(session: ActiveSession) {
         const currentAppSession = unref($asesh.currentAppSession)
 
         if (!currentAppSession) return;
 
         if (currentAppSession.sessionType == 'workspace') {
             const {getFileByUuid} = useActiveWorkspaceIndex(session)
+            const {activeTabUuid} = useActiveTabs(session)
+            const {getFromIdMeta} = useActiveFileTreeMemo(session)
+            const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${session?.uuid ?? useUuid()}`, () => [])
+            const tabId = unref(activeTabUuid)
+
             await $asesh.updateAppSession(currentAppSession.uuid, {
                 context: {
                     openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
                         .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
+                        .filter(i => i != undefined),
+                    openedAbsoluteFolderPaths: unref(expandedFolders)
+                        .map(i => getFileByUuid(getFromIdMeta(i)?.fid)?.fullPath)
+                        .filter(i => i != undefined),
+                    lastFocusedAbsoluteFilePath: tabId != null ? getFileByUuid(tabId)?.fullPath : undefined
                 },
                 lastUpdated: new Date()
             })
@@ -138,20 +160,12 @@ export function useAppSessionNavigator() {
                 context: {
                     openedAbsoluteFilePaths: unref(useActiveTabs(session).tabs)
                         .map(i => getFileByUuid(i.fileUuid)?.fullPath)
-                        .filter(i => i != undefined)
+                        .filter(i => i != undefined),
+                    openedAbsoluteFolderPaths: [],
                 },
                 lastUpdated: new Date()
             })
         }
-
-        const lastWindow = await $win.showLatestSessionWindow()
-
-        if ((await $win.getSessionWindows()).length <= 1) {
-            const mainWindow = await $win.showMainWindow()
-            await mainWindow?.setFocus()
-        }
-
-        await currentWindow.destroy()
     }
 
     async function addWindowCloseCallbacks(session: ActiveSession): Promise<{ unlistenClose: UnlistenFn, unlistenDestroyed: UnlistenFn} | undefined> {
@@ -181,6 +195,7 @@ export function useAppSessionNavigator() {
         openFolderOrFileFromPath,
         retrieveFolderOrFileAbsolutePath,
         destroyWindowAndTryReturnToLastWindow,
-        addWindowCloseCallbacks
+        addWindowCloseCallbacks,
+        updateAppSessionContexts
     }
 }

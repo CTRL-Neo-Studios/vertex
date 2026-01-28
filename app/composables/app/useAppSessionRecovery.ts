@@ -5,6 +5,9 @@ import { useActiveTabs } from "~/composables/active/useActiveTabs";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
+import useUuid from "~/composables/utility/useUuid";
+import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 
 /**
  * Orchestrates the recovery/saturation of session windows.
@@ -59,22 +62,37 @@ export function useAppSessionRecovery() {
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
         console.log(`Recovering App Session ${appSession.uuid} with Active Session ${activeSession.uuid}...`)
         const openedFilePaths = appSession.context?.openedAbsoluteFilePaths || [];
+        const openedFolderPaths = appSession.context?.openedAbsoluteFolderPaths || []
         
         if (openedFilePaths.length === 0) {
             await $navi.toWorkspaceEmptyTab(activeSession.uuid)
         } else {
-            const {getFilesByPaths} = useActiveWorkspaceIndex(activeSession);
-            const {openTabs} = useActiveTabs(activeSession);
+            const {getFilesByPaths, getFileByPath} = useActiveWorkspaceIndex(activeSession);
+            const {openTabs, getActiveTab} = useActiveTabs(activeSession);
+            const {putToIdMeta} = useActiveFileTreeMemo(activeSession)
 
             console.log(`Reading saved opened files: ${openedFilePaths}`)
 
             const files = getFilesByPaths(openedFilePaths);
             const fileUuids = files.map(file => file.uuid);
+            const folders = getFilesByPaths(openedFolderPaths)
+            const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${activeSession?.uuid ?? useUuid()}`, () => [])
 
             console.log(`Recovered opened tabs: ${fileUuids}`)
 
             if (fileUuids.length > 0) {
-                await $navi.toWorkspaceTab(activeSession.uuid, openTabs(fileUuids))
+                const lastTab = openTabs(fileUuids)
+                const recordedLastOpenedTab = getActiveTab(getFileByPath(appSession.context.lastFocusedAbsoluteFilePath || '')?.uuid)
+                if (!recordedLastOpenedTab)
+                    await $navi.toWorkspaceTab(activeSession.uuid, lastTab)
+                else
+                    await $navi.toWorkspaceTab(activeSession.uuid, recordedLastOpenedTab)
+            }
+
+            if (folders.length > 0) {
+                folders.forEach(i => {
+                    expandedFolders.value.push(`${i.fileName}${i.uuid.slice(0, 4)}`) // push the obfuscated folder names there
+                })
             }
         }
 

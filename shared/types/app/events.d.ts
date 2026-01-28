@@ -26,3 +26,11 @@ export interface WindowMenuEvents {
         }
     }
 }
+
+export interface AppWebviewWindowEvents {
+    webviewCreated: DispatcherEvent,
+    closeRequested: DispatcherEvent,
+    destroyed: DispatcherEvent,
+    focus: DispatcherEvent,
+    blur: DispatcherEvent
+}

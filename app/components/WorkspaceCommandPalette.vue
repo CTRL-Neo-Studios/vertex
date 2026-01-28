@@ -6,6 +6,8 @@ import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
+import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
+import {useFileIO} from "~/composables/io/useFileIO";
 
 const $route = useRoute()
 const $ovl = useOverlay()

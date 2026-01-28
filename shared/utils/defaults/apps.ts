@@ -26,7 +26,8 @@ export function defaultAppSession(data?: Partial<AppSession>): AppSession {
 export function defaultAppSessionContext(data?: Partial<AppSessionContext>): AppSessionContext {
     return {
         openedAbsoluteFilePaths: data?.openedAbsoluteFilePaths || [],
-        openedAbsoluteFolderPaths: data?.openedAbsoluteFolderPaths || []
+        openedAbsoluteFolderPaths: data?.openedAbsoluteFolderPaths || [],
+        lastFocusedAbsoluteFilePath: data?.lastFocusedAbsoluteFilePath
     } satisfies AppSessionContext
 }
 

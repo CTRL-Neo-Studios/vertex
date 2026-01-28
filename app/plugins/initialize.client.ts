@@ -8,6 +8,8 @@ import {invoke} from "@tauri-apps/api/core";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import {useAppWindowEventBus} from "~/composables/app/useAppWindowEventBus";
 
 export default defineNuxtPlugin({
     name: 'initialize',
@@ -17,9 +19,10 @@ export default defineNuxtPlugin({
         const $asesh = useAppSessions()
         const $win = useAppWebviewWindows()
         const $settings = useAppSettings()
+        const $bus = useAppWindowEventBus()
+        const $theme = useAppTheme()
 
         const cfg = await $settings.load()
-        useAppTheme().loadThemeFromConfig()
 
         // Initialize the current window session
         // Gets whether the current window is a `main` or a `session-` window
@@ -28,8 +31,25 @@ export default defineNuxtPlugin({
         await $menu.setMenu()
 
         await $win.getCurrentAppWindow().listen('tauri://focus', async () => {
-            await $menu.setMenu()
-            await $settings.load()
+            await Promise.all([
+                $menu.setMenu(),
+                $settings.load(),
+                $asesh.load()
+            ])
+            $theme.loadThemeFromConfig()
+            $bus.emit('focus')
+        })
+
+        await $win.getCurrentAppWindow().listen('tauri://blur', () => {
+            $bus.emit('blur')
+        })
+
+        await $win.getCurrentAppWindow().listen('tauri://close-requested', () => {
+            $bus.emit('closeRequested')
+        })
+
+        await $win.getCurrentAppWindow().listen('tauri://destroyed', () => {
+            $bus.emit('destroyed')
         })
         
         // Attempts to recover the saved sessions on the `main` window

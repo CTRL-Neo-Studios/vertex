@@ -11,12 +11,14 @@ Please check out [Concepts and Structures.md](Concepts%20and%20Structures.md) to
 
 - [X] Multi-window file contexts
 - [X] File CRUD
-- [ ] App Settings
-  - [ ] App Theme Customization
-- [ ] QoL 1
-  - [ ] Window Context Restoration needs to restore opened folders
-  - [ ] Folders with same names can be opened at the same time in the file tree
+- [X] App Settings
+  - [X] App Theme Customization
+- [X] QoL 1
+  - [X] Window Context Restoration needs to restore opened folders
+  - [X] Record last-focused tab
+  - [X] Folders with same names can be opened at the same time in the file tree
 - [ ] Markdown Frontmatter Editing Form Tool (inspired by Nuxt Studio's Form Editor)
+- [ ] Usage Timer (starts whenever a session window is focused, pauses when out of focus, just there to notify you about how long you've been working or smth)
 - [ ] Writing Analyzer (using `compromise`)
 - [ ] Code Prose components (e.g. render `mermaid` code blocks as a Mermaid Graph, `base` code blocks as a Base view, etc.)
 - [ ] Obsidian Bases support (including base views, edit, sort, all kinds of functions)

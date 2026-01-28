@@ -1,6 +1,7 @@
 export interface AppSessionContext {
     openedAbsoluteFilePaths: string[],
     openedAbsoluteFolderPaths: string[],
+    lastFocusedAbsoluteFilePath?: string
 }
 
 export interface AppSession {

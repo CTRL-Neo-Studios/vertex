@@ -15,6 +15,7 @@ import {useAppOpener} from "~/composables/app/useAppOpener";
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useAppSettings} from "~/composables/app/useAppSettings";
+import {useAppSessions} from "~/composables/app/useAppSessions";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -91,8 +92,10 @@ const formattedTreeData = computed<TreeItem[]>(() => {
                     originalNodeData: node
                 };
 
-                if (treeItem.label)
-                    $ftMemo.put(treeItem.label)
+                if (treeItem.label && treeItem.id) {
+                    $ftMemo.putToLabel(treeItem.label)
+                    $ftMemo.putToIdMeta(treeItem.label, treeItem.id)
+                }
 
                 accumulator.push(treeItem);
             }
@@ -328,7 +331,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
                 <UButton
                     size="sm"
-                    :label="config?.viewConfig.fileTree.showFileExtInName ? $ftMemo.get(item.label).name : $ftMemo.get(item.label).unextName"
+                    :label="config?.viewConfig.fileTree.showFileExtInName ? $ftMemo.getFromLabel(item.label).name : $ftMemo.getFromLabel(item.label).unextName"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
                     :class="['select-none relative align-middle items-center justify-start text-left', item.id == activeTabUuid ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
@@ -339,7 +342,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 >
                     <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
                         <div class="grow"/>
-                        <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${$ftMemo.get(item.label).ext}`"/>
+                        <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${$ftMemo.getFromLabel(item.label).ext}`"/>
                     </template>
                 </UButton>
             </UContextMenu>
@@ -348,7 +351,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == activeTabUuid ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon v-if="config?.viewConfig.fileTree.showFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
-                    <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.get(item.label).name }}</span>
+                    <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.getFromLabel(item.label).name }}</span>
                     <span class="grow"/>
                     <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
                 </div>
