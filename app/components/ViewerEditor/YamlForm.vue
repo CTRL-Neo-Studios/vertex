@@ -37,11 +37,43 @@ watch(data, () => {
 }, { deep: true })
 
 // Add new field to root
-function addField() {
+function addField(fieldType: string = 'string') {
     if (!data.value) data.value = {}
     
     const newKey = `field_${Object.keys(data.value).length + 1}`
-    data.value[newKey] = ''
+    
+    // Set initial value based on type
+    switch (fieldType) {
+        case 'string':
+            data.value[newKey] = ''
+            break
+        case 'number':
+            data.value[newKey] = 0
+            break
+        case 'boolean':
+            data.value[newKey] = false
+            break
+        case 'date':
+            data.value[newKey] = new Date()
+            break
+        case 'datetime':
+            data.value[newKey] = new Date()
+            break
+        case 'string-array':
+            data.value[newKey] = []
+            break
+        case 'array':
+            data.value[newKey] = []
+            break
+        case 'object':
+            data.value[newKey] = {}
+            break
+        case 'null':
+            data.value[newKey] = null
+            break
+        default:
+            data.value[newKey] = ''
+    }
 }
 
 // Remove field from root
@@ -50,6 +82,19 @@ function removeField(key: string) {
         delete data.value[key]
     }
 }
+
+// Dropdown options for adding fields
+const addFieldOptions = [
+    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addField('string') },
+    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addField('number') },
+    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addField('boolean') },
+    { label: 'Date', icon: 'i-lucide-calendar', onSelect: () => addField('date') },
+    { label: 'Date & Time', icon: 'i-lucide-calendar-clock', onSelect: () => addField('datetime') },
+    { label: 'Tags', icon: 'i-lucide-tags', onSelect: () => addField('string-array') },
+    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addField('array') },
+    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addField('object') },
+    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addField('null') },
+]
 </script>
 
 <template>
@@ -72,14 +117,18 @@ function removeField(key: string) {
             />
         </div>
         
-        <UButton
+        <UDropdownMenu
             v-if="!readonly"
-            icon="i-lucide-plus"
-            label="Add Field"
-            variant="ghost"
+            :items="[addFieldOptions]"
             size="sm"
-            @click="addField"
-        />
+        >
+            <UButton
+                icon="i-lucide-plus"
+                label="Add Field"
+                variant="ghost"
+                size="sm"
+            />
+        </UDropdownMenu>
     </div>
 
     <!-- Standalone mode (with layout wrapper) -->
@@ -95,7 +144,7 @@ function removeField(key: string) {
         <template #header-right>
             <div class="flex items-center gap-2">
                 <UTooltip v-if="isDirty" text="Unsaved changes">
-                    <UIcon name="i-heroicons-exclamation-circle" class="text-warning"/>
+                    <UIcon name="i-lucide-circle-alert" class="text-warning"/>
                 </UTooltip>
             </div>
         </template>
@@ -114,13 +163,16 @@ function removeField(key: string) {
                 <UCard>
                     <div class="space-y-4">
                         <div v-if="!data || Object.keys(data).length === 0" class="text-center py-8">
-                            <UIcon name="i-heroicons-document-text" class="w-12 h-12 mx-auto text-muted mb-3"/>
+                            <UIcon name="i-lucide-file-text" class="w-12 h-12 mx-auto text-muted mb-3"/>
                             <p class="text-sm text-muted mb-4">No fields yet</p>
-                            <UButton
-                                icon="i-lucide-plus"
-                                label="Add First Field"
-                                @click="addField"
-                            />
+                            <UDropdownMenu
+                                :items="[addFieldOptions]"
+                            >
+                                <UButton
+                                    icon="i-lucide-plus"
+                                    label="Add First Field"
+                                />
+                            </UDropdownMenu>
                         </div>
 
                         <div v-else class="space-y-3">
@@ -140,15 +192,19 @@ function removeField(key: string) {
                             />
                         </div>
                         
-                        <UButton
+                        <UDropdownMenu
                             v-if="data && Object.keys(data).length > 0 && !readonly"
-                            icon="i-lucide-plus"
-                            label="Add Field"
-                            variant="soft"
+                            :items="[addFieldOptions]"
                             size="sm"
-                            class="w-full"
-                            @click="addField"
-                        />
+                        >
+                            <UButton
+                                icon="i-lucide-plus"
+                                label="Add Field"
+                                variant="soft"
+                                size="sm"
+                                class="w-full"
+                            />
+                        </UDropdownMenu>
                     </div>
                 </UCard>
             </div>
