@@ -17,9 +17,9 @@
  * </YamlFormField>
  */
 
-import { CalendarDate, CalendarDateTime, parseDate, parseDateTime } from '@internationalized/date'
 import type {DropdownMenuItem} from "@nuxt/ui";
 import Collapsible from "~/components/Utility/Collapsible.vue";
+import YamlFieldInput from "~/components/ViewerEditor/Component/YamlFieldInput.vue";
 import { useYamlFieldTypes, type YamlFieldType } from '~/composables/editor/useYamlFieldTypes'
 
 type YamlValue = string | number | boolean | null | Date | YamlValue[] | { [key: string]: YamlValue }
@@ -116,38 +116,6 @@ function saveKey() {
         emit('update:fieldKey', trimmedValue)
     }
     isEditingKey.value = false
-}
-
-// Helper functions for date conversion
-function jsDateToCalendarDate(date: Date): CalendarDate {
-    return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
-}
-
-function jsDateToCalendarDateTime(date: Date): CalendarDateTime {
-    return new CalendarDateTime(
-        date.getFullYear(),
-        date.getMonth() + 1,
-        date.getDate(),
-        date.getHours(),
-        date.getMinutes(),
-        date.getSeconds()
-    )
-}
-
-function stringToCalendarDate(str: string): CalendarDate {
-    try {
-        return parseDate(str)
-    } catch {
-        return jsDateToCalendarDate(new Date())
-    }
-}
-
-function stringToCalendarDateTime(str: string): CalendarDateTime {
-    try {
-        return parseDateTime(str)
-    } catch {
-        return jsDateToCalendarDateTime(new Date())
-    }
 }
 
 // Check if a type conversion is valid
@@ -651,97 +619,17 @@ const addArrayItemOptions = computed(() => {
             </div>
 
             <!-- Value Input for simple types -->
-            <div class="space-y-2">
-                <!-- String -->
-                <UInput
-                    v-if="valueType === 'string'"
-                    :model-value="String(modelValue)"
-                    size="xs"
-                    :disabled="readonly"
-                    placeholder="Enter text..."
-                    @update:model-value="(val: string) => modelValue = val"
-                />
-
-                <!-- Textarea (Long Text) -->
-                <UTextarea
-                    v-else-if="valueType === 'textarea'"
-                    :model-value="String(modelValue)"
-                    size="xs"
-                    :disabled="readonly"
-                    placeholder="Enter long text..."
-                    :rows="4"
-                    autoresize
-                    @update:model-value="(val: string) => modelValue = val"
-                />
-
-                <!-- Number -->
-                <UInputNumber
-                    v-else-if="valueType === 'number'"
-                    :model-value="Number(modelValue)"
-                    size="xs"
-                    :disabled="readonly"
-                    @update:model-value="(val: number | null) => modelValue = val ?? 0"
-                />
-
-                <!-- Boolean -->
-                <USwitch
-                    v-else-if="valueType === 'boolean'"
-                    :model-value="Boolean(modelValue)"
-                    :disabled="readonly"
-                    size="sm"
-                    @update:model-value="(val: boolean) => modelValue = val"
-                />
-
-                <!-- Date (Date only, no time) -->
-                <UInputDate
-                    v-else-if="valueType === 'date'"
-                    :model-value="typeof modelValue === 'string' ? stringToCalendarDate(modelValue) : jsDateToCalendarDate(new Date())"
-                    size="xs"
-                    :disabled="readonly"
-                    @update:model-value="(val) => {
-                        if (val && 'year' in val) {
-                            modelValue = `${val.year}-${String(val.month).padStart(2, '0')}-${String(val.day).padStart(2, '0')}`
-                        }
-                    }"
-                />
-
-                <!-- DateTime (Date + Time) - UInputDate handles both with granularity -->
-                <UInputDate
-                    v-else-if="valueType === 'datetime'"
-                    :model-value="typeof modelValue === 'string' ? stringToCalendarDateTime(modelValue) : jsDateToCalendarDateTime(new Date())"
-                    size="xs"
-                    :disabled="readonly"
-                    granularity="second"
-                    @update:model-value="(val: any) => {
-                        if (val && 'year' in val && 'month' in val && 'day' in val) {
-                            // UInputDate with granularity='second' provides hour, minute, second
-                            const hour = 'hour' in val ? val.hour : 0
-                            const minute = 'minute' in val ? val.minute : 0
-                            const second = 'second' in val ? val.second : 0
-                            
-                            const newDateTime = new CalendarDateTime(val.year, val.month, val.day, hour, minute, second)
-                            // Convert to ISO 8601 format
-                            const isoString = `${newDateTime.year}-${String(newDateTime.month).padStart(2, '0')}-${String(newDateTime.day).padStart(2, '0')}T${String(newDateTime.hour).padStart(2, '0')}:${String(newDateTime.minute).padStart(2, '0')}:${String(newDateTime.second).padStart(2, '0')}`
-                            modelValue = isoString
-                        }
-                    }"
-                />
-
-                <!-- String Array (Tags) -->
-                <UInputTags
-                    v-else-if="valueType === 'string-array'"
-                    :model-value="Array.isArray(modelValue) ? modelValue as string[] : []"
-                    size="xs"
-                    :disabled="readonly"
-                    placeholder="Add tags..."
-                    @update:model-value="(val: string[]) => modelValue = val"
-                />
-
-                <!-- Null -->
-                <div v-else-if="valueType === 'null'" class="text-xs text-muted italic">
-                    null
-                </div>
-            </div>
+            <YamlFieldInput
+                v-model="modelValue"
+                :value-type="valueType"
+                :readonly="readonly"
+                :field-type="getFieldType(valueType)"
+            >
+                <!-- Forward all custom field component slots -->
+                <template v-for="(_, name) in $slots" #[name]="slotProps">
+                    <slot :name="name" v-bind="slotProps" />
+                </template>
+            </YamlFieldInput>
         </template>
     </div>
 </template>

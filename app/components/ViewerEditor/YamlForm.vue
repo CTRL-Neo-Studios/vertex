@@ -21,7 +21,6 @@ import { useYamlFieldTypes, type YamlFieldType } from '~/composables/editor/useY
  */
 
 const data = defineModel<YamlFormData>({ required: true })
-const fileName = defineModel<string>('fileName')
 
 const props = withDefaults(defineProps<{
     filePath?: string,
@@ -81,7 +80,12 @@ const addFieldOptions = computed(() => {
                         delete data[key]
                     }
                 }"
-            />
+            >
+                <!-- Forward all slots to YamlFormField for custom field components -->
+                <template v-for="(_, name) in $slots" #[name]="slotProps">
+                    <slot :name="name" v-bind="slotProps" />
+                </template>
+            </YamlFormField>
         </div>
         
         <UDropdownMenu
