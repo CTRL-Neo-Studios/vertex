@@ -74,9 +74,9 @@ function removeField(key: string) {
         
         <UButton
             v-if="!readonly"
-            icon="i-heroicons-plus"
+            icon="i-lucide-plus"
             label="Add Field"
-            variant="soft"
+            variant="ghost"
             size="sm"
             @click="addField"
         />
@@ -117,7 +117,7 @@ function removeField(key: string) {
                             <UIcon name="i-heroicons-document-text" class="w-12 h-12 mx-auto text-muted mb-3"/>
                             <p class="text-sm text-muted mb-4">No fields yet</p>
                             <UButton
-                                icon="i-heroicons-plus"
+                                icon="i-lucide-plus"
                                 label="Add First Field"
                                 @click="addField"
                             />
@@ -142,7 +142,7 @@ function removeField(key: string) {
                         
                         <UButton
                             v-if="data && Object.keys(data).length > 0 && !readonly"
-                            icon="i-heroicons-plus"
+                            icon="i-lucide-plus"
                             label="Add Field"
                             variant="soft"
                             size="sm"

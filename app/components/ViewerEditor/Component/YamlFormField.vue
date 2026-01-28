@@ -354,7 +354,7 @@ const selectedType = computed(() => {
 </script>
 
 <template>
-    <div :class="indentClass" class="space-y-2">
+    <div :class="indentClass" class="space-y-1">
         <!-- Field Header (Key + Type + Actions) -->
         <div class="flex items-center gap-2">
             <!-- Field Key (editable) -->
@@ -386,6 +386,7 @@ const selectedType = computed(() => {
                 :icon="isCollapsed ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-down'"
                 variant="ghost"
                 size="xs"
+                color="neutral"
                 @click="isCollapsed = !isCollapsed"
             />
 
@@ -549,15 +550,17 @@ const selectedType = computed(() => {
                     </div>
                 </template>
 
-                <UButton
-                    v-if="!readonly"
-                    icon="i-heroicons-plus"
-                    label="Add Item"
-                    variant="soft"
-                    size="xs"
-                    class="w-full"
-                    @click="addArrayItem"
-                />
+                <div class="pl-4">
+                    <UButton
+                        v-if="!readonly"
+                        icon="i-lucide-plus"
+                        label="Add Item"
+                        variant="ghost"
+                        size="xs"
+                        color="neutral"
+                        @click="addArrayItem"
+                    />
+                </div>
             </div>
 
             <!-- Object -->
@@ -596,15 +599,17 @@ const selectedType = computed(() => {
                     </template>
                 </template>
 
-                <UButton
-                    v-if="!readonly"
-                    icon="i-heroicons-plus"
-                    label="Add Field"
-                    variant="soft"
-                    size="xs"
-                    class="w-full"
-                    @click="addObjectField"
-                />
+                <div class="pl-4">
+                    <UButton
+                        v-if="!readonly"
+                        icon="i-lucide-plus"
+                        label="Add Field"
+                        variant="ghost"
+                        size="xs"
+                        color="neutral"
+                        @click="addObjectField"
+                    />
+                </div>
             </div>
         </div>
     </div>
