@@ -22,10 +22,10 @@ const open = defineModel('open', {type: Boolean, default: undefined})
         <div class="flex items-center justify-between gap-2 w-full">
             <div class="flex items-center gap-2">
                 <div
-                    class="flex items-center justify-center size-3.5 rounded bg-gray-100 dark:bg-gray-800 transition-colors duration-200 group-hover/collapsible:bg-gray-200 dark:group-hover/collapsible:bg-gray-700">
+                    class="flex items-center justify-center size-3.5 rounded bg-elevated transition-colors duration-200 group-hover/collapsible:bg-accented">
                     <UIcon
                         name="i-lucide-chevron-right"
-                        class="size-2.5 text-gray-500 dark:text-gray-400 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                        class="size-2.5 text-muted transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                     />
                 </div>
                 <span class="text-xs font-medium text-highlighted tracking-tight">{{ label }}</span>

@@ -315,6 +315,68 @@ function removeArrayItem(index: number) {
     modelValue.value.splice(index, 1)
 }
 
+// Add array item from template (using object with most fields as template)
+function addArrayItemFromTemplate() {
+    if (!Array.isArray(modelValue.value)) return
+    
+    // Find the object with the most fields
+    let templateObject: Record<string, YamlValue> | null = null
+    let maxFields = 0
+    
+    for (const item of modelValue.value) {
+        if (typeof item === 'object' && !Array.isArray(item) && item !== null) {
+            const fieldCount = Object.keys(item).length
+            if (fieldCount > maxFields) {
+                maxFields = fieldCount
+                templateObject = item as Record<string, YamlValue>
+            }
+        }
+    }
+    
+    // If we found a template, create a new object with same structure but default values
+    if (templateObject) {
+        const newObject: Record<string, YamlValue> = {}
+        
+        for (const key in templateObject) {
+            const value = templateObject[key]
+            
+            // Set default value based on type
+            if (value === null) {
+                newObject[key] = null
+            } else if (Array.isArray(value)) {
+                newObject[key] = []
+            } else if (typeof value === 'object') {
+                newObject[key] = {}
+            } else if (typeof value === 'string') {
+                newObject[key] = ''
+            } else if (typeof value === 'number') {
+                newObject[key] = 0
+            } else if (typeof value === 'boolean') {
+                newObject[key] = false
+            } else {
+                newObject[key] = ''
+            }
+        }
+        
+        modelValue.value.push(newObject)
+    } else {
+        // Fallback to empty object if no template found
+        modelValue.value.push({})
+    }
+}
+
+// Check if array has objects that can be used as templates
+const hasObjectTemplate = computed(() => {
+    if (!Array.isArray(modelValue.value) || modelValue.value.length === 0) return false
+    
+    return modelValue.value.some(item => 
+        typeof item === 'object' && 
+        !Array.isArray(item) && 
+        item !== null && 
+        Object.keys(item).length > 0
+    )
+})
+
 // Object operations
 function addObjectField(fieldType?: string) {
     if (typeof modelValue.value !== 'object' || Array.isArray(modelValue.value) || !modelValue.value || isDateObject(modelValue.value)) return
@@ -370,6 +432,16 @@ const isArrayItem = computed(() => {
     return /^\[\d+\]$/.test(props.fieldKey)
 })
 
+// Get count for badge display
+const itemCount = computed(() => {
+    if (valueType.value === 'array' && Array.isArray(modelValue.value)) {
+        return modelValue.value.length
+    } else if (valueType.value === 'object' && typeof modelValue.value === 'object' && !Array.isArray(modelValue.value) && modelValue.value !== null) {
+        return Object.keys(modelValue.value).length
+    }
+    return 0
+})
+
 // Indentation based on depth
 const indentClass = computed(() => {
     return props.depth > 0 ? 'pl-2' : ''
@@ -380,15 +452,15 @@ const typeOptions = computed(() => {
     const currentType = valueType.value
     
     const allOptions = [
-        { label: 'Text', value: 'string', icon: 'i-heroicons-bars-3-bottom-left' },
-        { label: 'Number', value: 'number', icon: 'i-heroicons-hashtag' },
-        { label: 'Boolean', value: 'boolean', icon: 'i-heroicons-check-circle' },
-        { label: 'Date', value: 'date', icon: 'i-heroicons-calendar' },
-        { label: 'Date & Time', value: 'datetime', icon: 'i-heroicons-clock' },
-        { label: 'Tags', value: 'string-array', icon: 'i-heroicons-tag' },
-        { label: 'Array', value: 'array', icon: 'i-heroicons-list-bullet' },
-        { label: 'Object', value: 'object', icon: 'i-heroicons-cube' },
-        { label: 'Null', value: 'null', icon: 'i-heroicons-minus-circle' },
+        { label: 'Text', value: 'string', icon: 'i-lucide-type' },
+        { label: 'Number', value: 'number', icon: 'i-lucide-hash' },
+        { label: 'Boolean', value: 'boolean', icon: 'i-lucide-circle-check' },
+        { label: 'Date', value: 'date', icon: 'i-lucide-calendar' },
+        { label: 'Date & Time', value: 'datetime', icon: 'i-lucide-calendar-clock' },
+        { label: 'Tags', value: 'string-array', icon: 'i-lucide-tags' },
+        { label: 'Array', value: 'array', icon: 'i-lucide-list' },
+        { label: 'Object', value: 'object', icon: 'i-lucide-box' },
+        { label: 'Null', value: 'null', icon: 'i-lucide-circle-slash' },
     ]
     
     // Filter and map to dropdown items with onSelect
@@ -404,42 +476,42 @@ const typeOptions = computed(() => {
 // Get icon for current type
 const selectedType = computed(() => {
     const iconMap: Record<string, string> = {
-        'string': 'i-heroicons-bars-3-bottom-left',
-        'number': 'i-heroicons-hashtag',
-        'boolean': 'i-heroicons-check-circle',
-        'date': 'i-heroicons-calendar',
-        'datetime': 'i-heroicons-clock',
-        'string-array': 'i-heroicons-tag',
-        'array': 'i-heroicons-list-bullet',
-        'object': 'i-heroicons-cube',
-        'null': 'i-heroicons-minus-circle',
+        'string': 'i-lucide-type',
+        'number': 'i-lucide-hash',
+        'boolean': 'i-lucide-circle-check',
+        'date': 'i-lucide-calendar',
+        'datetime': 'i-lucide-calendar-clock',
+        'string-array': 'i-lucide-tags',
+        'array': 'i-lucide-list',
+        'object': 'i-lucide-box',
+        'null': 'i-lucide-circle-slash',
     }
     return {
-        icon: iconMap[valueType.value] || 'i-heroicons-question-mark-circle'
+        icon: iconMap[valueType.value] || 'i-lucide-circle-question-mark'
     }
 })
 
 // Add field options (for creating new fields in objects)
 const addFieldOptions: DropdownMenuItem[] = [
-    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => addObjectField('string') },
-    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => addObjectField('number') },
-    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => addObjectField('boolean') },
-    { label: 'Date', icon: 'i-heroicons-calendar', onSelect: () => addObjectField('date') },
-    { label: 'Date & Time', icon: 'i-heroicons-clock', onSelect: () => addObjectField('datetime') },
-    { label: 'Tags', icon: 'i-heroicons-tag', onSelect: () => addObjectField('string-array') },
-    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => addObjectField('array') },
-    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => addObjectField('object') },
-    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => addObjectField('null') },
+    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addObjectField('string') },
+    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addObjectField('number') },
+    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addObjectField('boolean') },
+    { label: 'Date', icon: 'i-lucide-calendar', onSelect: () => addObjectField('date') },
+    { label: 'Date & Time', icon: 'i-lucide-calendar-clock', onSelect: () => addObjectField('datetime') },
+    { label: 'Tags', icon: 'i-lucide-tags', onSelect: () => addObjectField('string-array') },
+    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addObjectField('array') },
+    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addObjectField('object') },
+    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addObjectField('null') },
 ]
 
 // Add array item options (for creating new items in arrays)
 const addArrayItemOptions: DropdownMenuItem[] = [
-    { label: 'Text', icon: 'i-heroicons-bars-3-bottom-left', onSelect: () => addArrayItem('string') },
-    { label: 'Number', icon: 'i-heroicons-hashtag', onSelect: () => addArrayItem('number') },
-    { label: 'Boolean', icon: 'i-heroicons-check-circle', onSelect: () => addArrayItem('boolean') },
-    { label: 'Array', icon: 'i-heroicons-list-bullet', onSelect: () => addArrayItem('array') },
-    { label: 'Object', icon: 'i-heroicons-cube', onSelect: () => addArrayItem('object') },
-    { label: 'Null', icon: 'i-heroicons-minus-circle', onSelect: () => addArrayItem('null') },
+    { label: 'Text', icon: 'i-lucide-type', onSelect: () => addArrayItem('string') },
+    { label: 'Number', icon: 'i-lucide-hash', onSelect: () => addArrayItem('number') },
+    { label: 'Boolean', icon: 'i-lucide-circle-check', onSelect: () => addArrayItem('boolean') },
+    { label: 'Array', icon: 'i-lucide-list', onSelect: () => addArrayItem('array') },
+    { label: 'Object', icon: 'i-lucide-box', onSelect: () => addArrayItem('object') },
+    { label: 'Null', icon: 'i-lucide-circle-slash', onSelect: () => addArrayItem('null') },
 ]
 </script>
 
@@ -460,7 +532,11 @@ const addArrayItemOptions: DropdownMenuItem[] = [
             />
             
             <!-- Collapsible for non-edit mode -->
-            <Collapsible v-else :default-open="isOpen" :label="fieldKey">
+            <Collapsible v-else v-model:open="isOpen" :default-open="true" :label="fieldKey">
+                <template #badge>
+                    <UBadge size="xs" variant="soft" color="neutral">{{ itemCount }}</UBadge>
+                </template>
+                
                 <template #actions>
                     <div class="flex items-center gap-1">
                         <!-- Edit key button (hidden for array items) -->
@@ -481,7 +557,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                             size="xs"
                         >
                             <UButton
-                                :icon="selectedType?.icon || 'i-heroicons-question-mark-circle'"
+                                :icon="selectedType?.icon || 'i-heroicons-circle-question-mark'"
                                 variant="soft"
                                 size="xs"
                                 :disabled="readonly"
@@ -507,7 +583,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                     v-if="Array.isArray(modelValue) && modelValue.length === 0"
                     class="text-center py-4 text-sm text-muted border border-dashed border-default rounded-lg"
                 >
-                    <UIcon name="i-heroicons-queue-list" class="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <UIcon name="i-lucide-brackets" class="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>Empty array</p>
                     <p v-if="!readonly" class="text-xs mt-1">Click "Add Item" below</p>
                 </div>
@@ -533,19 +609,32 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                     </div>
                 </template>
 
-                <UDropdownMenu
-                    v-if="!readonly"
-                    :items="[addArrayItemOptions]"
-                    size="xs"
-                >
+                <div class="flex items-center gap-2">
+                    <UDropdownMenu
+                        v-if="!readonly"
+                        :items="[addArrayItemOptions]"
+                        size="xs"
+                    >
+                        <UButton
+                            icon="i-lucide-plus"
+                            label="Add Item"
+                            variant="link"
+                            size="xs"
+                            color="neutral"
+                        />
+                    </UDropdownMenu>
+
+                    <!-- Add Item From Template button (only shown when array has objects) -->
                     <UButton
-                        icon="i-lucide-plus"
-                        label="Add Item"
+                        v-if="!readonly && hasObjectTemplate"
+                        icon="i-lucide-copy-plus"
+                        label="From Template"
                         variant="link"
                         size="xs"
                         color="neutral"
+                        @click="addArrayItemFromTemplate"
                     />
-                </UDropdownMenu>
+                </div>
             </div>
 
             <!-- Object -->
@@ -554,7 +643,7 @@ const addArrayItemOptions: DropdownMenuItem[] = [
                     v-if="typeof modelValue === 'object' && !Array.isArray(modelValue) && modelValue !== null && !isDateObject(modelValue) && Object.keys(modelValue as Record<string, YamlValue>).length === 0"
                     class="text-center py-4 text-sm text-muted border border-dashed border-default rounded-lg"
                 >
-                    <UIcon name="i-heroicons-cube-transparent" class="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <UIcon name="i-lucide-box-transparent" class="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>Empty object</p>
                     <p v-if="!readonly" class="text-xs mt-1">Click "Add Field" below</p>
                 </div>
