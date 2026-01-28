@@ -99,15 +99,21 @@ const valueType = computed(() => {
 const isEditingKey = ref(false)
 const editingKeyValue = ref(props.fieldKey)
 
+// Watch for prop changes to keep editingKeyValue in sync
+watch(() => props.fieldKey, (newKey) => {
+    editingKeyValue.value = newKey
+})
+
 function startEditingKey() {
     if (props.readonly) return
+    editingKeyValue.value = props.fieldKey  // Sync current value
     isEditingKey.value = true
-    editingKeyValue.value = props.fieldKey
 }
 
 function saveKey() {
-    if (editingKeyValue.value && editingKeyValue.value !== props.fieldKey) {
-        emit('update:fieldKey', editingKeyValue.value)
+    const trimmedValue = editingKeyValue.value?.trim()
+    if (trimmedValue && trimmedValue !== props.fieldKey) {
+        emit('update:fieldKey', trimmedValue)
     }
     isEditingKey.value = false
 }
@@ -197,6 +203,37 @@ function convertType(newType: string) {
             modelValue.value = modelValue.value.map(item => String(item))
         } else {
             modelValue.value = [String(modelValue.value || '')]
+        }
+        return
+    }
+    
+    // Special case: date ↔ datetime conversion (preserve the date value)
+    if ((currentType === 'date' && newType === 'datetime') || (currentType === 'datetime' && newType === 'date')) {
+        const currentValue = modelValue.value
+        
+        if (newType === 'datetime') {
+            // Converting date to datetime: add time component
+            if (typeof currentValue === 'string') {
+                // If it's a date-only string (YYYY-MM-DD), add time
+                if (/^\d{4}-\d{2}-\d{2}$/.test(currentValue)) {
+                    modelValue.value = `${currentValue}T00:00:00`
+                } else {
+                    // Already has time, keep as is
+                    modelValue.value = currentValue
+                }
+            } else {
+                // Convert Date object to ISO string with time
+                const date = isDateObject(currentValue) ? currentValue as Date : new Date()
+                modelValue.value = date.toISOString()
+            }
+        } else {
+            // Converting datetime to date: remove time component
+            if (typeof currentValue === 'string') {
+                modelValue.value = currentValue.split('T')[0]!
+            } else {
+                const date = isDateObject(currentValue) ? currentValue as Date : new Date()
+                modelValue.value = date.toISOString().split('T')[0]!
+            }
         }
         return
     }
@@ -579,13 +616,12 @@ const addArrayItemOptions = computed(() => {
                     <UButton
                         v-else
                         class="text-xs font-medium text-left justify-start px-0 py-0 truncate"
-                        :class="{ 'cursor-not-allowed': readonly || isArrayItem }"
-                        @click="isArrayItem ? undefined : startEditingKey"
                         :label="fieldKey"
                         block
                         variant="link"
                         color="neutral"
-                        :disabled="isArrayItem"
+                        :disabled="readonly || isArrayItem"
+                        @click="startEditingKey"
                     />
                 </div>
 
