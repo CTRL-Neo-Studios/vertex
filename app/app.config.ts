@@ -14,6 +14,6 @@ export default defineAppConfig({
         editorMonoFont: 'Geist Mono',
     },
     versioning: {
-        version: '0.1.1.75018d98'
+        version: '0.1.1-75018d98'
     }
 })
