@@ -10,8 +10,6 @@ import type {
     TocEntry
 } from "#codemirror-rich-obsidian-editor/editor-types"
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
-import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
-import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useActiveSinglespaceTools} from "~/composables/active/useActiveSinglespaceTools";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
@@ -19,6 +17,7 @@ import type {ToTocEntryProps} from "#shared/types/active/events";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {convertFileSrc} from "@tauri-apps/api/core";
 import {isDataFile, isImage, isUnreadableAsText, isVideo, isYamlFile} from "#shared/utils/fs/filenames";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 
 definePageMeta({
     layout: 'singlespace'
@@ -39,6 +38,7 @@ const {
     moveFileInIndex,
     isIndexTemporary,
     setTemporaryIndex,
+    on,
 } = useActiveSinglespaceIndex($sesh.getSession(sessionId))
 const {
     closeTab,
@@ -54,6 +54,7 @@ const {
 } = useActiveSinglespaceTools($sesh.getSession(sessionId))
 const {content} = useActiveEditorContent($sesh.getSession(sessionId), getActiveTab(tabId))
 const {dispatcher: editorDispatcher} = useActiveEditorDispatcher($sesh.getSession(sessionId))
+const $win = useAppWebviewWindows()
 
 const editorRef = ref()
 const $eu = useEditorUtils(editorRef)
@@ -91,6 +92,8 @@ defineShortcuts({
     'meta_s': {
         usingInput: true,
         async handler(e) {
+            if (!isIndexTemporary(tabId)) return;
+
             isContentSaved.value = false;
             const newIndex = await saveTemporaryFile(tabId, content)
             fileName.value = newIndex?.fileName || 'Untitled.md'
@@ -143,8 +146,23 @@ onMounted(async () => {
     }
 })
 
+const unsubscribe = on(async (event) => {
+    console.log(`[Listener for ${fileName.value}]`, event)
+    if (event.type == "remove") {
+        await $win.getCurrentAppWindow().close()
+    } else if (event.type == "modify" && event.path == getFileByUuid(tabId)?.fullPath) {
+        // isContentSaved.value = false
+        // content.value = await $fileio.readTextFromFile(event.path)
+    } else if (event.type == "rename" && (event.oldPath == getFileByUuid(tabId)?.fullPath || event.newPath == getFileByUuid(tabId)?.fullPath)) {
+        isContentSaved.value = false
+        fileName.value = await $fileio.getFileNameFromPath(event.newPath, true)
+        isContentSaved.value = true
+    }
+})
+
 onBeforeUnmount(async () => {
     editorDispatcher.unmount()
+    unsubscribe()
 })
 
 async function onRename(oldValue: string) {

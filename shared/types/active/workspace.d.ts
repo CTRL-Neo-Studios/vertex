@@ -34,3 +34,10 @@ export type WorkspaceIndexEvent =
     | { type: 'modify'; path: string; };
 
 export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;
+
+export type SinglespaceIndexEvent =
+    | { type: 'remove'; path: string; removedNode: ActiveSinglespaceFileIndex }
+    | { type: 'rename'; oldPath: string; newPath: string; }
+    | { type: 'modify'; path: string; };
+
+export type SinglespaceIndexListener = (event: SinglespaceIndexEvent) => void;

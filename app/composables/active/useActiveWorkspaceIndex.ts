@@ -16,18 +16,44 @@ import {
 import {join} from "@tauri-apps/api/path"
 import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/defaults/actives";
 import useUuid from "~/composables/utility/useUuid";
-import type {PossiblyRef} from "#shared/types/types";
+import type {FrontmatterProperties, PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import type {UnlistenFn} from "@tauri-apps/api/event";
+import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
 // NEW: A registry for our event listeners, mapping session ID to a Set of callbacks.
 const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
 
+/**
+ * Private helper function to parse file content properties (frontmatter, etc.)
+ * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
+ * 
+ * @param {string} path - The absolute file path
+ * @param {string} content - The file content
+ * @returns {object} Object containing frontmatterProperties and any other parsed properties
+ * @private
+ */
+function _parseFileContentProperties(path: string, content: string): { frontmatterProperties: FrontmatterProperties } {
+    const extension = getFileExtensionFromPath(path);
+    
+    // Only parse frontmatter for plain text files
+    if (!isPlainTextFile(extension)) {
+        return { frontmatterProperties: {} };
+    }
+    
+    const fmResult = parseFrontmatter(content);
+    if (fmResult.error) {
+        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
+        return { frontmatterProperties: {} };
+    }
+    
+    return { frontmatterProperties: fmResult.data || {} };
+}
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -102,7 +128,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         await processDirectory(workspaceRoot);
 
         for (const path in newIndex) {
-            if (path.endsWith(".md") || path.endsWith(".mdx")) {
+            const extension = getFileExtensionFromPath(path);
+            if (isPlainTextFile(extension)) {
                 await preparseDocument(path, newIndex);
             }
         }
@@ -154,9 +181,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if (autoSort) parentNode.children.sort();
             }
 
-            // MODIFIED: Also parse frontmatter when a new file is added
-            if (!isDirectory && path.endsWith('.md')) {
-                await preparseDocument(path);
+            // MODIFIED: Also parse frontmatter when a new file is added (only for plain text files)
+            if (!isDirectory) {
+                const extension = getFileExtensionFromPath(path);
+                if (isPlainTextFile(extension)) {
+                    await preparseDocument(path);
+                }
             }
 
             console.log(`Added to index: ${path}`);
@@ -290,12 +320,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const node = index[path];
         if (!node || node.isFolder) return;
 
-        const fmResult = parseFrontmatter(content);
-        if (fmResult.error) {
-            console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-        } else {
-            node.frontmatterProperties = fmResult.data || {};
-        }
+        // Parse file content properties (frontmatter, etc.) - only for plain text files
+        const parsed = _parseFileContentProperties(path, content);
+        node.frontmatterProperties = parsed.frontmatterProperties;
 
         const internalLinks: InternalLinkNode[] = getInternalLinks(content);
         const forelinks = new Set<string>();
@@ -331,6 +358,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     async function preparseDocument(path: string, index = fileIndex.value) {
         const node = index[path];
         if (!node || node.isFolder) return;
+
+        // Don't attempt to read binary files (images, PDFs, videos) as text
+        const extension = getFileExtensionFromPath(path);
+        if (isUnreadableAsText(extension)) {
+            console.log(`Skipping text read for binary file: ${path}`);
+            return;
+        }
 
         try {
             const content = await readTextFile(path);
@@ -508,15 +542,19 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     async function updateFrontmatterForPath(path: string, index = fileIndex.value) {
         const node = index[path];
         if (!node || node.isFolder) return;
+
+        // Don't attempt to read binary files (images, PDFs, videos) as text
+        const extension = getFileExtensionFromPath(path);
+        if (isUnreadableAsText(extension)) {
+            console.log(`Skipping text read for binary file: ${path}`);
+            return;
+        }
+
         try {
             const content = await readTextFile(path);
-            const result = parseFrontmatter(content);
-            if (result.error) {
-                console.error(`Frontmatter parsing error in ${path}:`, result.error);
-            } else {
-                node.frontmatterProperties = result.data || {};
-                // console.log(`Updated frontmatter for ${path}`);
-            }
+            const parsed = _parseFileContentProperties(path, content);
+            node.frontmatterProperties = parsed.frontmatterProperties;
+            // console.log(`Updated frontmatter for ${path}`);
         } catch (readError) {
             console.error(`Failed to read file for frontmatter parsing: ${path}`, readError);
         }

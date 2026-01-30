@@ -1,8 +1,14 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
+import type {
+    ActiveSinglespaceFileIndex,
+    ActiveWorkspaceFileIndex,
+    WorkspaceIndexListener,
+    SinglespaceIndexEvent,
+    SinglespaceIndexListener
+} from "#shared/types/active/workspace";
 import useUuid from "~/composables/utility/useUuid";
 import {defaultActiveSinglespaceFileIndex} from "#shared/utils/defaults/actives";
-import {readTextFile} from "@tauri-apps/plugin-fs";
+import {readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {useFileIO} from "~/composables/io/useFileIO";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
 import type {WebviewWindow} from "@tauri-apps/api/webviewWindow";
@@ -11,6 +17,37 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import type {UnlistenFn} from "@tauri-apps/api/event";
+import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
+import type {FrontmatterProperties} from "#shared/types/types";
+
+const watcherRegistry = new Map<string, UnwatchFn>();
+const listenerRegistry = new Map<string, Set<SinglespaceIndexListener>>();
+
+/**
+ * Private helper function to parse file content properties (frontmatter, etc.)
+ * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
+ * 
+ * @param {string} path - The absolute file path
+ * @param {string} content - The file content
+ * @returns {object} Object containing frontmatterProperties and any other parsed properties
+ * @private
+ */
+function _parseFileContentProperties(path: string, content: string): { frontmatterProperties: FrontmatterProperties } {
+    const extension = getFileExtensionFromPath(path);
+    
+    // Only parse frontmatter for plain text files
+    if (!isPlainTextFile(extension)) {
+        return { frontmatterProperties: {} };
+    }
+    
+    const fmResult = parseFrontmatter(content);
+    if (fmResult.error) {
+        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
+        return { frontmatterProperties: {} };
+    }
+    
+    return { frontmatterProperties: fmResult.data || {} };
+}
 
 export function useActiveSinglespaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -27,11 +64,12 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         const firstFp = unref(firstFilePath)
 
         const entryContent = await $fio.readTextFromFile(firstFp)
+        const parsed = _parseFileContentProperties(firstFp, entryContent)
         fileIndex.value[firstFp] = defaultActiveSinglespaceFileIndex({
             uuid: useUuid(),
             fullPath: firstFp,
             fileName: await $fio.getFileNameFromPath(firstFp),
-            frontmatterProperties: parseFrontmatter(entryContent).data || {},
+            frontmatterProperties: parsed.frontmatterProperties,
         })
 
         return fileIndex.value[firstFp]
@@ -81,11 +119,12 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
 
         if (!oldIndex) throw new Error('No such file exists.')
 
+        const parsed = _parseFileContentProperties(np, unref(fileContent))
         fileIndex.value[np] = defaultActiveSinglespaceFileIndex({
             uuid: fid,
             fileName: await $fio.getFileNameFromPath(np),
             fullPath: np,
-            frontmatterProperties: parseFrontmatter(unref(fileContent)).data || {}
+            frontmatterProperties: parsed.frontmatterProperties
         })
 
         delete unref(fileIndex)[getIllegalPath(fid)] // delete the temporary index
@@ -99,12 +138,9 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
 
         if (!node) return;
 
-        const fmResult = parseFrontmatter(content);
-        if (fmResult.error) {
-            console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-        } else {
-            node.frontmatterProperties = fmResult.data || {};
-        }
+        // Parse file content properties (frontmatter, etc.) - only for plain text files
+        const parsed = _parseFileContentProperties(path, content);
+        node.frontmatterProperties = parsed.frontmatterProperties;
     }
 
     /**
@@ -177,6 +213,182 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         fileIndex.value = {}
     }
 
+    /**
+     * Broadcasts an event to all registered listeners for this session.
+     * @private
+     */
+    function _broadcast(event: SinglespaceIndexEvent) {
+        const listeners = listenerRegistry.get(session!.uuid);
+        if (listeners) {
+            listeners.forEach(listener => listener(event));
+        }
+    }
+
+    /**
+     * Starts the file system watcher for a single file.
+     * It will automatically update the fileIndex on modify, remove, or rename events.
+     *
+     * @param {string} filePath The absolute path of the file to watch.
+     */
+    async function startWatcher(filePath: string) {
+        // Before starting a new one, check if a watcher for this session already exists
+        if (watcherRegistry.has(session!.uuid)) {
+            console.log(`Watcher for session ${session!.uuid} already exists. Stopping it first.`);
+            await stopWatcher();
+        }
+
+        console.log(`Starting watcher for session ${session!.uuid} on: ${filePath}`);
+
+        const activeWatcher = await watch(filePath, async (event: WatchEvent) => {
+            // Ignore .DS_Store files
+            if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
+
+            // Ignore metadata-only changes
+            if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && event.type.modify.kind === 'metadata'))) return;
+
+            if (typeof event.type === 'object' && event.type !== null) {
+                
+                // --- Remove Event Handling ---
+                if ('remove' in event.type) {
+                    for (const path of event.paths) {
+                        console.log(`Remove detected: ${path}`);
+                        const removedNodes = removeFileFromIndex(path);
+                        if (removedNodes[0]) {
+                            _broadcast({ type: 'remove', path, removedNode: removedNodes[0] });
+                        }
+                    }
+                    return;
+                }
+
+                // --- Rename Event Handling ---
+                if ('modify' in event.type && event.type.modify.kind === 'rename') {
+                    // Standard rename with both paths
+                    if (event.paths.length >= 2) {
+                        const [oldPath, newPath] = event.paths;
+                        console.log(`Rename detected: ${oldPath} -> ${newPath}`);
+                        await moveFileInIndex(oldPath || '', newPath || '', '');
+                        _broadcast({ type: 'rename', oldPath: oldPath || '', newPath: newPath || '' });
+                        return;
+                    }
+
+                    // Incomplete rename with only one path
+                    if (event.paths.length === 1) {
+                        const path = event.paths[0];
+                        if (!path) return;
+
+                        setTimeout(async () => {
+                            try {
+                                await stat(path);
+                                // File still exists - might be a case-only rename or noisy event
+                                const node = fileIndex.value[path];
+                                if (!node) return;
+
+                                const fileName = path.substring(path.lastIndexOf('/') + 1);
+                                const actualFileName = await $fio.getFileNameFromPath(path);
+
+                                // If the file name changed (case-only rename), update it
+                                if (actualFileName !== node.fileName) {
+                                    console.log(`Case-only rename detected: ${node.fileName} -> ${actualFileName}`);
+                                    const parentPath = path.substring(0, path.lastIndexOf('/'));
+                                    const newPath = `${parentPath}/${actualFileName}`;
+                                    await moveFileInIndex(path, newPath, '');
+                                    _broadcast({ type: 'rename', oldPath: path, newPath: newPath });
+                                } else {
+                                    console.log('Ignoring noisy single-path rename event:', path);
+                                }
+                            } catch (error) {
+                                // File no longer exists - treat as remove
+                                console.log(`File at '${path}' no longer exists. Treating as remove.`);
+                                const removedNodes = removeFileFromIndex(path);
+                                if (removedNodes[0]) {
+                                    _broadcast({ type: 'remove', path, removedNode: removedNodes[0] });
+                                }
+                            }
+                        }, 100);
+                        return;
+                    }
+                }
+
+                // --- Modify Event Handling (Content Change) ---
+                if ('modify' in event.type && event.type.modify.kind === 'data') {
+                    for (const path of event.paths) {
+                        console.log(`Modify detected: ${path}`);
+                        
+                        // Don't attempt to read binary files (images, PDFs, videos) as text
+                        const extension = getFileExtensionFromPath(path);
+                        if (isUnreadableAsText(extension)) {
+                            console.log(`Skipping text read for binary file: ${path}`);
+                            continue;
+                        }
+
+                        try {
+                            const content = await readTextFile(path);
+                            await updateIndex(path, content);
+                            _broadcast({ type: 'modify', path });
+                        } catch (error) {
+                            console.error(`Failed to read file for update: ${path}`, error);
+                        }
+                    }
+                    return;
+                }
+
+                console.log('[Executed Watcher Event]: ', event);
+            } else {
+                // Simple string event type
+                console.log(`Received simple string event type: "${event.type}"`);
+            }
+        }, { recursive: false, delayMs: 5 });
+
+        // Store the new unwatch function in the registry
+        watcherRegistry.set(session!.uuid, activeWatcher);
+        console.log(`Watcher started and registered for session ${session!.uuid}.`);
+
+        return activeWatcher;
+    }
+
+    /**
+     * Stops the currently active file system watcher.
+     * This is crucial for cleanup when closing a file to prevent memory leaks.
+     */
+    async function stopWatcher() {
+        const unwatchFn = watcherRegistry.get(session!.uuid);
+
+        if (unwatchFn) {
+            console.log(`Stopping file watcher for session ${session!.uuid}...`);
+            unwatchFn();
+            watcherRegistry.delete(session!.uuid);
+            // Clean up listeners to prevent memory leaks
+            listenerRegistry.delete(session!.uuid);
+            console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
+        } else {
+            console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
+        }
+    }
+
+    /**
+     * Subscribes a listener to file system events for this session.
+     * Returns an unsubscribe function to remove the listener.
+     * 
+     * @param {SinglespaceIndexListener} listener - The callback function to handle events
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    function on(listener: SinglespaceIndexListener): () => void {
+        // Get or create the listener set for this session
+        if (!listenerRegistry.has(session!.uuid)) {
+            listenerRegistry.set(session!.uuid, new Set());
+        }
+        const listeners = listenerRegistry.get(session!.uuid)!;
+
+        // Add the new listener
+        listeners.add(listener);
+
+        // Return an unsubscribe function
+        // This is CRITICAL for preventing memory leaks in components
+        return () => {
+            listeners.delete(listener);
+        };
+    }
+
     return {
         initializeIndex,
         updateIndex,
@@ -189,5 +401,8 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         convertTemporaryToValidIndex,
         fileIndexWithPathExists,
         fileIndexWithUuidExists,
+        startWatcher,
+        stopWatcher,
+        on,
     }
 }

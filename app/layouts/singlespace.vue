@@ -35,6 +35,8 @@ const {
     updateIndex,
     clearIndex,
     getFileByUuid,
+    startWatcher,
+    stopWatcher
 } = useActiveSinglespaceIndex($sesh.getSession($sessionId))
 const {
     activeTabUuid,
@@ -74,7 +76,7 @@ onMounted(async () => {
         await until($sessionId).toMatch(v => v != undefined)
 
     const activeSesh = $sesh.getSession($sessionId)
-    if (!activeSesh) {
+    if (!activeSesh || !activeSesh.rootPath) {
         await $navi.toHome()
         return;
     }
@@ -84,11 +86,14 @@ onMounted(async () => {
     console.log(`Windows: ${await $win.getAppWindows()}`)
     await $menu.setMenu()
 
+    await startWatcher(activeSesh.rootPath)
+
     loading.value = false
 })
 
 onBeforeUnmount(async () => {
     clearTabs()
+    await stopWatcher()
     clearIndex()
     if (unlistenedWindows) {
         unlistenedWindows.unlistenClose()
