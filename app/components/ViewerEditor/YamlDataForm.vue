@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
+import type {YamlFormData} from "@type32/yaml-editor-form";
 
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({ default: '' })
 const contentSaved = defineModel<boolean>('contentSaved', {default: false})
-const $cm = useColorMode()
 
 const props = withDefaults(defineProps<{
     renaming: boolean,
@@ -13,12 +12,26 @@ const props = withDefaults(defineProps<{
 }>(), {
     renaming: false,
     filePath: '',
-    disabled: false,
+    disabled: false
 })
 
 const emit = defineEmits<{
     (e: 'on-rename', oldValue: string, newValue: string): void
 }>()
+
+const payload = computed(() => parseYaml<YamlFormData>(unref(content)))
+const payloadError = computed(() => unref(payload).error)
+const payloadData = computed({
+    get() {
+        if (unref(payloadError)) return {}
+        return unref(payload).data || {}
+    },
+    set(newValue) {
+        const p = stringifyYaml(newValue)
+        if (!p.error)
+            content.value = p.yaml || ''
+    }
+})
 </script>
 
 <template>
@@ -26,21 +39,19 @@ const emit = defineEmits<{
         scrollMode="vertical"
         v-model:fileName="fileName"
         @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
-        :filePath="props.filePath"
+        :filePath="filePath"
         :renaming="renaming"
     >
         <template #default>
-            <CodeEditor
-                :disabled="disabled || renaming"
-                :colorMode="$cm.value"
-                v-model="content"
-                class="w-full"
-                :language="getFileExtensionFromPath(props.filePath)"
-                @update:model-value="() => contentSaved = false"
+            <ViewerEditorComponentDataEditorForm
+                v-model="payloadData"
+                size="sm"
+                class="h-full max-w-2xl w-full"
+                :disabled="payloadError != undefined || renaming"
             />
         </template>
         <template #status-bar>
-            <ViewerEditorComponentWordCounter v-model="content" :paragraphs="false" :words="false"/>
+            <ViewerEditorComponentWordCounter v-model="content"/>
         </template>
     </ViewerEditorLayoutWrapper>
 </template>

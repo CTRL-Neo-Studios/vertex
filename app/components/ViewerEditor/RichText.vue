@@ -21,11 +21,17 @@ const props = withDefaults(defineProps<{
     filePath: '',
     disabled: false
 })
+const frontmatterOpen = useState<boolean>(props?.filePath, () => false)
 
 const emit = defineEmits<{
     (e: 'on-rename', oldValue: string, newValue: string): void
     (e: 'on-clicked-internal-link', detail: InternalLinkClickDetail): void
 }>()
+
+onBeforeUnmount(() => {
+    frontmatterOpen.value = false
+})
+
 </script>
 
 <template>
@@ -37,8 +43,9 @@ const emit = defineEmits<{
         :renaming="renaming"
     >
         <template #default>
+            <ViewerEditorComponentFrontmatterEditor class="max-w-2xl w-full" v-model:open="frontmatterOpen" v-model:editorInstance="editorInstance"/>
             <Editor
-                :disabled="disabled"
+                :disabled="disabled || frontmatterOpen || renaming"
                 ref="editorInstance"
                 v-model="content"
                 class="max-w-2xl w-full"

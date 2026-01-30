@@ -92,7 +92,15 @@ export function isPlainTextFile(extension: PossiblyRef<string>) {
 }
 
 export function isDataFile(extension: PossiblyRef<string>) {
-    return ['base', 'yml', 'csv'].includes(unref(extension))
+    return ['base', 'yml', 'yaml', 'csv'].includes(unref(extension))
+}
+
+export function isYamlFile(extension: PossiblyRef<string>) {
+    return ['yml', 'yaml'].includes(unref(extension))
+}
+
+export function isBasesFile(extension: PossiblyRef<string>) {
+    return ['base'].includes(unref(extension))
 }
 
 export function isPdf(extension: PossiblyRef<string>) {
@@ -104,7 +112,7 @@ export function isVideo(extension: PossiblyRef<string>) {
 }
 
 export function isUnreadableAsText(extension: PossiblyRef<string>) {
-    return isImage(extension) || isPdf(extension) || isDataFile(extension) || isVideo(extension)
+    return isImage(extension) || isPdf(extension) || isVideo(extension)
 }
 
 export function getFileExtensionFromPath(path: PossiblyRef<string>) {

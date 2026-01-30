@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { YamlFormData } from '#shared/types/types'
-import YamlForm from "~/components/ViewerEditor/YamlForm.vue";
+import type {YamlFormData} from '@type32/yaml-editor-form'
 
 const yamlData = ref<YamlFormData>({
     title: 'Demo Document',
@@ -44,7 +43,7 @@ watch(yamlData, (newVal) => {
                     </div>
                 </template>
 
-                <YamlForm v-model="yamlData" />
+                <YamlFormEditor v-model="yamlData" />
             </UCard>
 
             <UCard>

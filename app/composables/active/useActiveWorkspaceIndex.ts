@@ -560,6 +560,26 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return results
     }
 
+    /**
+     * Returns all files in the index that match the provided filter conditions.
+     */
+    function getFilteredFiles(filter: (file: ActiveWorkspaceFileIndex) => boolean): ActiveWorkspaceFileIndex[] {
+        return Object.values(unref(fileIndex)).filter(filter);
+    }
+
+    /**
+     * Convenience method to get files by a specific extension (e.g., 'md', 'png').
+     * Extension check is case-insensitive.
+     */
+    function getFilesByExtension(extension: string): ActiveWorkspaceFileIndex[] {
+        const ext = extension.startsWith('.') ? extension.slice(1).toLowerCase() : extension.toLowerCase();
+        return getFilteredFiles((file) => {
+            if (file.isFolder) return false;
+            const fileExt = file.fileName.split('.').pop()?.toLowerCase();
+            return fileExt === ext;
+        });
+    }
+
     function on(listener: WorkspaceIndexListener): () => void {
         // Get or create the listener set for this session.
         if (!listenerRegistry.has(session!.uuid)) {
@@ -592,5 +612,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         updateIndex,
         getFileByPath,
         getFilesByPaths,
+        getFilteredFiles,
+        getFilesByExtension
     };
 }

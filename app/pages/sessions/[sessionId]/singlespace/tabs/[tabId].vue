@@ -18,7 +18,7 @@ import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEd
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {convertFileSrc} from "@tauri-apps/api/core";
-import {isDataFile, isImage, isUnreadableAsText, isVideo} from "#shared/utils/fs/filenames";
+import {isDataFile, isImage, isUnreadableAsText, isVideo, isYamlFile} from "#shared/utils/fs/filenames";
 
 definePageMeta({
     layout: 'singlespace'
@@ -75,15 +75,10 @@ const showCodeEditor = computed(() => {
     if (isUnreadableAsText(fileExt)) return false;
     else return !['txt', 'md'].includes(unref(fileExt));
 })
-const showImageViewer = computed(() => {
-    return isImage(fileExt);
-})
-const showVideoViewer = computed(() => {
-    return isVideo(fileExt)
-})
-const showDataEditor = computed(() => {
-    return isDataFile(fileExt)
-})
+const showImageViewer = computed(() => isImage(fileExt))
+const showVideoViewer = computed(() => isVideo(fileExt))
+const showDataEditor = computed(() => isDataFile(fileExt))
+const showYamlEditor = computed(() => isYamlFile(fileExt))
 
 const internalLinkList = computed<InternalLink[]>(() => [])
 const codeblockMappings = useActiveEditorCodeblockMappings()
@@ -249,6 +244,18 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                             :renaming="renaming"
                             v-model:fileName="fileName"
                             :filePath="fullFilePath"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showDataEditor && showYamlEditor">
+                        <ViewerEditorYamlDataForm
+                            v-model="content"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :filePath="fullFilePath"
+                            :renaming="renaming"
                             @onRename="onRename"
                         />
                     </template>
