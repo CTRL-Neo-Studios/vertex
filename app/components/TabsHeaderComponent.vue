@@ -215,7 +215,7 @@ function scrollToItem(index: number) {
                 <UButton
                     :key="index"
                     size="sm"
-                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
+                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
                     :color="tabId == item.id ? 'primary' : 'neutral'"
                     :variant="tabId == item.id ? 'soft' : 'ghost'"
                     :label="item.label"

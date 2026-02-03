@@ -24,36 +24,11 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import type {UnlistenFn} from "@tauri-apps/api/event";
 import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
+import type {YamlFormData} from "@type32/yaml-editor-form";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
 // NEW: A registry for our event listeners, mapping session ID to a Set of callbacks.
 const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
-
-/**
- * Private helper function to parse file content properties (frontmatter, etc.)
- * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
- * 
- * @param {string} path - The absolute file path
- * @param {string} content - The file content
- * @returns {object} Object containing frontmatterProperties and any other parsed properties
- * @private
- */
-function _parseFileContentProperties(path: string, content: string): { frontmatterProperties: FrontmatterProperties } {
-    const extension = getFileExtensionFromPath(path);
-    
-    // Only parse frontmatter for plain text files
-    if (!isPlainTextFile(extension)) {
-        return { frontmatterProperties: {} };
-    }
-    
-    const fmResult = parseFrontmatter(content);
-    if (fmResult.error) {
-        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-        return { frontmatterProperties: {} };
-    }
-    
-    return { frontmatterProperties: fmResult.data || {} };
-}
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -90,6 +65,49 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     });
 
     /**
+     * Private helper function to parse file content properties (frontmatter, etc.)
+     * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
+     * For .yml/.yaml files, parses as pure YAML.
+     *
+     * @param {string} path - The absolute file path
+     * @param {string} content - The file content
+     * @returns {object} Object containing properties and any other parsed properties
+     * @private
+     */
+    function _parseFileContentProperties(path: string, content: string): { properties: YamlFormData } {
+        const extension = getFileExtensionFromPath(path);
+        const fileName = path.substring(path.lastIndexOf('/') + 1);
+
+        // Handle .yml/.yaml files (like .properties.yml)
+        if (extension === 'yml' || extension === 'yaml') {
+            try {
+                const yamlResult = parseYaml(content);
+                if (yamlResult.error) {
+                    console.error(`YAML parsing error in ${path}:`, yamlResult.error);
+                    return { properties: {} };
+                }
+                return { properties: yamlResult.data || {} };
+            } catch (error) {
+                console.error(`Failed to parse YAML in ${path}:`, error);
+                return { properties: {} };
+            }
+        }
+
+        // Only parse frontmatter for plain text files
+        if (!isPlainTextFile(extension)) {
+            return { properties: {} };
+        }
+
+        const fmResult = parseFrontmatter(content);
+        if (fmResult.error) {
+            console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
+            return { properties: {} };
+        }
+
+        return { properties: fmResult.data || {} };
+    }
+
+    /**
      * Builds index from a root path using Tauri's native recursive fs scan.
      */
     async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
@@ -102,10 +120,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const childrenPaths: string[] = [];
 
             for (const entry of entries) {
-                if (entry.name.startsWith('.')) continue;
+                if (entry.name.startsWith('.') && entry.name !== "properties.yml" && entry.name !== "properties.yaml") continue;
 
                 const entryPath = await join(currentPath, entry.name);
                 childrenPaths.push(entryPath);
+
+                // Get file stats for timestamps
+                const fileStats = await stat(entryPath);
+                const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
+                const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
 
                 newIndex[entryPath] = defaultActiveWorkspaceFileIndex({
                     uuid: useUuid(),
@@ -114,8 +137,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     fileName: entry.name,
                     isFolder: entry.isDirectory,
                     children: [],
-                    frontmatterProperties: {},
-                    forelinks: []
+                    properties: {},
+                    forelinks: [],
+                    createdTime,
+                    modifiedTime,
                 });
 
                 if (entry.isDirectory) {
@@ -127,10 +152,46 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
 
+        // Parse file contents and handle properties files
+        const propertiesFiles: string[] = [];
+        
         for (const path in newIndex) {
+            const node = newIndex[path];
+            if (!node) continue;
+            
+            const fileName = node.fileName;
             const extension = getFileExtensionFromPath(path);
+            
+            // Track .properties.yml/.properties.yaml FILES (not folders) for later processing
+            if (!node.isFolder && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
+                propertiesFiles.push(path);
+                continue;
+            }
+            
+            // Parse content for plain text files
             if (isPlainTextFile(extension)) {
                 await preparseDocument(path, newIndex);
+            }
+        }
+
+        // Process .properties.yml files and assign to parent folders
+        for (const propertiesPath of propertiesFiles) {
+            const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
+            const parentNode = newIndex[parentPath];
+            
+            if (parentNode && parentNode.isFolder) {
+                // Don't attempt to read binary files
+                const extension = getFileExtensionFromPath(propertiesPath);
+                if (!isUnreadableAsText(extension)) {
+                    try {
+                        const content = await readTextFile(propertiesPath);
+                        const parsed = _parseFileContentProperties(propertiesPath, content);
+                        parentNode.properties = parsed.properties;
+                        console.log(`Assigned properties from ${propertiesPath} to folder ${parentPath}`);
+                    } catch (error) {
+                        console.error(`Failed to read properties file ${propertiesPath}:`, error);
+                    }
+                }
             }
         }
 
@@ -160,17 +221,24 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const parentPath = path.substring(0, path.lastIndexOf('/'));
             const isDirectory = fileStats.isDirectory;
             const uuid = useUuid()
+            const fileName = path.substring(path.lastIndexOf('/') + 1);
+
+            // Get timestamps from file stats
+            const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
+            const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
 
             // 1. Create the new index entry
             const newEntry: ActiveWorkspaceFileIndex = defaultActiveWorkspaceFileIndex({
                 uuid: uuid,
                 fullPath: path,
                 relativePath: path.replace(workspaceRoot, '').substring(1),
-                fileName: path.substring(path.lastIndexOf('/') + 1),
+                fileName: fileName,
                 isFolder: isDirectory,
                 children: [], // New files/folders have no children initially
-                frontmatterProperties: {}, // Later, you could parse this here
-                forelinks: []
+                properties: {}, // Later, you could parse this here
+                forelinks: [],
+                createdTime,
+                modifiedTime,
             });
             unref(fileIndex)[path] = newEntry;
 
@@ -179,10 +247,28 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             if (parentNode && !parentNode.children.includes(path)) {
                 parentNode.children.push(path);
                 if (autoSort) parentNode.children.sort();
+                // Update parent's modifiedTime
+                parentNode.modifiedTime = new Date();
             }
 
-            // MODIFIED: Also parse frontmatter when a new file is added (only for plain text files)
-            if (!isDirectory) {
+            // 3. Handle .properties.yml/.properties.yaml files
+            if (!isDirectory && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
+                const extension = getFileExtensionFromPath(path);
+                if (!isUnreadableAsText(extension)) {
+                    try {
+                        const content = await readTextFile(path);
+                        const parsed = _parseFileContentProperties(path, content);
+                        if (parentNode) {
+                            parentNode.properties = parsed.properties;
+                            parentNode.modifiedTime = new Date();
+                            console.log(`Assigned properties from ${path} to folder ${parentPath}`);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to read properties file ${path}:`, error);
+                    }
+                }
+            } else if (!isDirectory) {
+                // Parse frontmatter when a new file is added (only for plain text files)
                 const extension = getFileExtensionFromPath(path);
                 if (isPlainTextFile(extension)) {
                     await preparseDocument(path);
@@ -297,6 +383,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const childIndex = oldParentNode.children.indexOf(oldPath);
             if (childIndex > -1) {
                 oldParentNode.children.splice(childIndex, 1);
+                // Update old parent's modifiedTime
+                oldParentNode.modifiedTime = new Date();
             }
         }
 
@@ -306,7 +394,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             if (!newParentNode.children.includes(newPath)) {
                 newParentNode.children.push(newPath);
                 newParentNode.children.sort(); // Keep it sorted
+                // Update new parent's modifiedTime
+                newParentNode.modifiedTime = new Date();
             }
+        }
+
+        // Update modifiedTime for the moved file/folder
+        const movedNode = fileIndexState[newPath];
+        if (movedNode) {
+            movedNode.modifiedTime = new Date();
         }
 
         // The change is now complete. Forcing a refresh on the ref is good practice
@@ -322,7 +418,22 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         // Parse file content properties (frontmatter, etc.) - only for plain text files
         const parsed = _parseFileContentProperties(path, content);
-        node.frontmatterProperties = parsed.frontmatterProperties;
+        node.properties = parsed.properties;
+
+        // Update modifiedTime for this file
+        node.modifiedTime = new Date();
+
+        // If this is a .properties.yml/.properties.yaml file, also update parent folder
+        const fileName = node.fileName;
+        if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
+            const parentPath = path.substring(0, path.lastIndexOf('/'));
+            const parentNode = index[parentPath];
+            if (parentNode && parentNode.isFolder) {
+                parentNode.properties = parsed.properties;
+                parentNode.modifiedTime = new Date();
+                console.log(`Updated parent folder properties from ${path}`);
+            }
+        }
 
         const internalLinks: InternalLinkNode[] = getInternalLinks(content);
         const forelinks = new Set<string>();
@@ -553,10 +664,22 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         try {
             const content = await readTextFile(path);
             const parsed = _parseFileContentProperties(path, content);
-            node.frontmatterProperties = parsed.frontmatterProperties;
-            // console.log(`Updated frontmatter for ${path}`);
+            node.properties = parsed.properties;
+            node.modifiedTime = new Date();
+
+            // If this is a .properties.yml/.properties.yaml file, also update parent folder
+            const fileName = node.fileName;
+            if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
+                const parentPath = path.substring(0, path.lastIndexOf('/'));
+                const parentNode = index[parentPath];
+                if (parentNode && parentNode.isFolder) {
+                    parentNode.properties = parsed.properties;
+                    parentNode.modifiedTime = new Date();
+                }
+            }
+            // console.log(`Updated properties for ${path}`);
         } catch (readError) {
-            console.error(`Failed to read file for frontmatter parsing: ${path}`, readError);
+            console.error(`Failed to read file for properties parsing: ${path}`, readError);
         }
     }
 
@@ -618,6 +741,48 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         });
     }
 
+    /**
+     * Checks if a file/folder has a .properties.yml or .properties.yaml file.
+     * - For folders: checks if the folder contains a .properties.yml/.properties.yaml child FILE (not folder)
+     * - For files: checks if the file itself is a properties file
+     *
+     * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
+     * @returns {string} The Properties file's UUID if a properties file exists, undefined otherwise
+     */
+    function getPropertiesFile(fileUuid: PossiblyRef<string>): string | undefined {
+        const uuid = unref(fileUuid);
+        const node = getFileByUuid(uuid);
+
+        if (!node) return;
+
+        // If it's a folder, check if any of its children is a .properties.yml/.properties.yaml FILE (not folder)
+        if (node.isFolder) {
+            const index = unref(fileIndex);
+            return node.children.find(childPath => {
+                const childNode = index[childPath];
+                if (!childNode || childNode.isFolder) return; // Skip if it's a folder or doesn't exist
+
+                const fileName = childNode.fileName;
+                return (fileName === 'properties.yml' || fileName === 'properties.yaml') ? childNode.uuid : undefined;
+            });
+        }
+
+        // If it's a file, check if it's a properties file itself
+        return (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? node.uuid : undefined;
+    }
+
+    /**
+     * Checks if a file/folder has a .properties.yml or .properties.yaml file.
+     * - For folders: checks if the folder contains a .properties.yml/.properties.yaml child FILE (not folder)
+     * - For files: checks if the file itself is a properties file
+     * 
+     * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
+     * @returns {boolean} True if a properties file exists, false otherwise
+     */
+    function hasPropertiesFile(fileUuid: PossiblyRef<string>): boolean {
+        return getPropertiesFile(fileUuid) != undefined;
+    }
+
     function on(listener: WorkspaceIndexListener): () => void {
         // Get or create the listener set for this session.
         if (!listenerRegistry.has(session!.uuid)) {
@@ -651,6 +816,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFileByPath,
         getFilesByPaths,
         getFilteredFiles,
-        getFilesByExtension
+        getFilesByExtension,
+        hasPropertiesFile,
+        getPropertiesFile
     };
 }

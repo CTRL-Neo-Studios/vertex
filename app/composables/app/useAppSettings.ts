@@ -28,8 +28,8 @@ export function useAppSettings() {
      * If no config exists, it creates one with default values and saves it.
      * This function is safe to call multiple times; it will only read from disk once.
      */
-    async function load() {
-        if (isLoaded.value) {
+    async function load(forceLoad: boolean = false) {
+        if (isLoaded.value && !forceLoad) {
             return config.value;
         }
 

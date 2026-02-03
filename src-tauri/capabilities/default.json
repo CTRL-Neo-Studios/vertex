@@ -86,7 +86,6 @@
     "core:window:allow-unmaximize",
     "core:window:allow-unminimize",
     "core:webview:default",
-
     "core:webview:allow-clear-all-browsing-data",
     "core:webview:allow-create-webview",
     "core:webview:allow-create-webview-window",
@@ -105,7 +104,6 @@
     "core:webview:allow-webview-position",
     "core:webview:allow-webview-show",
     "core:webview:allow-webview-size",
-
     "decorum:allow-show-snap-overlay",
     "fs:default",
     "dialog:default",
@@ -132,17 +130,58 @@
     "store:allow-reload",
     "store:allow-save",
     "fs:default",
-    "fs:read-all",
-    "fs:write-all",
-    "fs:allow-rename",
-    "fs:allow-mkdir",
-    "fs:allow-exists",
+    {
+      "identifier": "fs:read-all",
+      "allow": [
+        {
+          "path": "**/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:write-all",
+      "allow": [
+        {
+          "path": "**/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-rename",
+      "allow": [
+        {
+          "path": "**/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        {
+          "path": "**/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        {
+          "path": "**/*"
+        },
+        {
+          "path": ".*"
+        }
+      ]
+    },
     "fs:allow-watch",
     {
       "identifier": "fs:scope",
       "allow": [
         {
           "path": "**/*"
+        },
+        {
+          "path": ".*"
         }
       ]
     },
@@ -198,6 +237,23 @@
     "core:menu:allow-set-icon",
     "process:allow-exit",
     "process:allow-restart",
-    "process:default"
+    "process:default",
+    "notification:default",
+    "notification:allow-batch",
+    "notification:allow-cancel",
+    "notification:allow-check-permissions",
+    "notification:allow-create-channel",
+    "notification:allow-delete-channel",
+    "notification:allow-get-active",
+    "notification:allow-get-pending",
+    "notification:allow-is-permission-granted",
+    "notification:allow-list-channels",
+    "notification:allow-notify",
+    "notification:allow-permission-state",
+    "notification:allow-register-action-types",
+    "notification:allow-register-listener",
+    "notification:allow-remove-active",
+    "notification:allow-request-permission",
+    "notification:allow-show"
   ]
 }

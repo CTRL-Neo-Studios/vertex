@@ -96,8 +96,12 @@
                 @apply pb-0.5 scroll-mt-[calc(24px+45px+var(--ui-header-height))] lg:scroll-mt-[calc(24px+var(--ui-header-height))];
             }
 
-            .cm-heading-4 {
-                @apply text-highlighted/70;
+            .cm-heading-3 {
+                @apply text-toned;
+            }
+
+            .cm-heading-4, .cm-heading-5, .cm-heading-6 {
+                @apply text-toned/85;
             }
 
             @apply text-pretty;

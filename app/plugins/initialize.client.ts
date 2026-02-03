@@ -10,6 +10,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import {useAppWindowEventBus} from "~/composables/app/useAppWindowEventBus";
+import {isPermissionGranted, requestPermission} from "@tauri-apps/plugin-notification";
 
 export default defineNuxtPlugin({
     name: 'initialize',
@@ -26,6 +27,7 @@ export default defineNuxtPlugin({
 
         // Initialize the current window session
         // Gets whether the current window is a `main` or a `session-` window
+        if (!(await isPermissionGranted())) await requestPermission()
         const sesh = await $asesh.initializeCurrentAppSession()
         const $menu = useAppWindowMenu()
         await $menu.setMenu()
@@ -33,7 +35,7 @@ export default defineNuxtPlugin({
         await $win.getCurrentAppWindow().listen('tauri://focus', async () => {
             await Promise.all([
                 $menu.setMenu(),
-                $settings.load(),
+                $settings.load(true),
                 $asesh.load()
             ])
             $theme.loadThemeFromConfig()

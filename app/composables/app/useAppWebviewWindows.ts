@@ -5,6 +5,11 @@ import {exit} from "@tauri-apps/plugin-process"
 This composable serves as a helper for creating or finding windows. It does not do any session management. For that, check on `useActiveWindowSessions`.
  */
 export function useAppWebviewWindows() {
+    const sessionWindowCount = computedAsync(
+        async () => await getSessionWindows(),
+        undefined
+    )
+
     function getCurrentAppWindow(): WebviewWindow {
         return getCurrentWebviewWindow();
     }
@@ -77,6 +82,13 @@ export function useAppWebviewWindows() {
 
     async function closeAllWindows() {
         const windows = await getAppWindows()
+        for (const window of windows) {
+            await window.close()
+        }
+    }
+
+    async function closeAllSessionWindows() {
+        const windows = await getSessionWindows()
         for (const window of windows) {
             await window.close()
         }
@@ -160,6 +172,7 @@ export function useAppWebviewWindows() {
         isCurrentAppWindowSession,
         isCurrentAppWindowSettings,
         closeAllWindows,
+        closeAllSessionWindows,
         destroyAllWindows,
         getAppWindows,
         hideMainWindow,
@@ -168,6 +181,7 @@ export function useAppWebviewWindows() {
         showLatestSessionWindow,
         getCurrentAppWindowSessionIdFromLabel,
         showWindowWithLabel,
-        hideWindowWithLabel
+        hideWindowWithLabel,
+        sessionWindowCount,
     }
 }

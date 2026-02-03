@@ -112,7 +112,7 @@ async function openPath(path: string | undefined, workspace: boolean) {
                     orientation="vertical"
                     :items="recentsList"
                     v-slot="{item, index}: {item: RecentRecord, index: number}"
-                    class="w-full h-full"
+                    class="w-full h-full pb-6"
                     virtualize
                 >
                     <UButton

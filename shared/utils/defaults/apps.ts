@@ -34,8 +34,8 @@ export function defaultAppSessionContext(data?: Partial<AppSessionContext>): App
 export function defaultAppViewConfig(data?: DeepPartial<AppViewConfig>): AppViewConfig {
     return {
         fileTree: {
-            showFileIcons: data?.fileTree?.showFileIcons ?? false,
-            showFolderIcons: data?.fileTree?.showFolderIcons ?? true,
+            showDefaultFileIcons: data?.fileTree?.showDefaultFileIcons ?? false,
+            showDefaultFolderIcons: data?.fileTree?.showDefaultFolderIcons ?? true,
             showFoldArrows: data?.fileTree?.showFoldArrows ?? false,
             showFileExtInName: data?.fileTree?.showFileExtInName ?? false,
             showFileExtAsTag: data?.fileTree?.showFileExtAsTag ?? true,

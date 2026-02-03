@@ -72,7 +72,7 @@ const fileSizeKB = computed(() => {
                     size="xs"
                     variant="ghost"
                     @click="zoomOut"
-                    :disabled="zoom <= 10 || true"
+                    :disabled="zoom <= 10"
                 />
                 <UBadge size="sm" variant="subtle" class="font-mono min-w-12 text-center">{{ zoom }}%</UBadge>
                 <UButton 
@@ -80,7 +80,7 @@ const fileSizeKB = computed(() => {
                     size="xs"
                     variant="ghost"
                     @click="zoomIn"
-                    :disabled="zoom >= 200 || true"
+                    :disabled="zoom >= 100"
                 />
                 <UButton 
                     icon="i-lucide-refresh-ccw"
@@ -92,7 +92,7 @@ const fileSizeKB = computed(() => {
         </template>
         
         <template #default>
-            <div class="w-full h-full flex items-center justify-center overflow-hidden bg-muted/30">
+            <div class="w-full max-h-svh h-svh pb-6 flex items-center justify-center overflow-hidden bg-muted/30">
                 <img
                     ref="imageRef"
                     :src="imageSrc" 

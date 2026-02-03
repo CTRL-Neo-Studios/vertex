@@ -58,6 +58,7 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-clipboard-manager",
                 "@tauri-apps/api/path",
                 "@tauri-apps/plugin-os",
+                "@tauri-apps/plugin-notification",
                 "@tauri-apps/plugin-opener",
                 "@type32/codemirror-rich-obsidian-editor",
                 "compromise",

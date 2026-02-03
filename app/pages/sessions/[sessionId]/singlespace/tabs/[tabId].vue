@@ -88,19 +88,20 @@ async function onInternalLinkClick(args: InternalLinkClickDetail) {
     // Do nothing
 }
 
-defineShortcuts({
-    'meta_s': {
-        usingInput: true,
-        async handler(e) {
-            if (!isIndexTemporary(tabId)) return;
-
-            isContentSaved.value = false;
-            const newIndex = await saveTemporaryFile(tabId, content)
-            fileName.value = newIndex?.fileName || 'Untitled.md'
-            isContentSaved.value = true;
-        }
-    }
-})
+// TODO: add dispatcher handling here
+// defineShortcuts({
+//     'meta_s': {
+//         usingInput: true,
+//         async handler(e) {
+//             if (!isIndexTemporary(tabId)) return;
+//
+//             isContentSaved.value = false;
+//             const newIndex = await saveTemporaryFile(tabId, content)
+//             fileName.value = newIndex?.fileName || 'Untitled.md'
+//             isContentSaved.value = true;
+//         }
+//     }
+// })
 
 watch(isContentSaved, (newValue) => {
     setTabSavedState(tabId, newValue)

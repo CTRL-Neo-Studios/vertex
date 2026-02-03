@@ -3,6 +3,7 @@ A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nu
 
 ## Related Modules/Projects
 
+- https://github.com/Type-32/obsidian-bases-parser
 - https://github.com/CTRL-Neo-Studios/yaml-editor-form
 - https://github.com/Type-32/codemirror-rich-obsidian
 - https://github.com/CTRL-Neo-Studios/dispatcher

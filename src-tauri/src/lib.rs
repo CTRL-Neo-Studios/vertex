@@ -25,12 +25,15 @@ fn get_startup_file() -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            let _ = app.get_webview_window("main").expect("no main window").set_focus();
+            let _ = app
+                .get_webview_window("main")
+                .expect("no main window")
+                .set_focus();
 
             // WARM START (Windows/Linux)
             if let Some(path) = parse_file_path_from_args(&args) {
@@ -67,14 +70,14 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             app.listen_any("tauri://webview-created", move |event| {
-                 let label = event.payload();
-                 let clean_label = label.replace("\"", "");
+                let label = event.payload();
+                let clean_label = label.replace("\"", "");
 
-                 if clean_label.starts_with("session-") {
-                     if let Some(win) = app_handle.get_webview_window(&clean_label) {
-                         apply_decorum_style(&win);
-                     }
-                 }
+                if clean_label.starts_with("session-") {
+                    if let Some(win) = app_handle.get_webview_window(&clean_label) {
+                        apply_decorum_style(&win);
+                    }
+                }
             });
 
             if cfg!(debug_assertions) {
@@ -89,28 +92,30 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-
             // COLD & WARM START (macOS - File Associations)
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 // macOS delivers files as URLs (file:///...)
                 if let Some(url) = urls.first() {
-                     if let Ok(path_buf) = url.to_file_path() {
-                         let path_str = path_buf.to_string_lossy().to_string();
-                         println!("[Rust] macOS RunEvent::Opened: {}", path_str);
+                    if let Ok(path_buf) = url.to_file_path() {
+                        let path_str = path_buf.to_string_lossy().to_string();
+                        println!("[Rust] macOS RunEvent::Opened: {}", path_str);
 
-                         // 1. SAVE TO GLOBAL STATE ALWAYS
-                         *STARTUP_FILE.lock().unwrap() = Some(path_str.clone());
+                        // 1. SAVE TO GLOBAL STATE ALWAYS
+                        *STARTUP_FILE.lock().unwrap() = Some(path_str.clone());
 
-                         // 2. ATTEMPT TO EMIT (Works if frontend is ready)
-                         // If frontend is NOT ready, it will just miss this event,
-                         // but it will pick up the data from STARTUP_FILE via the command.
-                         if let Err(e) = app_handle.emit("open-file", path_str) {
-                             println!("[Rust] Failed to emit event (window might not be ready): {}", e);
-                         } else {
-                             println!("[Rust] Emitted open-file event successfully");
-                         }
-                     }
+                        // 2. ATTEMPT TO EMIT (Works if frontend is ready)
+                        // If frontend is NOT ready, it will just miss this event,
+                        // but it will pick up the data from STARTUP_FILE via the command.
+                        if let Err(e) = app_handle.emit("open-file", path_str) {
+                            println!(
+                                "[Rust] Failed to emit event (window might not be ready): {}",
+                                e
+                            );
+                        } else {
+                            println!("[Rust] Emitted open-file event successfully");
+                        }
+                    }
                 }
             }
         });
@@ -120,14 +125,18 @@ fn apply_decorum_style(window: &WebviewWindow) {
     let _ = window.create_overlay_titlebar();
     #[cfg(target_os = "macos")]
     {
-         // let _ = window.set_traffic_lights_inset(14.0, 21.0);
+        // let _ = window.set_traffic_lights_inset(14.0, 21.0);
     }
 }
 
 fn parse_file_path_from_args(args: &[String]) -> Option<String> {
     for (i, arg) in args.iter().enumerate() {
-        if i == 0 { continue; }
-        if arg.starts_with("-") { continue; }
+        if i == 0 {
+            continue;
+        }
+        if arg.starts_with("-") {
+            continue;
+        }
 
         if let Ok(url) = Url::parse(arg) {
             if let Ok(path) = url.to_file_path() {

@@ -5,6 +5,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {WindowMenuEvents} from "#shared/types/app/events";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
+import {sendNotification} from "@tauri-apps/plugin-notification";
 
 interface MenuState {
     canSave: boolean;
@@ -92,10 +93,24 @@ export function useAppWindowMenu() {
                     accelerator: 'CmdOrControl+Q',
                     async action() {
                         try {
+                            await $win.showMainWindow()
                             await $win.closeAllWindows()
+                            // sendNotification({
+                            //     title: 'Vertex Debug',
+                            //     body: 'Closing All Windows'
+                            // })
+                            await useWebNotification({
+                                title: 'Vertex Debug',
+                                body: 'Closing All Windows'
+                            }).show()
+                            // await $win.closeAllSessionWindows()
+                            await until($win.sessionWindowCount).toMatch(v => v != undefined && v.length <= 0)
+                            await useWebNotification({
+                                title: 'Vertex Debug',
+                                body: `Window Count ${unref($win.sessionWindowCount)}`
+                            }).show()
+                            // await exit()
                         } catch(e) {
-
-                        } finally {
                             await exit()
                         }
                     },

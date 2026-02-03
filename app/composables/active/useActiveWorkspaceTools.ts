@@ -5,6 +5,7 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import type {PossiblyRef} from "#shared/types/types";
+import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 
 export function useActiveWorkspaceTools(session?: ActiveSession) {
     const $fileio = useFileIO()
@@ -14,7 +15,9 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         getFileByUuid,
         addFileToIndex,
         moveFileInIndex,
-        removeFileFromIndex
+        removeFileFromIndex,
+        hasPropertiesFile,
+        getPropertiesFile
     } = useActiveWorkspaceIndex(session)
 
     /**
@@ -85,6 +88,26 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             } catch (error) {
                 console.error(`[createFile] Error creating file/folder at ${newPath}:`, error);
             }
+        }
+    }
+
+    async function createPropertiesFile(atUuidRef: PossiblyRef<string | undefined>): Promise<ActiveWorkspaceFileIndex | null | undefined> {
+        if (!session?.rootPath) return;
+
+        const atUuid = unref(atUuidRef);
+        const anchorNode = getFileByUuid(atUuid);
+
+        if (!anchorNode || !anchorNode.isFolder) return;
+
+        const prop = getPropertiesFile(anchorNode.uuid)
+        if (!prop) {
+            try {
+                return await createFile(atUuidRef, 'properties.yml', false, "below")
+            } catch (e) {
+                console.error(e)
+            }
+        } else {
+            return getFileByUuid(prop)
         }
     }
 
@@ -215,6 +238,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         renameFile,
         deleteFiles,
         moveFiles,
-        duplicateFile
+        duplicateFile,
+        createPropertiesFile
     }
 }

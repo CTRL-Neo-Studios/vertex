@@ -102,7 +102,7 @@ const internalLinkList = computed<InternalLink[]>(() => {
                 referenceId: file.uuid,
                 embedComponent: EditorProseEmbedImageDisplay,
                 componentProps: {
-                    filePath: convertFileSrc(file.fullPath),
+                    srcPath: convertFileSrc(file.fullPath),
                     display: noExtFilename
                 }
             } satisfies InternalLink)

@@ -69,7 +69,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
             uuid: useUuid(),
             fullPath: firstFp,
             fileName: await $fio.getFileNameFromPath(firstFp),
-            frontmatterProperties: parsed.frontmatterProperties,
+            properties: parsed.frontmatterProperties,
         })
 
         return fileIndex.value[firstFp]
@@ -82,7 +82,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
             uuid: uuid,
             fullPath: illegalPath,
             fileName: 'Untitled.md',
-            frontmatterProperties: {}
+            properties: {}
         })
 
         return fileIndex.value[illegalPath]
@@ -124,7 +124,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
             uuid: fid,
             fileName: await $fio.getFileNameFromPath(np),
             fullPath: np,
-            frontmatterProperties: parsed.frontmatterProperties
+            properties: parsed.frontmatterProperties
         })
 
         delete unref(fileIndex)[getIllegalPath(fid)] // delete the temporary index
@@ -140,7 +140,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
 
         // Parse file content properties (frontmatter, etc.) - only for plain text files
         const parsed = _parseFileContentProperties(path, content);
-        node.frontmatterProperties = parsed.frontmatterProperties;
+        node.properties = parsed.frontmatterProperties;
     }
 
     /**

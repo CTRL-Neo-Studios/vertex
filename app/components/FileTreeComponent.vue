@@ -16,6 +16,7 @@ import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 
 const props = defineProps<{
     nodes: UITreeNode[],
@@ -43,8 +44,12 @@ const {
     activeTabUuid
 } = useActiveTabs(getSession($sessionId))
 const {
-    getFileByUuid
+    getFileByUuid,
+    getPropertiesFile,
 } = useActiveWorkspaceIndex(getSession($sessionId))
+const {
+    createPropertiesFile
+} = useActiveWorkspaceTools(getSession($sessionId))
 const {
     config
 } = useAppSettings()
@@ -64,11 +69,12 @@ const formattedTreeData = computed<TreeItem[]>(() => {
 
                 // Note: The `treeItem` needs to be declared so it can be referenced in its own event handlers.
                 let treeItem: TreeItem;
+                let nodeIcon: string | undefined = (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? 'i-lucide-file-cog' : (node.properties.icon && typeof node.properties.icon === 'string') ? node.properties.icon : undefined
 
                 treeItem = {
                     id: node.uuid,
                     label: `${node.fileName}${node.uuid.slice(0,4)}`,
-                    icon: node.isFolder ? undefined : 'i-lucide-file',
+                    icon: nodeIcon,
 
                     // The recursive call correctly applies the same logic to children.
                     children: node.children ? buildTree(node.children) : undefined,
@@ -227,10 +233,28 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 disabled: true, // TODO: implement functionality
             },
             {
-                label: 'New Table',
+                label: 'New Base',
                 icon: 'i-lucide-file-plus',
                 disabled: true, // TODO: implement functionality
             },
+            {
+                label: 'New/Open Folder Properties',
+                icon: 'i-lucide-file-plus',
+                disabled: !isFolder,
+                async onSelect(e: Event) {
+                    if (getPropertiesFile(item.id) != undefined) {
+                        const tab = openTab(item.id)
+                        await $navi.toWorkspaceTab($sessionId, tab)
+                    } else {
+                        const result = await createPropertiesFile(item.id)
+                        if (result) {
+                            const tab = openTab(result.uuid)
+                            await $navi.toWorkspaceTab($sessionId, tab)
+                        }
+                        console.log(result)
+                    }
+                }
+            }
         ],
         [
             {
@@ -338,7 +362,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                     block
                     @click="onItemClick(item)"
                     :key="`${item.id}-file-tree-item`"
-                    :icon="`${config?.viewConfig.fileTree.showFileIcons ? 'i-lucide-file' : ''}`"
+                    :icon="`${(config?.viewConfig.fileTree.showDefaultFileIcons) ? (config?.viewConfig.fileTree.allowCustomFileIcons && item.icon) ? item.icon : 'i-lucide-file' : (config?.viewConfig.fileTree.allowCustomFileIcons && item.icon) ? item.icon : '' }`"
                 >
                     <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
                         <div class="grow"/>
@@ -350,7 +374,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == activeTabUuid ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
-                    <UIcon v-if="config?.viewConfig.fileTree.showFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? 'i-lucide-folder-open' : 'i-lucide-folder-closed'" />
+                    <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
                     <span class="truncate text-xs overflow-ellipsis">{{ $ftMemo.getFromLabel(item.label).name }}</span>
                     <span class="grow"/>
                     <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />

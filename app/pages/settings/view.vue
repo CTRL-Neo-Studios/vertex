@@ -59,10 +59,10 @@ const editorLayoutItems = [
                             <USwitch v-model="config.viewConfig.fileTree.showFileExtAsTag"/>
                         </UFormField>
                         <UFormField size="sm" label="Show File Icons" description="Shows the file item icon." orientation="horizontal">
-                            <USwitch v-model="config.viewConfig.fileTree.showFileIcons"/>
+                            <USwitch v-model="config.viewConfig.fileTree.showDefaultFileIcons"/>
                         </UFormField>
                         <UFormField size="sm" label="Show Folder Icons" description="Shows the folder item icons." orientation="horizontal">
-                            <USwitch v-model="config.viewConfig.fileTree.showFolderIcons"/>
+                            <USwitch v-model="config.viewConfig.fileTree.showDefaultFolderIcons"/>
                         </UFormField>
                         <UFormField size="sm" label="Show Folder Fold Arrows" description="Shows the folder folding arrows on the right side." orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showFoldArrows"/>
