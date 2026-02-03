@@ -1,16 +1,13 @@
 import {useAppSessions} from "~/composables/app/useAppSessions";
-import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
-import useUuid from "~/composables/utility/useUuid";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {listen} from "@tauri-apps/api/event";
-import {invoke} from "@tauri-apps/api/core";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
-import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import {useAppWindowEventBus} from "~/composables/app/useAppWindowEventBus";
 import {isPermissionGranted, requestPermission} from "@tauri-apps/plugin-notification";
+import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
+import {exit} from "@tauri-apps/plugin-process";
 
 export default defineNuxtPlugin({
     name: 'initialize',
@@ -22,6 +19,7 @@ export default defineNuxtPlugin({
         const $settings = useAppSettings()
         const $bus = useAppWindowEventBus()
         const $theme = useAppTheme()
+        const $ce = useAppCrossWindowEvents()
 
         const cfg = await $settings.load()
 
@@ -53,12 +51,25 @@ export default defineNuxtPlugin({
         await $win.getCurrentAppWindow().listen('tauri://destroyed', () => {
             $bus.emit('destroyed')
         })
+
+
         
         // Attempts to recover the saved sessions on the `main` window
         // This function does not run on other windows
 
-        if (cfg?.openLastOpenedWindows && $win.isCurrentAppWindowMain())
-            await $asesh.recoverSavedAppSessions()
+        if ($win.isCurrentAppWindowMain()) {
+            if (cfg?.openLastOpenedWindows)
+                await $asesh.recoverSavedAppSessions()
+
+            await $ce.listenQuitVertex(async (event) => {
+                await $win.closeAllSessionWindows()
+                await $win.hideMainWindow()
+                const {isPending} = useTimeout(500, {controls: true})
+                // await until($win.sessionWindowCount).toMatch(v => v != undefined && v.length <= 0)
+                await until(isPending).toBe(false)
+                await exit()
+            })
+        }
 
         await useAppFileStartHandler().initializeOnMain()
         

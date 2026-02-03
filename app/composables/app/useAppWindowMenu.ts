@@ -6,6 +6,7 @@ import type {WindowMenuEvents} from "#shared/types/app/events";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {sendNotification} from "@tauri-apps/plugin-notification";
+import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
 
 interface MenuState {
     canSave: boolean;
@@ -20,6 +21,7 @@ export function useAppWindowMenu() {
     const $win = useAppWebviewWindows()
     const $sessions = useAppSessions()
     const $settings = useAppSettings()
+    const $ce = useAppCrossWindowEvents()
 
     const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
 
@@ -93,24 +95,12 @@ export function useAppWindowMenu() {
                     accelerator: 'CmdOrControl+Q',
                     async action() {
                         try {
-                            await $win.showMainWindow()
-                            await $win.closeAllWindows()
+                            await $ce.emitQuitVertex()
+                        } catch(e) {
                             // sendNotification({
                             //     title: 'Vertex Debug',
-                            //     body: 'Closing All Windows'
+                            //     body: `Error: ${e}`
                             // })
-                            await useWebNotification({
-                                title: 'Vertex Debug',
-                                body: 'Closing All Windows'
-                            }).show()
-                            // await $win.closeAllSessionWindows()
-                            await until($win.sessionWindowCount).toMatch(v => v != undefined && v.length <= 0)
-                            await useWebNotification({
-                                title: 'Vertex Debug',
-                                body: `Window Count ${unref($win.sessionWindowCount)}`
-                            }).show()
-                            // await exit()
-                        } catch(e) {
                             await exit()
                         }
                     },
@@ -187,9 +177,6 @@ export function useAppWindowMenu() {
             action: () => handleSaveAs(),
             enabled: evaluateUnref($canSaveItems)
         }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-        items.push(await PredefinedMenuItem.new({ item: 'Quit' }));
 
         return await Submenu.new({
             text: 'File',

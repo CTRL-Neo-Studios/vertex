@@ -94,6 +94,15 @@ export function useAppWebviewWindows() {
         }
     }
 
+    async function closeAllSessionWindowsExceptCurrent() {
+        const current = getCurrentAppWindow()
+        const windows = (await getSessionWindows()).filter(w => w.label !== current.label)
+        for (const window of windows) {
+            await window.close()
+        }
+        return current
+    }
+
     async function hideMainWindow() {
         const window = await getMainAppWindow()
 
@@ -173,6 +182,7 @@ export function useAppWebviewWindows() {
         isCurrentAppWindowSettings,
         closeAllWindows,
         closeAllSessionWindows,
+        closeAllSessionWindowsExceptCurrent,
         destroyAllWindows,
         getAppWindows,
         hideMainWindow,
