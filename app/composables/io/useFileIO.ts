@@ -236,6 +236,72 @@ export function useFileIO() {
         return fileName;
     }
 
+    /**
+     * Finds the nearest parent directory of a given path (async version).
+     * @param pathRef The path to find the parent for (absolute or relative).
+     * @param defaultReturn The value to return when there's no parent (e.g., root directory). Defaults to "/".
+     * @returns The parent directory path, or defaultReturn if no parent exists.
+     */
+    async function getParentDirectory(
+        pathRef: PossiblyRef<string>,
+        defaultReturn: string = "/"
+    ): Promise<string> {
+        const path = unref(pathRef);
+        if (!path) return defaultReturn;
+
+        const parent = await dirname(path);
+        
+        // If dirname returns the same path, we're at the root or have no parent
+        if (parent === path || parent === "." || parent === "") {
+            return defaultReturn;
+        }
+
+        return parent;
+    }
+
+    /**
+     * Finds the nearest parent directory of a given path (synchronous, performant version).
+     * @param pathRef The path to find the parent for (absolute or relative).
+     * @param defaultReturn The value to return when there's no parent (e.g., root directory). Defaults to "/".
+     * @returns The parent directory path, or defaultReturn if no parent exists.
+     */
+    function getParentDirectorySync(
+        pathRef: PossiblyRef<string>,
+        defaultReturn: string = "/"
+    ): string {
+        let path = unref(pathRef);
+        if (!path) return defaultReturn;
+
+        // Normalize path separators to forward slashes
+        path = path.replace(/\\/g, '/');
+
+        // Remove trailing slashes
+        while (path.length > 1 && path.endsWith('/')) {
+            path = path.slice(0, -1);
+        }
+
+        // Handle root cases
+        if (path === '/' || path === '') {
+            return defaultReturn;
+        }
+
+        // Find last separator
+        const lastSeparatorIndex = path.lastIndexOf('/');
+        
+        // No separator found (relative path with no parent)
+        if (lastSeparatorIndex === -1) {
+            return defaultReturn;
+        }
+
+        // Root directory case (e.g., "/Users" -> "/")
+        if (lastSeparatorIndex === 0) {
+            return '/';
+        }
+
+        // Return everything before the last separator
+        return path.slice(0, lastSeparatorIndex);
+    }
+
     return {
         readTextFromFile,
         writeTextToFile,
@@ -249,6 +315,8 @@ export function useFileIO() {
         moveFileOrFolder,
         getFileNameFromPath,
         processFileNameFromPath,
+        getParentDirectory,
+        getParentDirectorySync,
         createFile
     }
 }

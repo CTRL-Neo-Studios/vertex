@@ -16,7 +16,14 @@ import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEd
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {convertFileSrc} from "@tauri-apps/api/core";
-import {isDataFile, isImage, isUnreadableAsText, isVideo, isYamlFile} from "#shared/utils/fs/filenames";
+import {
+    isDataFile,
+    isImage,
+    isPlainTextFile,
+    isUnreadableAsText,
+    isVideo,
+    isYamlFile
+} from "#shared/utils/fs/filenames";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 
 definePageMeta({
@@ -74,7 +81,7 @@ const showRichEditor = computed(() => {
 })
 const showCodeEditor = computed(() => {
     if (isUnreadableAsText(fileExt)) return false;
-    else return !['txt', 'md'].includes(unref(fileExt));
+    else return !isPlainTextFile(fileExt);
 })
 const showImageViewer = computed(() => isImage(fileExt))
 const showVideoViewer = computed(() => isVideo(fileExt))

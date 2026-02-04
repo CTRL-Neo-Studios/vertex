@@ -16,7 +16,7 @@ import {
     isUnreadableAsText,
     isPdf,
     isPlainTextFile,
-    isVideo, isYamlFile
+    isVideo, isYamlFile, isBasesFile
 } from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
@@ -74,7 +74,7 @@ const showCodeEditor = computed(() => {
 })
 const showImageViewer = computed(() => isImage(fileExt))
 const showVideoViewer = computed(() => isVideo(fileExt))
-const showDataEditor = computed(() => isDataFile(fileExt))
+const showBasesEditor = computed(() => isBasesFile(fileExt))
 const showYamlEditor = computed(() => isYamlFile(fileExt))
 
 const internalLinkList = computed<InternalLink[]>(() => {
@@ -290,7 +290,24 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                             @onRename="onRename"
                         />
                     </template>
-                    <template v-else-if="showDataEditor && showYamlEditor">
+                    <template v-else-if="showBasesEditor">
+                        <ViewerEditorBasesViewer
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+                            :sessionId="sessionId"
+
+                            :internalLinkList="internalLinkList"
+                            :filePath="relativeFilePath"
+                            :renaming="renaming"
+
+                            @onClickedInternalLink="onInternalLinkClick"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showYamlEditor">
                         <ViewerEditorYamlDataForm
                             v-model="content"
                             v-model:content-saved="isContentSaved"

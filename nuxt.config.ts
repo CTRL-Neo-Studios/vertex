@@ -77,7 +77,8 @@ export default defineNuxtConfig({
                 "yaml",
                 "@vue/devtools-core",
                 "@vue/devtools-kit",
-                "@internationalized/date"
+                "@internationalized/date",
+                "@type32/obsidian-bases-parser"
             ]
         },
     },

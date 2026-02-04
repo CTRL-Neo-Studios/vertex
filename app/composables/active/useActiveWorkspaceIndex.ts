@@ -78,7 +78,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const extension = getFileExtensionFromPath(path);
         const fileName = path.substring(path.lastIndexOf('/') + 1);
 
-        // Handle .yml/.yaml files (like .properties.yml)
+        // Handle .yml/.yaml files (like properties.yml)
         if (extension === 'yml' || extension === 'yaml') {
             try {
                 const yamlResult = parseYaml(content);
@@ -120,7 +120,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const childrenPaths: string[] = [];
 
             for (const entry of entries) {
-                if (entry.name.startsWith('.') && entry.name !== "properties.yml" && entry.name !== "properties.yaml") continue;
+                // Skip dot files (except properties files which no longer start with dot)
+                if (entry.name.startsWith('.')) continue;
 
                 const entryPath = await join(currentPath, entry.name);
                 childrenPaths.push(entryPath);
@@ -162,9 +163,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const fileName = node.fileName;
             const extension = getFileExtensionFromPath(path);
             
-            // Track .properties.yml/.properties.yaml FILES (not folders) for later processing
+            // Track properties.yml/.properties.yaml FILES (not folders) for later processing
             if (!node.isFolder && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
                 propertiesFiles.push(path);
+                console.log(`Found properties file: ${path}`);
                 continue;
             }
             
@@ -174,7 +176,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // Process .properties.yml files and assign to parent folders
+        console.log(`Found ${propertiesFiles.length} properties files to process`);
+
+        // Process properties.yml files and assign to parent folders
         for (const propertiesPath of propertiesFiles) {
             const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
             const parentNode = newIndex[parentPath];
@@ -187,15 +191,32 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                         const content = await readTextFile(propertiesPath);
                         const parsed = _parseFileContentProperties(propertiesPath, content);
                         parentNode.properties = parsed.properties;
-                        console.log(`Assigned properties from ${propertiesPath} to folder ${parentPath}`);
+                        console.log(`✓ Assigned properties from ${propertiesPath} to folder ${parentPath}`, parsed.properties);
                     } catch (error) {
                         console.error(`Failed to read properties file ${propertiesPath}:`, error);
                     }
                 }
+            } else {
+                console.warn(`Parent node not found or not a folder for properties file: ${propertiesPath}`);
             }
         }
 
         fileIndex.value = newIndex;
+        
+        // Debug: Log a sample of the index to verify structure
+        const samplePaths = Object.keys(newIndex).slice(0, 3);
+        console.log(`Index sample (first 3 entries):`);
+        samplePaths.forEach(path => {
+            const node = newIndex[path];
+            if (!node) return;
+            console.log(`  ${path}:`, {
+                isFolder: node.isFolder,
+                childrenCount: node.children.length,
+                hasProperties: Object.keys(node.properties).length > 0,
+                children: node.children.slice(0, 2) // Show first 2 children
+            });
+        });
+        
         console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
     }
 
@@ -251,7 +272,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 parentNode.modifiedTime = new Date();
             }
 
-            // 3. Handle .properties.yml/.properties.yaml files
+            // 3. Handle properties.yml/properties.yaml files
             if (!isDirectory && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
                 const extension = getFileExtensionFromPath(path);
                 if (!isUnreadableAsText(extension)) {
@@ -423,7 +444,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // Update modifiedTime for this file
         node.modifiedTime = new Date();
 
-        // If this is a .properties.yml/.properties.yaml file, also update parent folder
+        // If this is a properties.yml/properties.yaml file, also update parent folder
         const fileName = node.fileName;
         if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
             const parentPath = path.substring(0, path.lastIndexOf('/'));
@@ -667,7 +688,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             node.properties = parsed.properties;
             node.modifiedTime = new Date();
 
-            // If this is a .properties.yml/.properties.yaml file, also update parent folder
+            // If this is a properties.yml/properties.yaml file, also update parent folder
             const fileName = node.fileName;
             if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
                 const parentPath = path.substring(0, path.lastIndexOf('/'));
@@ -742,8 +763,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     }
 
     /**
-     * Checks if a file/folder has a .properties.yml or .properties.yaml file.
-     * - For folders: checks if the folder contains a .properties.yml/.properties.yaml child FILE (not folder)
+     * Checks if a file/folder has a properties.yml or properties.yaml file.
+     * - For folders: checks if the folder contains a properties.yml/properties.yaml child FILE (not folder)
      * - For files: checks if the file itself is a properties file
      *
      * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
@@ -755,25 +776,25 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         if (!node) return;
 
-        // If it's a folder, check if any of its children is a .properties.yml/.properties.yaml FILE (not folder)
+        // If it's a folder, check if any of its children is a properties.yml/properties.yaml FILE (not folder)
         if (node.isFolder) {
             const index = unref(fileIndex);
             return node.children.find(childPath => {
                 const childNode = index[childPath];
                 if (!childNode || childNode.isFolder) return; // Skip if it's a folder or doesn't exist
-
+                
                 const fileName = childNode.fileName;
                 return (fileName === 'properties.yml' || fileName === 'properties.yaml') ? childNode.uuid : undefined;
             });
         }
-
+        
         // If it's a file, check if it's a properties file itself
         return (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? node.uuid : undefined;
     }
 
     /**
-     * Checks if a file/folder has a .properties.yml or .properties.yaml file.
-     * - For folders: checks if the folder contains a .properties.yml/.properties.yaml child FILE (not folder)
+     * Checks if a file/folder has a properties.yml or properties.yaml file.
+     * - For folders: checks if the folder contains a properties.yml/properties.yaml child FILE (not folder)
      * - For files: checks if the file itself is a properties file
      * 
      * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
@@ -781,6 +802,50 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
      */
     function hasPropertiesFile(fileUuid: PossiblyRef<string>): boolean {
         return getPropertiesFile(fileUuid) != undefined;
+    }
+
+    /**
+     * Gets the parent folder of a file given its absolute path.
+     * 
+     * @param {PossiblyRef<string>} absolutePath - The absolute file path
+     * @returns {ActiveWorkspaceFileIndex | undefined} The parent folder's index entry, or undefined if not found
+     */
+    function getParentFolderByPath(absolutePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        const path = unref(absolutePath);
+        if (!path) return undefined;
+        
+        // Extract parent path by removing the last segment
+        const parentPath = path.substring(0, path.lastIndexOf('/'));
+        if (!parentPath) return undefined; // No parent (root level)
+        
+        const parentNode = unref(fileIndex)[parentPath];
+        
+        // Verify it's actually a folder
+        if (parentNode && parentNode.isFolder) {
+            return parentNode;
+        }
+        
+        return undefined;
+    }
+
+    /**
+     * Gets the parent folder of a file given its UUID.
+     * 
+     * @param {PossiblyRef<string>} fileUuid - The UUID of the file
+     * @returns {ActiveWorkspaceFileIndex | undefined} The parent folder's index entry, or undefined if not found
+     */
+    function getParentFolderByUuid(fileUuid: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        const uuid = unref(fileUuid);
+        const node = getFileByUuid(uuid);
+        
+        if (!node) return undefined;
+        
+        // If it's already a folder, it has no parent in this context
+        // (or you could return its parent folder if needed)
+        if (node.isFolder) return undefined;
+        
+        // Use the file's full path to get its parent
+        return getParentFolderByPath(node.fullPath);
     }
 
     function on(listener: WorkspaceIndexListener): () => void {
@@ -818,6 +883,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFilteredFiles,
         getFilesByExtension,
         hasPropertiesFile,
-        getPropertiesFile
+        getPropertiesFile,
+        getParentFolderByPath,
+        getParentFolderByUuid
     };
 }

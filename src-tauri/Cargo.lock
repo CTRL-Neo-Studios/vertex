@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "Vertex"
-version = "0.1.1-75018d98"
+version = "0.1.2-cf2d4438"
 dependencies = [
  "log",
  "serde",
