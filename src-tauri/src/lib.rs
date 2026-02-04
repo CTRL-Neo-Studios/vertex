@@ -3,10 +3,42 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
 use url::Url;
+use rayon::prelude::*;
+use std::fs;
 
 // GLOBAL STATIC STORAGE
 // This survives across the entire app lifecycle, regardless of when functions are called.
 static STARTUP_FILE: Mutex<Option<String>> = Mutex::new(None);
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct FileReadResult {
+    path: String,
+    content: Option<String>,
+    error: Option<String>,
+}
+
+/// Reads multiple text files in parallel using Rust's native I/O and rayon for parallelism.
+/// This is much faster than calling readTextFile multiple times from the frontend
+/// because it reduces IPC overhead and uses efficient native I/O.
+#[tauri::command]
+fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
+    paths.par_iter()
+        .map(|path| {
+            match fs::read_to_string(path) {
+                Ok(content) => FileReadResult {
+                    path: path.clone(),
+                    content: Some(content),
+                    error: None,
+                },
+                Err(e) => FileReadResult {
+                    path: path.clone(),
+                    content: None,
+                    error: Some(e.to_string()),
+                }
+            }
+        })
+        .collect()
+}
 
 #[tauri::command]
 fn get_startup_file() -> Option<String> {
@@ -52,7 +84,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
-        .invoke_handler(tauri::generate_handler![get_startup_file])
+        .invoke_handler(tauri::generate_handler![get_startup_file, read_text_files_batch])
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             apply_decorum_style(&main_window);

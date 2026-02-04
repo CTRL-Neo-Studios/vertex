@@ -14,6 +14,7 @@ import {
     type WatchEvent
 } from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path"
+import {invoke} from "@tauri-apps/api/core"
 import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/defaults/actives";
 import useUuid from "~/composables/utility/useUuid";
 import type {FrontmatterProperties, PossiblyRef} from "#shared/types/types";
@@ -28,6 +29,34 @@ import type {YamlFormData} from "@type32/yaml-editor-form";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
 const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
+
+/**
+ * Result type for batch file reading from Rust backend
+ */
+interface FileReadResult {
+    path: string;
+    content?: string;
+    error?: string;
+}
+
+/**
+ * Reads multiple text files in a single batch call to Rust backend.
+ * Much faster than individual readTextFile calls due to reduced IPC overhead.
+ */
+async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>> {
+    const results = await invoke<FileReadResult[]>('read_text_files_batch', { paths });
+    const contentMap = new Map<string, string>();
+    
+    for (const result of results) {
+        if (result.content) {
+            contentMap.set(result.path, result.content);
+        } else if (result.error) {
+            console.error(`Failed to read ${result.path}:`, result.error);
+        }
+    }
+    
+    return contentMap;
+}
 
 /**
  * Private helper function to extract file extension from a filename.
@@ -93,10 +122,12 @@ function _parseFileContentProperties(path: string, content: string): { propertie
  * Much faster than updateIndex since it doesn't build link maps or update backlinks.
  * 
  * @param {string} path - The absolute file path
+ * @param {string} content - The file content (pre-loaded)
  * @param {Record<string, ActiveWorkspaceFileIndex>} index - The index being built
+ * @param {object} timings - Optional timing accumulator
  * @private
  */
-async function _parseDocumentInitial(path: string, index: Record<string, ActiveWorkspaceFileIndex>) {
+function _parseDocumentInitial(path: string, content: string, index: Record<string, ActiveWorkspaceFileIndex>, timings?: {properties: number, links: number}) {
     const node = index[path];
     if (!node || node.isFolder) return;
 
@@ -104,18 +135,20 @@ async function _parseDocumentInitial(path: string, index: Record<string, ActiveW
     if (isUnreadableAsText(extension)) return;
 
     try {
-        const content = await readTextFile(path);
-        
         // Parse properties
+        const propsStart = Date.now();
         const parsed = _parseFileContentProperties(path, content);
         node.properties = parsed.properties;
+        if (timings) timings.properties += Date.now() - propsStart;
         
         // Extract raw internal links (don't resolve yet)
+        const linksStart = Date.now();
         const internalLinks = getInternalLinks(content);
         (node as any)._rawInternalLinks = internalLinks; // Temporary storage
+        if (timings) timings.links += Date.now() - linksStart;
         
-    } catch (readError) {
-        console.error(`Failed to read file for initial parsing: ${path}`, readError);
+    } catch (parseError) {
+        console.error(`Failed to parse file content for: ${path}`, parseError);
     }
 }
 
@@ -200,41 +233,82 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             return childrenPaths;
         }
 
+        const _dirProcessTime = new Date().getTime();
         await processDirectory(workspaceRoot);
+        console.log(`Directory processing took: ${(new Date()).getTime() - _dirProcessTime}ms`)
 
-        // Phase 2: Populate metadata and parse content in parallel
-        const processingTasks: Promise<void>[] = [];
+        // Phase 2: Populate metadata and batch read files
+        const _fileProcessTime = new Date().getTime();
+        
+        // Collect paths that need parsing
+        const pathsToRead: string[] = [];
+        const statTasks: Promise<void>[] = [];
+        
+        let totalStatTime = 0;
+        let statCount = 0;
         
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
 
-            // Create a task for each file that does both stat and parsing
-            processingTasks.push((async () => {
-                // Populate metadata (timestamps and size)
+            // Queue stat task for all files
+            statTasks.push((async () => {
+                const statStart = Date.now();
                 try {
                     const fileStats = await stat(path);
                     node.createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
                     node.modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
                     node.size = fileStats.size || 0;
+                    totalStatTime += Date.now() - statStart;
+                    statCount++;
                 } catch (error) {
                     console.error(`Failed to get stats for ${path}:`, error);
-                    // Keep default values
-                }
-
-                // Parse content for plain text files (not folders)
-                if (!node.isFolder) {
-                    const extension = getFileExtensionFromPath(path);
-                    if (isPlainTextFile(extension) || isYamlFile(extension)) {
-                        await _parseDocumentInitial(path, newIndex);
-                    }
+                    totalStatTime += Date.now() - statStart;
+                    statCount++;
                 }
             })());
+
+            // Collect paths that need content parsing
+            if (!node.isFolder) {
+                const extension = getFileExtensionFromPath(path);
+                if (isPlainTextFile(extension) || isYamlFile(extension)) {
+                    pathsToRead.push(path);
+                }
+            }
         }
 
-        // Execute all file processing tasks in parallel (stat + parsing)
-        await Promise.all(processingTasks);
+        // Execute stat tasks and batch file reading in parallel
+        const batchReadStart = Date.now();
+        const [, fileContents] = await Promise.all([
+            Promise.all(statTasks),
+            readTextFilesBatch(pathsToRead)
+        ]);
+        const batchReadTime = Date.now() - batchReadStart;
 
+        // Parse all loaded file contents
+        const parseTimings = {properties: 0, links: 0};
+        const parseStart = Date.now();
+        
+        for (const path of pathsToRead) {
+            const content = fileContents.get(path);
+            if (content) {
+                _parseDocumentInitial(path, content, newIndex, parseTimings);
+            }
+        }
+        
+        const totalParseTime = Date.now() - parseStart;
+        const totalFileProcessTime = Date.now() - _fileProcessTime;
+        
+        console.log(`File processing took: ${totalFileProcessTime}ms`);
+        console.log(`  - stat() calls: ${statCount} files, ${totalStatTime}ms total, ${(totalStatTime/statCount).toFixed(2)}ms avg`);
+        console.log(`  - batch file reading: ${pathsToRead.length} files, ${batchReadTime}ms total, ${(batchReadTime/pathsToRead.length).toFixed(2)}ms avg`);
+        console.log(`  - parsing: ${pathsToRead.length} files, ${totalParseTime}ms total, ${(totalParseTime/pathsToRead.length).toFixed(2)}ms avg`);
+        if (pathsToRead.length > 0) {
+            console.log(`    • property parsing: ${parseTimings.properties}ms (${(parseTimings.properties/pathsToRead.length).toFixed(2)}ms avg)`);
+            console.log(`    • link extraction: ${parseTimings.links}ms (${(parseTimings.links/pathsToRead.length).toFixed(2)}ms avg)`);
+        }
+
+        const _propertiesProcessTime = new Date().getTime();
         // Process properties files and assign to parent folders
         for (const propertiesPath of propertiesFiles) {
             const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
@@ -250,7 +324,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 }
             }
         }
+        console.log(`Properties processing took: ${(new Date()).getTime() - _propertiesProcessTime}ms`);
 
+        const _linkProcessTime = new Date().getTime();
         // Phase 3: Build link target map and resolve forelinks (single pass)
         const linkTargetToUuidMap = new Map<string, string>();
         
@@ -276,7 +352,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 }
             }
         }
-
+        console.log(`Link processing took: ${(new Date()).getTime() - _linkProcessTime}ms`);
+        const _linksProcessTime = new Date().getTime();
         // Resolve forelinks and compute backlinks
         for (const path in newIndex) {
             const file = newIndex[path];
@@ -307,6 +384,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 }
             }
         }
+        console.log(
+          `Links processing took: ${new Date().getTime() - _linksProcessTime}ms`
+        );
 
         fileIndex.value = newIndex;
         console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
