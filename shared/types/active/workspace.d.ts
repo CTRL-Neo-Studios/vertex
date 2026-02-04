@@ -13,6 +13,7 @@ export interface ActiveWorkspaceFileIndex {
     fileName: string,
     fileExt: string,
     isFolder: boolean,
+    size: number,
     children: string[]
     properties: YamlFormData,
     forelinks: string[]

@@ -33,7 +33,7 @@ const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
  * Private helper function to extract file extension from a filename.
  * Handles edge cases like .env.dev (returns 'dev') or .env (returns 'env').
  * Returns empty string if no extension.
- * 
+ *
  * @param {string} fileName - The file name
  * @returns {string} The file extension without the dot
  * @private
@@ -49,7 +49,7 @@ function _extractFileExtension(fileName: string): string {
 
 /**
  * Private helper function to parse file content properties (frontmatter for text files, YAML for .yml/.yaml files)
- * 
+ *
  * @param {string} path - The absolute file path
  * @param {string} content - The file content
  * @returns {object} Object containing properties
@@ -57,7 +57,7 @@ function _extractFileExtension(fileName: string): string {
  */
 function _parseFileContentProperties(path: string, content: string): { properties: YamlFormData } {
     const extension = getFileExtensionFromPath(path);
-    
+
     // Handle .yml/.yaml files as pure YAML
     if (isYamlFile(extension)) {
         try {
@@ -72,18 +72,18 @@ function _parseFileContentProperties(path: string, content: string): { propertie
             return { properties: {} };
         }
     }
-    
+
     // Only parse frontmatter for plain text files
     if (!isPlainTextFile(extension)) {
         return { properties: {} };
     }
-    
+
     const fmResult = parseFrontmatter(content);
     if (fmResult.error) {
         console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
         return { properties: {} };
     }
-    
+
     return { properties: fmResult.data || {} };
 }
 
@@ -96,7 +96,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     const $asesh = useAppSessions()
 
     const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
-    
+    const uuidToFilePathIndex = useState<Map<string, string>>(`active.workspace.uuidToFilePathIndexMap.${session?.uuid ?? useUuid()}`, () => new Map());
+
     const fileTree = computed<UITreeNode[]>(() => {
         const index = fileIndex.value;
         if (Object.keys(index).length === 0) return [];
@@ -121,6 +122,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Builds index from a root path using Tauri's native recursive fs scan.
+     * Optimized to separate recursion from metadata collection.
      */
     async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
         const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
@@ -128,6 +130,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const time = new Date().getTime()
         const propertiesFiles: string[] = [];
 
+        // Phase 1: Fast recursion - only build structure
         async function processDirectory(currentPath: string) {
             const entries = await readDir(currentPath);
             const childrenPaths: string[] = [];
@@ -138,11 +141,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 const entryPath = await join(currentPath, entry.name);
                 childrenPaths.push(entryPath);
 
-                // Get file stats for timestamps
-                const fileStats = await stat(entryPath);
-                const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
-                const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
-
+                // Create basic index entry without expensive stat calls
                 newIndex[entryPath] = defaultActiveWorkspaceFileIndex({
                     uuid: useUuid(),
                     fullPath: entryPath,
@@ -154,8 +153,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     properties: {},
                     forelinks: [],
                     backlinks: [],
-                    createdTime,
-                    modifiedTime
+                    // Timestamps and size will be set in phase 2
                 });
 
                 // Track properties files for later processing
@@ -172,15 +170,28 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
 
-        // Parse content for plain text files
+        // Phase 2: Single loop to populate metadata and parse content
         for (const path in newIndex) {
-            if (newIndex[path] && newIndex[path].isFolder) continue;
+            const node = newIndex[path];
+            if (!node) continue;
 
-            const extension = getFileExtensionFromPath(path);
-            if (isPlainTextFile(extension)) {
-                // console.log('Preparsing Path:', path, extension)
-                await preparseDocument(path, newIndex);
-                // console.log('Preparsed Path:', unref(newIndex[path]))
+            // Populate metadata (timestamps and size)
+            try {
+                const fileStats = await stat(path);
+                node.createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
+                node.modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
+                node.size = fileStats.size || 0;
+            } catch (error) {
+                console.error(`Failed to get stats for ${path}:`, error);
+                // Keep default values
+            }
+
+            // Parse content for plain text files (not folders)
+            if (!node.isFolder) {
+                const extension = getFileExtensionFromPath(path);
+                if (isPlainTextFile(extension)) {
+                    await preparseDocument(path, newIndex);
+                }
             }
         }
 
@@ -188,7 +199,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         for (const propertiesPath of propertiesFiles) {
             const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
             const parentNode = newIndex[parentPath];
-            
+
             if (parentNode && parentNode.isFolder) {
                 try {
                     const content = await readTextFile(propertiesPath);
@@ -200,22 +211,25 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // Compute backlinks: for each file, find all files that reference it
+        // uuid-to-path map as preprocessing for backlinks computation
+        for (const path in newIndex) {
+            if (newIndex[path])
+                unref(uuidToFilePathIndex).set(newIndex[path].uuid, path);
+        }
+
+        // Compute backlinks efficiently using the uuid map
         for (const path in newIndex) {
             const file = newIndex[path];
             if (!file || file.isFolder) continue;
-            
+
             // For each file that this file references (forelinks),
             // add this file's uuid to that file's backlinks
             for (const forelinkUuid of file.forelinks) {
-                // Find the file with this uuid
-                for (const targetPath in newIndex) {
+                const targetPath = unref(uuidToFilePathIndex).get(forelinkUuid);
+                if (targetPath) {
                     const targetFile = newIndex[targetPath];
-                    if (targetFile && targetFile.uuid === forelinkUuid) {
-                        if (!targetFile.backlinks.includes(file.uuid)) {
-                            targetFile.backlinks.push(file.uuid);
-                        }
-                        break;
+                    if (targetFile && !targetFile.backlinks.includes(file.uuid)) {
+                        targetFile.backlinks.push(file.uuid);
                     }
                 }
             }
@@ -223,7 +237,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         fileIndex.value = newIndex;
         console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
-        console.log(`FileIndex: `, unref(fileIndex))
+        return newIndex;
     }
 
     /**
@@ -252,6 +266,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
             const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
             const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
+            const size = fileStats.size || 0;
 
             const newEntry: ActiveWorkspaceFileIndex = defaultActiveWorkspaceFileIndex({
                 uuid: uuid,
@@ -260,6 +275,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 fileName: fileName,
                 fileExt: _extractFileExtension(fileName),
                 isFolder: isDirectory,
+                size: size,
                 children: [],
                 properties: {},
                 forelinks: [],
@@ -481,7 +497,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 forelinks.add(linkTargetToUuidMap.get(linkTarget)!);
             }
         }
-        
+
         // Store old forelinks to compute backlink changes
         const oldForelinks = new Set(node.forelinks);
         const newForelinks = Array.from(forelinks);
@@ -755,12 +771,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             return node.children.some(childPath => {
                 const childNode = index[childPath];
                 if (!childNode || childNode.isFolder) return false;
-                
+
                 const fileName = childNode.fileName;
                 return fileName === 'properties.yml' || fileName === 'properties.yaml';
             });
         }
-        
+
         return node.fileName === 'properties.yml' || node.fileName === 'properties.yaml';
     }
 
@@ -770,16 +786,16 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function getParentFolderByPath(absolutePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
         const path = unref(absolutePath);
         if (!path) return undefined;
-        
+
         const parentPath = path.substring(0, path.lastIndexOf('/'));
         if (!parentPath) return undefined;
-        
+
         const parentNode = unref(fileIndex)[parentPath];
-        
+
         if (parentNode && parentNode.isFolder) {
             return parentNode;
         }
-        
+
         return undefined;
     }
 
@@ -789,10 +805,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function getParentFolderByUuid(fileUuid: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
         const uuid = unref(fileUuid);
         const node = getFileByUuid(uuid);
-        
+
         if (!node) return undefined;
         if (node.isFolder) return undefined;
-        
+
         return getParentFolderByPath(node.fullPath);
     }
 
