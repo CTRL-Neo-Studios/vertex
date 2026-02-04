@@ -23,12 +23,51 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import type {UnlistenFn} from "@tauri-apps/api/event";
-import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
+import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
 import type {YamlFormData} from "@type32/yaml-editor-form";
 
 const watcherRegistry = new Map<string, UnwatchFn>();
-// NEW: A registry for our event listeners, mapping session ID to a Set of callbacks.
 const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
+
+/**
+ * Private helper function to parse file content properties (frontmatter for text files, YAML for .yml/.yaml files)
+ * 
+ * @param {string} path - The absolute file path
+ * @param {string} content - The file content
+ * @returns {object} Object containing properties
+ * @private
+ */
+function _parseFileContentProperties(path: string, content: string): { properties: YamlFormData } {
+    const extension = getFileExtensionFromPath(path);
+    
+    // Handle .yml/.yaml files as pure YAML
+    if (isYamlFile(extension)) {
+        try {
+            const yamlResult = parseYaml(content);
+            if (yamlResult.error) {
+                console.error(`YAML parsing error in ${path}:`, yamlResult.error);
+                return { properties: {} };
+            }
+            return { properties: yamlResult.data || {} };
+        } catch (error) {
+            console.error(`Failed to parse YAML in ${path}:`, error);
+            return { properties: {} };
+        }
+    }
+    
+    // Only parse frontmatter for plain text files
+    if (!isPlainTextFile(extension)) {
+        return { properties: {} };
+    }
+    
+    const fmResult = parseFrontmatter(content);
+    if (fmResult.error) {
+        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
+        return { properties: {} };
+    }
+    
+    return { properties: fmResult.data || {} };
+}
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
@@ -39,16 +78,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     const $asesh = useAppSessions()
 
     const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
-    // Turns the fileIndex into a recursive File tree to serve the UI
+    
     const fileTree = computed<UITreeNode[]>(() => {
-        const index = fileIndex.value; // No need for unref
+        const index = fileIndex.value;
         if (Object.keys(index).length === 0) return [];
 
         const getNode = (path: string): UITreeNode => {
             const file = index[path];
             return defaultUITreeNode({
                 ...file,
-                // The children array now correctly contains paths, so this works
                 children: file?.children.map(getNode) || []
             });
         };
@@ -56,7 +94,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const rootNodes: UITreeNode[] = [];
         for (const path in index) {
             const parentPath = path.substring(0, path.lastIndexOf('/'));
-            // This lookup now works because the keys of the index are paths
             if (!index[parentPath]) {
                 rootNodes.push(getNode(path));
             }
@@ -65,62 +102,19 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     });
 
     /**
-     * Private helper function to parse file content properties (frontmatter, etc.)
-     * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
-     * For .yml/.yaml files, parses as pure YAML.
-     *
-     * @param {string} path - The absolute file path
-     * @param {string} content - The file content
-     * @returns {object} Object containing properties and any other parsed properties
-     * @private
-     */
-    function _parseFileContentProperties(path: string, content: string): { properties: YamlFormData } {
-        const extension = getFileExtensionFromPath(path);
-        const fileName = path.substring(path.lastIndexOf('/') + 1);
-
-        // Handle .yml/.yaml files (like properties.yml)
-        if (extension === 'yml' || extension === 'yaml') {
-            try {
-                const yamlResult = parseYaml(content);
-                if (yamlResult.error) {
-                    console.error(`YAML parsing error in ${path}:`, yamlResult.error);
-                    return { properties: {} };
-                }
-                return { properties: yamlResult.data || {} };
-            } catch (error) {
-                console.error(`Failed to parse YAML in ${path}:`, error);
-                return { properties: {} };
-            }
-        }
-
-        // Only parse frontmatter for plain text files
-        if (!isPlainTextFile(extension)) {
-            return { properties: {} };
-        }
-
-        const fmResult = parseFrontmatter(content);
-        if (fmResult.error) {
-            console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-            return { properties: {} };
-        }
-
-        return { properties: fmResult.data || {} };
-    }
-
-    /**
      * Builds index from a root path using Tauri's native recursive fs scan.
      */
     async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
         const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
         const workspaceRoot = unref(workspaceRootFilePath)
         const time = new Date().getTime()
+        const propertiesFiles: string[] = [];
 
         async function processDirectory(currentPath: string) {
             const entries = await readDir(currentPath);
             const childrenPaths: string[] = [];
 
             for (const entry of entries) {
-                // Skip dot files (except properties files which no longer start with dot)
                 if (entry.name.startsWith('.')) continue;
 
                 const entryPath = await join(currentPath, entry.name);
@@ -141,8 +135,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     properties: {},
                     forelinks: [],
                     createdTime,
-                    modifiedTime,
+                    modifiedTime
                 });
+
+                // Track properties files for later processing
+                if (!entry.isDirectory && (entry.name === 'properties.yml' || entry.name === 'properties.yaml')) {
+                    propertiesFiles.push(entryPath);
+                }
 
                 if (entry.isDirectory) {
                     newIndex[entryPath].children = (await processDirectory(entryPath)).sort();
@@ -153,71 +152,37 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
 
-        // Parse file contents and handle properties files
-        const propertiesFiles: string[] = [];
-        
+        // Parse content for plain text files
         for (const path in newIndex) {
-            const node = newIndex[path];
-            if (!node) continue;
-            
-            const fileName = node.fileName;
+            if (newIndex[path] && newIndex[path].isFolder) continue;
+
             const extension = getFileExtensionFromPath(path);
-            
-            // Track properties.yml/.properties.yaml FILES (not folders) for later processing
-            if (!node.isFolder && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
-                propertiesFiles.push(path);
-                console.log(`Found properties file: ${path}`);
-                continue;
-            }
-            
-            // Parse content for plain text files
             if (isPlainTextFile(extension)) {
+                // console.log('Preparsing Path:', path, extension)
                 await preparseDocument(path, newIndex);
+                // console.log('Preparsed Path:', unref(newIndex[path]))
             }
         }
 
-        console.log(`Found ${propertiesFiles.length} properties files to process`);
-
-        // Process properties.yml files and assign to parent folders
+        // Process properties files and assign to parent folders
         for (const propertiesPath of propertiesFiles) {
             const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
             const parentNode = newIndex[parentPath];
             
             if (parentNode && parentNode.isFolder) {
-                // Don't attempt to read binary files
-                const extension = getFileExtensionFromPath(propertiesPath);
-                if (!isUnreadableAsText(extension)) {
-                    try {
-                        const content = await readTextFile(propertiesPath);
-                        const parsed = _parseFileContentProperties(propertiesPath, content);
-                        parentNode.properties = parsed.properties;
-                        console.log(`✓ Assigned properties from ${propertiesPath} to folder ${parentPath}`, parsed.properties);
-                    } catch (error) {
-                        console.error(`Failed to read properties file ${propertiesPath}:`, error);
-                    }
+                try {
+                    const content = await readTextFile(propertiesPath);
+                    const parsed = _parseFileContentProperties(propertiesPath, content);
+                    parentNode.properties = parsed.properties;
+                } catch (error) {
+                    console.error(`Failed to read properties file ${propertiesPath}:`, error);
                 }
-            } else {
-                console.warn(`Parent node not found or not a folder for properties file: ${propertiesPath}`);
             }
         }
 
         fileIndex.value = newIndex;
-        
-        // Debug: Log a sample of the index to verify structure
-        const samplePaths = Object.keys(newIndex).slice(0, 3);
-        console.log(`Index sample (first 3 entries):`);
-        samplePaths.forEach(path => {
-            const node = newIndex[path];
-            if (!node) return;
-            console.log(`  ${path}:`, {
-                isFolder: node.isFolder,
-                childrenCount: node.children.length,
-                hasProperties: Object.keys(node.properties).length > 0,
-                children: node.children.slice(0, 2) // Show first 2 children
-            });
-        });
-        
         console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
+        console.log(`FileIndex: `, unref(fileIndex))
     }
 
     /**
@@ -244,55 +209,47 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const uuid = useUuid()
             const fileName = path.substring(path.lastIndexOf('/') + 1);
 
-            // Get timestamps from file stats
             const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
             const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
 
-            // 1. Create the new index entry
             const newEntry: ActiveWorkspaceFileIndex = defaultActiveWorkspaceFileIndex({
                 uuid: uuid,
                 fullPath: path,
                 relativePath: path.replace(workspaceRoot, '').substring(1),
                 fileName: fileName,
                 isFolder: isDirectory,
-                children: [], // New files/folders have no children initially
-                properties: {}, // Later, you could parse this here
+                children: [],
+                properties: {},
                 forelinks: [],
                 createdTime,
-                modifiedTime,
+                modifiedTime
             });
             unref(fileIndex)[path] = newEntry;
 
-            // 2. Link this new entry to its parent
             const parentNode = fileIndex.value[parentPath];
             if (parentNode && !parentNode.children.includes(path)) {
                 parentNode.children.push(path);
                 if (autoSort) parentNode.children.sort();
-                // Update parent's modifiedTime
                 parentNode.modifiedTime = new Date();
             }
 
-            // 3. Handle properties.yml/properties.yaml files
+            // Handle properties files
             if (!isDirectory && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
-                const extension = getFileExtensionFromPath(path);
-                if (!isUnreadableAsText(extension)) {
+                if (parentNode) {
                     try {
                         const content = await readTextFile(path);
                         const parsed = _parseFileContentProperties(path, content);
-                        if (parentNode) {
-                            parentNode.properties = parsed.properties;
-                            parentNode.modifiedTime = new Date();
-                            console.log(`Assigned properties from ${path} to folder ${parentPath}`);
-                        }
+                        parentNode.properties = parsed.properties;
+                        parentNode.modifiedTime = new Date();
                     } catch (error) {
                         console.error(`Failed to read properties file ${path}:`, error);
                     }
                 }
             } else if (!isDirectory) {
-                // Parse frontmatter when a new file is added (only for plain text files)
                 const extension = getFileExtensionFromPath(path);
                 if (isPlainTextFile(extension)) {
-                    await preparseDocument(path);
+                    console.log('Preparsing Non-Dir: ', path, extension)
+                    await preparseDocument(path, unref(fileIndex));
                 }
             }
 
@@ -313,15 +270,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (!nodeToRemove) return [];
         const removedNodes: ActiveWorkspaceFileIndex[] = []
 
-        // 1. Recursively remove all children first
         if (nodeToRemove.isFolder) {
-            // Create a copy of children array to avoid modification during iteration
             [...nodeToRemove.children].forEach(childId => {
                 removedNodes.push(...removeFileFromIndex(childId));
             });
         }
 
-        // 2. Unlink from parent
         const parentPath = path.substring(0, path.lastIndexOf('/'));
         const parentNode = unref(fileIndex)[parentPath];
         if (parentNode) {
@@ -331,7 +285,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // 3. Remove the node itself
         removedNodes.push(defaultActiveWorkspaceFileIndex(unref(fileIndex)[path]))
         delete unref(fileIndex)[path];
         console.log(`Removed from index: ${path}`);
@@ -339,15 +292,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return removedNodes
     }
 
-    // Place this inside your useActiveWorkspaceIndex composable
-
     /**
      * Handles a file or folder being renamed/moved.
      * This version preserves UUIDs to maintain UI state (e.g., open tabs)
      * and recursively updates all child paths in-memory for moved folders.
      */
     async function moveFileInIndex(oldPath: string, newPath: string, workspaceRoot: string) {
-        const fileIndexState = fileIndex.value; // Work with a local reference for clarity
+        const fileIndexState = fileIndex.value;
         const nodeToMove = fileIndexState[oldPath];
 
         if (!nodeToMove) {
@@ -355,96 +306,68 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             return;
         }
 
-        // --- Step 1: Recursively update the node and all its children ---
-
-        // A helper function to update a node and its descendants in-memory
         const recursivelyUpdatePaths = async (currentOldPath: string, currentNewPath: string) => {
             const node = fileIndexState[currentOldPath];
             if (!node) return;
 
-            // Create the new node data, preserving the UUID
             const newNodeData: ActiveWorkspaceFileIndex = {
                 ...node,
-                uuid: node.uuid, // Preserve the stable ID
+                uuid: node.uuid,
                 fullPath: currentNewPath,
                 relativePath: currentNewPath.replace(workspaceRoot, '').substring(1),
                 fileName: currentNewPath.substring(currentNewPath.lastIndexOf('/') + 1),
-                // The `children` paths need to be updated, which we'll do next
+                modifiedTime: new Date()
             };
 
-            // If it's a folder, iterate its children and recursively call this function
             if (node.isFolder) {
                 const updatedChildrenPaths: string[] = [];
                 for (const childOldPath of node.children) {
-                    // Construct the child's new path based on the parent's move
                     const childName = childOldPath.substring(childOldPath.lastIndexOf('/') + 1);
-                    const childNewPath = await join(currentNewPath, childName); // Use join for safety
+                    const childNewPath = await join(currentNewPath, childName);
                     await recursivelyUpdatePaths(childOldPath, childNewPath);
                     updatedChildrenPaths.push(childNewPath);
                 }
                 newNodeData.children = updatedChildrenPaths;
             }
 
-            // Add the updated node under its new path and delete the old one
             delete fileIndexState[currentOldPath];
             fileIndexState[currentNewPath] = newNodeData;
         };
 
-        // Initial call to start the recursive update
         await recursivelyUpdatePaths(oldPath, newPath);
-
-        // --- Step 2: Update the parent's `children` array ---
 
         const oldParentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
         const newParentPath = newPath.substring(0, newPath.lastIndexOf('/'));
 
-        // Remove from old parent's children list
         const oldParentNode = fileIndexState[oldParentPath];
         if (oldParentNode) {
             const childIndex = oldParentNode.children.indexOf(oldPath);
             if (childIndex > -1) {
                 oldParentNode.children.splice(childIndex, 1);
-                // Update old parent's modifiedTime
                 oldParentNode.modifiedTime = new Date();
             }
         }
 
-        // Add to new parent's children list (even if it's the same parent)
         const newParentNode = fileIndexState[newParentPath];
         if (newParentNode) {
             if (!newParentNode.children.includes(newPath)) {
                 newParentNode.children.push(newPath);
-                newParentNode.children.sort(); // Keep it sorted
-                // Update new parent's modifiedTime
+                newParentNode.children.sort();
                 newParentNode.modifiedTime = new Date();
             }
         }
-
-        // Update modifiedTime for the moved file/folder
-        const movedNode = fileIndexState[newPath];
-        if (movedNode) {
-            movedNode.modifiedTime = new Date();
-        }
-
-        // The change is now complete. Forcing a refresh on the ref is good practice
-        // if you were mutating deeply without Vue's reactivity system catching it,
-        // but since we are adding/deleting keys, it should be fine.
-        // fileIndex.value = { ...fileIndexState }; // Use if reactivity fails
     }
 
-    async function updateIndex(path: string, content: string) {
-        const index = unref(fileIndex);
+    async function updateIndex(path: string, content: string, index = fileIndex.value) {
         const node = index[path];
         if (!node || node.isFolder) return;
 
-        // Parse file content properties (frontmatter, etc.) - only for plain text files
         const parsed = _parseFileContentProperties(path, content);
+        console.log("at update index run parsed file content props:", parsed.properties)
         node.properties = parsed.properties;
-
-        // Update modifiedTime for this file
         node.modifiedTime = new Date();
 
-        // If this is a properties.yml/properties.yaml file, also update parent folder
+        // If this is a properties file, also update parent folder
         const fileName = node.fileName;
         if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
             const parentPath = path.substring(0, path.lastIndexOf('/'));
@@ -452,7 +375,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             if (parentNode && parentNode.isFolder) {
                 parentNode.properties = parsed.properties;
                 parentNode.modifiedTime = new Date();
-                console.log(`Updated parent folder properties from ${path}`);
             }
         }
 
@@ -491,7 +413,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const node = index[path];
         if (!node || node.isFolder) return;
 
-        // Don't attempt to read binary files (images, PDFs, videos) as text
         const extension = getFileExtensionFromPath(path);
         if (isUnreadableAsText(extension)) {
             console.log(`Skipping text read for binary file: ${path}`);
@@ -500,7 +421,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         try {
             const content = await readTextFile(path);
-            await updateIndex(path, content);
+            await updateIndex(path, content, index);
         } catch (readError) {
             console.error(`Failed to read file for preparsing: ${path}`, readError);
         }
@@ -509,22 +430,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function _broadcast(event: WorkspaceIndexEvent) {
         const listeners = listenerRegistry.get(session!.uuid);
         if (listeners) {
-            // Call each subscribed listener with the event.
             listeners.forEach(listener => listener(event));
         }
     }
 
     /**
      * Starts the file system watcher for the specified workspace root.
-     * It will automatically update the fileIndex on create, remove, or rename events.
-     *
-     * @param {string} workspaceRoot The absolute path of the workspace folder to watch.
      */
     async function startWatcher(workspaceRoot: string) {
-        // Before starting a new one, check if a watcher for this session already exists in the registry.
         if (watcherRegistry.has(session!.uuid)) {
             console.log(`Watcher for session ${session!.uuid} already exists. Stopping it first.`);
-            await stopWatcher(); // This will correctly use the registry
+            await stopWatcher();
         }
 
         console.log(`Starting watcher for session ${session!.uuid} on: ${workspaceRoot}`);
@@ -533,28 +449,20 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const currentTabId = useRoute().params.tabId as string;
             if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
 
-            // console.log('[Detected Watcher Event]: ', event);
-
             if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && (event.type.modify.kind === 'metadata' || event.type.modify.kind === 'data')))) return;
 
             if (typeof event.type === 'object' && event.type !== null) {
 
-                // Inside this block, TypeScript now knows event.type is an object.
-                // It is now safe to use the `in` operator.
-
-                // --- Remove Event Handling ---
                 if ('remove' in event.type) {
                     for (const path of event.paths) {
                         console.log(`Remove detected: ${path}`);
                         const removedNodes = removeFileFromIndex(path);
-                        _broadcast({ type: 'remove', path, removedNodes }); // Broadcast event
+                        _broadcast({ type: 'remove', path, removedNodes });
                     }
                     return;
                 }
 
-                // --- Rename Event Handling ---
                 if ('modify' in event.type && event.type.modify.kind === 'rename') {
-                    // Standard rename with both paths. This is the ideal case.
                     if (event.paths.length >= 2) {
                         const [oldPath, newPath] = event.paths;
                         console.log(`Rename detected: ${oldPath} -> ${newPath}`);
@@ -564,83 +472,57 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                         return;
                     }
 
-                    // Incomplete rename with only one path. This is ambiguous.
-                    // It could be a "move to trash" or just a noisy event from a regular rename.
                     if (event.paths.length === 1) {
                         const path = event.paths[0];
                         if (!path) return;
 
-                        // To figure out what it is, we check if the file still exists.
-                        // A short delay helps ensure the file system has settled.
                         setTimeout(async () => {
                             try {
                                 await stat(path);
-                                // File still exists (case-insensitively). This could be a case-only
-                                // rename or a noisy event. We need to check the actual file name on disk.
                                 const node = fileIndex.value[path];
-                                if (!node) return; // Should not happen, but a good safeguard.
+                                if (!node) return;
 
                                 const parentPath = path.substring(0, path.lastIndexOf('/'));
                                 const entries = await readDir(parentPath);
                                 const eventFileName = path.substring(path.lastIndexOf('/') + 1);
                                 const actualEntry = entries.find(e => e.name.toLowerCase() === eventFileName.toLowerCase());
 
-                                // If we found the file and its casing is different, it's a case-only rename.
                                 if (actualEntry && actualEntry.name !== node.fileName) {
                                     console.log(`Case-only rename detected: ${node.fileName} -> ${actualEntry.name}`);
                                     const newPath = await join(parentPath, actualEntry.name);
                                     await moveFileInIndex(path, newPath, workspaceRoot);
                                     _broadcast({ type: 'rename', oldPath: path, newPath: newPath });
                                 } else {
-                                    // The file exists and the name is the same. It was a noisy event.
                                     console.log('Ignoring noisy single-path rename event:', path);
                                 }
                             } catch (error) {
-                                // `stat` threw an error, which means the file is no longer at this path.
-                                // This is our signal for a "move to trash" or delete operation.
                                 console.log(`File at '${path}' no longer exists. Treating as remove.`);
                                 const removedNodes = removeFileFromIndex(path);
                                 _broadcast({ type: 'remove', path, removedNodes });
                             }
-                        }, 100); // A small delay to avoid race conditions with the file system.
+                        }, 100);
                         return;
                     }
                 }
 
-
-                // --- Create Event Handling ---
                 if ('create' in event.type) {
                     for (const path of event.paths) {
                         console.log(`Create detected: ${path}`);
                         addFileToIndex(path, workspaceRoot).then(() => {
-                            _broadcast({ type: 'create', path }); // Broadcast event
+                            _broadcast({ type: 'create', path });
                         });
                     }
                     return;
                 }
 
-
                 console.log('[Executed Watcher Event]: ', event);
 
-                // --- Modify Event Handling (Content Change) ---
-                // if ('modify' in event.type && event.type.modify.kind === 'data') {
-                //     for (const path of event.paths) {
-                //         // updateFrontmatterForPath(path).then(() => { // Assuming this is your parsing function
-                //         //     _broadcast({ type: 'modify', path }); // Broadcast event
-                //         // });
-                //     }
-                //     return;
-                // }
-
             } else {
-                // This block handles the case where event.type is a string ("any" or "other").
-                // Usually, these are less critical and can often be ignored or just logged.
                 console.log(`Received simple string event type: "${event.type}"`);
             }
 
         }, { recursive: true, delayMs: 5 });
 
-        // Store the new unwatch function in our central registry.
         watcherRegistry.set(session!.uuid, activeWatcher);
         console.log(`Watcher started and registered for session ${session!.uuid}.`);
 
@@ -649,33 +531,28 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Stops the currently active file system watcher.
-     * This is crucial for cleanup when closing a workspace to prevent memory leaks.
      */
     async function stopWatcher() {
         const unwatchFn = watcherRegistry.get(session!.uuid);
 
         if (unwatchFn) {
             console.log(`Stopping file watcher for session ${session!.uuid}...`);
-            unwatchFn(); // Execute the unwatch function.
-            watcherRegistry.delete(session!.uuid); // Clean up the registry.
-            // Also clean up listeners for this session to prevent memory leaks!
+            unwatchFn();
+            watcherRegistry.delete(session!.uuid);
             listenerRegistry.delete(session!.uuid);
             console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
         } else {
             console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
         }
-
     }
 
     /**
-     * Reads a file at a given path, parses its frontmatter, and updates the index.
-     * Does nothing if the path points to a folder or is not in the index.
+     * Reads a file at a given path, parses its properties, and updates the index.
      */
     async function updateFrontmatterForPath(path: string, index = fileIndex.value) {
         const node = index[path];
         if (!node || node.isFolder) return;
 
-        // Don't attempt to read binary files (images, PDFs, videos) as text
         const extension = getFileExtensionFromPath(path);
         if (isUnreadableAsText(extension)) {
             console.log(`Skipping text read for binary file: ${path}`);
@@ -688,7 +565,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             node.properties = parsed.properties;
             node.modifiedTime = new Date();
 
-            // If this is a properties.yml/properties.yaml file, also update parent folder
             const fileName = node.fileName;
             if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
                 const parentPath = path.substring(0, path.lastIndexOf('/'));
@@ -698,7 +574,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     parentNode.modifiedTime = new Date();
                 }
             }
-            // console.log(`Updated properties for ${path}`);
         } catch (readError) {
             console.error(`Failed to read file for properties parsing: ${path}`, readError);
         }
@@ -706,9 +581,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Finds a file in the index by its stable UUID.
-     * Returns the full file object or null if not found.
-     *
-     * Optimize: Can be optimized via adding a separate uuidToFilePathIndexMap later but it's hard to manage right now, i.e. premature optimization.
      */
     function getFileByUuid(uuidRef: PossiblyRef<string | undefined>): ActiveWorkspaceFileIndex | null {
         const uuid = unref(uuidRef)
@@ -725,7 +597,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Finds a file in the index by its path.
-     * Returns the full file object or null if not found.
      */
     function getFileByPath(absoluteFilePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
         return unref(fileIndex)[unref(absoluteFilePath)]
@@ -737,7 +608,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const f = getFileByPath(fp)
             if (f)
                 results.push(f)
-
         }
         return results
     }
@@ -751,7 +621,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Convenience method to get files by a specific extension (e.g., 'md', 'png').
-     * Extension check is case-insensitive.
      */
     function getFilesByExtension(extension: string): ActiveWorkspaceFileIndex[] {
         const ext = extension.startsWith('.') ? extension.slice(1).toLowerCase() : extension.toLowerCase();
@@ -764,63 +633,39 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Checks if a file/folder has a properties.yml or properties.yaml file.
-     * - For folders: checks if the folder contains a properties.yml/properties.yaml child FILE (not folder)
-     * - For files: checks if the file itself is a properties file
-     *
-     * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
-     * @returns {string} The Properties file's UUID if a properties file exists, undefined otherwise
      */
-    function getPropertiesFile(fileUuid: PossiblyRef<string>): string | undefined {
+    function hasPropertiesFile(fileUuid: PossiblyRef<string>): boolean {
         const uuid = unref(fileUuid);
         const node = getFileByUuid(uuid);
 
-        if (!node) return;
+        if (!node) return false;
 
-        // If it's a folder, check if any of its children is a properties.yml/properties.yaml FILE (not folder)
         if (node.isFolder) {
             const index = unref(fileIndex);
-            return node.children.find(childPath => {
+            return node.children.some(childPath => {
                 const childNode = index[childPath];
-                if (!childNode || childNode.isFolder) return; // Skip if it's a folder or doesn't exist
+                if (!childNode || childNode.isFolder) return false;
                 
                 const fileName = childNode.fileName;
-                return (fileName === 'properties.yml' || fileName === 'properties.yaml') ? childNode.uuid : undefined;
+                return fileName === 'properties.yml' || fileName === 'properties.yaml';
             });
         }
         
-        // If it's a file, check if it's a properties file itself
-        return (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? node.uuid : undefined;
-    }
-
-    /**
-     * Checks if a file/folder has a properties.yml or properties.yaml file.
-     * - For folders: checks if the folder contains a properties.yml/properties.yaml child FILE (not folder)
-     * - For files: checks if the file itself is a properties file
-     * 
-     * @param {PossiblyRef<string>} fileUuid - The UUID of the file or folder to check
-     * @returns {boolean} True if a properties file exists, false otherwise
-     */
-    function hasPropertiesFile(fileUuid: PossiblyRef<string>): boolean {
-        return getPropertiesFile(fileUuid) != undefined;
+        return node.fileName === 'properties.yml' || node.fileName === 'properties.yaml';
     }
 
     /**
      * Gets the parent folder of a file given its absolute path.
-     * 
-     * @param {PossiblyRef<string>} absolutePath - The absolute file path
-     * @returns {ActiveWorkspaceFileIndex | undefined} The parent folder's index entry, or undefined if not found
      */
     function getParentFolderByPath(absolutePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
         const path = unref(absolutePath);
         if (!path) return undefined;
         
-        // Extract parent path by removing the last segment
         const parentPath = path.substring(0, path.lastIndexOf('/'));
-        if (!parentPath) return undefined; // No parent (root level)
+        if (!parentPath) return undefined;
         
         const parentNode = unref(fileIndex)[parentPath];
         
-        // Verify it's actually a folder
         if (parentNode && parentNode.isFolder) {
             return parentNode;
         }
@@ -830,36 +675,25 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     /**
      * Gets the parent folder of a file given its UUID.
-     * 
-     * @param {PossiblyRef<string>} fileUuid - The UUID of the file
-     * @returns {ActiveWorkspaceFileIndex | undefined} The parent folder's index entry, or undefined if not found
      */
     function getParentFolderByUuid(fileUuid: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
         const uuid = unref(fileUuid);
         const node = getFileByUuid(uuid);
         
         if (!node) return undefined;
-        
-        // If it's already a folder, it has no parent in this context
-        // (or you could return its parent folder if needed)
         if (node.isFolder) return undefined;
         
-        // Use the file's full path to get its parent
         return getParentFolderByPath(node.fullPath);
     }
 
     function on(listener: WorkspaceIndexListener): () => void {
-        // Get or create the listener set for this session.
         if (!listenerRegistry.has(session!.uuid)) {
             listenerRegistry.set(session!.uuid, new Set());
         }
         const listeners = listenerRegistry.get(session!.uuid)!;
 
-        // Add the new listener.
         listeners.add(listener);
 
-        // Return an `unsubscribe` function.
-        // This is CRITICAL for preventing memory leaks in components.
         return () => {
             listeners.delete(listener);
         };
@@ -883,7 +717,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFilteredFiles,
         getFilesByExtension,
         hasPropertiesFile,
-        getPropertiesFile,
         getParentFolderByPath,
         getParentFolderByUuid
     };

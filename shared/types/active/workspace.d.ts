@@ -1,27 +1,27 @@
 import type {FrontmatterProperties} from "#shared/types/types";
 import {type TreeItem} from "@nuxt/ui";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types"
-import type {YamlFormData} from "@type32/yaml-editor-form"; // Look here: new type for plugin
+import type {YamlFormData} from "@type32/yaml-editor-form";
 
 /*
 Usage Scope: Active Workspaces
  */
-export interface ActiveWorkspaceFileIndex { // Using the Hybrid ID Approach: uuid for Stable UI References, fullPath for primary key for fileIndex.
-    uuid: string; // The stable UI identifier
-    fullPath: string; // The primary key for the index
+export interface ActiveWorkspaceFileIndex {
+    uuid: string;
+    fullPath: string;
     relativePath: string,
     fileName: string,
     isFolder: boolean,
-    children: string[] // Contains the `fullPath` of children
+    children: string[]
     properties: YamlFormData,
-    forelinks: string[], // Referenced links, in terms of uuids in this file
+    forelinks: string[]
     createdTime: Date,
     modifiedTime: Date,
 }
 
-export interface ActiveSinglespaceFileIndex { // Using the Hybrid ID Approach: uuid for Stable UI References, fullPath for primary key for fileIndex.
-    uuid: string; // The stable UI identifier
-    fullPath: string; // The primary key for the index
+export interface ActiveSinglespaceFileIndex {
+    uuid: string;
+    fullPath: string;
     fileName: string,
     properties: YamlFormData,
 }
