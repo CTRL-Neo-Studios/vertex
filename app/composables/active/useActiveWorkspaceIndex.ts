@@ -202,35 +202,38 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
 
-        // Phase 2: Populate metadata and collect parsing tasks
-        const parsingTasks: Promise<void>[] = [];
+        // Phase 2: Populate metadata and parse content in parallel
+        const processingTasks: Promise<void>[] = [];
         
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
 
-            // Populate metadata (timestamps and size)
-            try {
-                const fileStats = await stat(path);
-                node.createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
-                node.modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
-                node.size = fileStats.size || 0;
-            } catch (error) {
-                console.error(`Failed to get stats for ${path}:`, error);
-                // Keep default values
-            }
-
-            // Queue parsing tasks for plain text files (not folders)
-            if (!node.isFolder) {
-                const extension = getFileExtensionFromPath(path);
-                if (isPlainTextFile(extension) || isYamlFile(extension)) {
-                    parsingTasks.push(_parseDocumentInitial(path, newIndex));
+            // Create a task for each file that does both stat and parsing
+            processingTasks.push((async () => {
+                // Populate metadata (timestamps and size)
+                try {
+                    const fileStats = await stat(path);
+                    node.createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
+                    node.modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
+                    node.size = fileStats.size || 0;
+                } catch (error) {
+                    console.error(`Failed to get stats for ${path}:`, error);
+                    // Keep default values
                 }
-            }
+
+                // Parse content for plain text files (not folders)
+                if (!node.isFolder) {
+                    const extension = getFileExtensionFromPath(path);
+                    if (isPlainTextFile(extension) || isYamlFile(extension)) {
+                        await _parseDocumentInitial(path, newIndex);
+                    }
+                }
+            })());
         }
 
-        // Execute all parsing tasks in parallel
-        await Promise.all(parsingTasks);
+        // Execute all file processing tasks in parallel (stat + parsing)
+        await Promise.all(processingTasks);
 
         // Process properties files and assign to parent folders
         for (const propertiesPath of propertiesFiles) {
