@@ -30,6 +30,24 @@ const watcherRegistry = new Map<string, UnwatchFn>();
 const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
 
 /**
+ * Private helper function to extract file extension from a filename.
+ * Handles edge cases like .env.dev (returns 'dev') or .env (returns 'env').
+ * Returns empty string if no extension.
+ * 
+ * @param {string} fileName - The file name
+ * @returns {string} The file extension without the dot
+ * @private
+ */
+function _extractFileExtension(fileName: string): string {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === 0) {
+        // No extension or file starts with dot (hidden file with no extension)
+        return '';
+    }
+    return fileName.substring(lastDotIndex + 1);
+}
+
+/**
  * Private helper function to parse file content properties (frontmatter for text files, YAML for .yml/.yaml files)
  * 
  * @param {string} path - The absolute file path
@@ -130,10 +148,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     fullPath: entryPath,
                     relativePath: entryPath.replace(workspaceRoot, '').substring(1),
                     fileName: entry.name,
+                    fileExt: _extractFileExtension(entry.name),
                     isFolder: entry.isDirectory,
                     children: [],
                     properties: {},
                     forelinks: [],
+                    backlinks: [],
                     createdTime,
                     modifiedTime
                 });
@@ -180,6 +200,27 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
+        // Compute backlinks: for each file, find all files that reference it
+        for (const path in newIndex) {
+            const file = newIndex[path];
+            if (!file || file.isFolder) continue;
+            
+            // For each file that this file references (forelinks),
+            // add this file's uuid to that file's backlinks
+            for (const forelinkUuid of file.forelinks) {
+                // Find the file with this uuid
+                for (const targetPath in newIndex) {
+                    const targetFile = newIndex[targetPath];
+                    if (targetFile && targetFile.uuid === forelinkUuid) {
+                        if (!targetFile.backlinks.includes(file.uuid)) {
+                            targetFile.backlinks.push(file.uuid);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
         fileIndex.value = newIndex;
         console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
         console.log(`FileIndex: `, unref(fileIndex))
@@ -217,10 +258,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 fullPath: path,
                 relativePath: path.replace(workspaceRoot, '').substring(1),
                 fileName: fileName,
+                fileExt: _extractFileExtension(fileName),
                 isFolder: isDirectory,
                 children: [],
                 properties: {},
                 forelinks: [],
+                backlinks: [],
                 createdTime,
                 modifiedTime
             });
@@ -276,6 +319,37 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             });
         }
 
+        // Clean up backlinks and forelinks
+        if (!nodeToRemove.isFolder) {
+            // Remove this file from the backlinks of files it references (its forelinks)
+            for (const forelinkUuid of nodeToRemove.forelinks) {
+                for (const p in unref(fileIndex)) {
+                    const file = unref(fileIndex)[p];
+                    if (file && file.uuid === forelinkUuid) {
+                        const backlinkIndex = file.backlinks.indexOf(nodeToRemove.uuid);
+                        if (backlinkIndex > -1) {
+                            file.backlinks.splice(backlinkIndex, 1);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Remove this file from the forelinks of files that reference it (its backlinks)
+            for (const backlinkUuid of nodeToRemove.backlinks) {
+                for (const p in unref(fileIndex)) {
+                    const file = unref(fileIndex)[p];
+                    if (file && file.uuid === backlinkUuid) {
+                        const forelinkIndex = file.forelinks.indexOf(nodeToRemove.uuid);
+                        if (forelinkIndex > -1) {
+                            file.forelinks.splice(forelinkIndex, 1);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
         const parentPath = path.substring(0, path.lastIndexOf('/'));
         const parentNode = unref(fileIndex)[parentPath];
         if (parentNode) {
@@ -310,12 +384,14 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const node = fileIndexState[currentOldPath];
             if (!node) return;
 
+            const newFileName = currentNewPath.substring(currentNewPath.lastIndexOf('/') + 1);
             const newNodeData: ActiveWorkspaceFileIndex = {
                 ...node,
                 uuid: node.uuid,
                 fullPath: currentNewPath,
                 relativePath: currentNewPath.replace(workspaceRoot, '').substring(1),
-                fileName: currentNewPath.substring(currentNewPath.lastIndexOf('/') + 1),
+                fileName: newFileName,
+                fileExt: _extractFileExtension(newFileName),
                 modifiedTime: new Date()
             };
 
@@ -363,7 +439,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (!node || node.isFolder) return;
 
         const parsed = _parseFileContentProperties(path, content);
-        console.log("at update index run parsed file content props:", parsed.properties)
         node.properties = parsed.properties;
         node.modifiedTime = new Date();
 
@@ -406,7 +481,42 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 forelinks.add(linkTargetToUuidMap.get(linkTarget)!);
             }
         }
-        node.forelinks = Array.from(forelinks);
+        
+        // Store old forelinks to compute backlink changes
+        const oldForelinks = new Set(node.forelinks);
+        const newForelinks = Array.from(forelinks);
+        node.forelinks = newForelinks;
+
+        // Update backlinks: remove this file from old targets, add to new targets
+        const addedLinks = newForelinks.filter(uuid => !oldForelinks.has(uuid));
+        const removedLinks = Array.from(oldForelinks).filter(uuid => !forelinks.has(uuid));
+
+        // Remove from old backlinks
+        for (const removedUuid of removedLinks) {
+            for (const p in index) {
+                const file = index[p];
+                if (file && file.uuid === removedUuid) {
+                    const backlinkIndex = file.backlinks.indexOf(node.uuid);
+                    if (backlinkIndex > -1) {
+                        file.backlinks.splice(backlinkIndex, 1);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Add to new backlinks
+        for (const addedUuid of addedLinks) {
+            for (const p in index) {
+                const file = index[p];
+                if (file && file.uuid === addedUuid) {
+                    if (!file.backlinks.includes(node.uuid)) {
+                        file.backlinks.push(node.uuid);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     async function preparseDocument(path: string, index = fileIndex.value) {

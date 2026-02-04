@@ -11,10 +11,12 @@ export interface ActiveWorkspaceFileIndex {
     fullPath: string;
     relativePath: string,
     fileName: string,
+    fileExt: string,
     isFolder: boolean,
     children: string[]
     properties: YamlFormData,
     forelinks: string[]
+    backlinks: string[]
     createdTime: Date,
     modifiedTime: Date,
 }

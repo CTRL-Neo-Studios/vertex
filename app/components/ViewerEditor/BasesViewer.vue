@@ -7,6 +7,14 @@ import type {YamlFormData} from "@type32/yaml-editor-form";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useFileIO} from "~/composables/io/useFileIO";
 import type {DropdownMenuItem} from "@nuxt/ui";
+import type { TableColumn } from '@nuxt/ui'
+import { h, resolveComponent } from 'vue'
+import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
+
+
+const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
 
 const editorInstance = defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
@@ -38,6 +46,8 @@ const {
     getFileByUuid,
     fileIndex,
 } = useActiveWorkspaceIndex(unref($session))
+const $tab = useActiveTabs(unref($session))
+const $navi = useAppNavigator()
 const $fio = useFileIO()
 
 function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
@@ -47,7 +57,7 @@ function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
     for (const path in unref(fileIndex)) {
         const file = unref(fileIndex)[path]
         if (!file || file.isFolder) continue // Skip folders and invalid entries
-        console.log(file)
+        // console.log(file)
         // Use file UUID as the key and properties as the value
         const memo = $ftMemo.getFromLabel(`${file.fileName}${file.uuid.slice(0,4)}`)
         const sourceEntry: BaseSource<YamlFormData> = {
@@ -69,6 +79,62 @@ function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
     }
 
     return source
+}
+
+function propogateDisplayData(): TableColumn<BaseSource<YamlFormData>>[] {
+    const originals: TableColumn<BaseSource<YamlFormData>>[] = [
+        {
+            accessorKey: 'id',
+            header: '#',
+            cell: ({row}) => `#${row.getValue<string>('id').slice(0, 4)}`
+        },
+        {
+            accessorKey: 'name',
+            header: 'File Name',
+            cell: ({row}) => h(UButton, {
+                variant: 'link',
+                size: 'sm',
+                block: true,
+                class: 'justify-left cursor-pointer',
+                async onClick() {
+                    await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.getValue<string>('id')))
+                }
+            })
+        },
+        {
+            accessorKey: 'ctime',
+            header: 'Created Time',
+            cell: ({ row }) => {
+                return new Date(row.getValue('ctime')).toLocaleString('en-US', {
+                    day: 'numeric',
+                    month: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    year: 'numeric',
+                    hour12: false
+                })
+            }
+        },
+        {
+            accessorKey: 'mtime',
+            header: 'Last Modified Time',
+            cell: ({ row }) => {
+                return new Date(row.getValue('mtime')).toLocaleString('en-US', {
+                    day: 'numeric',
+                    month: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    year: 'numeric',
+                    hour12: false
+                })
+            }
+        },
+        {
+            accessorKey: 'size'
+        }
+    ]
+
+    return originals
 }
 
 function getIconFromBaseType(baseType: string) {
@@ -96,6 +162,7 @@ watch($base.hasChanges, (newValue) => {
         content.value = $base.save()
 })
 
+const table = useTemplateRef('table')
 const currentViewResults = computed(() => unref($base.query.getViewResults(unref(activeView))).items)
 const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
     [
@@ -104,10 +171,13 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
             onSelect(e) {
                 activeView.value = i.name
             },
-            icon: getIconFromBaseType(i.type)
+            icon: getIconFromBaseType(i.type),
+            checked: unref(activeView).includes(i.name),
+            active: unref(activeView).includes(i.name)
         } satisfies DropdownMenuItem))
     ]
 ])
+const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayData())
 
 onMounted(async () => {
     await until($session).toMatch(v => !!v)
@@ -116,7 +186,7 @@ onMounted(async () => {
         activeView.value = unref($base.viewNames)[0] || ''
 
     $base.setSource(propogateFileIndexToSourceArray())
-    console.log(unref($base.source))
+    // console.log(unref($base.source))
     // console.log(JSON.stringify(propogateFileIndexToSourceArray()))
 
     console.log(unref(activeView))
@@ -128,17 +198,18 @@ onMounted(async () => {
 
 <template>
     <ViewerEditorLayoutWrapper
-        scrollMode="both"
+        scrollMode="none"
         v-model:fileName="fileName"
         @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
         :showStatusBar="false"
+        :bottomSpacing="false"
     >
         <template #default>
-            <div class="w-full h-full flex flex-col">
-                <div class="top-0 left-0 right-0 w-full sticky">
-                    <div class="w-full flex items-center justify-center p-1">
+            <div class="w-full flex flex-col flex-1 h-full pb-10" :style="{maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)'}">
+                <div class="w-full">
+                    <div class="w-full flex items-center justify-center p-1 px-2">
                         <UDropdownMenu
                             :items="baseViewsItems"
                             size="sm"
@@ -148,9 +219,15 @@ onMounted(async () => {
                         <div class="grow"/>
                     </div>
                 </div>
-                <div class="flex-1">
-                    <UTable :data="currentViewResults"/>
-                </div>
+                <UTable
+                    ref="table"
+                    sticky
+                    :data="currentViewResults"
+                    class="flex-1"
+                    :ui="{
+                        thead: 'backdrop-blur-xs bg-linear-to-t from-default/0 to-default'
+                    }"
+                />
             </div>
         </template>
     </ViewerEditorLayoutWrapper>

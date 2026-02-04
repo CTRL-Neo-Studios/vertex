@@ -45,6 +45,9 @@ const props = withDefaults(defineProps<{
     // Layout spacing
     topSpacing?: boolean,
     bottomSpacing?: boolean,
+    ui?: {
+        root?: string,
+    }
 }>(), {
     // Defaults
     showHeader: true,
@@ -126,7 +129,8 @@ const viewportClasses = computed(() => {
     <div 
         v-if="scrollMode === 'none'"
         class="w-full h-full flex flex-col relative"
-        :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
+        :class="ui?.root"
+        :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)', maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
     >
         <!-- Header (no scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">

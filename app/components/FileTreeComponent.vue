@@ -251,7 +251,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                             const tab = openTab(result.uuid)
                             await $navi.toWorkspaceTab($sessionId, tab)
                         }
-                        console.log(result)
+                        // console.log(result)
                     }
                 }
             }
