@@ -87,6 +87,38 @@ function _parseFileContentProperties(path: string, content: string): { propertie
     return { properties: fmResult.data || {} };
 }
 
+/**
+ * Simplified document parser for initial indexing.
+ * Only extracts properties and raw internal links without resolving them.
+ * Much faster than updateIndex since it doesn't build link maps or update backlinks.
+ * 
+ * @param {string} path - The absolute file path
+ * @param {Record<string, ActiveWorkspaceFileIndex>} index - The index being built
+ * @private
+ */
+async function _parseDocumentInitial(path: string, index: Record<string, ActiveWorkspaceFileIndex>) {
+    const node = index[path];
+    if (!node || node.isFolder) return;
+
+    const extension = getFileExtensionFromPath(path);
+    if (isUnreadableAsText(extension)) return;
+
+    try {
+        const content = await readTextFile(path);
+        
+        // Parse properties
+        const parsed = _parseFileContentProperties(path, content);
+        node.properties = parsed.properties;
+        
+        // Extract raw internal links (don't resolve yet)
+        const internalLinks = getInternalLinks(content);
+        (node as any)._rawInternalLinks = internalLinks; // Temporary storage
+        
+    } catch (readError) {
+        console.error(`Failed to read file for initial parsing: ${path}`, readError);
+    }
+}
+
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
         console.error("useActiveWorkspaceIndex was called without a session!");
@@ -170,7 +202,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         await processDirectory(workspaceRoot);
 
-        // Phase 2: Single loop to populate metadata and parse content
+        // Phase 2: Populate metadata and collect parsing tasks
+        const parsingTasks: Promise<void>[] = [];
+        
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
@@ -186,14 +220,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 // Keep default values
             }
 
-            // Parse content for plain text files (not folders)
+            // Queue parsing tasks for plain text files (not folders)
             if (!node.isFolder) {
                 const extension = getFileExtensionFromPath(path);
-                if (isPlainTextFile(extension)) {
-                    await preparseDocument(path, newIndex);
+                if (isPlainTextFile(extension) || isYamlFile(extension)) {
+                    parsingTasks.push(_parseDocumentInitial(path, newIndex));
                 }
             }
         }
+
+        // Execute all parsing tasks in parallel
+        await Promise.all(parsingTasks);
 
         // Process properties files and assign to parent folders
         for (const propertiesPath of propertiesFiles) {
@@ -211,19 +248,52 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // uuid-to-path map as preprocessing for backlinks computation
+        // Phase 3: Build link target map and resolve forelinks (single pass)
+        const linkTargetToUuidMap = new Map<string, string>();
+        
         for (const path in newIndex) {
-            if (newIndex[path])
-                unref(uuidToFilePathIndex).set(newIndex[path].uuid, path);
+            const file = newIndex[path];
+            if (!file) continue;
+            
+            // Populate uuid-to-path map
+            unref(uuidToFilePathIndex).set(file.uuid, path);
+            
+            // Build link target map for non-folders
+            if (!file.isFolder) {
+                const baseName = file.fileName.substring(0, file.fileName.lastIndexOf('.')) || file.fileName;
+                if (!linkTargetToUuidMap.has(baseName)) {
+                    linkTargetToUuidMap.set(baseName, file.uuid);
+                }
+                const relativePathWithoutExt = file.relativePath.substring(0, file.relativePath.lastIndexOf('.')) || file.relativePath;
+                if (!linkTargetToUuidMap.has(relativePathWithoutExt)) {
+                    linkTargetToUuidMap.set(relativePathWithoutExt, file.uuid);
+                }
+                if (!linkTargetToUuidMap.has(file.relativePath)) {
+                    linkTargetToUuidMap.set(file.relativePath, file.uuid);
+                }
+            }
         }
 
-        // Compute backlinks efficiently using the uuid map
+        // Resolve forelinks and compute backlinks
         for (const path in newIndex) {
             const file = newIndex[path];
             if (!file || file.isFolder) continue;
 
-            // For each file that this file references (forelinks),
-            // add this file's uuid to that file's backlinks
+            // Resolve raw internal links to UUIDs
+            const rawLinks = (file as any)._rawInternalLinks as InternalLinkNode[] | undefined;
+            if (rawLinks) {
+                const forelinks = new Set<string>();
+                for (const linkNode of rawLinks) {
+                    const targetUuid = linkTargetToUuidMap.get(linkNode.path);
+                    if (targetUuid) {
+                        forelinks.add(targetUuid);
+                    }
+                }
+                file.forelinks = Array.from(forelinks);
+                delete (file as any)._rawInternalLinks; // Clean up temporary data
+            }
+
+            // Compute backlinks
             for (const forelinkUuid of file.forelinks) {
                 const targetPath = unref(uuidToFilePathIndex).get(forelinkUuid);
                 if (targetPath) {
@@ -241,10 +311,11 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     }
 
     /**
-     * Clears the File index map.
+     * Clears the File index map and uuid map.
      */
     function clearIndex() {
         fileIndex.value = {}
+        unref(uuidToFilePathIndex).clear()
     }
 
     /**
@@ -284,6 +355,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 modifiedTime
             });
             unref(fileIndex)[path] = newEntry;
+            
+            // Update uuid map
+            unref(uuidToFilePathIndex).set(uuid, path);
 
             const parentNode = fileIndex.value[parentPath];
             if (parentNode && !parentNode.children.includes(path)) {
@@ -335,32 +409,32 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             });
         }
 
-        // Clean up backlinks and forelinks
+        // Clean up backlinks and forelinks using uuid map (O(1) lookups)
         if (!nodeToRemove.isFolder) {
             // Remove this file from the backlinks of files it references (its forelinks)
             for (const forelinkUuid of nodeToRemove.forelinks) {
-                for (const p in unref(fileIndex)) {
-                    const file = unref(fileIndex)[p];
-                    if (file && file.uuid === forelinkUuid) {
+                const targetPath = unref(uuidToFilePathIndex).get(forelinkUuid);
+                if (targetPath) {
+                    const file = unref(fileIndex)[targetPath];
+                    if (file) {
                         const backlinkIndex = file.backlinks.indexOf(nodeToRemove.uuid);
                         if (backlinkIndex > -1) {
                             file.backlinks.splice(backlinkIndex, 1);
                         }
-                        break;
                     }
                 }
             }
 
             // Remove this file from the forelinks of files that reference it (its backlinks)
             for (const backlinkUuid of nodeToRemove.backlinks) {
-                for (const p in unref(fileIndex)) {
-                    const file = unref(fileIndex)[p];
-                    if (file && file.uuid === backlinkUuid) {
+                const targetPath = unref(uuidToFilePathIndex).get(backlinkUuid);
+                if (targetPath) {
+                    const file = unref(fileIndex)[targetPath];
+                    if (file) {
                         const forelinkIndex = file.forelinks.indexOf(nodeToRemove.uuid);
                         if (forelinkIndex > -1) {
                             file.forelinks.splice(forelinkIndex, 1);
                         }
-                        break;
                     }
                 }
             }
@@ -376,6 +450,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
 
         removedNodes.push(defaultActiveWorkspaceFileIndex(unref(fileIndex)[path]))
+        
+        // Remove from uuid map
+        unref(uuidToFilePathIndex).delete(nodeToRemove.uuid);
+        
         delete unref(fileIndex)[path];
         console.log(`Removed from index: ${path}`);
 
@@ -424,6 +502,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
             delete fileIndexState[currentOldPath];
             fileIndexState[currentNewPath] = newNodeData;
+            
+            // Update uuid map with new path
+            unref(uuidToFilePathIndex).set(node.uuid, currentNewPath);
         };
 
         await recursivelyUpdatePaths(oldPath, newPath);
@@ -507,29 +588,27 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const addedLinks = newForelinks.filter(uuid => !oldForelinks.has(uuid));
         const removedLinks = Array.from(oldForelinks).filter(uuid => !forelinks.has(uuid));
 
-        // Remove from old backlinks
+        // Remove from old backlinks using uuid map (O(1) lookup)
         for (const removedUuid of removedLinks) {
-            for (const p in index) {
-                const file = index[p];
-                if (file && file.uuid === removedUuid) {
+            const targetPath = unref(uuidToFilePathIndex).get(removedUuid);
+            if (targetPath) {
+                const file = index[targetPath];
+                if (file) {
                     const backlinkIndex = file.backlinks.indexOf(node.uuid);
                     if (backlinkIndex > -1) {
                         file.backlinks.splice(backlinkIndex, 1);
                     }
-                    break;
                 }
             }
         }
 
-        // Add to new backlinks
+        // Add to new backlinks using uuid map (O(1) lookup)
         for (const addedUuid of addedLinks) {
-            for (const p in index) {
-                const file = index[p];
-                if (file && file.uuid === addedUuid) {
-                    if (!file.backlinks.includes(node.uuid)) {
-                        file.backlinks.push(node.uuid);
-                    }
-                    break;
+            const targetPath = unref(uuidToFilePathIndex).get(addedUuid);
+            if (targetPath) {
+                const file = index[targetPath];
+                if (file && !file.backlinks.includes(node.uuid)) {
+                    file.backlinks.push(node.uuid);
                 }
             }
         }
@@ -708,17 +787,18 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     /**
      * Finds a file in the index by its stable UUID.
      */
+    /**
+     * Finds a file in the index by its stable UUID.
+     * O(1) lookup using the uuid-to-path map.
+     */
     function getFileByUuid(uuidRef: PossiblyRef<string | undefined>): ActiveWorkspaceFileIndex | null {
         const uuid = unref(uuidRef)
         if (!uuid) return null;
 
-        for (const path in unref(fileIndex)) {
-            if (unref(fileIndex)[path]?.uuid === uuid) {
-                return unref(fileIndex)[path] || null;
-            }
-        }
+        const path = unref(uuidToFilePathIndex).get(uuid);
+        if (!path) return null;
 
-        return null;
+        return unref(fileIndex)[path] || null;
     }
 
     /**
