@@ -40,6 +40,17 @@ interface FileReadResult {
 }
 
 /**
+ * Result type for batch file stat from Rust backend
+ */
+interface FileStatResult {
+    path: string;
+    size?: number;
+    created?: number;  // Unix timestamp in milliseconds
+    modified?: number; // Unix timestamp in milliseconds
+    error?: string;
+}
+
+/**
  * Reads multiple text files in a single batch call to Rust backend.
  * Much faster than individual readTextFile calls due to reduced IPC overhead.
  */
@@ -56,6 +67,24 @@ async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>>
     }
     
     return contentMap;
+}
+
+/**
+ * Gets file metadata for multiple files in a single batch call to Rust backend.
+ * Much faster than individual stat calls due to reduced IPC overhead.
+ */
+async function statFilesBatch(paths: string[]): Promise<Map<string, FileStatResult>> {
+    const results = await invoke<FileStatResult[]>('stat_files_batch', { paths });
+    const statMap = new Map<string, FileStatResult>();
+    
+    for (const result of results) {
+        statMap.set(result.path, result);
+        if (result.error) {
+            console.error(`Failed to stat ${result.path}:`, result.error);
+        }
+    }
+    
+    return statMap;
 }
 
 /**
@@ -240,33 +269,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // Phase 2: Populate metadata and batch read files
         const _fileProcessTime = new Date().getTime();
         
-        // Collect paths that need parsing
+        // Collect all paths for stat and paths that need content parsing
+        const allPaths: string[] = [];
         const pathsToRead: string[] = [];
-        const statTasks: Promise<void>[] = [];
-        
-        let totalStatTime = 0;
-        let statCount = 0;
         
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
 
-            // Queue stat task for all files
-            statTasks.push((async () => {
-                const statStart = Date.now();
-                try {
-                    const fileStats = await stat(path);
-                    node.createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
-                    node.modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
-                    node.size = fileStats.size || 0;
-                    totalStatTime += Date.now() - statStart;
-                    statCount++;
-                } catch (error) {
-                    console.error(`Failed to get stats for ${path}:`, error);
-                    totalStatTime += Date.now() - statStart;
-                    statCount++;
-                }
-            })());
+            allPaths.push(path);
 
             // Collect paths that need content parsing
             if (!node.isFolder) {
@@ -277,13 +288,24 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // Execute stat tasks and batch file reading in parallel
-        const batchReadStart = Date.now();
-        const [, fileContents] = await Promise.all([
-            Promise.all(statTasks),
+        // Execute batch stat and batch file reading in parallel
+        const batchStart = Date.now();
+        const [fileStats, fileContents] = await Promise.all([
+            statFilesBatch(allPaths),
             readTextFilesBatch(pathsToRead)
         ]);
-        const batchReadTime = Date.now() - batchReadStart;
+        const batchTime = Date.now() - batchStart;
+        
+        // Apply stat results to index
+        for (const path of allPaths) {
+            const node = newIndex[path];
+            const stats = fileStats.get(path);
+            if (node && stats && !stats.error) {
+                node.createdTime = stats.created ? new Date(stats.created) : new Date();
+                node.modifiedTime = stats.modified ? new Date(stats.modified) : new Date();
+                node.size = stats.size || 0;
+            }
+        }
 
         // Parse all loaded file contents
         const parseTimings = {properties: 0, links: 0};
@@ -300,8 +322,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const totalFileProcessTime = Date.now() - _fileProcessTime;
         
         console.log(`File processing took: ${totalFileProcessTime}ms`);
-        console.log(`  - stat() calls: ${statCount} files, ${totalStatTime}ms total, ${(totalStatTime/statCount).toFixed(2)}ms avg`);
-        console.log(`  - batch file reading: ${pathsToRead.length} files, ${batchReadTime}ms total, ${(batchReadTime/pathsToRead.length).toFixed(2)}ms avg`);
+        console.log(`  - batch I/O (stat + read): ${batchTime}ms`);
+        console.log(`    • stat: ${allPaths.length} files`);
+        console.log(`    • read: ${pathsToRead.length} files`);
         console.log(`  - parsing: ${pathsToRead.length} files, ${totalParseTime}ms total, ${(totalParseTime/pathsToRead.length).toFixed(2)}ms avg`);
         if (pathsToRead.length > 0) {
             console.log(`    • property parsing: ${parseTimings.properties}ms (${(parseTimings.properties/pathsToRead.length).toFixed(2)}ms avg)`);
