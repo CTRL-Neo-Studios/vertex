@@ -51,6 +51,19 @@ interface FileStatResult {
 }
 
 /**
+ * Directory entry from Rust recursive scan
+ */
+interface DirectoryEntry {
+    path: string;
+    name: string;
+    is_directory: boolean;
+    size: number;
+    created?: number;  // Unix timestamp in milliseconds
+    modified?: number; // Unix timestamp in milliseconds
+    children: string[]; // Paths of direct children
+}
+
+/**
  * Reads multiple text files in a single batch call to Rust backend.
  * Much faster than individual readTextFile calls due to reduced IPC overhead.
  */
@@ -215,8 +228,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     });
 
     /**
-     * Builds index from a root path using Tauri's native recursive fs scan.
-     * Optimized to separate recursion from metadata collection.
+     * Builds index from a root path using Rust's native recursive directory scan.
+     * Much faster than JavaScript recursion due to eliminated IPC overhead.
      */
     async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
         const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
@@ -224,60 +237,44 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const time = new Date().getTime()
         const propertiesFiles: string[] = [];
 
-        // Phase 1: Fast recursion - only build structure
-        async function processDirectory(currentPath: string) {
-            const entries = await readDir(currentPath);
-            const childrenPaths: string[] = [];
-
-            for (const entry of entries) {
-                if (entry.name.startsWith('.')) continue;
-
-                const entryPath = await join(currentPath, entry.name);
-                childrenPaths.push(entryPath);
-
-                // Create basic index entry without expensive stat calls
-                newIndex[entryPath] = defaultActiveWorkspaceFileIndex({
-                    uuid: useUuid(),
-                    fullPath: entryPath,
-                    relativePath: entryPath.replace(workspaceRoot, '').substring(1),
-                    fileName: entry.name,
-                    fileExt: _extractFileExtension(entry.name),
-                    isFolder: entry.isDirectory,
-                    children: [],
-                    properties: {},
-                    forelinks: [],
-                    backlinks: [],
-                    // Timestamps and size will be set in phase 2
-                });
-
-                // Track properties files for later processing
-                if (!entry.isDirectory && (entry.name === 'properties.yml' || entry.name === 'properties.yaml')) {
-                    propertiesFiles.push(entryPath);
-                }
-
-                if (entry.isDirectory) {
-                    newIndex[entryPath].children = (await processDirectory(entryPath)).sort();
-                }
-            }
-            return childrenPaths;
-        }
-
+        // Phase 1: Scan directory tree in Rust (single IPC call)
         const _dirProcessTime = new Date().getTime();
-        await processDirectory(workspaceRoot);
+        const entries = await invoke<DirectoryEntry[]>('scan_directory_recursive', { rootPath: workspaceRoot });
         console.log(`Directory processing took: ${(new Date()).getTime() - _dirProcessTime}ms`)
 
-        // Phase 2: Populate metadata and batch read files
+        // Convert Rust entries to index format
+        for (const entry of entries) {
+            newIndex[entry.path] = defaultActiveWorkspaceFileIndex({
+                uuid: useUuid(),
+                fullPath: entry.path,
+                relativePath: entry.path.replace(workspaceRoot, '').substring(1),
+                fileName: entry.name,
+                fileExt: _extractFileExtension(entry.name),
+                isFolder: entry.is_directory,
+                size: entry.size,
+                children: entry.children,
+                properties: {},
+                forelinks: [],
+                backlinks: [],
+                createdTime: entry.created ? new Date(entry.created) : new Date(),
+                modifiedTime: entry.modified ? new Date(entry.modified) : new Date(),
+            });
+
+            // Track properties files for later processing
+            if (!entry.is_directory && (entry.name === 'properties.yml' || entry.name === 'properties.yaml')) {
+                propertiesFiles.push(entry.path);
+            }
+        }
+
+        // Phase 2: Batch read files (metadata already from Rust scan)
         const _fileProcessTime = new Date().getTime();
         
-        // Collect all paths for stat and paths that need content parsing
-        const allPaths: string[] = [];
+        // Collect paths that need content parsing
         const pathsToRead: string[] = [];
         
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
-
-            allPaths.push(path);
 
             // Collect paths that need content parsing
             if (!node.isFolder) {
@@ -288,24 +285,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             }
         }
 
-        // Execute batch stat and batch file reading in parallel
-        const batchStart = Date.now();
-        const [fileStats, fileContents] = await Promise.all([
-            statFilesBatch(allPaths),
-            readTextFilesBatch(pathsToRead)
-        ]);
-        const batchTime = Date.now() - batchStart;
-        
-        // Apply stat results to index
-        for (const path of allPaths) {
-            const node = newIndex[path];
-            const stats = fileStats.get(path);
-            if (node && stats && !stats.error) {
-                node.createdTime = stats.created ? new Date(stats.created) : new Date();
-                node.modifiedTime = stats.modified ? new Date(stats.modified) : new Date();
-                node.size = stats.size || 0;
-            }
-        }
+        // Batch read all text files
+        const batchReadStart = Date.now();
+        const fileContents = await readTextFilesBatch(pathsToRead);
+        const batchReadTime = Date.now() - batchReadStart;
 
         // Parse all loaded file contents
         const parseTimings = {properties: 0, links: 0};
@@ -322,9 +305,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const totalFileProcessTime = Date.now() - _fileProcessTime;
         
         console.log(`File processing took: ${totalFileProcessTime}ms`);
-        console.log(`  - batch I/O (stat + read): ${batchTime}ms`);
-        console.log(`    • stat: ${allPaths.length} files`);
-        console.log(`    • read: ${pathsToRead.length} files`);
+        console.log(`  - batch file reading: ${pathsToRead.length} files, ${batchReadTime}ms`);
         console.log(`  - parsing: ${pathsToRead.length} files, ${totalParseTime}ms total, ${(totalParseTime/pathsToRead.length).toFixed(2)}ms avg`);
         if (pathsToRead.length > 0) {
             console.log(`    • property parsing: ${parseTimings.properties}ms (${(parseTimings.properties/pathsToRead.length).toFixed(2)}ms avg)`);

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
@@ -24,6 +24,17 @@ struct FileStatResult {
     created: Option<i64>,  // Unix timestamp in milliseconds
     modified: Option<i64>, // Unix timestamp in milliseconds
     error: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DirectoryEntry {
+    path: String,
+    name: String,
+    is_directory: bool,
+    size: u64,
+    created: Option<i64>,  // Unix timestamp in milliseconds
+    modified: Option<i64>, // Unix timestamp in milliseconds
+    children: Vec<String>, // Paths of direct children
 }
 
 /// Reads multiple text files in parallel using Rust's native I/O and rayon for parallelism.
@@ -90,6 +101,84 @@ fn stat_files_batch(paths: Vec<String>) -> Vec<FileStatResult> {
         .collect()
 }
 
+/// Recursively scans a directory tree and returns all entries with metadata.
+/// This is much faster than doing recursive readDir calls from JavaScript
+/// because it eliminates all the IPC overhead and does the entire traversal in native code.
+#[tauri::command]
+fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, String> {
+    let mut entries = Vec::new();
+    let mut properties_files = Vec::new();
+    
+    fn scan_dir(
+        path: &Path, 
+        entries: &mut Vec<DirectoryEntry>,
+        properties_files: &mut Vec<String>
+    ) -> Result<Vec<String>, String> {
+        let dir_entries = fs::read_dir(path)
+            .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?;
+        
+        let mut children = Vec::new();
+        
+        for entry in dir_entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let entry_path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            
+            // Skip hidden files (starting with .)
+            if name.starts_with('.') {
+                continue;
+            }
+            
+            let metadata = fs::metadata(&entry_path)
+                .map_err(|e| format!("Failed to get metadata for {}: {}", entry_path.display(), e))?;
+            
+            let is_directory = metadata.is_dir();
+            let size = metadata.len();
+            
+            let created = metadata.created()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64);
+            
+            let modified = metadata.modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64);
+            
+            let path_str = entry_path.to_string_lossy().to_string();
+            children.push(path_str.clone());
+            
+            // Track properties files
+            if !is_directory && (name == "properties.yml" || name == "properties.yaml") {
+                properties_files.push(path_str.clone());
+            }
+            
+            let child_children = if is_directory {
+                scan_dir(&entry_path, entries, properties_files)?
+            } else {
+                Vec::new()
+            };
+            
+            entries.push(DirectoryEntry {
+                path: path_str,
+                name,
+                is_directory,
+                size,
+                created,
+                modified,
+                children: child_children,
+            });
+        }
+        
+        // Sort children for consistent ordering
+        children.sort();
+        Ok(children)
+    }
+    
+    scan_dir(Path::new(&root_path), &mut entries, &mut properties_files)?;
+    Ok(entries)
+}
+
 #[tauri::command]
 fn get_startup_file() -> Option<String> {
     let mut file_guard = STARTUP_FILE.lock().unwrap();
@@ -134,7 +223,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
-        .invoke_handler(tauri::generate_handler![get_startup_file, read_text_files_batch, stat_files_batch])
+        .invoke_handler(tauri::generate_handler![
+            get_startup_file, 
+            read_text_files_batch, 
+            stat_files_batch,
+            scan_directory_recursive
+        ])
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             apply_decorum_style(&main_window);
