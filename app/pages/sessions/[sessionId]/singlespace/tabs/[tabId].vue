@@ -18,7 +18,7 @@ import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useA
 import {convertFileSrc} from "@tauri-apps/api/core";
 import {
     isDataFile,
-    isImage,
+    isImage, isLatexFile,
     isPlainTextFile,
     isUnreadableAsText,
     isVideo,
@@ -87,6 +87,7 @@ const showImageViewer = computed(() => isImage(fileExt))
 const showVideoViewer = computed(() => isVideo(fileExt))
 const showDataEditor = computed(() => isDataFile(fileExt))
 const showYamlEditor = computed(() => isYamlFile(fileExt))
+const showLatexEditor = computed(() => isLatexFile(fileExt))
 
 const internalLinkList = computed<InternalLink[]>(() => [])
 const codeblockMappings = useActiveEditorCodeblockMappings()
@@ -155,7 +156,7 @@ onMounted(async () => {
 })
 
 const unsubscribe = on(async (event) => {
-    console.log(`[Listener for ${fileName.value}]`, event)
+    // console.log(`[Listener for ${fileName.value}]`, event)
     if (event.type == "remove") {
         await $win.getCurrentAppWindow().close()
     } else if (event.type == "modify" && event.path == getFileByUuid(tabId)?.fullPath) {
@@ -276,6 +277,19 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                     <template v-else-if="showDataEditor && showYamlEditor">
                         <ViewerEditorYamlDataForm
                             v-model="content"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :filePath="fullFilePath"
+                            :renaming="renaming"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showLatexEditor">
+                        <ViewerEditorLatexDoc
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
                             v-model:content-saved="isContentSaved"
                             v-model:fileName="fileName"
                             :disabled="!isContentLoaded"

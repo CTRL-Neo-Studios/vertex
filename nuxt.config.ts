@@ -78,7 +78,8 @@ export default defineNuxtConfig({
                 "@vue/devtools-core",
                 "@vue/devtools-kit",
                 "@internationalized/date",
-                "@type32/obsidian-bases-parser"
+                "@type32/obsidian-bases-parser",
+                "@type32/latex2vue"
             ]
         },
     },

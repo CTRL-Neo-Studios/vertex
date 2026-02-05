@@ -2,7 +2,7 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import useUuid from "~/composables/utility/useUuid";
-import {defaultAppSession} from "#shared/utils/defaults/apps";
+import {defaultAppSession, defaultAppSessionContext} from "#shared/utils/defaults/apps";
 import {useFileIO} from "~/composables/io/useFileIO";
 import type {AppSession} from "#shared/types/app/sessions";
 import {save} from "@tauri-apps/plugin-dialog";
@@ -117,9 +117,9 @@ export function useAppSessionActions() {
                     uuid: useUuid(),
                     rootFileOrFolderAbsolutePath: path,
                     sessionType: 'workspace',
-                    context: {
-                        openedAbsoluteFilePaths: []
-                    }
+                    context: defaultAppSessionContext({
+                        openedAbsoluteFilePaths: [] as string[],
+                    })
                 }))
             else
                 session = existingSession
@@ -156,9 +156,9 @@ export function useAppSessionActions() {
                     uuid: useUuid(),
                     rootFileOrFolderAbsolutePath: path,
                     sessionType: 'singlespace',
-                    context: {
-                        openedAbsoluteFilePaths: [path]
-                    }
+                    context: defaultAppSessionContext({
+                        openedAbsoluteFilePaths: [path] as string[],
+                    })
                 }))
             else
                 session = existingSession

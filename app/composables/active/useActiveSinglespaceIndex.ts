@@ -312,12 +312,12 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
                 // --- Modify Event Handling (Content Change) ---
                 if ('modify' in event.type && event.type.modify.kind === 'data') {
                     for (const path of event.paths) {
-                        console.log(`Modify detected: ${path}`);
+                        // console.log(`Modify detected: ${path}`);
                         
                         // Don't attempt to read binary files (images, PDFs, videos) as text
                         const extension = getFileExtensionFromPath(path);
                         if (isUnreadableAsText(extension)) {
-                            console.log(`Skipping text read for binary file: ${path}`);
+                            // console.log(`Skipping text read for binary file: ${path}`);
                             continue;
                         }
 

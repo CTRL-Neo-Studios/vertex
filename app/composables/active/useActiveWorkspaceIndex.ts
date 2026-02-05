@@ -206,7 +206,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     const uuidToFilePathIndex = useState<Map<string, string>>(`active.workspace.uuidToFilePathIndexMap.${session?.uuid ?? useUuid()}`, () => new Map());
 
     const fileTree = computed<UITreeNode[]>(() => {
-        const index = fileIndex.value;
+        const index = unref(fileIndex);
         if (Object.keys(index).length === 0) return [];
 
         const getNode = (path: string): UITreeNode => {

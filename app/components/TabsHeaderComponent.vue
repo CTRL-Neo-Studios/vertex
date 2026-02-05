@@ -191,8 +191,8 @@ function scrollToItem(index: number) {
 </script>
 
 <template>
-    <div class="w-full flex items-center">
-        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`">
+    <div class="w-full flex items-center" data-tauri-drag-region>
+        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`" data-tauri-drag-region>
             <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
             <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
         </div>
@@ -251,7 +251,7 @@ function scrollToItem(index: number) {
 <!--                />-->
 <!--            </ScrollAreaScrollbar>-->
 <!--        </ScrollAreaRoot>-->
-        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`">
+        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>

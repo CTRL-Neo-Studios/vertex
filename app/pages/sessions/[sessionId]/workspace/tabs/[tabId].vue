@@ -16,7 +16,7 @@ import {
     isUnreadableAsText,
     isPdf,
     isPlainTextFile,
-    isVideo, isYamlFile, isBasesFile
+    isVideo, isYamlFile, isBasesFile, isLatexFile
 } from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
@@ -76,6 +76,7 @@ const showImageViewer = computed(() => isImage(fileExt))
 const showVideoViewer = computed(() => isVideo(fileExt))
 const showBasesEditor = computed(() => isBasesFile(fileExt))
 const showYamlEditor = computed(() => isYamlFile(fileExt))
+const showLatexEditor = computed(() => isLatexFile(fileExt))
 
 const internalLinkList = computed<InternalLink[]>(() => {
     const list: InternalLink[] = []
@@ -310,6 +311,19 @@ editorDispatcher.on('editor.tableOfContents.toEntry', (props) => {
                     <template v-else-if="showYamlEditor">
                         <ViewerEditorYamlDataForm
                             v-model="content"
+                            v-model:content-saved="isContentSaved"
+                            v-model:fileName="fileName"
+                            :disabled="!isContentLoaded"
+
+                            :filePath="relativeFilePath"
+                            :renaming="renaming"
+                            @onRename="onRename"
+                        />
+                    </template>
+                    <template v-else-if="showLatexEditor">
+                        <ViewerEditorLatexDoc
+                            v-model="content"
+                            v-model:editorInstance="editorRef"
                             v-model:content-saved="isContentSaved"
                             v-model:fileName="fileName"
                             :disabled="!isContentLoaded"
