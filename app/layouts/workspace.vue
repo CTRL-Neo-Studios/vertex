@@ -66,6 +66,10 @@ $menu.dispatcher.on('categories.file.open.openFolder', async () => {
     await $act.openWorkspaceAction()
 })
 
+$menu.dispatcher.on('categories.view.closeWindow', async () => {
+    await $win.getCurrentAppWindow().close()
+})
+
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
 }, {deep: false})

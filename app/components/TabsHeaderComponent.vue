@@ -54,10 +54,8 @@ onMounted(() => {
     // }
 })
 
-$menu.dispatcher.on('categories.view.closeTabOrWindow', async () => {
-    if (unref(tabs).length <= 0 || !unref(isWorkspace)) {
-        await $win.getCurrentAppWindow().close()
-    } else if (unref(tabs).length > 0 && unref(isWorkspace)) {
+$menu.dispatcher.on('categories.view.closeTab', async () => {
+    if (unref(tabs).length > 0 && unref(isWorkspace)) {
         const tab = getActiveTab(tabId)
         if (tab)
             await exitTab(tab)

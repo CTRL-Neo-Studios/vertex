@@ -948,6 +948,37 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     }
 
     /**
+     * Returns the UUID of the properties.yml/yaml file belonging to the given folder UUID,
+     * or undefined if none exists. If the UUID itself points to a properties file, returns
+     * its own UUID.
+     */
+    function getPropertiesFile(fileUuid: PossiblyRef<string | undefined>): string | undefined {
+        const uuid = unref(fileUuid);
+        if (!uuid) return undefined;
+
+        const node = getFileByUuid(uuid);
+        if (!node) return undefined;
+
+        if (node.isFolder) {
+            const index = unref(fileIndex);
+            for (const childPath of node.children) {
+                const childNode = index[childPath];
+                if (!childNode || childNode.isFolder) continue;
+                if (childNode.fileName === 'properties.yml' || childNode.fileName === 'properties.yaml') {
+                    return childNode.uuid;
+                }
+            }
+            return undefined;
+        }
+
+        if (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') {
+            return node.uuid;
+        }
+
+        return undefined;
+    }
+
+    /**
      * Gets the parent folder of a file given its absolute path.
      */
     function getParentFolderByPath(absolutePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
@@ -1010,6 +1041,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFilteredFiles,
         getFilesByExtension,
         hasPropertiesFile,
+        getPropertiesFile,
         getParentFolderByPath,
         getParentFolderByUuid
     };

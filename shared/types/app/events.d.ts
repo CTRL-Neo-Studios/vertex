@@ -15,7 +15,8 @@ export interface WindowMenuEvents {
             saveAs: DispatcherEvent
         },
         view: {
-            closeTabOrWindow: DispatcherEvent,
+            closeTab: DispatcherEvent,
+            closeWindow: DispatcherEvent
             clearTabs: DispatcherEvent
         },
         about: {

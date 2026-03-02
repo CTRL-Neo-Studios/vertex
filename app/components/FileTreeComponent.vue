@@ -242,8 +242,9 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 icon: 'i-lucide-file-plus',
                 disabled: !isFolder,
                 async onSelect(e: Event) {
-                    if (getPropertiesFile(item.id) != undefined) {
-                        const tab = openTab(item.id)
+                    const propFileUuid = getPropertiesFile(item.id)
+                    if (propFileUuid != undefined) {
+                        const tab = openTab(propFileUuid)
                         await $navi.toWorkspaceTab($sessionId, tab)
                     } else {
                         const result = await createPropertiesFile(item.id)

@@ -67,6 +67,10 @@ $menu.dispatcher.on('categories.file.new.newFile', async () => {
     await $act.createNewFileForSinglespace()
 })
 
+$menu.dispatcher.on('categories.view.closeWindow', async () => {
+    await $win.getCurrentAppWindow().close()
+})
+
 watch(activeTabUuid, (newValue) => {
     activeTreeItem.value = newValue
 }, {deep: false})

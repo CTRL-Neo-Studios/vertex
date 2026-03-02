@@ -246,9 +246,9 @@ export function useAppWindowMenu() {
 
         items.push(await MenuItem.new({
             id: 'close-tab',
-            text: 'Close Current Tab/Window',
+            text: 'Close Current Tab',
             accelerator: 'CmdOrCtrl+W',
-            action: () => handleCloseTabOrWindow(),
+            action: () => handleCloseTab(),
             enabled: evaluateUnref($inEditingSpace)
         }));
 
@@ -258,6 +258,14 @@ export function useAppWindowMenu() {
             accelerator: 'CmdOrCtrl+Shift+W',
             action: () => handleClearTabs(),
             enabled: evaluateUnref($inWorkspace)
+        }));
+
+        items.push(await MenuItem.new({
+            id: 'close-window',
+            text: 'Close Current Window',
+            accelerator: 'CmdOrCtrl+Alt+W',
+            action: () => handleCloseWindow(),
+            enabled: evaluateUnref($inEditingSpace)
         }));
 
         items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
@@ -361,8 +369,12 @@ export function useAppWindowMenu() {
         dispatcher.emit('categories.file.saveAs')
     }
 
-    function handleCloseTabOrWindow() {
-        dispatcher.emit('categories.view.closeTabOrWindow')
+    function handleCloseWindow() {
+        dispatcher.emit('categories.view.closeWindow')
+    }
+
+    function handleCloseTab() {
+        dispatcher.emit('categories.view.closeTab')
     }
 
     function handleClearTabs() {

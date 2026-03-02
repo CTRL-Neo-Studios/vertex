@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ReferenceLinksListComponent from "~/components/ReferenceLinksListComponent.vue";
+import ReferenceForelinksListComponent from "~/components/ReferenceForelinksListComponent.vue";
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import WritersInfoPanelComponent from "~/components/WritersInfoPanelComponent.vue";
@@ -10,13 +10,17 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import type {TabsItem} from "@nuxt/ui";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
+import ReferenceBacklinksListComponent from "~/components/ReferenceBacklinksListComponent.vue";
+import {computed} from "vue";
+import {isBasesFile} from "#shared/utils/fs/filenames";
 
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
-const $sessionId = computed<string>(() => $route.params.sessionId as string)
+const $sessionId = computed<string>(() => $route.params.sessionId as string), $tabId = computed<string>(() => $route.params.tabId as string)
 const {
     fileTree,
+    getFileByUuid
 } = useActiveWorkspaceIndex($sesh.getSession($sessionId))
 const {
     openTab,
@@ -27,31 +31,48 @@ const {
 const emit = defineEmits<{
     (e: 'to-toc', value: TocEntry): void
 }>()
+const isBases = computed(() => isBasesFile(getFileByUuid($tabId)?.fileExt || ''))
 
-const activeRightPanel = ref('reflinks')
+const activeRightPanel = ref('0')
 const rightPanelItems: TabsItem[] = [
     {
-        value: 'reflinks',
-        label: 'Referenced Links',
-        icon: 'i-lucide-link'
+        value: '0',
+        label: 'Foreinks',
+        icon: 'i-lucide-square-arrow-out-up-right'
     },
     {
-        value: 'writer',
+        value: '1',
+        label: 'Backlinks',
+        icon: 'i-lucide-square-arrow-out-down-left'
+    },
+    {
+        value: '2',
         label: 'Writer\'s Tools',
         icon: 'i-lucide-pencil'
     },
     {
-        value: 'toc',
+        value: '3',
         label: 'Table of Contents',
         icon: 'i-lucide-table-of-contents'
     }
 ]
+const basesPanelItems: TabsItem[] = [
+    {
+        value: ''
+    }
+]
+const tabItems = computed(() => unref(isBases) ? basesPanelItems : rightPanelItems)
+
+watch($tabId, () => {
+    if (unref(isBases))
+        activeRightPanel.value = "0"
+})
 
 /*
 Note to future self:
 Stop messing around with the sidebar constantly going into mobile-drawer mode. Currently there isn't an option that does that for the dashboard sidebar,
 and the UDashboardPanel is used as a lesser alternative that requires more effort to the styling. This, complicates things a lot.
- */
+*/
 
 </script>
 
@@ -85,20 +106,28 @@ and the UDashboardPanel is used as a lesser alternative that requires more effor
                     <SidebarCollapserButton side="right"/>
                 </div>
                 <div class="grow"/>
-                <UTabs label-key="title" v-model="activeRightPanel" :content="false" :items="rightPanelItems" size="xs" variant="pill"/>
+                <UTabs label-key="title" v-model="activeRightPanel" :content="false" :items="tabItems" size="xs" variant="pill"/>
             </UDashboardNavbar>
         </template>
         <template #body>
             <UScrollArea orientation="vertical" class="no-scrollbar" data-tauri-drag-region>
                 <div class="w-full">
-                    <template v-if="activeRightPanel == 'reflinks'">
-                        <ReferenceLinksListComponent class="w-full h-full mt-2"/>
+                    <template v-if="!isBases">
+                        <template v-if="activeRightPanel == '0'">
+                            <ReferenceForelinksListComponent class="w-full h-full mt-2"/>
+                        </template>
+                        <template v-else-if="activeRightPanel == '1'">
+                            <ReferenceBacklinksListComponent class="w-full h-full mt-2"/>
+                        </template>
+                        <template v-else-if="activeRightPanel == '2'">
+                            <WritersInfoPanelComponent class="w-full h-full mt-2"/>
+                        </template>
+                        <template v-else-if="activeRightPanel == '3'">
+                            <TableOfContentsPanelComponent @to-toc="(entry) => emit('to-toc', entry)" class="w-full h-full mt-2"/>
+                        </template>
                     </template>
-                    <template v-else-if="activeRightPanel == 'writer'">
-                        <WritersInfoPanelComponent class="w-full h-full mt-2"/>
-                    </template>
-                    <template v-else-if="activeRightPanel == 'toc'">
-                        <TableOfContentsPanelComponent @to-toc="(entry) => emit('to-toc', entry)" class="w-full h-full mt-2"/>
+                    <template v-else>
+
                     </template>
                 </div>
             </UScrollArea>

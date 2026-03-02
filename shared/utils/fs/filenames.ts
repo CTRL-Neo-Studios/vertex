@@ -91,6 +91,10 @@ export function isPlainTextFile(extension: PossiblyRef<string>) {
     return ['txt', 'md'].includes(unref(extension))
 }
 
+export function isLatexFile(extension: PossiblyRef<string>) {
+    return ['tex'].includes(unref(extension))
+}
+
 export function isDataFile(extension: PossiblyRef<string>) {
     return ['base', 'yml', 'yaml', 'csv'].includes(unref(extension))
 }
