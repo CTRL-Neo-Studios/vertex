@@ -1,23 +1,33 @@
 <script setup lang="ts">
 import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types";
-import {type BaseSource, createBase, createReactiveBaseFromYAML, useBase} from "@type32/obsidian-bases-parser";
+import {
+    type BaseSource,
+    createBase,
+    createReactiveBaseFromYAML,
+    type SortConfig,
+    useBase
+} from "@type32/obsidian-bases-parser";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {YamlFormData} from "@type32/yaml-editor-form";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useFileIO} from "~/composables/io/useFileIO";
-import type {ArrayOrNested, DropdownMenuItem} from "@nuxt/ui";
+import type {DropdownMenuItem} from "@nuxt/ui";
 import type {TableColumn} from '@nuxt/ui'
 import {h, resolveComponent} from 'vue'
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {toLargestFileSizeUnit} from "#shared/utils/fs/filestats";
-import {upperFirst} from 'scule'
+import type { Column, SortingState } from '@tanstack/vue-table'
+import NewBaseViewModal from "~/components/Modals/Bases/NewBaseViewModal.vue";
 
+const $ovl = useOverlay()
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 const UScrollArea = resolveComponent('UScrollArea')
+const UDropdownMenu = resolveComponent('UDropdownMenu')
+const ModalNewBaseView = $ovl.create(NewBaseViewModal)
 
 const editorInstance = defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
@@ -53,6 +63,111 @@ const $tab = useActiveTabs(unref($session))
 const $navi = useAppNavigator()
 const $fio = useFileIO()
 
+function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
+    const isSorted = column.getIsSorted()
+
+    return h(
+        UDropdownMenu,
+        {
+            content: {
+                align: 'start'
+            },
+            'aria-label': 'Actions dropdown',
+            size: 'sm',
+            items: [[
+                {
+                    label: 'Sort Ascending',
+                    type: 'checkbox',
+                    icon: 'i-lucide-arrow-up-narrow-wide',
+                    checked: isSorted === 'asc',
+                    onSelect: () => {
+                        if (isSorted === 'asc') {
+                            $base.removeViewSort(unref(activeView), column.id)
+                            column.clearSorting()
+                        } else {
+                            $base.addViewSort(unref(activeView), column.id, 'ASC')
+                            column.toggleSorting(false)
+                        }
+                    }
+                },
+                {
+                    label: 'Sort Descending',
+                    icon: 'i-lucide-arrow-down-wide-narrow',
+                    type: 'checkbox',
+                    checked: isSorted === 'desc',
+                    onSelect: () => {
+                        if (isSorted === 'desc') {
+                            $base.removeViewSort(unref(activeView), column.id)
+                            column.clearSorting()
+                        } else {
+                            $base.addViewSort(unref(activeView), column.id, 'DESC')
+                            column.toggleSorting(true)
+                        }
+                    }
+                }
+            ], [{
+                label: 'Clear Sorting',
+                icon: 'i-lucide-trash',
+                color: 'error',
+                onSelect: () => {
+                    $base.removeViewSort(unref(activeView), column.id)
+                    column.clearSorting()
+                }
+            }]]
+        },
+        () =>
+            h(UButton, {
+                color: 'neutral',
+                variant: 'ghost',
+                label,
+                size: 'sm',
+                icon: isSorted
+                    ? isSorted === 'asc'
+                        ? 'i-lucide-arrow-up-narrow-wide'
+                        : 'i-lucide-arrow-down-wide-narrow'
+                    : 'i-lucide-arrow-up-down',
+                class: '-mx-2.5 data-[state=open]:bg-elevated',
+                'aria-label': `Sort by ${isSorted === 'asc' ? 'descending' : 'ascending'}`
+            })
+    )
+}
+
+function getFileLinkBadgeList(idList: string[]) {
+    return h('div', { class: 'relative max-w-96' }, [
+        h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
+        h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, {
+            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
+                idList.map((v) => h(UBadge, {
+                    label: `${getFileByUuid(v)?.fileName}`,
+                    variant: 'soft',
+                    class: 'cursor-pointer',
+                    async onClick() {
+                        await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(v))
+                    },
+                    size: 'md'
+                }))
+            ])
+        }),
+        h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
+    ])
+}
+
+function getTagsBadgeList(stringList: string[]) {
+    return h('div', { class: 'relative max-w-96' }, [
+        h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
+        h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, {
+            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
+                stringList.map((v) => h(UBadge, {
+                    label: `${v}`,
+                    variant: 'subtle',
+                    size: 'md'
+                }))
+            ])
+        }),
+        h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
+    ])
+}
+
 function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
     let source: BaseSource<YamlFormData>[] = []
 
@@ -86,9 +201,10 @@ function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
     return source
 }
 
-function propogateDisplayData(): TableColumn<BaseSource<YamlFormData>>[] {
+function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] {
     const originals: TableColumn<BaseSource<YamlFormData>>[] = [
         {
+            id: '#id',
             accessorKey: 'id',
             header: '#',
             cell: ({row}) => `#${row.getValue<string>('id').slice(0, 4)}`
@@ -96,20 +212,21 @@ function propogateDisplayData(): TableColumn<BaseSource<YamlFormData>>[] {
         {
             id: 'file.name',
             accessorKey: 'name',
-            header: 'File Name',
+            header: ({ column }) => getHeader(column, 'File Name'),
             cell: ({row}) => h(UButton, {
                 variant: 'link',
                 class: 'cursor-pointer',
                 label: row.getValue<string>('file.name'),
                 async onClick() {
                     await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.getValue<string>('id')))
-                }
+                },
+                size: 'sm'
             })
         },
         {
             id: 'file.ctime',
             accessorKey: 'ctime',
-            header: 'Created Time',
+            header: ({ column }) => getHeader(column, 'Created Time'),
             cell: ({row}) => {
                 return new Date(row.getValue('file.ctime')).toLocaleString('en-US', {
                     day: 'numeric',
@@ -124,7 +241,7 @@ function propogateDisplayData(): TableColumn<BaseSource<YamlFormData>>[] {
         {
             id: 'file.mtime',
             accessorKey: 'mtime',
-            header: 'Last Modified Time',
+            header: ({ column }) => getHeader(column, 'Last Modified Time'),
             cell: ({row}) => {
                 return new Date(row.getValue('file.mtime')).toLocaleString('en-US', {
                     day: 'numeric',
@@ -139,96 +256,63 @@ function propogateDisplayData(): TableColumn<BaseSource<YamlFormData>>[] {
         {
             id: 'file.size',
             accessorKey: 'size',
-            header: 'File Size',
+            header: ({ column }) => getHeader(column, 'File Size'),
             cell: ({row}) => toLargestFileSizeUnit(row.getValue<number>('file.size'))
         },
         {
             id: 'file.basename',
             accessorKey: 'basename',
-            header: 'File Base Name',
+            header: ({ column }) => getHeader(column, 'File Base Name'),
             cell: ({row}) => row.getValue<string>('file.basename')
         },
         {
             id: 'file.path',
             accessorKey: 'path',
-            header: 'File Relative Path',
+            header: ({ column }) => getHeader(column, 'File Relative Path'),
             cell: ({row}) => row.getValue<string>('file.path')
         },
         {
             id: 'file.folder',
             accessorKey: 'folder',
-            header: 'File Parent Folder',
+            header: ({ column }) => getHeader(column, 'File Parent Folder'),
             cell: ({row}) => row.getValue<string>('file.folder')
         },
         {
             id: 'file.ext',
             accessorKey: 'ext',
-            header: 'File Extension',
+            header: ({ column }) => getHeader(column, 'File Extension'),
             cell: ({row}) => h(UBadge, {
                 label: `.${row.getValue<string>('file.ext')}`,
                 variant: 'soft',
-                color: 'neutral'
+                color: 'neutral',
+                size: 'md'
             })
         },
         {
             id: 'file.links',
             accessorKey: 'links',
-            header: 'Forelinks',
-            cell: ({row}) => h('div', { class: 'relative max-w-96' }, [
-                h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
-                h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, [
-                    h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
-                        row.getValue<string[]>('file.links').map((v) => h(UBadge, {
-                            label: `${getFileByUuid(v)?.fileName}`,
-                            variant: 'soft',
-                            class: 'cursor-pointer',
-                            async onClick() {
-                                await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(v))
-                            }
-                        }))
-                    ]),
-                ]),
-                h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default'}),
-            ])
+            header: ({ column }) => getHeader(column, 'Forelinks'),
+            cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.links'))
         },
         {
             id: 'file.backlinks',
             accessorKey: 'backlinks',
-            header: 'Backlinks',
-            cell: ({row}) => h('div', { class: 'relative max-w-96' }, [
-                h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
-                h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, [
-                    h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
-                        row.getValue<string[]>('file.backlinks').map((v) => h(UBadge, {
-                            label: `${getFileByUuid(v)?.fileName}`,
-                            variant: 'soft',
-                            class: 'cursor-pointer',
-                            async onClick() {
-                                await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(v))
-                            }
-                        }))
-                    ]),
-                ]),
-                h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
-            ])
+            header: ({ column }) => getHeader(column, 'Backlinks'),
+            cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.backlinks'))
         },
         {
+            id: 'tags',
             accessorKey: 'tags',
-            header: 'Tags',
-            cell: ({row}) => h('div', { class: 'relative max-w-96' }, [
-                h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
-                h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, [
-                    h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
-                        row.getValue<string[]>('tags').map((v) => h(UBadge, {
-                            label: `${v}`,
-                            variant: 'subtle',
-                        }))
-                    ]),
-                ]),
-                h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
-            ])
+            header: ({ column }) => getHeader(column, 'Tags'),
+            cell: ({row}) => getTagsBadgeList(row.getValue<string[]>('tags'))
         }
     ]
+
+    const columnIds = originals.map(v => v.id).filter(i => i != undefined)
+
+    const datas = unref(currentViewResults).map(i => i.data).filter(i => i != undefined)
+
+    // console.log(columnIds, datas)
 
     return originals
 }
@@ -255,14 +339,22 @@ function setBaseColumnVisibility(columnId: string, visible: boolean) {
     }
 }
 
-function applyAllColumnsVisibilityFromBaseConfig() {
-    console.log($base.getView(unref(activeView))?.order)
+function loadColumnsVisibilityFromBase() {
     unref(table)?.tableApi?.getAllColumns()
         .filter((column) => column.getCanHide())
         .forEach((column) => {
             const exists = $base.getView(unref(activeView))?.order?.includes(column.id)
             unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(exists)
         })
+}
+
+function loadColumnsSortingFromBase() {
+    $base.getView(unref(activeView))?.sort?.forEach((i: SortConfig) => {
+        sorting.value.push({
+            id: i.property,
+            desc: i.direction === "DESC"
+        })
+    })
 }
 
 function setAllColumnsVisibility(visible: boolean) {
@@ -286,22 +378,52 @@ watch($base.hasChanges, (newValue) => {
         content.value = $base.save()
 })
 
+const searchTerm = computed({
+    get() {
+
+    },
+    set(newValue) {
+
+    }
+})
 const table = useTemplateRef('table')
 const currentViewResults = computed(() => unref($base.query.getViewResults(unref(activeView))).items)
 const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
     [
         ...unref($base.views).map(i => ({
             label: i.name,
-            onSelect(e) {
-                activeView.value = i.name
-            },
             icon: getIconFromBaseType(i.type),
             checked: unref(activeView).includes(i.name),
-            active: unref(activeView).includes(i.name)
+            active: unref(activeView).includes(i.name),
+            slot: 'view' as const,
+            children: [[{
+                label: 'View',
+                icon: 'i-lucide-eye',
+                onSelect(e) {
+                    activeView.value = i.name
+                }
+            }], [{
+                label: 'Remove',
+                icon: 'i-lucide-trash',
+                color: 'error'
+            }]]
         } satisfies DropdownMenuItem))
+    ],
+    [
+        {
+            label: 'Add View',
+            icon: 'i-lucide-grid-2x2-plus',
+            async onSelect(e) {
+                const view = await ModalNewBaseView.open()
+                if (view) {
+                    $base.addView(view)
+                    activeView.value = view.name
+                }
+            }
+        }
     ]
 ])
-const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayData())
+const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayDataColumns())
 const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
     let cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
         .filter((column) => column.getCanHide())
@@ -347,12 +469,16 @@ onMounted(async () => {
     // console.log(unref($base.source))
     // console.log(JSON.stringify(propogateFileIndexToSourceArray()))
 
-    applyAllColumnsVisibilityFromBaseConfig()
+    loadColumnsVisibilityFromBase()
+    loadColumnsSortingFromBase()
 
     // console.log(unref(activeView))
     // console.log(unref($base.query.getViewResults(unref(activeView))))
     // console.log(unref($base.views))
 })
+
+const sorting = ref<SortingState>([])
+const filters = ref([])
 
 </script>
 
@@ -377,8 +503,13 @@ onMounted(async () => {
                             :items="baseViewsItems"
                             size="sm"
                         >
-                            <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" label="Views"/>
+                            <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" label="Views">
+                                <template #trailing>
+                                    <UBadge :label="activeView" size="xs" variant="subtle" color="neutral"/>
+                                </template>
+                            </UButton>
                         </UDropdownMenu>
+                        <UButton size="sm" variant="link" color="neutral" :label="`${currentViewResults.length} Results`"/>
                         <div class="grow"/>
                         <UDropdownMenu
                             :items="columnsDropdownItems"
@@ -392,18 +523,20 @@ onMounted(async () => {
                                 variant="ghost"
                             />
                         </UDropdownMenu>
+                        <UInput icon="i-lucide-search" size="sm" placeholder="Search..."/>
                     </div>
                 </div>
                 <UTable
+                    v-model:sorting="sorting"
                     :columns="columns"
                     ref="table"
                     sticky
                     :data="currentViewResults"
                     class="flex-1"
                     :ui="{
-                        thead: 'backdrop-blur-xs bg-linear-to-t from-default/0 to-default',
+                        thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
                         td: 'py-1',
-                        th: 'py-2'
+                        th: 'py-2 pt-0 text-xs',
                     }"
                 />
             </div>
