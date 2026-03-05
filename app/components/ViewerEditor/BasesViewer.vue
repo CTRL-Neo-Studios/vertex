@@ -212,7 +212,6 @@ function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
 }
 
 function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] {
-	console.log('propogating cols')
     const originals: TableColumn<BaseSource<YamlFormData>>[] = [
         {
             id: '#id',
@@ -431,7 +430,6 @@ function loadColumnsVisibilityFromBase() {
 	console.log('load cols visibility from base')
     unref(columns).forEach((column) => {
 		const exists = ($base.getView(unref(activeView))?.order || [])?.includes(`${column.id}`)
-		console.log('col key', column.id, exists)
 		unref(table)?.tableApi?.getColumn(`${column.id}`)?.toggleVisibility(exists)
 	})
 }
@@ -513,17 +511,16 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
                 const view = await ModalNewBaseView.open()
                 if (view) {
                     $base.addView(view)
-                    activeView.value = view.name
+					if (view?.name) {
+						$base.addViewOrder(view.name, 'file.name')
+						activeView.value = view.name
+					}
                 }
             }
         }
     ]
 ])
-const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => {
-	const cols = propogateDisplayDataColumns()
-	console.log('resolved cols count', cols.length)
-	return cols
-})
+const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayDataColumns())
 const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
     let cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
         .filter((column) => column.getCanHide() && column.id != '#id')
