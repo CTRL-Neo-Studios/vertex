@@ -35,7 +35,7 @@
     "@tauri-apps/plugin-store": "^2.4.2",
     "@tiptap/extension-collaboration": "^3.20.0",
     "@tiptap/extension-node-range": "^3.20.0",
-    "@type32/codemirror-rich-obsidian-editor": "^0.1.26",
+    "@type32/codemirror-rich-obsidian-editor": "^0.1.28",
     "@type32/dispatcher": "^0.1.2",
     "@type32/latex2vue": "^3.1.18",
     "@type32/nuxt-predicates": "^1.1.0",
@@ -54,16 +54,16 @@
     "mathjaxjs": "^3.0.10",
     "nuxt": "^4.3.1",
     "nuxt-auth-utils": "0.5.29",
-    "reka-ui": "^2.8.2",
+    "reka-ui": "^2.9.0",
     "smol-toml": "^1.6.0",
     "sortablejs": "^1.15.7",
     "vue": "^3.5.29",
-    "vue-codemirror6": "^1.4.2",
+    "vue-codemirror6": "^1.4.3",
     "vue-mermaid-string": "^8.0.2",
     "yjs": "^13.6.29"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.0",
+    "@tauri-apps/cli": "^2.10.1",
     "typescript": "^5.9.3"
   },
   "trustedDependencies": [

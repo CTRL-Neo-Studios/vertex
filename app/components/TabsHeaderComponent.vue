@@ -208,7 +208,7 @@ function scrollToItem(index: number) {
             </div>
             <div
                 v-else
-                :class="['w-fit relative inline-flex items-center justify-center group', 'h-full', tabId == item.id ? 'border-b-2 border-primary' : '']"
+                :class="['w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 after:border-b-2 after:border-neutral after:w-0 after:bottom-0 after:h-full after:bg-linear-to-t after:from-primary/10 dark:after:from-primary/20 after:via-transparent after:to-transparent', 'h-full', tabId == item.id ? 'after:absolute after:transition after:border-b-2 after:border-primary after:w-full' : '']"
             >
                 <UButton
                     :key="index"

@@ -348,7 +348,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         value-key="id"
         :ui="{
             itemWithChildren: 'ps-0',
-            listWithChildren: `ms-4.5 pl-2 border-muted`
+            listWithChildren: `ms-4.5 pl-2 border-muted border-dotted`
         }"
         size="sm"
     >
@@ -359,7 +359,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                     :label="config?.viewConfig.fileTree.showFileExtInName ? $ftMemo.getFromLabel(item.label).name : $ftMemo.getFromLabel(item.label).unextName"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
-                    :class="['select-none relative align-middle items-center justify-start text-left', item.id == activeTabUuid ? 'pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
+                    :class="['select-none relative align-middle items-center justify-start text-left transition-all duration-300 after:transition-all after:duration-300 after:h-0 after:w-0 after:border-0 after:border-primary/0 after:left-0 after:absolute', item.id == activeTabUuid ? ' transition-all duration-300 pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
                     block
                     @click="onItemClick(item)"
                     :key="`${item.id}-file-tree-item`"

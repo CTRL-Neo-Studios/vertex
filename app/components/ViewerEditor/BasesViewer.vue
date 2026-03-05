@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {
+	InternalLink,
+	InternalLinkClickDetail,
+	InternalLinkNode
+} from "#codemirror-rich-obsidian-editor/editor-types";
 import {
     type BaseSource,
     createBase,
@@ -20,13 +24,19 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {toLargestFileSizeUnit} from "#shared/utils/fs/filestats";
 import type { Column, SortingState } from '@tanstack/vue-table'
 import NewBaseViewModal from "~/components/Modals/Bases/NewBaseViewModal.vue";
+import {getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
+import {EditorProseEmbedImageDisplay} from "#components";
+import {convertFileSrc} from "@tauri-apps/api/core";
 
 const $ovl = useOverlay()
+const loadingData = ref(false)
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 const UScrollArea = resolveComponent('UScrollArea')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
+const UPopover = resolveComponent('UPopover')
+const UTooltip = resolveComponent('UTooltip')
 const ModalNewBaseView = $ovl.create(NewBaseViewModal)
 
 const editorInstance = defineModel('editorInstance')
@@ -202,12 +212,13 @@ function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
 }
 
 function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] {
+	console.log('propogating cols')
     const originals: TableColumn<BaseSource<YamlFormData>>[] = [
         {
             id: '#id',
             accessorKey: 'id',
             header: '#',
-            cell: ({row}) => `#${row.getValue<string>('id').slice(0, 4)}`
+            cell: ({row}) => `#${row.getValue<string>('#id').slice(0, 4)}`
         },
         {
             id: 'file.name',
@@ -218,7 +229,7 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
                 class: 'cursor-pointer',
                 label: row.getValue<string>('file.name'),
                 async onClick() {
-                    await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.getValue<string>('id')))
+                    await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.getValue<string>('#id')))
                 },
                 size: 'sm'
             })
@@ -309,10 +320,87 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
     ]
 
     const columnIds = originals.map(v => v.id).filter(i => i != undefined)
-
     const datas = unref(currentViewResults).map(i => i.data).filter(i => i != undefined)
+	const columnMap = new Map<string, string>()
+	datas.forEach((value) => {
+		Object.keys(value).forEach((key) => {
+			if (!columnMap.has(key)) {
+				const val = value[key]
 
-    // console.log(columnIds, datas)
+				if (Array.isArray(val)) {
+					const itemType = val.length > 0 ? typeof val[0] : 'unknown'
+					columnMap.set(key, `array[${itemType}]`)
+				} else if (val instanceof Date) {
+					columnMap.set(key, 'date')
+				} else if (val === null || val === undefined) {
+					columnMap.set(key, 'null')
+				} else {
+					columnMap.set(key, typeof val)
+				}
+			}
+		})
+	})
+
+	const propCols: TableColumn<BaseSource<YamlFormData>>[] = columnMap.keys().toArray().map((key) => {
+		const keyType = columnMap.get(key)
+		if (!keyType || columnIds.includes(key)) return;
+		let flag = true
+
+		const col: TableColumn<BaseSource<YamlFormData>> = {
+			accessorFn: (originalRow) => originalRow.properties || originalRow.data,
+			id: key,
+			header: ({column}) => getHeader(column, key),
+			cell: ({row}) => {
+				const rowVal = (row.getValue(key) as any)
+				if (!rowVal[key]) {
+					flag = false
+					return
+				}
+
+				if (keyType === 'array[string]') {
+					return getTagsBadgeList(rowVal[key] as string[])
+				} else if (keyType === 'array[object]' || keyType === 'object') {
+					return JSON.stringify(rowVal[key])
+				} else if (keyType === 'string') {
+					const links = getInternalLinks(rowVal[key] as string)
+					if (links.length <= 0) return;
+					else if (links.length == 1) {
+						const [link]: InternalLinkNode[] = links
+						if (!link) return;
+						const internalLink = props.internalLinkList.find(value => value.filePath?.endsWith(link.path))
+						if (!internalLink) return;
+						if (isImage(getFileExtensionFromPath(`${internalLink.filePath}`)))
+							return h(UPopover, {}, {
+								default: () => h(UTooltip, { text: 'Click to view Image' }, () => h(UButton, { color: 'neutral', variant: 'ghost', size: 'xs', icon: 'i-lucide-image' })),
+								content: () => h(EditorProseEmbedImageDisplay, { srcPath: convertFileSrc(`${getFileByUuid(internalLink.referenceId)?.fullPath}`), display: internalLink.name })
+							})
+						else
+							return h(UButton, {
+								variant: 'link',
+								class: 'cursor-pointer',
+								label: internalLink.name,
+								async onClick() {
+									await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(internalLink.referenceId))
+								},
+								size: 'sm'
+							})
+					} else {
+						const [link]: InternalLinkNode[] = links
+						if (!link) return;
+						const internalLinkIds = props.internalLinkList.filter(value => value.filePath?.endsWith(link.path)).map(value => value.referenceId)
+						return getFileLinkBadgeList(internalLinkIds)
+					}
+				} else {
+					return rowVal[key]
+				}
+			}
+		} satisfies TableColumn<BaseSource<YamlFormData>>
+
+		if (!flag) return;
+		return col
+	}).filter((value) => value != undefined)
+
+	originals.push(...propCols)
 
     return originals
 }
@@ -340,12 +428,12 @@ function setBaseColumnVisibility(columnId: string, visible: boolean) {
 }
 
 function loadColumnsVisibilityFromBase() {
-    unref(table)?.tableApi?.getAllColumns()
-        .filter((column) => column.getCanHide())
-        .forEach((column) => {
-            const exists = $base.getView(unref(activeView))?.order?.includes(column.id)
-            unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(exists)
-        })
+	console.log('load cols visibility from base')
+    unref(columns).forEach((column) => {
+		const exists = ($base.getView(unref(activeView))?.order || [])?.includes(`${column.id}`)
+		console.log('col key', column.id, exists)
+		unref(table)?.tableApi?.getColumn(`${column.id}`)?.toggleVisibility(exists)
+	})
 }
 
 function loadColumnsSortingFromBase() {
@@ -378,14 +466,14 @@ watch($base.hasChanges, (newValue) => {
         content.value = $base.save()
 })
 
-const searchTerm = computed({
-    get() {
-
-    },
-    set(newValue) {
-
-    }
+watch(activeView, (newValue) => {
+	loadingData.value = true
+	propogateDisplayDataColumns()
+	loadColumnsVisibilityFromBase()
+	loadingData.value = false
 })
+
+const searchTerm = ref('')
 const table = useTemplateRef('table')
 const currentViewResults = computed(() => unref($base.query.getViewResults(unref(activeView))).items)
 const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
@@ -405,7 +493,15 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
             }], [{
                 label: 'Remove',
                 icon: 'i-lucide-trash',
-                color: 'error'
+                color: 'error',
+				onSelect(e) {
+					if (unref($base.viewNames).length <= 1) return;
+					const baseName = i.name
+					$base.removeView(baseName)
+					if (baseName === unref(activeView))
+						activeView.value = unref($base.viewNames)[0] || ''
+				},
+				disabled: unref($base.viewNames).length <= 1
             }]]
         } satisfies DropdownMenuItem))
     ],
@@ -423,17 +519,21 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
         }
     ]
 ])
-const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayDataColumns())
+const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => {
+	const cols = propogateDisplayDataColumns()
+	console.log('resolved cols count', cols.length)
+	return cols
+})
 const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
     let cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
-        .filter((column) => column.getCanHide())
+        .filter((column) => column.getCanHide() && column.id != '#id')
         .map((column) => ({
-            label: column?.columnDef?.header?.toString() || column.id || '',
+            label: column.id || '',
             type: 'checkbox' as const,
             checked: column.getIsVisible(),
             onUpdateChecked(checked: boolean) {
                 setBaseColumnVisibility(column.id, checked)
-                unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
+                unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(checked)
             },
             onSelect(e: Event) {
                 e.preventDefault()
@@ -460,15 +560,29 @@ const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
 })
 
 onMounted(async () => {
+	loadingData.value = true
     await until($session).toMatch(v => !!v)
 
     if (!unref(activeView) || unref(activeView) == '')
         activeView.value = unref($base.viewNames)[0] || ''
 
-    $base.setSource(propogateFileIndexToSourceArray())
+    $base.setSource(unref(baseSource))
     // console.log(unref($base.source))
     // console.log(JSON.stringify(propogateFileIndexToSourceArray()))
 
+	// Note on this part: for some weird reason, the `columns` field of the UTable tends to fetch the static columns first, which were the
+	// `originals` in the propogate columns function. Then, as the data is "gradually fetched" (which isn't but UTable or the Tanstack Table somehow thinks it is),
+	// the columns would THEN propogate to its full form. I absolutely despise Tanstack Tables for making such an appaling
+	// fucking table framework with weird as fuck APIs and hard to understand documentations that gives me a fucking headache
+	// instead of the functions that I want to work with.
+	//
+	// Because of this 'delayed' column propogation perceived by the Tanstack table, I have to manually wait for the table to load all the columns
+	// in its first phrase of fetching the static cols and the phrase of fetching & processing the dynamic cols and then have it put into the damn table.
+	// God I hate it when frameworks work in weird and unexpected ways.
+	await until(table).toMatch(v => !!v)
+	await until(() => unref(table)?.tableApi?.getAllColumns().length).toMatch(v => v === unref(columns).length)
+
+	loadingData.value = false
     loadColumnsVisibilityFromBase()
     loadColumnsSortingFromBase()
 
@@ -509,8 +623,19 @@ const filters = ref([])
                                 </template>
                             </UButton>
                         </UDropdownMenu>
-                        <UButton size="sm" variant="link" color="neutral" :label="`${currentViewResults.length} Results`"/>
-                        <div class="grow"/>
+						<UInput
+							v-model="searchTerm"
+							icon="i-lucide-search"
+							size="sm"
+							:placeholder="`Search in ${currentViewResults.length} Results...`"
+							:ui="{ trailing: 'pr-0.5' }"
+							variant="ghost"
+						>
+							<template #trailing v-if="searchTerm != ''">
+								<UButton size="sm" variant="link" @click="searchTerm = ''" color="neutral" icon="i-lucide-x"/>
+							</template>
+						</UInput>
+						<div class="grow"/>
                         <UDropdownMenu
                             :items="columnsDropdownItems"
                             :content="{ align: 'end' }"
@@ -523,16 +648,17 @@ const filters = ref([])
                                 variant="ghost"
                             />
                         </UDropdownMenu>
-                        <UInput icon="i-lucide-search" size="sm" placeholder="Search..."/>
                     </div>
                 </div>
                 <UTable
+					v-if="!loadingData"
                     v-model:sorting="sorting"
                     :columns="columns"
                     ref="table"
                     sticky
                     :data="currentViewResults"
                     class="flex-1"
+					v-model:global-filter="searchTerm"
                     :ui="{
                         thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
                         td: 'py-1',
