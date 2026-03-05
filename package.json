@@ -41,6 +41,7 @@
     "@type32/nuxt-predicates": "^1.1.0",
     "@type32/obsidian-bases-parser": "^0.3.4",
     "@type32/yaml-editor-form": "0.2.4",
+    "@vue-flow/core": "^1.48.2",
     "@vueuse/nuxt": "14.2.1",
     "alfaaz": "^1.1.0",
     "better-sqlite3": "^12.6.2",
