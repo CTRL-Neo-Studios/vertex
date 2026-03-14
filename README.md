@@ -1,6 +1,9 @@
 # Vertex
 A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
+> [!NOTE]
+> This project falls strictly under the AGPL v3 License.
+
 ## Related Modules/Projects
 
 - https://github.com/Type-32/obsidian-bases-parser
