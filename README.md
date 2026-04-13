@@ -3,6 +3,9 @@
 
 A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
+> [!WARNING]
+> Since the app is in ***ALPHA***, I highly suggest you to **NOT USE IT ON IMPORTANT VAULTS**. I've warned you here and I won't be responsible for any loss caused by the software.
+
 > [!NOTE]
 > This project falls strictly under the AGPL v3 License.
 
