@@ -8,6 +8,8 @@ A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nu
 
 > [!NOTE]
 > This project falls strictly under the AGPL v3 License.
+> 
+> If you are going to fork this project, please make sure you mark this repository in your credits and in a visible place.
 
 ## Related Modules/Projects
 
