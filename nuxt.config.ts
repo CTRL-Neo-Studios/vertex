@@ -84,4 +84,12 @@ export default defineNuxtConfig({
             ]
         },
     },
+	runtimeConfig: {
+		public: {
+			vertex: {
+				workflowsVersion: 1,
+				workflowsNightlyVersion: 1,
+			}
+		}
+	}
 });

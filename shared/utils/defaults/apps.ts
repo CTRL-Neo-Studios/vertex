@@ -9,7 +9,8 @@ export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings
         openLastOpenedWindows: data?.openLastOpenedWindows || false,
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
-        viewConfig: defaultAppViewConfig(data?.viewConfig)
+        viewConfig: defaultAppViewConfig(data?.viewConfig),
+		deviceId: data?.deviceId || useUuid()
     } satisfies AppSettings
 }
 
@@ -19,7 +20,8 @@ export function defaultAppSession(data?: Partial<AppSession>): AppSession {
         sessionType: data?.sessionType || 'workspace',
         rootFileOrFolderAbsolutePath: data?.rootFileOrFolderAbsolutePath || '',
         context: defaultAppSessionContext(data?.context),
-        lastUpdated: data?.lastUpdated || new Date()
+        lastUpdated: data?.lastUpdated || new Date(),
+		trustedDeviceIds: data?.trustedDeviceIds || [] as string[]
     } satisfies AppSession
 }
 
