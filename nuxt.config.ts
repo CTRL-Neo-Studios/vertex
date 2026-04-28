@@ -15,6 +15,14 @@ export default defineNuxtConfig({
       "@type32/yaml-editor-form",
     ],
 
+	i18n: {
+		defaultLocale: 'en',
+		locales: [
+			{ code: 'en', name: 'English', file: 'en.json' },
+			{ code: 'zh-CN', name: '简体中文', file: 'zh-CN.json' }
+		]
+	},
+
     css: ["~/assets/css/main.css"],
 
     compatibilityDate: "2026-01-14",
