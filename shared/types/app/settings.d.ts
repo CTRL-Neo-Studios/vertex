@@ -2,7 +2,8 @@ export interface AppSettings {
     openLastOpenedWindows: boolean,
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
-    viewConfig: AppViewConfig
+    viewConfig: AppViewConfig,
+	deviceId: string
 }
 
 export interface AppThemeConfig {

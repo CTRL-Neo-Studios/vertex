@@ -70,7 +70,7 @@ interface DirectoryEntry {
 async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>> {
     const results = await invoke<FileReadResult[]>('read_text_files_batch', { paths });
     const contentMap = new Map<string, string>();
-    
+
     for (const result of results) {
         if (result.content) {
             contentMap.set(result.path, result.content);
@@ -78,7 +78,7 @@ async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>>
             console.error(`Failed to read ${result.path}:`, result.error);
         }
     }
-    
+
     return contentMap;
 }
 
@@ -89,14 +89,14 @@ async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>>
 async function statFilesBatch(paths: string[]): Promise<Map<string, FileStatResult>> {
     const results = await invoke<FileStatResult[]>('stat_files_batch', { paths });
     const statMap = new Map<string, FileStatResult>();
-    
+
     for (const result of results) {
         statMap.set(result.path, result);
         if (result.error) {
             console.error(`Failed to stat ${result.path}:`, result.error);
         }
     }
-    
+
     return statMap;
 }
 
@@ -162,7 +162,7 @@ function _parseFileContentProperties(path: string, content: string): { propertie
  * Simplified document parser for initial indexing.
  * Only extracts properties and raw internal links without resolving them.
  * Much faster than updateIndex since it doesn't build link maps or update backlinks.
- * 
+ *
  * @param {string} path - The absolute file path
  * @param {string} content - The file content (pre-loaded)
  * @param {Record<string, ActiveWorkspaceFileIndex>} index - The index being built
@@ -182,13 +182,13 @@ function _parseDocumentInitial(path: string, content: string, index: Record<stri
         const parsed = _parseFileContentProperties(path, content);
         node.properties = parsed.properties;
         if (timings) timings.properties += Date.now() - propsStart;
-        
+
         // Extract raw internal links (don't resolve yet)
         const linksStart = Date.now();
         const internalLinks = getInternalLinks(content);
         (node as any)._rawInternalLinks = internalLinks; // Temporary storage
         if (timings) timings.links += Date.now() - linksStart;
-        
+
     } catch (parseError) {
         console.error(`Failed to parse file content for: ${path}`, parseError);
     }
@@ -198,9 +198,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     if (!session) {
         console.error("useActiveWorkspaceIndex was called without a session!");
     }
-
-    const $win = useAppWebviewWindows()
-    const $asesh = useAppSessions()
 
     const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
     const uuidToFilePathIndex = useState<Map<string, string>>(`active.workspace.uuidToFilePathIndexMap.${session?.uuid ?? useUuid()}`, () => new Map());
@@ -268,10 +265,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         // Phase 2: Batch read files (metadata already from Rust scan)
         const _fileProcessTime = new Date().getTime();
-        
+
         // Collect paths that need content parsing
         const pathsToRead: string[] = [];
-        
+
         for (const path in newIndex) {
             const node = newIndex[path];
             if (!node) continue;
@@ -293,17 +290,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // Parse all loaded file contents
         const parseTimings = {properties: 0, links: 0};
         const parseStart = Date.now();
-        
+
         for (const path of pathsToRead) {
             const content = fileContents.get(path);
             if (content) {
                 _parseDocumentInitial(path, content, newIndex, parseTimings);
             }
         }
-        
+
         const totalParseTime = Date.now() - parseStart;
         const totalFileProcessTime = Date.now() - _fileProcessTime;
-        
+
         console.log(`File processing took: ${totalFileProcessTime}ms`);
         console.log(`  - batch file reading: ${pathsToRead.length} files, ${batchReadTime}ms`);
         console.log(`  - parsing: ${pathsToRead.length} files, ${totalParseTime}ms total, ${(totalParseTime/pathsToRead.length).toFixed(2)}ms avg`);
@@ -333,14 +330,14 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const _linkProcessTime = new Date().getTime();
         // Phase 3: Build link target map and resolve forelinks (single pass)
         const linkTargetToUuidMap = new Map<string, string>();
-        
+
         for (const path in newIndex) {
             const file = newIndex[path];
             if (!file) continue;
-            
+
             // Populate uuid-to-path map
             unref(uuidToFilePathIndex).set(file.uuid, path);
-            
+
             // Build link target map for non-folders
             if (!file.isFolder) {
                 const baseName = file.fileName.substring(0, file.fileName.lastIndexOf('.')) || file.fileName;
@@ -442,7 +439,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 modifiedTime
             });
             unref(fileIndex)[path] = newEntry;
-            
+
             // Update uuid map
             unref(uuidToFilePathIndex).set(uuid, path);
 
@@ -537,10 +534,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
 
         removedNodes.push(defaultActiveWorkspaceFileIndex(unref(fileIndex)[path]))
-        
+
         // Remove from uuid map
         unref(uuidToFilePathIndex).delete(nodeToRemove.uuid);
-        
+
         delete unref(fileIndex)[path];
         console.log(`Removed from index: ${path}`);
 
@@ -589,7 +586,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
             delete fileIndexState[currentOldPath];
             fileIndexState[currentNewPath] = newNodeData;
-            
+
             // Update uuid map with new path
             unref(uuidToFilePathIndex).set(node.uuid, currentNewPath);
         };
