@@ -9,5 +9,6 @@ export interface AppSession {
     sessionType: 'workspace' | 'singlespace',
     rootFileOrFolderAbsolutePath?: string,
     context: AppSessionContext,
-    lastUpdated?: Date
+    lastUpdated?: Date,
+	trustedDeviceIds: string[],
 }
