@@ -25,7 +25,7 @@ export default defineNuxtConfig({
 
     css: ["~/assets/css/main.css"],
 
-    compatibilityDate: "2026-01-14",
+    compatibilityDate: "2026-10-14",
 
     fonts: {
         priority: ['local', 'google'],
@@ -44,9 +44,7 @@ export default defineNuxtConfig({
     ssr: false,
     ignore: ['**/src-tauri/**'],
     // Enables the development server to be discoverable by other devices when running on iOS physical devices
-    devServer: {
-        host: '0',
-    },
+    devServer: {host: '127.0.0.1',},
     vite: {
         // Better support for Tauri CLI output
         clearScreen: false,
