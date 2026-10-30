@@ -18,7 +18,7 @@ const $fio = useFileIO()
 const $win = useAppWebviewWindows()
 
 onMounted(async () => {
-    console.log(`Windows: ${await $win.getAppWindows()}`)
+    console.log(`Windows: ${(await $win.getAppWindows()).map(v => v.label)}`)
 })
 
 const recentsList = computedAsync(async (onCancel) => {

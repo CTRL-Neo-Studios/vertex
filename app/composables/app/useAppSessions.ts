@@ -173,7 +173,7 @@ export function useAppSessions() {
                 return bTime - aTime; // Descending order (newest first)
             });
             lastOpenedSession.value = data.lastOpenedSession
-            
+
             // Automatically sanitize sessions after loading
             await sanitizeAppSessions();
         }
@@ -221,10 +221,10 @@ export function useAppSessions() {
      * Sanitizes the app sessions by:
      * 1. Removing duplicates (same rootPath + same sessionType)
      * 2. Removing sessions with missing/invalid paths
-     * 
+     *
      * When duplicates are found, keeps the first occurrence and removes the rest.
      * This is called automatically during loadAppSessions().
-     * 
+     *
      * @returns The number of sessions removed
      */
     async function sanitizeAppSessions(): Promise<number> {
@@ -303,9 +303,9 @@ export function useAppSessions() {
         const windowTitle = await $fio.getFileNameFromPath(session.rootFileOrFolderAbsolutePath, false)
         const window = $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
 
-        if (unref(hideMainWindow)) {
-            await $win.hideMainWindow()
-        }
+        // if (unref(hideMainWindow)) {
+        //     await $win.hideMainWindow()
+        // }
 
         return window
     }

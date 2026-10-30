@@ -1,8 +1,11 @@
+import type { WorkflowSettings } from "#shared/types/editor/workflows";
+
 export interface AppSettings {
     openLastOpenedWindows: boolean,
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
+    workflowConfig: WorkflowSettings,
 	deviceId: string
 }
 

@@ -33,6 +33,7 @@ export function useAppWebviewWindows() {
             transparent: true,
             width: 900,
             height: 600,
+			resizable: true,
             title: titleSuffix ? `Vertex - ${titleSuffix}` : "Vertex",
             hiddenTitle: true,
             titleBarStyle: 'overlay',

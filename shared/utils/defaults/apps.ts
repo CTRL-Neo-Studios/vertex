@@ -2,6 +2,7 @@ import useUuid from "~/composables/utility/useUuid";
 import type {AppSettings, AppViewConfig} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
+import {defaultWorkflowSettings} from "#shared/utils/defaults/workflows";
 import type {DeepPartial} from "#shared/types/types";
 
 export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings {
@@ -10,6 +11,7 @@ export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
+		workflowConfig: defaultWorkflowSettings(data?.workflowConfig),
 		deviceId: data?.deviceId || useUuid()
     } satisfies AppSettings
 }
