@@ -19,8 +19,7 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
 		deviceId: data?.deviceId || crypto.randomUUID(),
-        updateChannel: data?.updateChannel || 'stable',
-        updateToken: data?.updateToken || ''
+        updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
 }
 

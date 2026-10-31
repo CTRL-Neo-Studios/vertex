@@ -95,11 +95,15 @@
 				"title": "更新",
 				"channel": {
 					"label": "更新通道",
-					"description": "从中获取更新的发布通道，例如 stable 或 beta。"
+					"description": "Vertex 获取更新的发布通道。",
+					"loadFailed": "无法从更新服务器加载通道：{error}"
 				},
 				"token": {
 					"label": "通道令牌",
-					"description": "受限（私有）通道的可选访问令牌。"
+					"description": "受限通道的可选访问令牌，保存在系统钥匙串中。",
+					"saved": "已有令牌保存在系统钥匙串中。",
+					"save": "保存",
+					"remove": "移除令牌"
 				}
 			},
 			"theme": {

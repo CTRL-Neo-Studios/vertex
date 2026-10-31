@@ -95,11 +95,15 @@
 				"title": "Updates",
 				"channel": {
 					"label": "Update channel",
-					"description": "The release channel to update from, e.g. stable or beta."
+					"description": "The release channel Vertex updates from.",
+					"loadFailed": "Couldn't load channels from the update server: {error}"
 				},
 				"token": {
 					"label": "Channel token",
-					"description": "Optional token for restricted (private) channels."
+					"description": "Optional token for restricted channels. Stored in your system keychain.",
+					"saved": "A token is saved in your system keychain.",
+					"save": "Save",
+					"remove": "Remove Token"
 				}
 			},
 			"theme": {
