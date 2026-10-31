@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      # Errors inside node_modules (@type32/latex2vue .vue sources) are upstream; gate on our code only.
+      - run: bun run typecheck 2>&1 | tee typecheck.log || true; ! grep -E '^(app|shared|server)/.*error TS' typecheck.log
+      - run: bun run test
+
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tauri system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri::generate_context! needs frontendDist to exist at compile time.
+      - run: mkdir -p ../.output/public
+      - run: cargo clippy --all-targets -- -D warnings

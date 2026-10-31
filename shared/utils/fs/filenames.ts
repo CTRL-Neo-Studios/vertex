@@ -79,8 +79,9 @@ export function isValidFilename(name: string): boolean {
 
     // The shortcut above doesn't catch reserved names because sanitizeFilename *prepends*
     // an underscore rather than replacing. So we must test for it explicitly.
-    const baseName = name.split('.')[0];
-    return !(!baseName || RESERVED_FILENAMES_REGEX.test(baseName));
+    // Dotfiles (".obsidian") have an empty base name; empty and dots-only names are rejected above.
+    const baseName = name.split('.')[0] ?? '';
+    return !RESERVED_FILENAMES_REGEX.test(baseName);
 }
 
 export function isImage(extension: PossiblyRef<string>) {

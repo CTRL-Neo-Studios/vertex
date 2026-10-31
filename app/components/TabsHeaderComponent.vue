@@ -113,7 +113,7 @@ async function exitTab(tab: ActiveTab) {
 }
 
 const dropdownItems = computed<DropdownMenuItem[][]>(() => {
-    let items: DropdownMenuItem[][] = [
+    const items: DropdownMenuItem[][] = [
         [{
             label: 'New Tab',
             icon: 'i-lucide-plus',

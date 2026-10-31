@@ -1,4 +1,6 @@
 import type {PossiblyRef} from "#shared/types/types";
+import type { FileHandle
+} from "@tauri-apps/plugin-fs";
 import {
     copyFile,
     exists,
@@ -10,7 +12,7 @@ import {
     rename,
     stat,
     writeTextFile,
-    create, FileHandle
+    create
 } from "@tauri-apps/plugin-fs";
 import {basename, dirname, join} from "@tauri-apps/api/path";
 

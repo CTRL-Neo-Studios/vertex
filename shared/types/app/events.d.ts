@@ -1,4 +1,4 @@
-import {DispatcherEvent} from "@type32/dispatcher"
+import type {DispatcherEvent} from "@type32/dispatcher"
 
 export interface WindowMenuEvents {
     categories: {

@@ -1,5 +1,5 @@
 import type {FrontmatterProperties} from "#shared/types/types";
-import {type TreeItem} from "@nuxt/ui";
+import type {TreeItem} from "@nuxt/ui";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types"
 import type {YamlFormData} from "@type32/yaml-editor-form";
 

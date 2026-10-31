@@ -24,7 +24,7 @@ onMounted(async () => {
 const recentsList = computedAsync(async (onCancel) => {
     const abortController = new AbortController()
     onCancel(() => abortController.abort())
-    let results: RecentRecord[] = []
+    const results: RecentRecord[] = []
 
     for (const s of unref($sessions.appSessions)) {
         results.push({

@@ -734,7 +734,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
         console.log(`Starting watcher for session ${session!.uuid} on: ${workspaceRoot}`);
 
-        let activeWatcher = await watch(workspaceRoot, (event: WatchEvent) => {
+        const activeWatcher = await watch(workspaceRoot, (event: WatchEvent) => {
             const currentTabId = useRoute().params.tabId as string;
             if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
 
@@ -893,7 +893,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     }
 
     function getFilesByPaths(absoluteFilePaths: PossiblyRef<string[]>): ActiveWorkspaceFileIndex[] {
-        let results: ActiveWorkspaceFileIndex[] = []
+        const results: ActiveWorkspaceFileIndex[] = []
         for (const fp of unref(absoluteFilePaths)) {
             const f = getFileByPath(fp)
             if (f)

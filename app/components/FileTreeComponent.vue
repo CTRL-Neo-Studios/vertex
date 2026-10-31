@@ -71,7 +71,7 @@ const formattedTreeData = computed<TreeItem[]>(() => {
 
                 // Note: The `treeItem` needs to be declared so it can be referenced in its own event handlers.
                 let treeItem: TreeItem;
-                let nodeIcon: string | undefined = (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? 'i-lucide-file-cog' : (node.properties.icon && typeof node.properties.icon === 'string') ? node.properties.icon : undefined
+                const nodeIcon: string | undefined = (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? 'i-lucide-file-cog' : (node.properties.icon && typeof node.properties.icon === 'string') ? node.properties.icon : undefined
 
                 treeItem = {
                     id: node.uuid,

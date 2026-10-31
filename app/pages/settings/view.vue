@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { SelectItem, ChipProps } from '@nuxt/ui'
-import type { AccordionItem } from '@nuxt/ui'
+import type { SelectItem, ChipProps, AccordionItem  } from '@nuxt/ui'
 import {useAppSettings} from "~/composables/app/useAppSettings";
 
 definePageMeta({

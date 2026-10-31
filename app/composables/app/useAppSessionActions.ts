@@ -58,7 +58,7 @@ export function useAppSessionActions() {
     }
 
     async function createNewFileForSinglespace(openImmediately: boolean = true) {
-        let path = await save({
+        const path = await save({
             filters: [{
                 name: 'Markdown Files',
                 extensions: ['md']

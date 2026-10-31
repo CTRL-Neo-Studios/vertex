@@ -16,8 +16,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import type {YamlFormData} from "@type32/yaml-editor-form";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useFileIO} from "~/composables/io/useFileIO";
-import type {DropdownMenuItem} from "@nuxt/ui";
-import type {TableColumn} from '@nuxt/ui'
+import type {DropdownMenuItem,TableColumn} from "@nuxt/ui";
 import {h, resolveComponent} from 'vue'
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -179,7 +178,7 @@ function getTagsBadgeList(stringList: string[]) {
 }
 
 function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
-    let source: BaseSource<YamlFormData>[] = []
+    const source: BaseSource<YamlFormData>[] = []
 
     // Map fileIndex to BaseSource format
     for (const path in unref(fileIndex)) {
@@ -522,7 +521,7 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
 ])
 const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayDataColumns())
 const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
-    let cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
+    const cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
         .filter((column) => column.getCanHide() && column.id != '#id')
         .map((column) => ({
             label: column.id || '',

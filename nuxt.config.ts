@@ -13,6 +13,7 @@ export default defineNuxtConfig({
       "@type32/dispatcher",
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
+      "@nuxt/eslint",
     ],
 
 	i18n: {

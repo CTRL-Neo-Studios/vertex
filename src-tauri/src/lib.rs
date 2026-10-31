@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Listener, Manager, WebviewWindow};
+use tauri::{Emitter, Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
 use url::Url;
 use rayon::prelude::*;
