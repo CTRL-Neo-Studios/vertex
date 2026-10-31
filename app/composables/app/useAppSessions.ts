@@ -3,7 +3,7 @@ import type {PossiblyRef} from "#shared/types/types";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {SessionRecoveryMode} from "#shared/types/app/settings";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useFileIO} from "~/composables/io/useFileIO";
+import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {stateClient} from "~/utils/stateClient";
 
 /*
@@ -19,7 +19,6 @@ Persistence
 */
 export function useAppSessions() {
     const $win = useAppWebviewWindows()
-    const $fio = useFileIO()
 
     const appSessions = useState<AppSession[]>(StateKey.appSessions, () => [])
     const currentAppSession = useState<AppSession | null>(StateKey.currentAppSession, () => null)
@@ -99,7 +98,7 @@ export function useAppSessions() {
 
     async function createWindowFromAppSession(session: AppSession) {
         if (!session?.rootFileOrFolderAbsolutePath) return
-        const title = await $fio.getFileNameFromPath(session.rootFileOrFolderAbsolutePath, false)
+        const title = fileNameFromPath(session.rootFileOrFolderAbsolutePath)
         return $win.createAppWebviewWindow(Routes.loading, sessionWindowLabel(session.uuid), title)
     }
 

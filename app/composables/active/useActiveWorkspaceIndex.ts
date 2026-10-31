@@ -21,6 +21,8 @@ interface SessionRuntime {
     graph: LinkGraph
     selfWrites: RecentWrites
     root: string
+    /** True after `buildIndex` scanned the whole folder; a singlespace session only tracks its one file. */
+    wholeFolder: boolean
 }
 const runtimes = new Map<string, SessionRuntime>()
 
@@ -48,6 +50,10 @@ function fileExtOf(fileName: string) {
     return dot > 0 ? fileName.slice(dot + 1) : ''
 }
 
+/**
+ * The file index of one session, in both modes. A workspace scans its folder (`buildIndex`); a singlespace
+ * session is a workspace rooted at the file's folder that indexes and watches only that file (`openFile`).
+ */
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
     const scope = sessionScope(session, 'useActiveWorkspaceIndex')
     const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(StateKey.workspaceIndex(scope), () => ({}))
@@ -56,7 +62,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function runtime(): SessionRuntime {
         let rt = runtimes.get(scope)
         if (!rt) {
-            rt = {listeners: new Set(), graph: new LinkGraph(), selfWrites: new RecentWrites(), root: session?.rootPath ?? ''}
+            rt = {listeners: new Set(), graph: new LinkGraph(), selfWrites: new RecentWrites(), root: session?.rootPath ?? '', wholeFolder: false}
             runtimes.set(scope, rt)
         }
         return rt
@@ -108,6 +114,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const rt = runtime()
         rt.root = root
         rt.graph = new LinkGraph()
+        rt.wholeFolder = true
         const started = Date.now()
 
         const entries = await invoke<DirectoryEntry[]>('scan_directory_recursive', {rootPath: root})
@@ -145,6 +152,11 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         syncLinks(uuidMap.keys())
         console.log(`[index] ${entries.length} entries, ${textPaths.length} parsed in ${Date.now() - started}ms`)
         return next
+    }
+
+    /** Singlespace: index only `path`, rooted at its folder. */
+    function openFile(path: string) {
+        return addFileToIndex(path, parentPathOf(path))
     }
 
     function clearIndex() {
@@ -302,16 +314,18 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const paths = event.paths.filter(p => !p.endsWith('.DS_Store'))
         if (paths.length === 0 || 'access' in type || 'metadata' in type) return
         const rt = runtime()
+        const drop = (path: string) => {
+            const removedNodes = removeFileFromIndex(path)
+            if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})
+        }
 
         if ('remove' in type) {
-            for (const path of paths) {
-                if (rt.selfWrites.has(path)) continue
-                broadcast({type: 'remove', path, removedNodes: removeFileFromIndex(path)})
-            }
+            for (const path of paths) if (!rt.selfWrites.has(path)) drop(path)
             return
         }
 
         if ('create' in type) {
+            if (!rt.wholeFolder) return
             for (const path of paths) {
                 if (rt.selfWrites.has(path) || unref(fileIndex)[path]) continue
                 await addFileToIndex(path)
@@ -327,6 +341,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             if (paths.length >= 2) {
                 const [oldPath, newPath] = paths as [string, string]
                 if (rt.selfWrites.has(oldPath) && rt.selfWrites.has(newPath)) return
+                if (!unref(fileIndex)[oldPath]) return
                 await moveFileInIndex(oldPath, newPath)
                 broadcast({type: 'rename', oldPath, newPath})
                 return
@@ -342,6 +357,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 await stat(path)
                 const node = unref(fileIndex)[path]
                 if (!node) {
+                    if (!rt.wholeFolder) return
                     await addFileToIndex(path)
                     broadcast({type: 'create', path})
                     return
@@ -353,16 +369,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     broadcast({type: 'rename', oldPath: path, newPath})
                 }
             } catch {
-                broadcast({type: 'remove', path, removedNodes: removeFileFromIndex(path)})
+                drop(path)
             }
             return
         }
 
-        // Content changes from other editors, git, sync tools… — previously dropped, leaving links stale.
+        // Content changes from other editors, git, sync tools…: re-parse indexed formats, and tell open tabs
+        // about every tracked file so they can reload (including code/LaTeX files).
         if (kind === 'data' || kind === 'any') {
             for (const path of paths) {
-                if (rt.selfWrites.has(path) || !isIndexedText(path) || !unref(fileIndex)[path]) continue
-                await reparse(path)
+                if (rt.selfWrites.has(path) || !unref(fileIndex)[path]) continue
+                if (isIndexedText(path)) await reparse(path)
                 broadcast({type: 'modify', path})
             }
         }
@@ -376,7 +393,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         let queue: Promise<void> = Promise.resolve()
         rt.unwatch = await watch(root, (event) => {
             queue = queue.then(() => handleWatchEvent(event)).catch(e => console.error('[index] watcher event failed', e))
-        }, {recursive: true, delayMs: 50})
+        }, {recursive: rt.wholeFolder, delayMs: 50})
     }
 
     async function stopWatcher() {
@@ -403,38 +420,11 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return Object.values(unref(fileIndex)).filter(filter)
     }
 
-    function getFilesByExtension(extension: string): ActiveWorkspaceFileIndex[] {
-        const ext = extension.replace(/^\./, '').toLowerCase()
-        return getFilteredFiles(f => !f.isFolder && getFileExtensionFromPath(f.fileName) === ext)
-    }
-
-    /** Files whose `tags` property (frontmatter) contains `tag`. Accepts a list or a single string. */
-    function getFilesByTag(tag: string): ActiveWorkspaceFileIndex[] {
-        return getFilteredFiles(f => {
-            const tags = (f.properties as Record<string, unknown>)?.tags
-            return Array.isArray(tags) ? tags.includes(tag) : tags === tag
-        })
-    }
-
     function getPropertiesFile(uuidRef: PossiblyRef<string | undefined>): string | undefined {
         const node = getFileByUuid(uuidRef)
         if (!node) return
         if (!node.isFolder) return isPropertiesFile(node.fileName) ? node.uuid : undefined
         return node.children.map(c => unref(fileIndex)[c]).find(c => c && !c.isFolder && isPropertiesFile(c.fileName))?.uuid
-    }
-
-    function hasPropertiesFile(uuidRef: PossiblyRef<string>): boolean {
-        return getPropertiesFile(uuidRef) !== undefined
-    }
-
-    function getParentFolderByPath(path: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
-        const parent = unref(fileIndex)[parentPathOf(unref(path))]
-        return parent?.isFolder ? parent : undefined
-    }
-
-    function getParentFolderByUuid(uuidRef: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
-        const node = getFileByUuid(uuidRef)
-        return node && !node.isFolder ? getParentFolderByPath(node.fullPath) : undefined
     }
 
     function on(listener: WorkspaceIndexListener): () => void {
@@ -445,6 +435,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     return {
         buildIndex,
+        openFile,
         fileIndex,
         fileTree,
         getFileByUuid,
@@ -455,17 +446,14 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         stopWatcher,
         clearIndex,
         on,
+        /** For writes the app makes to a file on behalf of another feature (the watcher ignores self-writes), so open tabs reload. */
+        notifyModified: (path: string) => broadcast({type: 'modify', path}),
         updateIndex,
         markSelfWrite,
         getRenameImpact,
         getFileByPath,
         getFilesByPaths,
         getFilteredFiles,
-        getFilesByExtension,
-        getFilesByTag,
-        hasPropertiesFile,
         getPropertiesFile,
-        getParentFolderByPath,
-        getParentFolderByUuid,
     }
 }

@@ -14,8 +14,9 @@ export function isPropertiesFile(fileName: string) {
     return (PROPERTIES_FILE_NAMES as readonly string[]).includes(fileName)
 }
 
+/** Folder part of a `/`-separated path; `''` for a bare name. */
 export function parentPathOf(path: string) {
-    return path.slice(0, path.lastIndexOf('/'))
+    return path.slice(0, Math.max(path.lastIndexOf('/'), 0))
 }
 
 /**

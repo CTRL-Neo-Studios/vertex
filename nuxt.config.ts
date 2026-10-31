@@ -62,7 +62,6 @@ export default defineNuxtConfig({
         },
         optimizeDeps: {
             include: [
-                "@tauri-apps/plugin-store",
                 "@tauri-apps/plugin-fs",
                 "@tauri-apps/plugin-dialog",
                 "@tauri-apps/plugin-clipboard-manager",

@@ -4,7 +4,6 @@ import {StateKey} from "#shared/constants/app";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {stateClient} from "~/utils/stateClient";
 
@@ -19,9 +18,7 @@ export function useAppSessionPersistence(session: ActiveSession) {
     const $win = useAppWebviewWindows()
     const {tabs, activeTabUuid} = useActiveTabs(session)
     const expandedFolders = useState<string[]>(StateKey.expandedFolders(session.uuid), () => [])
-    const pathOf = session.workspaceSession
-        ? useActiveWorkspaceIndex(session).getFileByUuid
-        : useActiveSinglespaceIndex(session).getFileByUuid
+    const pathOf = useActiveWorkspaceIndex(session).getFileByUuid
 
     function snapshot(): AppSessionContext {
         const paths = (uuids: (string | null | undefined)[]) =>

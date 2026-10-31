@@ -4,24 +4,19 @@ import type {
 	InternalLinkClickDetail,
 	InternalLinkNode
 } from "#codemirror-rich-obsidian-editor/editor-types";
-import {
-    type BaseSource,
-    type SortConfig,
-    useBase
-} from "@type32/obsidian-bases-parser";
+import {type BaseSource, type SortConfig, useBase} from "@type32/obsidian-bases-parser";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {YamlFormData} from "@type32/yaml-editor-form";
-import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
-import {useFileIO} from "~/composables/io/useFileIO";
 import type {DropdownMenuItem,TableColumn} from "@nuxt/ui";
-import {h, resolveComponent} from 'vue'
+import {h, resolveComponent, type VNode} from 'vue'
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {toLargestFileSizeUnit} from "#shared/utils/fs/filestats";
 import type { Column, SortingState } from '@tanstack/vue-table'
 import NewBaseViewModal from "~/components/Modals/Bases/NewBaseViewModal.vue";
-import {getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
+import {parentPathOf} from "#shared/utils/index/parse";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {convertFileSrc} from "@tauri-apps/api/core";
 
@@ -37,10 +32,9 @@ const UPopover = resolveComponent('UPopover')
 const UTooltip = resolveComponent('UTooltip')
 const ModalNewBaseView = $ovl.create(NewBaseViewModal)
 
-defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({default: ''})
-defineModel<boolean>('contentSaved', {default: false})
+const contentSaved = defineModel<boolean>('contentSaved', {default: false})
 const activeView = defineModel<string>('activeView', {required: false, default: ''})
 
 const props = withDefaults(defineProps<{
@@ -62,14 +56,12 @@ const emit = defineEmits<{
 
 const $session = computed(() => $sesh.getSession(props.sessionId))
 const $sesh = useActiveSessions()
-const $ftMemo = useActiveFileTreeMemo(unref($session))
 const {
     getFileByUuid,
     fileIndex,
 } = useActiveWorkspaceIndex(unref($session))
 const $tab = useActiveTabs(unref($session))
 const $navi = useAppNavigator()
-const $fio = useFileIO()
 
 function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
     const isSorted = column.getIsSorted()
@@ -140,180 +132,83 @@ function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
     )
 }
 
-function getFileLinkBadgeList(idList: string[]) {
-    return h('div', { class: 'relative max-w-96' }, [
+type Row = BaseSource<YamlFormData>
+
+/** Horizontally scrolling strip of badges with faded edges. */
+function badgeStrip(badges: VNode[]) {
+    return h('div', {class: 'relative max-w-96'}, [
         h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
         h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, {
-            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
-                idList.map((v) => h(UBadge, {
-                    label: `${getFileByUuid(v)?.fileName}`,
-                    variant: 'soft',
-                    class: 'cursor-pointer',
-                    async onClick() {
-                        await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(v))
-                    },
-                    size: 'md'
-                }))
-            ])
+            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, badges),
         }),
         h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
     ])
 }
 
-function getTagsBadgeList(stringList: string[]) {
-    return h('div', { class: 'relative max-w-96' }, [
-        h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
-        h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, {
-            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, [
-                stringList.map((v) => h(UBadge, {
-                    label: `${v}`,
-                    variant: 'subtle',
-                    size: 'md'
-                }))
-            ])
-        }),
-        h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
-    ])
+const getFileLinkBadgeList = (ids: string[]) => badgeStrip(ids.map(id => h(UBadge, {
+    label: `${getFileByUuid(id)?.fileName}`,
+    variant: 'soft',
+    class: 'cursor-pointer',
+    size: 'md',
+    onClick: () => $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(id)),
+})))
+
+const getTagsBadgeList = (tags: string[]) => badgeStrip(tags.map(tag => h(UBadge, {label: `${tag}`, variant: 'subtle', size: 'md'})))
+
+const formatTime = (value: unknown) => new Date(value as string).toLocaleString('en-US', {
+    day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+})
+
+/** A built-in column: `id` is the Bases property name, `labelKey` its i18n header. */
+function fileColumn(id: string, accessorKey: keyof Row, labelKey: string, cell: (value: unknown, row: Row) => unknown): TableColumn<Row> {
+    return {
+        id,
+        accessorKey,
+        header: ({column}) => getHeader(column, t(labelKey)),
+        cell: ({row}) => cell(row.getValue(id), row.original),
+    } as TableColumn<Row>
 }
 
-function propogateFileIndexToSourceArray(): BaseSource<YamlFormData>[] {
-    const source: BaseSource<YamlFormData>[] = []
-
-    // Map fileIndex to BaseSource format
-    for (const path in unref(fileIndex)) {
-        const file = unref(fileIndex)[path]
-        if (!file || file.isFolder) continue // Skip folders and invalid entries
-        // console.log(file)
-        // Use file UUID as the key and properties as the value
-        const memo = $ftMemo.getFromLabel(`${file.fileName}${file.uuid.slice(0, 4)}`)
-        const sourceEntry: BaseSource<YamlFormData> = {
-            data: file.properties,
-            id: file.uuid,
-            name: memo.unextName,
-            basename: memo.name,
-            path: file.relativePath,
-            folder: $fio.getParentDirectorySync(file.relativePath),
-            ext: memo.ext,
-            ctime: file.createdTime,
-            mtime: file.modifiedTime,
-            tags: file.properties.tags,
-            backlinks: file.backlinks,
-            properties: file.properties,
-            size: file.size,
-            links: file.forelinks
-            //TODO: Require rest of the fields' impl.
-        } satisfies YamlFormData
-        source.push(sourceEntry)
-    }
-
-    return source
+function propogateFileIndexToSourceArray(): Row[] {
+    return Object.values(unref(fileIndex)).filter(file => !file.isFolder).map(file => ({
+        data: file.properties,
+        id: file.uuid,
+        name: fileNameFromPath(file.fileName, true),
+        basename: file.fileName,
+        path: file.relativePath,
+        folder: parentPathOf(file.relativePath.replace(/\\/g, '/')) || '/',
+        ext: getFileExtensionFromPath(file.fileName),
+        ctime: file.createdTime,
+        mtime: file.modifiedTime,
+        tags: file.properties.tags,
+        backlinks: file.backlinks,
+        properties: file.properties,
+        size: file.size,
+        links: file.forelinks,
+    }) satisfies Row)
 }
 
-function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] {
-    const originals: TableColumn<BaseSource<YamlFormData>>[] = [
-        {
-            id: '#id',
-            accessorKey: 'id',
-            header: '#',
-            cell: ({row}) => `#${row.getValue<string>('#id').slice(0, 4)}`
-        },
-        {
-            id: 'file.name',
-            accessorKey: 'name',
-            header: ({ column }) => getHeader(column, 'File Name'),
-            cell: ({row}) => h(UButton, {
-                variant: 'link',
-                class: 'cursor-pointer',
-                label: row.getValue<string>('file.name'),
-                async onClick() {
-                    await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.getValue<string>('#id')))
-                },
-                size: 'sm'
-            })
-        },
-        {
-            id: 'file.ctime',
-            accessorKey: 'ctime',
-            header: ({ column }) => getHeader(column, 'Created Time'),
-            cell: ({row}) => {
-                return new Date(row.getValue('file.ctime')).toLocaleString('en-US', {
-                    day: 'numeric',
-                    month: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    year: 'numeric',
-                    hour12: false
-                })
-            }
-        },
-        {
-            id: 'file.mtime',
-            accessorKey: 'mtime',
-            header: ({ column }) => getHeader(column, 'Last Modified Time'),
-            cell: ({row}) => {
-                return new Date(row.getValue('file.mtime')).toLocaleString('en-US', {
-                    day: 'numeric',
-                    month: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    year: 'numeric',
-                    hour12: false
-                })
-            }
-        },
-        {
-            id: 'file.size',
-            accessorKey: 'size',
-            header: ({ column }) => getHeader(column, 'File Size'),
-            cell: ({row}) => toLargestFileSizeUnit(row.getValue<number>('file.size'))
-        },
-        {
-            id: 'file.basename',
-            accessorKey: 'basename',
-            header: ({ column }) => getHeader(column, 'File Base Name'),
-            cell: ({row}) => row.getValue<string>('file.basename')
-        },
-        {
-            id: 'file.path',
-            accessorKey: 'path',
-            header: ({ column }) => getHeader(column, 'File Relative Path'),
-            cell: ({row}) => row.getValue<string>('file.path')
-        },
-        {
-            id: 'file.folder',
-            accessorKey: 'folder',
-            header: ({ column }) => getHeader(column, 'File Parent Folder'),
-            cell: ({row}) => row.getValue<string>('file.folder')
-        },
-        {
-            id: 'file.ext',
-            accessorKey: 'ext',
-            header: ({ column }) => getHeader(column, 'File Extension'),
-            cell: ({row}) => h(UBadge, {
-                label: `.${row.getValue<string>('file.ext')}`,
-                variant: 'soft',
-                color: 'neutral',
-                size: 'md'
-            })
-        },
-        {
-            id: 'file.links',
-            accessorKey: 'links',
-            header: ({ column }) => getHeader(column, t('app.editor.ui.forelinks')),
-            cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.links'))
-        },
-        {
-            id: 'file.backlinks',
-            accessorKey: 'backlinks',
-            header: ({ column }) => getHeader(column, t('app.editor.ui.backlinks')),
-            cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.backlinks'))
-        },
-        {
-            id: 'tags',
-            accessorKey: 'tags',
-            header: ({ column }) => getHeader(column, 'Tags'),
-            cell: ({row}) => getTagsBadgeList(row.getValue<string[]>('tags'))
-        }
+function propogateDisplayDataColumns(): TableColumn<Row>[] {
+    const cols = 'app.editor.ui.bases.columns'
+    const originals: TableColumn<Row>[] = [
+        {id: '#id', accessorKey: 'id', header: '#', cell: ({row}) => `#${row.getValue<string>('#id').slice(0, 4)}`},
+        fileColumn('file.name', 'name', `${cols}.name`, (name, row) => h(UButton, {
+            variant: 'link',
+            class: 'cursor-pointer',
+            label: name,
+            size: 'sm',
+            onClick: () => $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.id as string)),
+        })),
+        fileColumn('file.ctime', 'ctime', `${cols}.ctime`, formatTime),
+        fileColumn('file.mtime', 'mtime', `${cols}.mtime`, formatTime),
+        fileColumn('file.size', 'size', `${cols}.size`, size => toLargestFileSizeUnit(size as number)),
+        fileColumn('file.basename', 'basename', `${cols}.basename`, v => v),
+        fileColumn('file.path', 'path', `${cols}.path`, v => v),
+        fileColumn('file.folder', 'folder', `${cols}.folder`, v => v),
+        fileColumn('file.ext', 'ext', `${cols}.ext`, ext => h(UBadge, {label: `.${ext}`, variant: 'soft', color: 'neutral', size: 'md'})),
+        fileColumn('file.links', 'links', 'app.editor.ui.forelinks', ids => getFileLinkBadgeList(ids as string[])),
+        fileColumn('file.backlinks', 'backlinks', 'app.editor.ui.backlinks', ids => getFileLinkBadgeList(ids as string[])),
+        fileColumn('tags', 'tags', `${cols}.tags`, tags => getTagsBadgeList((tags as string[] | undefined) ?? [])),
     ]
 
     const columnIds = originals.map(v => v.id).filter(i => i != undefined)
@@ -348,7 +243,7 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
 			id: key,
 			header: ({column}) => getHeader(column, key),
 			cell: ({row}) => {
-				const rowVal = row.getValue(key) as Record<string, unknown>
+				const rowVal = (row.getValue(key) as any)
 				if (!rowVal[key]) {
 					flag = false
 					return
@@ -402,17 +297,9 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
     return originals
 }
 
+const BASE_TYPE_ICONS: Record<string, string> = {list: 'i-lucide-rows-3', table: 'i-lucide-sheet', cards: 'i-lucide-layout-grid', map: 'i-lucide-map'}
 function getIconFromBaseType(baseType: string) {
-    switch (baseType) {
-        case 'list':
-            return 'i-lucide-rows-3';
-        case 'table':
-            return 'i-lucide-sheet';
-        case 'cards':
-            return 'i-lucide-layout-grid';
-        case 'map':
-            return 'i-lucide-map'
-    }
+    return BASE_TYPE_ICONS[baseType]
 }
 
 function setBaseColumnVisibility(columnId: string, visible: boolean) {
@@ -462,12 +349,7 @@ watch($base.hasChanges, (newValue) => {
         content.value = $base.save()
 })
 
-watch(activeView, () => {
-	loadingData.value = true
-	propogateDisplayDataColumns()
-	loadColumnsVisibilityFromBase()
-	loadingData.value = false
-})
+watch(activeView, loadColumnsVisibilityFromBase)
 
 const searchTerm = ref('')
 const table = useTemplateRef('table')
@@ -483,14 +365,14 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
             children: [[{
                 label: t('app.editor.ui.bases.view'),
                 icon: 'i-lucide-eye',
-                onSelect(_e) {
+                onSelect() {
                     activeView.value = i.name
                 }
             }], [{
                 label: t('app.editor.ui.bases.remove'),
                 icon: 'i-lucide-trash',
                 color: 'error',
-				onSelect(_e) {
+				onSelect() {
 					if (unref($base.viewNames).length <= 1) return;
 					const baseName = i.name
 					$base.removeView(baseName)
@@ -505,7 +387,7 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
         {
             label: t('app.editor.ui.bases.addView'),
             icon: 'i-lucide-grid-2x2-plus',
-            async onSelect(_e) {
+            async onSelect() {
                 const view = await ModalNewBaseView.open()
                 if (view) {
                     $base.addView(view)
@@ -539,16 +421,14 @@ const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
             {
                 label: t('app.editor.ui.bases.hideAll'),
                 icon: 'i-lucide-eye-off',
-                onSelect(_e) {
+                onSelect() {
                     setAllColumnsVisibility(false)
                 }
             },
             {
                 label: t('app.editor.ui.bases.addFormula'),
                 icon: 'i-lucide-square-function',
-                onSelect(_e) {
-
-                }
+                disabled: true, // not implemented yet
             }
         ]
     ]
@@ -562,8 +442,6 @@ onMounted(async () => {
         activeView.value = unref($base.viewNames)[0] || ''
 
     $base.setSource(unref(baseSource))
-    // console.log(unref($base.source))
-    // console.log(JSON.stringify(propogateFileIndexToSourceArray()))
 
 	// Note on this part: for some weird reason, the `columns` field of the UTable tends to fetch the static columns first, which were the
 	// `originals` in the propogate columns function. Then, as the data is "gradually fetched" (which isn't but UTable or the Tanstack Table somehow thinks it is),
@@ -580,10 +458,6 @@ onMounted(async () => {
 	loadingData.value = false
     loadColumnsVisibilityFromBase()
     loadColumnsSortingFromBase()
-
-    // console.log(unref(activeView))
-    // console.log(unref($base.query.getViewResults(unref(activeView))))
-    // console.log(unref($base.views))
 })
 
 const sorting = ref<SortingState>([])
@@ -621,7 +495,7 @@ const sorting = ref<SortingState>([])
 							v-model="searchTerm"
 							icon="i-lucide-search"
 							size="sm"
-							:placeholder="`Search in ${currentViewResults.length} Results...`"
+							:placeholder="$t('app.editor.ui.bases.search', {count: currentViewResults.length})"
 							:ui="{ trailing: 'pr-0.5' }"
 							variant="ghost"
 						>

@@ -11,7 +11,6 @@ const props = defineProps<{
     modalTitle?: string,
     atFileIndexId?: string,
     asFolder: boolean,
-    isFolder: boolean,
     asLevel: "above" | "same" | "below",
     fileExt?: string,
 }>()
@@ -37,9 +36,13 @@ const validate = (state: { filename: string }): FormError[] => {
 }
 
 async function onSubmit(event: FormSubmitEvent<typeof state>) {
-    await $wt.createFile(props.atFileIndexId, `${event.data.filename}${props?.fileExt && !props?.asFolder ? '.' + props?.fileExt : ''}`, props.asFolder, props.asLevel)
-    $qt.success(t('app.generic.ui.createdFile', { filename: event.data.filename }))
-    emit('close', false)
+    try {
+        await $wt.createFile(props.atFileIndexId, `${event.data.filename}${props?.fileExt && !props?.asFolder ? '.' + props?.fileExt : ''}`, props.asFolder, props.asLevel)
+        $qt.success(t('app.generic.ui.createdFile', { filename: event.data.filename }))
+        emit('close', false)
+    } catch (error) {
+        $qt.error(t('app.home.createFailed'), String(error))
+    }
 }
 </script>
 

@@ -1,4 +1,4 @@
-import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
+import type {ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 
@@ -18,15 +18,6 @@ export function defaultActiveWorkspaceFileIndex(data?: Partial<ActiveWorkspaceFi
         createdTime: data?.createdTime ?? new Date(),
         modifiedTime: data?.modifiedTime ?? new Date(),
     } satisfies ActiveWorkspaceFileIndex
-}
-
-export function defaultActiveSinglespaceFileIndex(data?: Partial<ActiveSinglespaceFileIndex>): ActiveSinglespaceFileIndex {
-    return {
-        fileName: data?.fileName ?? '',
-        properties: data?.properties ?? {},
-        uuid: data?.uuid ?? crypto.randomUUID(),
-        fullPath: data?.fullPath ?? '',
-    } satisfies ActiveSinglespaceFileIndex
 }
 
 export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {

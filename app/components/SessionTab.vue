@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import {convertFileSrc} from "@tauri-apps/api/core"
+import {readTextFile} from "@tauri-apps/plugin-fs"
 import type {InternalLink, InternalLinkClickDetail, TocEntry} from "#codemirror-rich-obsidian-editor/editor-types"
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {SessionMode} from "#shared/constants/app";
-import {getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
-import {useActiveFileTools} from "~/composables/active/useActiveFileTools";
+import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useFileIO} from "~/composables/io/useFileIO";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {viewerFor} from "~/utils/viewers";
 import {viewerComponents} from "~/utils/viewerComponents";
@@ -30,18 +31,18 @@ const mode: SessionMode = session?.workspaceSession ? 'workspace' : 'singlespace
 
 const $navi = useAppNavigator()
 const $win = useAppWebviewWindows()
-const $fileio = useFileIO()
 const $qt = useQuickToasts()
 const {t} = useI18n()
-const $tools = useActiveFileTools(session)
+const $index = useActiveWorkspaceIndex(session)
+const $tools = useActiveWorkspaceTools(session)
 const {closeTab, activeTabUuid, getActiveTab, isTabOpened, setTabSavedState, openTab, tabs} = useActiveTabs(session)
 const {content} = useActiveEditorContent(session, getActiveTab(tabId))
 const {dispatcher: editorDispatcher} = useActiveEditorDispatcher(session)
 const codeblockMappings = useActiveEditorCodeblockMappings()
 
-const file = computed(() => $tools.getFileByUuid(tabId.value))
+const file = computed(() => $index.getFileByUuid(tabId.value))
 const fullFilePath = computed(() => file.value?.fullPath)
-const displayPath = computed(() => mode === 'workspace' ? $tools.relativePathOf(file.value) : file.value?.fullPath)
+const displayPath = computed(() => mode === 'workspace' ? file.value?.relativePath : file.value?.fullPath)
 const fileExt = computed(() => getFileExtensionFromPath(fullFilePath.value ?? ''))
 const viewer = computed(() => viewerFor(fileExt.value, mode))
 const viewerComponent = computed(() => viewer.value ? viewerComponents[viewer.value.id] : undefined)
@@ -49,7 +50,7 @@ const viewerComponent = computed(() => viewer.value ? viewerComponents[viewer.va
 const isContentSaved = ref(true)
 const isContentLoaded = ref(false)
 const renaming = ref(false)
-const fileName = ref($fileio.processFileNameFromPath(fullFilePath.value ?? '', true))
+const fileName = ref(fileNameFromPath(fullFilePath.value ?? '', true))
 const editorRef = ref()
 const $eu = useEditorUtils(editorRef)
 const INVALID_CHARS = /[\\/:*?"<>|]/
@@ -58,9 +59,9 @@ watch(isContentSaved, v => setTabSavedState(tabId, v))
 
 const internalLinkList = computed<InternalLink[]>(() => {
     if (mode !== 'workspace') return []
-    return $tools.linkableFiles().flatMap(f => {
+    return $index.getFilteredFiles(f => !f.isFolder).flatMap(f => {
         const ext = getFileExtensionFromPath(f.fileName)
-        const name = $fileio.processFileNameFromPath(f.fullPath, true)
+        const name = fileNameFromPath(f.fullPath, true)
         if (isPlainTextFile(ext)) return [{name, filePath: f.relativePath, referenceId: f.uuid} satisfies InternalLink]
         if (isImage(ext)) return [{
             name, filePath: f.relativePath, referenceId: f.uuid,
@@ -103,7 +104,7 @@ async function onInternalLinkClick({referenceId}: InternalLinkClickDetail) {
 }
 
 debouncedWatch(content, async () => {
-    if (!isContentLoaded.value || !viewer.value?.loadsText || $tools.isTemporary(tabId.value)) return
+    if (!isContentLoaded.value || !viewer.value?.loadsText) return
     isContentSaved.value = false
     await until(renaming).toBe(false)
     try {
@@ -118,16 +119,11 @@ debouncedWatch(content, async () => {
 
 onMounted(async () => {
     if (!isTabOpened(tabId.value)) return goToTab()
-    if ($tools.isTemporary(tabId.value)) {
-        isContentSaved.value = false
-        isContentLoaded.value = true
-        return
-    }
-    if (viewer.value?.loadsText && fullFilePath.value) content.value = await $fileio.readTextFromFile(fullFilePath.value)
+    if (viewer.value?.loadsText && fullFilePath.value) content.value = await readTextFile(fullFilePath.value)
     isContentLoaded.value = true
 })
 
-const unsubscribe = $tools.on(async (event) => {
+const unsubscribe = $index.on(async (event) => {
     const current = fullFilePath.value
     if (event.type === 'remove') {
         if (mode === 'singlespace') return $win.getCurrentAppWindow().close()
@@ -137,14 +133,14 @@ const unsubscribe = $tools.on(async (event) => {
     } else if (event.type === 'modify' && event.path === current) {
         // Changed by another program. Reload only if nothing is unsaved here, so no edits are lost.
         if (!isContentSaved.value || !viewer.value?.loadsText) return
-        const fresh = await $fileio.readTextFromFile(event.path)
+        const fresh = await readTextFile(event.path)
         if (fresh === content.value) return
         isContentLoaded.value = false
         content.value = fresh
         await nextTick()
         isContentLoaded.value = true
     } else if (event.type === 'rename' && event.newPath === current) {
-        fileName.value = $fileio.processFileNameFromPath(event.newPath, true)
+        fileName.value = fileNameFromPath(event.newPath, true)
     }
 })
 
@@ -154,7 +150,6 @@ onBeforeUnmount(() => {
 })
 
 async function onRename(oldValue: string) {
-    if ($tools.isTemporary(tabId.value)) return
     if (!fileName.value || INVALID_CHARS.test(fileName.value) || fileName.value === oldValue) {
         fileName.value = oldValue
         return

@@ -19,13 +19,8 @@ const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $ovl = useOverlay()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {
-    fileTree
-} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
-const {
-    openTab,
-    activeTabUuid
-} = useActiveTabs($sesh.getSession($sessionId))
+const {fileTree} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
+const {openTab, activeTabUuid} = useActiveTabs($sesh.getSession($sessionId))
 const {
     leftPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
@@ -47,9 +42,8 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
         {
             label: t('app.editor.ui.filetree.newMarkdownFile'),
             icon: 'i-lucide-file-plus',
-            onSelect(_e) {
+            onSelect() {
                 newFileModal.open({
-                    isFolder: false,
                     modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                     asFolder: false,
                     asLevel: 'same',
@@ -60,9 +54,8 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
         {
             label: t('app.editor.ui.filetree.newFolder'),
             icon: 'i-lucide-folder-dot',
-            onSelect(_e) {
+            onSelect() {
                 newFileModal.open({
-                    isFolder: true,
                     modalTitle: t('app.editor.ui.filetree.newFolder'),
                     asFolder: true,
                     asLevel: 'same'

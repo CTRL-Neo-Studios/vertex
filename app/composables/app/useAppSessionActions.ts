@@ -1,9 +1,9 @@
 import {save} from "@tauri-apps/plugin-dialog";
+import {create, exists} from "@tauri-apps/plugin-fs";
 import {defaultAppSession, defaultAppSessionContext} from "#shared/utils/defaults/apps";
 import type {AppSession} from "#shared/types/app/sessions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
-import {useFileIO} from "~/composables/io/useFileIO";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 /**
@@ -14,7 +14,6 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 export function useAppSessionActions() {
     const $sessions = useAppSessions()
     const $open = useAppSessionNavigator()
-    const $fio = useFileIO()
     const $qt = useQuickToasts()
     const {t} = useI18n()
 
@@ -54,24 +53,18 @@ export function useAppSessionActions() {
 
         if (!path) return;
 
-        if (await $fio.pathExists(path)) {
+        if (await exists(path)) {
             $qt.error(t('app.home.fileExists'))
             return;
         }
 
-        const fileName = await $fio.getFileNameFromPath(path)
-        const allowedExtensions: string[] = [".md", ".txt", "mdx"]
-
-        // If the returned file path does not end with any extensions listed above
-        console.log(`returned path ${path}`)
-        if (allowedExtensions.findIndex(i => fileName.endsWith(i)) == -1) {
+        if (!['.md', '.txt', '.mdx'].some(ext => path.endsWith(ext))) {
             $qt.error(t('app.home.notMarkdown'))
             return;
         }
 
         try {
-            const file = await $fio.createFile(path)
-            await file?.close()
+            await (await create(path)).close()
 
             if (openImmediately) {
                 await openSinglespaceFromPath(path)
@@ -85,7 +78,7 @@ export function useAppSessionActions() {
     }
 
     async function openFromPath(path: string | undefined, sessionType: AppSession['sessionType']) {
-        if (!path || !(await $fio.pathExists(path))) return
+        if (!path || !(await exists(path))) return
 
         await $sessions.load()
         const existing = $sessions.getAppSessionFromAbsolutePath(path)

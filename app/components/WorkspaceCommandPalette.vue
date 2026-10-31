@@ -58,7 +58,6 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 icon: 'i-lucide-file-plus',
                 onSelect() {
                     newFileModal.open({
-                        isFolder: false,
                         modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                         asFolder: false,
                         asLevel: 'same',
@@ -72,7 +71,6 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 icon: 'i-lucide-folder-dot',
                 onSelect() {
                     newFileModal.open({
-                        isFolder: true,
                         modalTitle: t('app.editor.ui.filetree.newFolder'),
                         asFolder: true,
                         asLevel: 'same'

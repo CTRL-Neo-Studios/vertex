@@ -16,8 +16,6 @@
 			"openFile": "打开文件…",
 			"openFolder": "打开文件夹…",
 			"save": "保存",
-			"saveAs": "另存为…",
-			"saveAsUnsupported": "“另存为”仅适用于尚未保存的文件。请改用重命名或移动。",
 			"reload": "重新加载",
 			"toggleFullscreen": "切换全屏",
 			"closeTab": "关闭标签页",
@@ -195,7 +193,19 @@
 					"table": "表格",
 					"cards": "卡片",
 					"list": "列表",
-					"map": "地图"
+					"map": "地图",
+					"columns": {
+						"name": "文件名",
+						"ctime": "创建时间",
+						"mtime": "最后修改时间",
+						"size": "文件大小",
+						"basename": "文件基本名",
+						"path": "文件相对路径",
+						"folder": "所在文件夹",
+						"ext": "文件扩展名",
+						"tags": "标签"
+					},
+					"search": "在 {count} 个结果中搜索…"
 				},
 				"filetree": {
 					"newMarkdownFile": "新建 Markdown 文件",

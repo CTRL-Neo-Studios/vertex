@@ -16,8 +16,6 @@
 			"openFile": "Open File…",
 			"openFolder": "Open Folder…",
 			"save": "Save",
-			"saveAs": "Save As…",
-			"saveAsUnsupported": "Save As is only available for unsaved files. Use Rename or Move instead.",
 			"reload": "Reload",
 			"toggleFullscreen": "Toggle Full Screen",
 			"closeTab": "Close Tab",
@@ -195,7 +193,19 @@
 					"table": "Table",
 					"cards": "Cards",
 					"list": "List",
-					"map": "Map"
+					"map": "Map",
+					"columns": {
+						"name": "File Name",
+						"ctime": "Created Time",
+						"mtime": "Last Modified Time",
+						"size": "File Size",
+						"basename": "File Base Name",
+						"path": "File Relative Path",
+						"folder": "File Parent Folder",
+						"ext": "File Extension",
+						"tags": "Tags"
+					},
+					"search": "Search in {count} results..."
 				},
 				"filetree": {
 					"newMarkdownFile": "New Markdown File",

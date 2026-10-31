@@ -3,7 +3,6 @@ import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
@@ -27,9 +26,7 @@ const $sesh = useActiveSessions()
 const activeSesh = $sesh.getSession($sessionId)
 const isWorkspace = !!activeSesh?.workspaceSession
 const $asesh = useAppSessions()
-const workspaceIndex = useActiveWorkspaceIndex(activeSesh)
-const singlespaceIndex = useActiveSinglespaceIndex(activeSesh)
-const index = isWorkspace ? workspaceIndex : singlespaceIndex
+const index = useActiveWorkspaceIndex(activeSesh)
 const {clearTabs} = useActiveTabs(activeSesh)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
@@ -43,7 +40,7 @@ onMounted(async () => {
     if (!activeSesh?.rootPath) return navigateTo(Routes.loading)
     unregisterClose = await $persistence?.registerCloseHandlers()
     if (isWorkspace) {
-        await workspaceIndex.buildIndex(activeSesh.rootPath)
+        await index.buildIndex(activeSesh.rootPath)
         const appSesh = $asesh.getCurrentAppSession()
         if (appSesh) await recoverWorkspaceTabs(activeSesh, appSesh)
     }
