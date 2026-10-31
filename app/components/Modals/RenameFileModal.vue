@@ -38,10 +38,16 @@ const validate = (state: any): FormError[] => {
 
 async function onSubmit(event: FormSubmitEvent<typeof state>) {
     renaming.value = true
-    await $wt.renameFile(props.fileIndexId, `${event.data.filename}`)
-    $qt.success(t('app.generic.ui.createdFile', { filename: event.data.filename }))
-    renaming.value = false
-    emit('close', false)
+    try {
+        // The link-update prompt (if any) opens after this modal closes.
+        emit('close', false)
+        await $wt.renameFile(props.fileIndexId, `${event.data.filename}`)
+        $qt.success(t('app.generic.ui.renamedFile', { filename: event.data.filename }))
+    } catch (error) {
+        $qt.error(t('app.generic.ui.renameFailed'), String(error))
+    } finally {
+        renaming.value = false
+    }
 }
 </script>
 

@@ -42,7 +42,17 @@
 				"functions": {
 					"writersTools": "Writer's Tools",
 					"tableOfContents": "Table of Contents"
-				}
+				},
+				"updateLinks": {
+					"title": "Update links to “{name}”?",
+					"description": "{links} link(s) in {files} note(s) point to the old name.",
+					"update": "Update links",
+					"keep": "Keep as is",
+					"done": "Updated {links} link(s).",
+					"failed": "Could not update links in {file}."
+				},
+				"saveFailed": "Could not save the file.",
+				"moveFailed": "Could not move {file}."
 			}
 		},
 		"generic": {
@@ -52,7 +62,9 @@
 			"delete": "Delete",
 			"ui": {
 				"invalidFileName": "Invalid File Name",
-				"createdFile": "Created file {filename}."
+				"createdFile": "Created file {filename}.",
+				"renamedFile": "Renamed to {filename}.",
+				"renameFailed": "Could not rename the file."
 			},
 			"fileName": "File Name",
 			"fonts": "Fonts",

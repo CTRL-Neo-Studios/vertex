@@ -1,3 +1,6 @@
+import {unref} from "vue";
+import type {PossiblyRef} from "#shared/types/types";
+
 /**
  * A regex that matches characters that are not allowed in filenames on Windows.
  * This is the most restrictive set, ensuring cross-platform compatibility.
@@ -108,10 +111,6 @@ export function isBasesFile(extension: PossiblyRef<string>) {
     return ['base'].includes(unref(extension))
 }
 
-export function isWorkflowsFile(extension: PossiblyRef<string>) {
-	return ['workflow'].includes(unref(extension))
-}
-
 export function isPdf(extension: PossiblyRef<string>) {
     return ['pdf'].includes(unref(extension))
 }
@@ -124,7 +123,13 @@ export function isUnreadableAsText(extension: PossiblyRef<string>) {
     return isImage(extension) || isPdf(extension) || isVideo(extension)
 }
 
+/**
+ * Lower-cased extension of the last path segment, without the dot; `'unknown'` when there is none.
+ * Dots in folder names and a leading dot (".obsidian") are not extensions.
+ */
 export function getFileExtensionFromPath(path: PossiblyRef<string>) {
-    const fn = unref(path).split('.')
-    return fn[fn.length - 1] || 'unknown'
+    const p = unref(path)
+    const name = p.slice(Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1)
+    const dot = name.lastIndexOf('.')
+    return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'unknown'
 }

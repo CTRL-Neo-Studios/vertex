@@ -197,7 +197,7 @@ async function onRename(oldValue: string) {
             if (newPath) {
                 // 2. Proactively update the in-memory index to prevent desync from watcher lag
                 console.log(`Proactively moving index from ${fileToRename.fullPath} to ${newPath}`);
-                await moveFileInIndex(fileToRename.fullPath, newPath, singlespaceRoot);
+                await moveFileInIndex(fileToRename.fullPath, newPath);
             }
         } catch (error) {
             console.error("Failed to rename file or update index:", error);

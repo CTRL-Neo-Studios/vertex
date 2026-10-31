@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { isValidFilename, sanitizeFilename } from './filenames'
+import { getFileExtensionFromPath, isValidFilename, sanitizeFilename } from './filenames'
+
+describe('getFileExtensionFromPath', () => {
+    it.each([
+        ['/v/notes/B.md', 'md'],
+        ['/v/README.MD', 'md'],
+        ['/Users/me/my.vault/notes/README', 'unknown'],
+        ['/v/.obsidian', 'unknown'],
+        ['/v/archive.tar.gz', 'gz'],
+        ['C:\\v\\note.txt', 'txt'],
+        ['plain', 'unknown'],
+    ])('%s → %s', (path, ext) => {
+        expect(getFileExtensionFromPath(path)).toBe(ext)
+    })
+})
 
 describe('isValidFilename', () => {
     it.each(['note', 'My Note.md', '日本語のメモ', 'a.b.c', '.hidden'])('accepts %s', (name) => {

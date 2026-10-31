@@ -36,7 +36,8 @@ export function useFileIO() {
         const fullPath = unref(fullPathRef);
         const data = unref(dataRef);
 
-        if (!fullPath || !data) return;
+        // Empty string is valid content (user cleared the note); only a missing path or value is not.
+        if (!fullPath || data === undefined) return;
         await writeTextFile(fullPath, data);
     }
 

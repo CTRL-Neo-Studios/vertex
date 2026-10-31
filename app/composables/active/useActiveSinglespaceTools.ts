@@ -70,7 +70,7 @@ export function useActiveSinglespaceTools(session?: ActiveSession) {
 
         try {
             const newPath = await $fileio.renameFileOrFolder(file.fullPath, newName);
-            await moveFileInIndex(file.fullPath, newPath, session.rootPath);
+            await moveFileInIndex(file.fullPath, newPath);
         } catch (error) {
             console.error(`[renameFile] Error renaming file:`, error);
         }

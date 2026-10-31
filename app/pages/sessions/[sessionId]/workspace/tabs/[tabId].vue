@@ -3,6 +3,8 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {convertFileSrc} from "@tauri-apps/api/core"
 import type {InternalLink, InternalLinkClickDetail, TocEntry} from "#codemirror-rich-obsidian-editor/editor-types"
@@ -29,16 +31,19 @@ const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $fileio = useFileIO()
+const $qt = useQuickToasts()
+const {t} = useI18n()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const isContentSaved = ref(true)
 const isContentLoaded = ref(false), renaming = ref(false);
 const {
     on,
     getFileByUuid,
-    moveFileInIndex,
     fileIndex,
-    updateIndex
+    updateIndex,
+    markSelfWrite,
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
+const $wt = useActiveWorkspaceTools($sesh.getSession(sessionId))
 const {
     closeTab,
     activeTabUuid,
@@ -136,17 +141,18 @@ debouncedWatch(content, async () => {
 
     try {
         await until(renaming).toMatch(i => i == false)
-        // await $fileio.writeTextToFile(getFileByUuid(tabId)?.fullPath, content.value);
+        // markSelfWrite keeps the watcher from treating our own write as an external edit.
         const fp = getFileByUuid(tabId)?.fullPath
-        if (fp)
-            Promise.all([
-                $fileio.writeTextToFile(fp, unref(content)),
-                updateIndex(fp, unref(content))
-            ]).then(() => {
-                isContentSaved.value = true
-            });
+        if (fp) {
+            markSelfWrite(fp)
+            await $fileio.writeTextToFile(fp, unref(content))
+            await updateIndex(fp, unref(content))
+            isContentSaved.value = true
+        }
     } catch (error) {
+        // Leave the tab marked unsaved and tell the user; previously a failed write was silent.
         console.error("Auto-save failed:", error);
+        $qt.error(t('app.editor.ui.saveFailed'), String(error))
     }
 }, {deep: false, debounce: 500, maxWait: 1000 })
 
@@ -179,8 +185,15 @@ const unsubscribe = on(async (event) => {
             event.removedNodes.forEach(i => closeTab(i.uuid))
         }
     } else if (event.type == "modify" && event.path == getFileByUuid(tabId)?.fullPath) {
-        // isContentSaved.value = false
-        // content.value = await $fileio.readTextFromFile(event.path)
+        // Changed by another program. Reload only if there are no unsaved edits here, so nothing is lost.
+        if (!isContentSaved.value) return
+        const fresh = await $fileio.readTextFromFile(event.path)
+        if (fresh !== content.value) {
+            isContentLoaded.value = false
+            content.value = fresh
+            await nextTick()
+            isContentLoaded.value = true
+        }
     } else if (event.type == "rename" && (event.oldPath == getFileByUuid(tabId)?.fullPath || event.newPath == getFileByUuid(tabId)?.fullPath)) {
         isContentSaved.value = false
         fileName.value = await $fileio.getFileNameFromPath(event.newPath, true)
@@ -203,24 +216,12 @@ async function onRename(oldValue: string) {
         return;
     }
 
-    const fileToRename = getFileByUuid(tabId);
-    const workspaceRoot = $sesh.getSession(sessionId)?.rootPath;
-
-    if (fileToRename?.fullPath && workspaceRoot) {
-        try {
-            // 1. Perform the rename on the file system
-            const newPath = await $fileio.renameFileOrFolder(fileToRename.fullPath, unref(fileName));
-
-            if (newPath) {
-                // 2. Proactively update the in-memory index to prevent desync from watcher lag
-                console.log(`Proactively moving index from ${fileToRename.fullPath} to ${newPath}`);
-                await moveFileInIndex(fileToRename.fullPath, newPath, workspaceRoot);
-            }
-        } catch (error) {
-            console.error("Failed to rename file or update index:", error);
-            // Revert the filename in the UI if the operation fails
-            fileName.value = oldValue;
-        }
+    try {
+        // Renames on disk + in the index, and offers to update links in other notes.
+        await $wt.renameFile(tabId, unref(fileName))
+    } catch (error) {
+        console.error("Failed to rename file:", error);
+        fileName.value = oldValue;
     }
 
     renaming.value = false;

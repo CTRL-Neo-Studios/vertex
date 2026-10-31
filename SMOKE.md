@@ -13,11 +13,11 @@ expected to fail until the noted phase lands; anything else failing is a regress
 | 6 | With Vertex running, open a `.md` from Finder | It opens | fixed in P3 (queued, drained on event and at startup); live check pending |
 | 7 | Cmd+S, Save As, Cmd+Shift+N, Vertex → About | Each does something | known broken until P6 (no listeners) |
 | 8 | Change theme in Settings, then click an editor window | Editor shows the new theme | fixed in P3 (settings broadcast); not separately exercised |
-| 9 | In a workspace, edit a note in another editor | Backlinks/frontmatter update in Vertex | known broken until P4 (watcher drops content events) |
-| 10 | Rename a note that other notes link to | Backlinks to it are kept (or you're asked to update links) | known broken until P4 |
+| 9 | In a workspace, edit a note in another editor | Backlinks/frontmatter update; open tab reloads if it has no unsaved edits | fixed in P4 (watcher handles content events; covered by `workspaceFlow.test.ts`); live check pending |
+| 10 | Rename a note that other notes link to | "Update N links?" prompt; accepting rewrites `[[old]]`, declining keeps links (unresolved, not dropped) | fixed in P4 (covered by `workspaceFlow.test.ts`); live check pending |
+| 16 | Clear a note completely, wait 1 s, reopen | Stays empty | fixed in P4 (empty content was never written) |
 | 11 | Create, rename, delete a file and a folder from the file tree | Tree and tabs update; no console errors | should pass |
 | 12 | Type in a note, wait 1 s, reopen it | Content persisted | should pass |
 | 13 | New file named `.hidden` | Allowed | fixed in P0 |
 | 14 | Open Settings, toggle each view option, close | Persists across relaunch | should pass |
-
 | 15 | Close the last session window | Main window reappears | verified in P3 |
