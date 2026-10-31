@@ -1,6 +1,26 @@
 {
 	"welcome": "Welcome",
 	"app": {
+		"settings": {
+			"nav": {
+				"about": "About",
+				"general": "General",
+				"theme": "Theme",
+				"view": "View"
+			},
+			"general": {
+				"title": "General",
+				"startup": "Startup",
+				"recovery": {
+					"label": "Reopen windows on launch",
+					"description": "Which windows from your last session are reopened when Vertex starts.",
+					"none": "None",
+					"workspaces": "Workspaces only",
+					"singlespaces": "Single files only",
+					"both": "Workspaces and single files"
+				}
+			}
+		},
 		"editor": {
 			"ui": {
 				"filetree": {

@@ -3,15 +3,13 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
+import {useAppSessionPersistence} from "~/composables/app/useAppSessionPersistence";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
@@ -24,37 +22,20 @@ const $sesh = useActiveSessions()
 const $asesh = useAppSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const $win = useAppWebviewWindows()
-const activeTreeItem = ref()
 const loading = ref(true)
 
 await until($sessionId).toMatch(v => v != undefined)
 
-const {
-    buildIndex,
-    startWatcher,
-    stopWatcher,
-    clearIndex,
-} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
-const {
-    activeTabUuid,
-    clearTabs
-} = useActiveTabs($sesh.getSession($sessionId))
-// const {
-//     leftPanelCollapsed,
-//     rightPanelCollapsed
-// } = useActiveLayouts($sesh.getSession($sessionId))
-const {
-    recoverWorkspaceTabs
-} = useAppSessionRecovery()
-const {
-    getCurrentAppSession
-} = useAppSessions()
+const activeSesh = $sesh.getSession($sessionId)
+const {buildIndex, startWatcher, stopWatcher, clearIndex} = useActiveWorkspaceIndex(activeSesh)
+const {clearTabs} = useActiveTabs(activeSesh)
+const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $menu = useAppWindowMenu()
 const $act = useAppSessionActions()
-const $aseshNavi = useAppSessionNavigator()
-const $editorDispatcher = useActiveEditorDispatcher($sesh.getSession($sessionId))
+const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
+const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
 
-let unlistenedWindows: { unlistenClose: UnlistenFn; unlistenDestroyed: UnlistenFn; } | undefined
+let unregisterClose: (() => void) | undefined
 
 $menu.dispatcher.on('categories.file.open.openFile', async () => {
     await until(loading).toBe(false)
@@ -70,44 +51,29 @@ $menu.dispatcher.on('categories.view.closeWindow', async () => {
     await $win.getCurrentAppWindow().close()
 })
 
-watch(activeTabUuid, (newValue) => {
-    activeTreeItem.value = newValue
-}, {deep: false})
-
 onMounted(async () => {
-    if (!unref($sessionId))
-        await until($sessionId).toMatch(v => v != undefined)
-
-    const activeSesh = $sesh.getSession($sessionId)
     if (!activeSesh) {
         await $navi.toHome()
-        return;
+        return
     }
-    const rootPath = activeSesh.rootPath
 
-    await buildIndex(rootPath || '')
-    await startWatcher(rootPath || '')
-    unlistenedWindows = await $aseshNavi.addWindowCloseCallbacks(activeSesh)
-    await $menu.setMenu()
+    unregisterClose = await $persistence?.registerCloseHandlers()
+    await buildIndex(activeSesh.rootPath || '')
+    await startWatcher(activeSesh.rootPath || '')
 
-    const appSesh = getCurrentAppSession()
-
-    if (appSesh)
-        await recoverWorkspaceTabs(activeSesh, appSesh)
-
-    console.log(`Windows: ${await $win.getAppWindows()}`)
+    const appSesh = $asesh.getCurrentAppSession()
+    if (appSesh) await recoverWorkspaceTabs(activeSesh, appSesh)
+    // Track changes only after restore, so the restored state is never overwritten by an empty one.
+    $persistence?.start()
 
     loading.value = false
 })
 
 onBeforeUnmount(async () => {
+    unregisterClose?.()
     clearTabs()
     await stopWatcher()
     clearIndex()
-    if (unlistenedWindows) {
-        unlistenedWindows.unlistenClose()
-        unlistenedWindows.unlistenDestroyed()
-    }
     $editorDispatcher.dispatcher.unmount()
     $menu.dispatcher.unmount()
     $sesh.removeSession($sessionId)
@@ -120,7 +86,6 @@ function callToTocEntryWithDefaults(node: TocEntry) {
         verticalScrollStrategy: 'start'
     })
 }
-
 </script>
 
 <template>

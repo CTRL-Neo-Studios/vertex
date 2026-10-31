@@ -76,6 +76,7 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-process",
                 "@tauri-apps/api/event",
                 "@tauri-apps/api/core",
+                "@tauri-apps/api/dpi",
                 "tailwindcss/colors",
                 "vue-mermaid-string",
                 "@type32/obsidian-bases-parser",

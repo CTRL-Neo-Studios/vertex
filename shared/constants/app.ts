@@ -1,7 +1,8 @@
 /**
- * Single source for every string that crosses a file, window or process boundary.
- * Tauri's own `tauri://*` events come from `TauriEvent` in `@tauri-apps/api/event`.
- * Rust mirrors the `AppEvent` / command names in `src-tauri/src/lib.rs`; keep both in sync.
+ * Single source for window labels, routes and `useState` keys.
+ * Tauri's own `tauri://*` events come from `TauriEvent` in `@tauri-apps/api/event`; Rust commands/events
+ * are named in app/utils/stateClient.ts. Window labels are mirrored by MAIN_WINDOW / SESSION_WINDOW_PREFIX
+ * in src-tauri/src/lib.rs; keep both in sync.
  */
 
 export const WindowLabel = {
@@ -29,18 +30,11 @@ export const Routes = {
     sessionTab: (sessionUuid: string, mode: SessionMode, fileUuid: string) => `/sessions/${sessionUuid}/${mode}/tabs/${fileUuid}`,
 } as const
 
-/** App-defined cross-window / Rust→JS events. */
-export const AppEvent = {
-    quit: 'vertex://app:actions:quit',
-    openFile: 'open-file',
-} as const
-
 /** Keys for Nuxt `useState`. Session-scoped keys require a real session uuid; never fall back to a random one. */
 export const StateKey = {
     activeSessions: 'active.sessions',
     appSessions: 'app.sessions',
     currentAppSession: 'app.sessions.current',
-    lastRedirect: 'app.store.lastRedirected',
     settings: 'settings.data',
     settingsLoaded: 'settings.is_loaded',
     tabs: (s: string) => `active.tabs.${s}`,
@@ -55,7 +49,6 @@ export const StateKey = {
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,
     activeTreeItem: (s: string) => `active.workspace.active-tree-item-${s}`,
     fileTreeLabels: (s: string) => `active.workspace.${s}.processed-file-labels`,
-    fileTreeIdMeta: (s: string) => `active.workspace.${s}.processed-file-label-id-meta`,
 } as const
 
 /**

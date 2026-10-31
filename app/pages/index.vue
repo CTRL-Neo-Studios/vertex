@@ -4,7 +4,6 @@ import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useFileIO} from "~/composables/io/useFileIO";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {AppSession} from "#shared/types/app/sessions";
 
 interface RecentRecord {name: string, path: string, workspace: boolean}
@@ -15,11 +14,6 @@ const $act = useAppSessionActions()
 const $menu = useAppWindowMenu()
 const $sessions = useAppSessions()
 const $fio = useFileIO()
-const $win = useAppWebviewWindows()
-
-onMounted(async () => {
-    console.log(`Windows: ${(await $win.getAppWindows()).map(v => v.label)}`)
-})
 
 const recentsList = computedAsync(async (onCancel) => {
     const abortController = new AbortController()
@@ -50,7 +44,6 @@ $menu.dispatcher.on('categories.file.new.newFile', async () => {
 })
 
 onUnmounted(() => {
-    console.log('unmounted for some reason')
     $menu.dispatcher.unmount()
 })
 
@@ -93,7 +86,7 @@ async function openPath(path: string | undefined, workspace: boolean) {
             <div class="grid grid-cols-1 gap-2 select-none" data-tauri-drag-region>
                 <img src="/icon.png" alt="vertex icon" class="size-24 justify-self-center"/>
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
-                <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
+                <UButton color="neutral" label="New File..." icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" @click="createFile()" :disabled="openingFile"/>
                 <UButton color="neutral" label="New Workspace..." icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open File..." class="cursor-pointer" variant="ghost" @click="openFile()" :disabled="openingFile"/>
                 <UButton color="neutral" label="Open Folder..." class="cursor-pointer" variant="ghost" @click="openFolder()" :disabled="openingFile"/>

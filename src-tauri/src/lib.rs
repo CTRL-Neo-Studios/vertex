@@ -1,14 +1,15 @@
+mod state;
+
+use rayon::prelude::*;
+use state::AppState;
+use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
-use tauri::{Emitter, Listener, Manager, WebviewWindow};
+use tauri::{Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
 use url::Url;
-use rayon::prelude::*;
-use std::fs;
 
-// GLOBAL STATIC STORAGE
-// This survives across the entire app lifecycle, regardless of when functions are called.
-static STARTUP_FILE: Mutex<Option<String>> = Mutex::new(None);
+const MAIN_WINDOW: &str = "main";
+const SESSION_WINDOW_PREFIX: &str = "session-";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct FileReadResult {
@@ -129,37 +130,80 @@ fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, St
     Ok(entries)
 }
 
-#[tauri::command]
-fn get_startup_file() -> Option<String> {
-    let mut file_guard = STARTUP_FILE.lock().unwrap();
-    let file = file_guard.take(); // Read and clear
-
-    // Log for debugging
-    if let Some(ref f) = file {
-        println!("[Rust] Frontend requested startup file. Found: {}", f);
-    } else {
-        println!("[Rust] Frontend requested startup file. Found: None");
+fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(main) = app.get_webview_window(MAIN_WINDOW) {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
     }
+}
 
-    file
+/// Hides `main` once a session window exists and shows it again when the last one is gone,
+/// so the app never ends up with zero visible windows. Driven by real window events, not timers.
+fn sync_main_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>, closing: Option<&str>) {
+    let has_sessions = app
+        .webview_windows()
+        .keys()
+        .any(|l| l.starts_with(SESSION_WINDOW_PREFIX) && Some(l.as_str()) != closing);
+    if has_sessions {
+        if let Some(main) = app.get_webview_window(MAIN_WINDOW) {
+            let _ = main.hide();
+        }
+    } else {
+        show_main_window(app);
+    }
+}
+
+/// Quits the app after every session window has flushed its pending session write.
+/// Each window answers `vertex://flush-requested` by awaiting its last write and calling `flush_done`.
+/// The timeout only guards against a hung webview; normal flushes finish in milliseconds.
+#[tauri::command]
+async fn quit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
+    use std::sync::{Arc, Mutex};
+    use tauri::{Emitter, Listener};
+
+    let pending: std::collections::HashSet<String> = app
+        .webview_windows()
+        .into_keys()
+        .filter(|l| l.starts_with(SESSION_WINDOW_PREFIX))
+        .collect();
+    if !pending.is_empty() {
+        let pending = Arc::new(Mutex::new(pending));
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let tx = Arc::new(Mutex::new(Some(tx)));
+        let id = {
+            let (pending, tx) = (pending.clone(), tx.clone());
+            app.listen_any(state::EVENT_FLUSH_DONE, move |event| {
+                let label = event.payload().trim_matches('"').to_owned();
+                let mut p = pending.lock().unwrap();
+                p.remove(&label);
+                if p.is_empty() {
+                    if let Some(tx) = tx.lock().unwrap().take() {
+                        let _ = tx.send(());
+                    }
+                }
+            })
+        };
+        let _ = app.emit(state::EVENT_FLUSH_REQUESTED, ());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(3), rx).await;
+        app.unlisten(id);
+    }
+    app.exit(0);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+    let mut builder = tauri::Builder::default()
+        .manage(AppState::default())
+        .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            let _ = app
-                .get_webview_window("main")
-                .expect("no main window")
-                .set_focus();
-
-            // WARM START (Windows/Linux)
-            if let Some(path) = parse_file_path_from_args(&args) {
-                println!("[Rust] Warm Start (Args): {}", path);
-                let _ = app.emit("open-file", path);
+            // Second launch (Windows/Linux file association, or user re-opening the app).
+            match parse_file_path_from_args(&args) {
+                Some(path) => app.state::<AppState>().push_open_request(app, path),
+                None => show_main_window(app),
             }
         }));
     }
@@ -174,34 +218,37 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
         .invoke_handler(tauri::generate_handler![
-            get_startup_file, 
-            read_text_files_batch, 
-            scan_directory_recursive
+            read_text_files_batch,
+            scan_directory_recursive,
+            state::sessions_list,
+            state::sessions_upsert,
+            state::sessions_remove,
+            state::settings_get,
+            state::settings_set,
+            state::take_open_requests,
+            quit_app,
         ])
         .setup(|app| {
-            let main_window = app.get_webview_window("main").unwrap();
+            let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
             apply_decorum_style(&main_window);
 
-            // COLD START (Windows/Linux - Args)
+            // Cold start with a file argument (Windows/Linux).
             #[cfg(any(windows, target_os = "linux"))]
             {
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(path) = parse_file_path_from_args(&args) {
-                    println!("[Rust] Cold Start (Args): {}", path);
-                    *STARTUP_FILE.lock().unwrap() = Some(path);
+                    app.state::<AppState>().push_open_request(app.handle(), path);
                 }
             }
 
             let app_handle = app.handle().clone();
-
             app.listen_any("tauri://webview-created", move |event| {
-                let label = event.payload();
-                let clean_label = label.replace("\"", "");
-
-                if clean_label.starts_with("session-") {
-                    if let Some(win) = app_handle.get_webview_window(&clean_label) {
+                let label = event.payload().replace('"', "");
+                if label.starts_with(SESSION_WINDOW_PREFIX) {
+                    if let Some(win) = app_handle.get_webview_window(&label) {
                         apply_decorum_style(&win);
                     }
+                    sync_main_visibility(&app_handle, None);
                 }
             });
 
@@ -214,33 +261,22 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label().starts_with(SESSION_WINDOW_PREFIX) {
+                    sync_main_visibility(window.app_handle(), Some(window.label()));
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            // COLD & WARM START (macOS - File Associations)
+        .run(|_app_handle, _event| {
+            // macOS delivers file associations (cold and warm) as RunEvent::Opened, possibly several at once.
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Opened { urls } = event {
-                // macOS delivers files as URLs (file:///...)
-                if let Some(url) = urls.first() {
-                    if let Ok(path_buf) = url.to_file_path() {
-                        let path_str = path_buf.to_string_lossy().to_string();
-                        println!("[Rust] macOS RunEvent::Opened: {}", path_str);
-
-                        // 1. SAVE TO GLOBAL STATE ALWAYS
-                        *STARTUP_FILE.lock().unwrap() = Some(path_str.clone());
-
-                        // 2. ATTEMPT TO EMIT (Works if frontend is ready)
-                        // If frontend is NOT ready, it will just miss this event,
-                        // but it will pick up the data from STARTUP_FILE via the command.
-                        if let Err(e) = app_handle.emit("open-file", path_str) {
-                            println!(
-                                "[Rust] Failed to emit event (window might not be ready): {}",
-                                e
-                            );
-                        } else {
-                            println!("[Rust] Emitted open-file event successfully");
-                        }
-                    }
+            if let tauri::RunEvent::Opened { urls } = _event {
+                let state = _app_handle.state::<AppState>();
+                for path in urls.iter().filter_map(|u| u.to_file_path().ok()) {
+                    state.push_open_request(_app_handle, path.to_string_lossy().into_owned());
                 }
             }
         });

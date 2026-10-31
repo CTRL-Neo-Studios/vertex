@@ -1,36 +1,17 @@
 <script setup lang="ts">
 import type {NavigationMenuItem} from "#ui/components/NavigationMenu.vue";
-import {useAppSettings} from "~/composables/app/useAppSettings";
+import {Routes} from "#shared/constants/app";
 
-const $route = useRoute()
-const $settings = useAppSettings()
-
+const {t} = useI18n()
 const open = ref(false)
+const close = () => { open.value = false }
 
-const links = [[{
-    label: 'About',
-    icon: 'i-lucide-info',
-    to: '/settings',
-    onSelect: () => {
-        open.value = false
-    }
-}, {
-    label: 'Theme',
-    icon: 'i-lucide-palette',
-    to: '/settings/theme',
-    onSelect: () => {
-        open.value = false
-    }
-}, {
-    label: 'View',
-    icon: 'i-lucide-layout-grid',
-    to: '/settings/view',
-    onSelect: () => {
-        open.value = false
-    }
-},]] satisfies NavigationMenuItem[][]
-
-const groups = computed(() => [])
+const links = computed(() => [
+    {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings, onSelect: close},
+    {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`, onSelect: close},
+    {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`, onSelect: close},
+    {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`, onSelect: close},
+] satisfies NavigationMenuItem[])
 </script>
 
 <template>
@@ -44,7 +25,7 @@ const groups = computed(() => [])
                     <UDashboardSearchButton class="bg-transparent ring-default w-full mb-4" />
 
                     <UNavigationMenu
-                        :items="links[0]"
+                        :items="links"
                         orientation="vertical"
                         tooltip
                         popover

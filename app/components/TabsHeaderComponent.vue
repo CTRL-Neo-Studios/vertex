@@ -8,7 +8,6 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
-import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
@@ -18,7 +17,6 @@ const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
-const $aseshNavi = useAppSessionNavigator()
 const $qt = useQuickToasts()
 const {
     closeTab,
@@ -153,13 +151,9 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                     if (i.changesSaved) {
                         if (unref(isWorkspace))
                             await exitTab(i)
-                        else {
-                            const sesh = $sesh.getSession(sessionId)
-                            if (sesh)
-                                await $aseshNavi.destroyWindowAndTryReturnToLastWindow(sesh)
-                            else
-                                $qt.error('Please restart your app. An error has occurred.')
-                        }
+                        else
+                            // Closing a singlespace's only tab closes its window through the normal close path.
+                            await $win.getCurrentAppWindow().close()
                     } else {
                         $qt.warning('Saving file...')
                     }

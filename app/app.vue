@@ -1,12 +1,34 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
+import {getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppOpener} from "~/composables/app/useAppOpener";
+import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
-const {dispatcher} = useAppWindowMenu()
+const $menu = useAppWindowMenu()
+const {dispatcher} = $menu
 const $opener = useAppOpener()
+const $route = useRoute()
+
+// The native menu is per-window on Windows/Linux but a single app menu on macOS, so the focused window
+// re-applies its own menu; route changes re-evaluate the enabled/disabled predicates.
+let unlistenFocus: (() => void) | undefined
+let unlistenOpen: (() => void) | undefined
+const $fileStart = useAppFileStartHandler()
+onMounted(async () => {
+    await $menu.setMenu()
+    unlistenFocus = await getCurrentWebviewWindow().onFocusChanged(({payload: focused}) => {
+        if (focused) $menu.setMenu()
+    })
+    unlistenOpen = await $fileStart.initializeOnMain()
+})
+onBeforeUnmount(() => {
+    unlistenFocus?.()
+    unlistenOpen?.()
+})
+watch(() => $route.path, () => $menu.setMenu())
 
 const color = computed(() => colorMode.value === 'dark' ? (colors as any)[appConfig.ui.colors.neutral][900] : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)

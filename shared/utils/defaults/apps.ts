@@ -1,11 +1,19 @@
-import type {AppSettings, AppViewConfig} from "#shared/types/app/settings";
+import type {AppSettings, AppViewConfig, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {DeepPartial} from "#shared/types/types";
 
-export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings {
+const RECOVERY_MODES: readonly SessionRecoveryMode[] = ['none', 'workspaces', 'singlespaces', 'both']
+
+/** Settings written before `recoverSessions` existed only had `openLastOpenedWindows`, which recovered workspaces. */
+type LegacySettings = DeepPartial<AppSettings> & { openLastOpenedWindows?: boolean }
+
+export function defaultAppSettings(data?: LegacySettings): AppSettings {
+    const recoverSessions = RECOVERY_MODES.includes(data?.recoverSessions as SessionRecoveryMode)
+        ? data!.recoverSessions as SessionRecoveryMode
+        : data?.openLastOpenedWindows ? 'workspaces' : 'none'
     return {
-        openLastOpenedWindows: data?.openLastOpenedWindows || false,
+        recoverSessions,
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),

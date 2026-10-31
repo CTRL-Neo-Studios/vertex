@@ -1,52 +1,39 @@
-import {listen} from "@tauri-apps/api/event";
-import {AppEvent} from "#shared/constants/app";
-import {invoke} from "@tauri-apps/api/core";
-import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {stat} from "@tauri-apps/plugin-fs";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
+import {stateClient} from "~/utils/stateClient";
 
+/**
+ * Opens every path the OS hands us (file associations, Finder "Open With", second launches).
+ * Rust queues paths and pings `open-requested`; the main window drains the queue on startup and on
+ * each ping, so paths delivered before the webview was ready are not lost.
+ */
 export function useAppFileStartHandler() {
     const $win = useAppWebviewWindows()
     const $act = useAppSessionActions()
 
-    async function initializeOnMain() {
-        if (!$win.isCurrentAppWindowMain()) return;
+    let draining: Promise<void> = Promise.resolve()
 
-        let handledPath: string | null = null;
-
-        // --- 1. SET UP LISTENER (Warm Start & Late Cold Start) ---
-        // Start listening immediately
-        const unlisten = await listen<string>(AppEvent.openFile, async (event) => {
-            const filePath = event.payload;
-            console.log("[JS] Warm File Startup Event Received:", filePath);
-
-            // Deduplicate logic is already handled via the actions composable.
-            // if (handledPath === filePath) return;
-
-            handledPath = filePath;
-
-            // Run actual logic
-            console.log(`Windows: ${await $win.getAppWindows()}`)
-            await $act.openSinglespaceFromPath(filePath)
-        });
-
-        // --- 2. CHECK COMMAND (Early Cold Start) ---
-        // Check if Rust already caught the file before we loaded
-        const startupFile = await invoke<string | null>('get_startup_file');
-        if (startupFile) {
-            console.log("[JS] Cold File Startup Command Received:", startupFile);
-
-            if (handledPath !== startupFile) {
-                handledPath = startupFile;
-
-                // Run actual logic
-                console.log(`Windows: ${await $win.getAppWindows()}`)
-                await $act.openSinglespaceFromPath(startupFile)
+    async function drain() {
+        for (const path of await stateClient.takeOpenRequests()) {
+            try {
+                const info = await stat(path)
+                await (info.isDirectory ? $act.openWorkspaceFromPath(path) : $act.openSinglespaceFromPath(path))
+            } catch (e) {
+                console.error(`[useAppFileStartHandler] could not open ${path}`, e)
             }
         }
     }
 
-    return {
-        initializeOnMain
+    async function initializeOnMain() {
+        if (!$win.isCurrentAppWindowMain()) return
+        const unlisten = await stateClient.onOpenRequested(() => {
+            draining = draining.then(drain)
+        })
+        draining = draining.then(drain)
+        await draining
+        return unlisten
     }
+
+    return {initializeOnMain}
 }

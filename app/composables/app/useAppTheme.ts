@@ -37,7 +37,7 @@ export function useAppTheme() {
                     primaryColor: option,
                     blackAsPrimary: false
                 }
-            }, 'computed primary')
+            })
         }
     })
 
@@ -128,9 +128,9 @@ export function useAppTheme() {
         appConfig.theme.blackAsPrimary = value
         $settings.set({
             themeConfig: {
-                blackAsPrimary: true
+                blackAsPrimary: value
             }
-        }, 'setBlackAsPrimary()')
+        })
     }
 
     function resetTheme() {

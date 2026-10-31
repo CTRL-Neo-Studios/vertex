@@ -6,13 +6,8 @@ const $asesh = useAppSessions()
 const $recv = useAppSessionRecovery()
 
 onMounted(async () => {
-    // If the current window is a `session-` window, saturate it
-    console.log(`Getting current app session...`)
-    const currentAppSession = $asesh.getCurrentAppSession()
-    console.log(`Fetched app session. ${currentAppSession}`)
-    if (currentAppSession) {
-        await $recv.redirectAppSessionWindowToEditSpace(currentAppSession)
-    }
+    const appSession = $asesh.getCurrentAppSession()
+    if (appSession) await $recv.redirectAppSessionWindowToEditSpace(appSession)
 })
 </script>
 

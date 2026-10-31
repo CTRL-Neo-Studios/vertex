@@ -104,10 +104,7 @@ const formattedTreeData = computed<TreeItem[]>(() => {
                     originalNodeData: node
                 };
 
-                if (treeItem.label && treeItem.id) {
-                    $ftMemo.putToLabel(treeItem.label)
-                    $ftMemo.putToIdMeta(treeItem.label, treeItem.id)
-                }
+                if (treeItem.label) $ftMemo.putToLabel(treeItem.label)
 
                 accumulator.push(treeItem);
             }
@@ -351,7 +348,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         expanded-icon="i-lucide-folder-open"
         collapsed-icon="i-lucide-folder-closed"
         v-model:expanded="expandedFolders"
-        value-key="id"
+        :get-key="(i: TreeItem) => i.id as string"
         :ui="{
             itemWithChildren: 'ps-0',
             listWithChildren: `ms-4.5 pl-2 border-muted border-dotted`

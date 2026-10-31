@@ -1,12 +1,10 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
-import {exit, relaunch} from '@tauri-apps/plugin-process'
-import type {AppSession} from "#shared/types/app/sessions";
+import {stateClient} from "~/utils/stateClient";
+import {relaunch} from "@tauri-apps/plugin-process";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import type {WindowMenuEvents} from "#shared/types/app/events";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {sendNotification} from "@tauri-apps/plugin-notification";
-import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
 import {Routes} from "#shared/constants/app";
 
 export function useAppWindowMenu() {
@@ -16,7 +14,6 @@ export function useAppWindowMenu() {
     const $win = useAppWebviewWindows()
     const $sessions = useAppSessions()
     const $settings = useAppSettings()
-    const $ce = useAppCrossWindowEvents()
 
     const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
 
@@ -81,17 +78,7 @@ export function useAppWindowMenu() {
                     id: 'quit',
                     text: 'Quit',
                     accelerator: 'CmdOrControl+Q',
-                    async action() {
-                        try {
-                            await $ce.emitQuitVertex()
-                        } catch(e) {
-                            // sendNotification({
-                            //     title: 'Vertex Debug',
-                            //     body: `Error: ${e}`
-                            // })
-                            await exit()
-                        }
-                    },
+                    action: () => stateClient.quit(),
                 }),
             ],
         });
@@ -319,17 +306,10 @@ export function useAppWindowMenu() {
 
     // Set the menu on the window
     async function setMenu() {
-        console.log('Setting Window Menu...')
         const menu = await buildMenu();
         const window = $win.getCurrentAppWindow();
         await menu.setAsWindowMenu(window)
         await menu.setAsAppMenu()
-        console.log('Menu set.')
-    }
-
-    // Update menu when route changes
-    async function updateMenu() {
-        await setMenu();
     }
 
     // Action handlers
