@@ -1,81 +1,94 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Vertex",
-  "version": "0.2.0-beta.1",
-  "identifier": "dev.ctrl-neo.vertex",
-  "build": {
-    "frontendDist": "../.output/public",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run generate"
-  },
-  "app": {
-    "macOSPrivateApi": true,
-    "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "Vertex",
-        "width": 900,
-        "height": 600,
-        "resizable": true,
-        "fullscreen": false,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "transparent": true,
-        "center": true,
-        "decorations": true,
-        "windowEffects": {
-          "effects": ["sidebar"],
-          "state": "followsWindowActiveState",
-          "radius": 9
-        },
-        "trafficLightPosition": {
-          "x": 14,
-          "y": 21
-        }
-      }
-    ],
-    "security": {
-      "csp": null,
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["**"]
-      }
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico",
-      "icons/icon.png"
-    ],
-    "macOS": {
-      "entitlements": "./Entitlements.plist"
-    },
-    "fileAssociations": [
-      {
-        "ext": [
-          "md"
-        ],
-        "mimeType": "text/markdown",
-        "name": "Markdown",
-        "description": "The Markdown Format",
-        "role": "Editor"
-      },
-      {
-        "ext": [
-          "txt"
-        ],
-        "mimeType": "text/plain",
-        "name": "Text",
-        "description": "The Plain Text Format",
-        "role": "Editor"
-      }
-    ]
-  }
+	"$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+	"productName": "Vertex",
+	"version": "0.2.0-beta.1",
+	"identifier": "dev.ctrl-neo.vertex",
+	"build": {
+		"frontendDist": "../.output/public",
+		"devUrl": "http://localhost:3000",
+		"beforeDevCommand": "bun run dev",
+		"beforeBuildCommand": "bun run generate"
+	},
+	"app": {
+		"macOSPrivateApi": true,
+		"withGlobalTauri": true,
+		"windows": [
+			{
+				"title": "Vertex",
+				"width": 900,
+				"height": 600,
+				"resizable": true,
+				"fullscreen": false,
+				"titleBarStyle": "Overlay",
+				"hiddenTitle": true,
+				"transparent": true,
+				"center": true,
+				"decorations": true,
+				"windowEffects": {
+					"effects": [
+						"sidebar"
+					],
+					"state": "followsWindowActiveState",
+					"radius": 9
+				},
+				"trafficLightPosition": {
+					"x": 14,
+					"y": 21
+				}
+			}
+		],
+		"security": {
+			"csp": null,
+			"assetProtocol": {
+				"enable": true,
+				"scope": [
+					"**"
+				]
+			}
+		}
+	},
+	"bundle": {
+		"createUpdaterArtifacts": true,
+		"active": true,
+		"targets": "all",
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico",
+			"icons/icon.png"
+		],
+		"macOS": {
+			"entitlements": "./Entitlements.plist"
+		},
+		"fileAssociations": [
+			{
+				"ext": [
+					"md"
+				],
+				"mimeType": "text/markdown",
+				"name": "Markdown",
+				"description": "The Markdown Format",
+				"role": "Editor"
+			},
+			{
+				"ext": [
+					"txt"
+				],
+				"mimeType": "text/plain",
+				"name": "Text",
+				"description": "The Plain Text Format",
+				"role": "Editor"
+			}
+		]
+	},
+	"plugins": {
+		"updater": {
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc4NzIzOUUyOUI5Qzc0RTQKUldUa2RKeWI0amx5ZUhoUTdZVTUyMm1Tak9JeUgvWitzUHhBblV5d1F4Vlc4cXV3VzZWOEdJemYK",
+			"endpoints": [
+				"https://www.ctrl-neo.dev/apps/updates/vertex/{{target}}/{{arch}}/{{current_version}}"
+			]
+		}
+	}
 }

@@ -67,7 +67,8 @@ pub fn sanitize_sessions(list: Vec<Value>) -> Vec<Value> {
             let (Some(uuid), Some(kind), Some(root)) = (
                 session_uuid(s),
                 s.get("sessionType").and_then(Value::as_str),
-                s.get("rootFileOrFolderAbsolutePath").and_then(Value::as_str),
+                s.get("rootFileOrFolderAbsolutePath")
+                    .and_then(Value::as_str),
             ) else {
                 return false;
             };
@@ -78,8 +79,13 @@ pub fn sanitize_sessions(list: Vec<Value>) -> Vec<Value> {
 
 /// Insert or merge one session by uuid. Returns the merged session.
 pub fn upsert_session(list: &mut Vec<Value>, session: Value) -> Result<Value, String> {
-    let uuid = session_uuid(&session).ok_or("session has no uuid")?.to_owned();
-    match list.iter_mut().find(|s| session_uuid(s) == Some(uuid.as_str())) {
+    let uuid = session_uuid(&session)
+        .ok_or("session has no uuid")?
+        .to_owned();
+    match list
+        .iter_mut()
+        .find(|s| session_uuid(s) == Some(uuid.as_str()))
+    {
         Some(existing) => {
             merge(existing, session);
             Ok(existing.clone())
@@ -129,7 +135,8 @@ impl AppState {
             data.insert(SESSIONS_LIST.into(), Value::Array(list.clone()));
             root.insert(SESSIONS_ROOT.into(), Value::Object(data));
             write_json(app, SESSIONS_FILE, &Value::Object(root))?;
-            app.emit(EVENT_SESSIONS_CHANGED, list.clone()).map_err(|e| e.to_string())?;
+            app.emit(EVENT_SESSIONS_CHANGED, list.clone())
+                .map_err(|e| e.to_string())?;
         }
         Ok(out)
     }
@@ -142,14 +149,18 @@ impl AppState {
     ) -> Result<T, String> {
         let mut guard = self.settings.lock().map_err(|e| e.to_string())?;
         let settings = guard.get_or_insert_with(|| {
-            read_json(app, SETTINGS_FILE).get(SETTINGS_ROOT).cloned().unwrap_or(Value::Null)
+            read_json(app, SETTINGS_FILE)
+                .get(SETTINGS_ROOT)
+                .cloned()
+                .unwrap_or(Value::Null)
         });
         let out = f(settings);
         if persist {
             let mut root = Map::new();
             root.insert(SETTINGS_ROOT.into(), settings.clone());
             write_json(app, SETTINGS_FILE, &Value::Object(root))?;
-            app.emit(EVENT_SETTINGS_CHANGED, settings.clone()).map_err(|e| e.to_string())?;
+            app.emit(EVENT_SETTINGS_CHANGED, settings.clone())
+                .map_err(|e| e.to_string())?;
         }
         Ok(out)
     }
@@ -164,37 +175,63 @@ impl AppState {
 }
 
 #[tauri::command]
-pub fn sessions_list<R: Runtime>(app: AppHandle<R>, state: tauri::State<'_, AppState>) -> Result<Vec<Value>, String> {
+pub fn sessions_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<Value>, String> {
     state.with_sessions(&app, |l| Ok(l.clone()), false)
 }
 
 #[tauri::command]
-pub fn sessions_upsert<R: Runtime>(app: AppHandle<R>, state: tauri::State<'_, AppState>, session: Value) -> Result<Value, String> {
+pub fn sessions_upsert<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    session: Value,
+) -> Result<Value, String> {
     state.with_sessions(&app, |l| upsert_session(l, session), true)
 }
 
 #[tauri::command]
-pub fn sessions_remove<R: Runtime>(app: AppHandle<R>, state: tauri::State<'_, AppState>, uuid: String) -> Result<(), String> {
-    state.with_sessions(&app, |l| {
-        l.retain(|s| session_uuid(s) != Some(uuid.as_str()));
-        Ok(())
-    }, true)
+pub fn sessions_remove<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    uuid: String,
+) -> Result<(), String> {
+    state.with_sessions(
+        &app,
+        |l| {
+            l.retain(|s| session_uuid(s) != Some(uuid.as_str()));
+            Ok(())
+        },
+        true,
+    )
 }
 
 #[tauri::command]
-pub fn settings_get<R: Runtime>(app: AppHandle<R>, state: tauri::State<'_, AppState>) -> Result<Value, String> {
+pub fn settings_get<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+) -> Result<Value, String> {
     state.with_settings(&app, |s| s.clone(), false)
 }
 
 #[tauri::command]
-pub fn settings_set<R: Runtime>(app: AppHandle<R>, state: tauri::State<'_, AppState>, settings: Value) -> Result<(), String> {
+pub fn settings_set<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    settings: Value,
+) -> Result<(), String> {
     state.with_settings(&app, |s| *s = settings, true)
 }
 
 /// Returns and clears every path the OS asked us to open (file associations, second launches).
 #[tauri::command]
 pub fn take_open_requests(state: tauri::State<'_, AppState>) -> Vec<String> {
-    state.open_queue.lock().map(|mut q| q.drain(..).collect()).unwrap_or_default()
+    state
+        .open_queue
+        .lock()
+        .map(|mut q| q.drain(..).collect())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -205,7 +242,11 @@ mod tests {
     #[test]
     fn open_queue_keeps_every_path_in_order_and_drains_once() {
         let state = AppState::default();
-        state.open_queue.lock().unwrap().extend(["/a.md".to_string(), "/b.md".to_string()]);
+        state
+            .open_queue
+            .lock()
+            .unwrap()
+            .extend(["/a.md".to_string(), "/b.md".to_string()]);
         let first: Vec<String> = state.open_queue.lock().unwrap().drain(..).collect();
         assert_eq!(first, ["/a.md", "/b.md"]);
         assert!(state.open_queue.lock().unwrap().is_empty());
@@ -226,8 +267,14 @@ mod tests {
 
     #[test]
     fn upsert_merges_top_level_and_replaces_nested() {
-        let mut list = vec![json!({"uuid": "a", "sessionType": "workspace", "context": {"openedAbsoluteFilePaths": ["/x"], "openedAbsoluteFolderPaths": ["/f"]}})];
-        let merged = upsert_session(&mut list, json!({"uuid": "a", "context": {"openedAbsoluteFilePaths": []}})).unwrap();
+        let mut list = vec![
+            json!({"uuid": "a", "sessionType": "workspace", "context": {"openedAbsoluteFilePaths": ["/x"], "openedAbsoluteFolderPaths": ["/f"]}}),
+        ];
+        let merged = upsert_session(
+            &mut list,
+            json!({"uuid": "a", "context": {"openedAbsoluteFilePaths": []}}),
+        )
+        .unwrap();
         assert_eq!(merged["sessionType"], "workspace");
         assert_eq!(merged["context"], json!({"openedAbsoluteFilePaths": []}));
         assert_eq!(list.len(), 1);

@@ -34,20 +34,19 @@ struct DirectoryEntry {
 /// because it reduces IPC overhead and uses efficient native I/O.
 #[tauri::command]
 fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
-    paths.par_iter()
-        .map(|path| {
-            match fs::read_to_string(path) {
-                Ok(content) => FileReadResult {
-                    path: path.clone(),
-                    content: Some(content),
-                    error: None,
-                },
-                Err(e) => FileReadResult {
-                    path: path.clone(),
-                    content: None,
-                    error: Some(e.to_string()),
-                }
-            }
+    paths
+        .par_iter()
+        .map(|path| match fs::read_to_string(path) {
+            Ok(content) => FileReadResult {
+                path: path.clone(),
+                content: Some(content),
+                error: None,
+            },
+            Err(e) => FileReadResult {
+                path: path.clone(),
+                content: None,
+                error: Some(e.to_string()),
+            },
         })
         .collect()
 }
@@ -59,57 +58,60 @@ fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
 fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, String> {
     let mut entries = Vec::new();
     let mut properties_files = Vec::new();
-    
+
     fn scan_dir(
-        path: &Path, 
+        path: &Path,
         entries: &mut Vec<DirectoryEntry>,
-        properties_files: &mut Vec<String>
+        properties_files: &mut Vec<String>,
     ) -> Result<Vec<String>, String> {
         let dir_entries = fs::read_dir(path)
             .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?;
-        
+
         let mut children = Vec::new();
-        
+
         for entry in dir_entries {
             let entry = entry.map_err(|e| e.to_string())?;
             let entry_path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
-            
+
             // Skip hidden files (starting with .)
             if name.starts_with('.') {
                 continue;
             }
-            
-            let metadata = fs::metadata(&entry_path)
-                .map_err(|e| format!("Failed to get metadata for {}: {}", entry_path.display(), e))?;
-            
+
+            let metadata = fs::metadata(&entry_path).map_err(|e| {
+                format!("Failed to get metadata for {}: {}", entry_path.display(), e)
+            })?;
+
             let is_directory = metadata.is_dir();
             let size = metadata.len();
-            
-            let created = metadata.created()
+
+            let created = metadata
+                .created()
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as i64);
-            
-            let modified = metadata.modified()
+
+            let modified = metadata
+                .modified()
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as i64);
-            
+
             let path_str = entry_path.to_string_lossy().to_string();
             children.push(path_str.clone());
-            
+
             // Track properties files
             if !is_directory && (name == "properties.yml" || name == "properties.yaml") {
                 properties_files.push(path_str.clone());
             }
-            
+
             let child_children = if is_directory {
                 scan_dir(&entry_path, entries, properties_files)?
             } else {
                 Vec::new()
             };
-            
+
             entries.push(DirectoryEntry {
                 path: path_str,
                 name,
@@ -120,12 +122,12 @@ fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, St
                 children: child_children,
             });
         }
-        
+
         // Sort children for consistent ordering
         children.sort();
         Ok(children)
     }
-    
+
     scan_dir(Path::new(&root_path), &mut entries, &mut properties_files)?;
     Ok(entries)
 }
@@ -194,6 +196,7 @@ async fn quit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .plugin(tauri_plugin_notification::init());
 
@@ -237,7 +240,8 @@ pub fn run() {
             {
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(path) = parse_file_path_from_args(&args) {
-                    app.state::<AppState>().push_open_request(app.handle(), path);
+                    app.state::<AppState>()
+                        .push_open_request(app.handle(), path);
                 }
             }
 
