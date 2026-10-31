@@ -22,7 +22,6 @@ export function useInternalLinkParsing() {
 
                 i += 2; // Skip the initial "[["
                 const linkStart = i;
-                const bracketDepth = 0;
 
                 // Find the closing "]]"
                 while (i < text.length - 1) {
@@ -81,7 +80,7 @@ export function useInternalLinkParsing() {
         const pipeIndex = content.indexOf('|');
 
         let pathPart = content;
-        let aliasPart = '';
+        let aliasPart: string;
 
         if (pipeIndex !== -1) {
             pathPart = content.substring(0, pipeIndex).trim();
@@ -138,7 +137,6 @@ export function useInternalLinkParsing() {
 
         // Check if there's a "!" before the "[["
         const isEmbed = start > 0 && text[start - 1] === '!';
-        const linkStart = isEmbed ? start - 1 : start;
 
         // Look forward for closing "]]"
         let end = start + 2;
@@ -155,7 +153,6 @@ export function useInternalLinkParsing() {
         }
 
         // Extract and parse the link
-        const fullLink = text.substring(linkStart, end + 2);
         const content = text.substring(start + 2, end);
 
         return parseLinkContent(content, isEmbed);
@@ -175,7 +172,6 @@ export function useInternalLinkParsing() {
 
             if (isEmbed || isLink) {
                 const startPos = i;
-                const linkStart = i;
 
                 if (isEmbed) i++; // Skip the "!" for embeds
 
@@ -325,16 +321,6 @@ export function useInternalLinkParsing() {
         }
 
         return false;
-    }
-
-    /**
-     * Extract the first internal link or embed from a string
-     * Returns the full matched string or null if none found
-     */
-    function extractFirstInternalLinkOrEmbed(str: string): string | null {
-        // Quick implementation using the existing parser
-        const links = parseInternalLinksWithPositions(str);
-        return links.length > 0 ? links[0]?.fullMatch ?? null : null;
     }
 
     /**

@@ -6,8 +6,6 @@ import type {
 } from "#codemirror-rich-obsidian-editor/editor-types";
 import {
     type BaseSource,
-    createBase,
-    createReactiveBaseFromYAML,
     type SortConfig,
     useBase
 } from "@type32/obsidian-bases-parser";
@@ -39,10 +37,10 @@ const UPopover = resolveComponent('UPopover')
 const UTooltip = resolveComponent('UTooltip')
 const ModalNewBaseView = $ovl.create(NewBaseViewModal)
 
-const editorInstance = defineModel('editorInstance')
+defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({default: ''})
-const contentSaved = defineModel<boolean>('contentSaved', {default: false})
+defineModel<boolean>('contentSaved', {default: false})
 const activeView = defineModel<string>('activeView', {required: false, default: ''})
 
 const props = withDefaults(defineProps<{
@@ -350,7 +348,7 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
 			id: key,
 			header: ({column}) => getHeader(column, key),
 			cell: ({row}) => {
-				const rowVal = (row.getValue(key) as any)
+				const rowVal = row.getValue(key) as Record<string, unknown>
 				if (!rowVal[key]) {
 					flag = false
 					return
@@ -464,7 +462,7 @@ watch($base.hasChanges, (newValue) => {
         content.value = $base.save()
 })
 
-watch(activeView, (newValue) => {
+watch(activeView, () => {
 	loadingData.value = true
 	propogateDisplayDataColumns()
 	loadColumnsVisibilityFromBase()
@@ -485,14 +483,14 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
             children: [[{
                 label: t('app.editor.ui.bases.view'),
                 icon: 'i-lucide-eye',
-                onSelect(e) {
+                onSelect(_e) {
                     activeView.value = i.name
                 }
             }], [{
                 label: t('app.editor.ui.bases.remove'),
                 icon: 'i-lucide-trash',
                 color: 'error',
-				onSelect(e) {
+				onSelect(_e) {
 					if (unref($base.viewNames).length <= 1) return;
 					const baseName = i.name
 					$base.removeView(baseName)
@@ -507,7 +505,7 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
         {
             label: t('app.editor.ui.bases.addView'),
             icon: 'i-lucide-grid-2x2-plus',
-            async onSelect(e) {
+            async onSelect(_e) {
                 const view = await ModalNewBaseView.open()
                 if (view) {
                     $base.addView(view)
@@ -541,14 +539,14 @@ const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
             {
                 label: t('app.editor.ui.bases.hideAll'),
                 icon: 'i-lucide-eye-off',
-                onSelect(e) {
+                onSelect(_e) {
                     setAllColumnsVisibility(false)
                 }
             },
             {
                 label: t('app.editor.ui.bases.addFormula'),
                 icon: 'i-lucide-square-function',
-                onSelect(e) {
+                onSelect(_e) {
 
                 }
             }
@@ -589,7 +587,6 @@ onMounted(async () => {
 })
 
 const sorting = ref<SortingState>([])
-const filters = ref([])
 
 </script>
 

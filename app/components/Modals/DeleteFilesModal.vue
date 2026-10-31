@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
 const props = defineProps<{
     modalTitle?: string,
     fileIndexIds: string[],
@@ -14,7 +13,6 @@ const {
     getSession
 } = useActiveSessions()
 const $wt = useActiveWorkspaceTools(getSession($sessionId))
-const $qt = useQuickToasts()
 
 const deleting = ref(false)
 

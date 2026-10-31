@@ -6,7 +6,6 @@ const appConfig = useAppConfig()
 const colorMode = useColorMode()
 const $settings = useAppSettings()
 
-const open = ref(false)
 const saving = defineModel<boolean>({default: false})
 
 const {
@@ -24,8 +23,7 @@ const {
     editorMonoFont,
     modes,
     mode,
-    resetTheme,
-    saveTheme
+    resetTheme
 } = useAppTheme()
 
 // Debounced save to prevent recursive loops

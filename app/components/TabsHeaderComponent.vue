@@ -31,7 +31,6 @@ const {
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     getFileByUuid: getSinglespaceFileByUuid,
-    isIndexTemporary: isSinglespaceIndexTemporary,
     setTemporaryIndex: setSinglespaceTempIndex
 } = useActiveSinglespaceIndex($sesh.getSession(sessionId))
 const {
@@ -101,7 +100,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
             label: t('app.editor.ui.clearAllTabs'),
             icon: 'i-lucide-x',
             color: 'error',
-            async onSelect(e: Event) {
+            async onSelect(_e: Event) {
                 await clearAllTabs()
             },
             disabled: !unref(isWorkspace)
@@ -136,7 +135,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                         $qt.warning(t('app.editor.ui.saving'))
                     }
                 },
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     await toTab(i);
                 }
             })
@@ -147,10 +146,6 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 })
 
 const firstTabItem = computed(() => unref(dropdownItems)[1]?.[0])
-
-const panelsCollapsed = computed(() => {
-    return $sesh.isSessionWorkspace(sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
-})
 
 const scrollArea = useTemplateRef('scrollArea')
 

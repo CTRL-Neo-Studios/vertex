@@ -203,6 +203,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const parent = unref(fileIndex)[parentPathOf(path)]
         if (parent) parent.children = parent.children.filter(c => c !== path)
         unref(uuidToFilePathIndex).delete(node.uuid)
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- Vue 3 proxies deleteProperty on the reactive index
         delete unref(fileIndex)[path]
         removed.push(node)
         return removed
@@ -232,6 +233,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     next.children.push(childTo)
                 }
             } else moved.push(node.uuid)
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- Vue 3 proxies deleteProperty on the reactive index
             delete index[from]
             index[to] = next
             unref(uuidToFilePathIndex).set(node.uuid, to)
@@ -332,6 +334,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             // macOS reports some renames as two single-path events; resolve from disk.
             const path = paths[0]!
             if (rt.selfWrites.has(path)) return
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- void marks the "no value" settle signal
             const settled = Promise.withResolvers<void>()
             setTimeout(settled.resolve, 100)
             await settled.promise

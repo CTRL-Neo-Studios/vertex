@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types"
-const props = defineProps<{
+defineProps<{
     srcPath: string;
     display: string;
     linkData?: InternalLink

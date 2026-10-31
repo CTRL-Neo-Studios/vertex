@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
 import FileTreeComponent from "#build/types/components";
 const props = defineProps<{
     modalTitle?: string,
@@ -12,14 +9,6 @@ const props = defineProps<{
     fileExt?: string,
 }>()
 const emit = defineEmits<{ close: [boolean] }>()
-
-const $route = useRoute()
-const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {
-    getSession
-} = useActiveSessions()
-const $wt = useActiveWorkspaceTools(getSession($sessionId))
-const $qt = useQuickToasts()
 
 const selectedFolder = ref<string>('')
 </script>

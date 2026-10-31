@@ -1,8 +1,6 @@
 import type {YamlFieldType} from "@type32/yaml-editor-form";
-import {useInternalLinkParsing} from "~/composables/utility/editor/useInternalLinkParsing";
 
 export function useFrontmatterTypes(): YamlFieldType[] {
-    const parse = useInternalLinkParsing()
     const {t} = useI18n()
     return [
         {

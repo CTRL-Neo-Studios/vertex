@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import {useAppTheme} from "~/composables/app/useAppTheme";
-import {useAppSettings} from "~/composables/app/useAppSettings";
-
 definePageMeta({
     layout: 'settings'
 })

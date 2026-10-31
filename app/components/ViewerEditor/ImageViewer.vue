@@ -6,7 +6,7 @@
 
 const fileName = defineModel<string>('fileName', { required: true })
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
     imageSrc: string,
     renaming: boolean,
     filePath?: string,

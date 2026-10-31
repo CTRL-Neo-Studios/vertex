@@ -104,7 +104,9 @@ describe('LinkGraph', () => {
                 g.addFile({id, relativePath: files[id]})
             } else if (op === 1 && files[id]) {
                 g.removeFile(id)
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- plain-object map in a fuzz test
                 delete files[id]
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- plain-object map in a fuzz test
                 delete links[id]
                 order = order.filter(o => o !== id)
             } else if (op === 2 && files[id]) {

@@ -29,7 +29,7 @@ const {
 const $wt = useActiveWorkspaceTools(getSession($sessionId))
 const $qt = useQuickToasts()
 
-const validate = (state: any): FormError[] => {
+const validate = (state: { filename: string }): FormError[] => {
     const errors = []
     if (!state.filename) errors.push({ name: 'filename', message: t('app.generic.required') })
     if (!isValidFilename(state.filename)) errors.push({ name: 'filename', message: t('app.generic.ui.invalidFileName') })

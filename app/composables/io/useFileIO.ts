@@ -6,7 +6,6 @@ import {
     exists,
     mkdir,
     readDir,
-    readFile,
     readTextFile,
     remove,
     rename,
@@ -88,7 +87,7 @@ export function useFileIO() {
         } catch (e) {
             // If stat fails, the file likely doesn't exist. Proceed with caution or throw.
             // For rename, it's safer to throw.
-            throw new Error(`Cannot stat original path: ${fullPath}. It may not exist.`);
+            throw new Error(`Cannot stat original path: ${fullPath}. It may not exist.`, {cause: e});
         }
 
         const newPath = await join(dir, finalNewName);

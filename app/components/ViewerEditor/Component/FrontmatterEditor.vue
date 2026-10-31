@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { AccordionItem } from "@nuxt/ui";
 import type {YamlFormData} from '@type32/yaml-editor-form'
 import DataEditorForm from "~/components/ViewerEditor/Component/DataEditorForm.vue";
 

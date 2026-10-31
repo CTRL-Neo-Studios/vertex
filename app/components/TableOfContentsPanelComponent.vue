@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 
@@ -13,8 +12,6 @@ const {
 const {
     getActiveTab
 } = useActiveTabs(getSession($sessionId))
-const {
-} = useActiveWorkspaceIndex(getSession($sessionId))
 const {content} = useActiveEditorContent(getSession($sessionId), getActiveTab($tabId))
 const $eu = useDocumentUtils()
 

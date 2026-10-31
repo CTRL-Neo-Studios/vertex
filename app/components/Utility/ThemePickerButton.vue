@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {ButtonProps} from "@nuxt/ui";
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
     label: string
     icon?: string
     chip?: string
@@ -14,17 +14,8 @@ const props = withDefaults(defineProps<{
 })
 
 const slots = defineSlots<{
-    leading: () => any
+    leading: () => unknown
 }>()
-
-const colorMode = useColorMode()
-
-// Use lighter shade in dark mode for better visibility
-const chipColor = computed(() => {
-    if (!props.chip) return ''
-    const shade = colorMode.value === 'dark' ? '400' : '500'
-    return `var(--color-${props.chip}-${shade})`
-})
 </script>
 
 <template>

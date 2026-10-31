@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const content = defineModel({ default: '' })
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
     words?: boolean,
     lines?: boolean,
     paragraphs?: boolean

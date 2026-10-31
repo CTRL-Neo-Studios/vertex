@@ -29,6 +29,7 @@ export function useCommands(commands: CommandHandlers) {
         for (const id of Object.keys(commands)) {
             if (next[id] !== commands[id]) continue
             if (previous[id]) next[id] = previous[id]
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- next is a plain-object copy, not reactive
             else delete next[id]
         }
         handlers.value = next

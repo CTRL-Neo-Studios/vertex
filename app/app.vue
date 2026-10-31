@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
 const {locale} = useI18n()
 watch([() => $route.path, $menu.handlers, locale], () => rebuildMenu())
 
-const color = computed(() => colorMode.value === 'dark' ? (colors as any)[appConfig.ui.colors.neutral][900] : 'white')
+const color = computed(() => colorMode.value === 'dark' ? (colors as unknown as Record<string, Record<number, string>>)[appConfig.ui.colors.neutral]?.[900] ?? 'white' : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)
 const blackAsPrimary = computed(() => appConfig.theme.blackAsPrimary ? `:root { --ui-primary: black; } .dark { --ui-primary: white; }` : ':root {}')
 const appFont = computed(() => `:root { --font-sans: '${appConfig.theme.appFont}', 'Geist', 'Inter', sans-serif; }`)

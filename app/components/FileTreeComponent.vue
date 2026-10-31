@@ -2,7 +2,6 @@
 import {StateKey} from "#shared/constants/app";
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
-import useUuid from "~/composables/utility/useUuid";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
@@ -13,10 +12,8 @@ import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
 import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {useAppOpener} from "~/composables/app/useAppOpener";
-import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 
 const { t } = useI18n()
@@ -74,10 +71,9 @@ const formattedTreeData = computed<TreeItem[]>(() => {
             if (!props?.onlyFolders || node.isFolder) {
 
                 // Note: The `treeItem` needs to be declared so it can be referenced in its own event handlers.
-                let treeItem: TreeItem;
                 const nodeIcon: string | undefined = (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') ? 'i-lucide-file-cog' : (node.properties.icon && typeof node.properties.icon === 'string') ? node.properties.icon : undefined
 
-                treeItem = {
+                const treeItem: TreeItem = {
                     id: node.uuid,
                     label: `${node.fileName}${node.uuid.slice(0,4)}`,
                     icon: nodeIcon,
@@ -91,7 +87,7 @@ const formattedTreeData = computed<TreeItem[]>(() => {
                     },
 
                     // === The key conditional logic for onToggle ===
-                    onToggle(e) {
+                    onToggle(_e) {
                         // If "folders only" mode is active, the toggle action
                         // should also trigger the primary item click behavior.
                         if (props?.onlyFolders) {
@@ -141,7 +137,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         label: t('app.editor.ui.filetree.aboveLevel'),
                         icon: 'i-lucide-folder-up',
                         disabled: itemLevel <= 1,
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -155,7 +151,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                     {
                         label: t('app.editor.ui.filetree.thisLevel'),
                         icon: 'i-lucide-folder-dot',
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -170,7 +166,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         label: t('app.editor.ui.filetree.underLevel'),
                         icon: 'i-lucide-folder-down',
                         disabled: !isFolder,
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -191,7 +187,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         label: t('app.editor.ui.filetree.aboveLevel'),
                         icon: 'i-lucide-folder-up',
                         disabled: itemLevel <= 1,
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -204,7 +200,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                     {
                         label: t('app.editor.ui.filetree.thisLevel'),
                         icon: 'i-lucide-folder-dot',
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -218,7 +214,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         label: t('app.editor.ui.filetree.underLevel'),
                         icon: 'i-lucide-folder-down',
                         disabled: !isFolder,
-                        onSelect(e) {
+                        onSelect(_e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
@@ -244,7 +240,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 label: t('app.editor.ui.filetree.newOpenFolderProperties'),
                 icon: 'i-lucide-file-plus',
                 disabled: !isFolder,
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     const propFileUuid = getPropertiesFile(item.id)
                     if (propFileUuid != undefined) {
                         const tab = openTab(propFileUuid)
@@ -265,7 +261,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 label: t('app.editor.ui.openInNewTab'),
                 icon: 'i-lucide-square-plus',
                 disabled: isFolder,
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     const tab = openTab(item.id)
                     await $navi.toWorkspaceTab($sessionId, tab)
                 }
@@ -273,7 +269,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: t('app.editor.ui.openInDefaultApp'),
                 icon: 'i-lucide-square-arrow-out-up-right',
-                async onSelect(e) {
+                async onSelect(_e) {
                     const file = getFileByUuid(item.id)
                     if (file)
                         await $opener.openFileWithDefaultApp(file.fullPath)
@@ -284,21 +280,21 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: t('app.editor.ui.copyFullPath'),
                 icon: 'i-lucide-copy',
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     await writeText(getFileByUuid(item.id)?.fullPath ?? '')
                 }
             },
             {
                 label: t('app.editor.ui.copyRelativePath'),
                 icon: 'i-lucide-copy',
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     await writeText(getFileByUuid(item.id)?.relativePath ?? '')
                 }
             },
             {
                 label: t('app.editor.ui.revealInFileExplorer'),
                 icon: 'i-lucide-copy',
-                async onSelect(e) {
+                async onSelect(_e) {
                     const file = getFileByUuid(item.id)
                     if (file)
                         await $opener.revealFilesInFileManager([file.fullPath])
@@ -319,7 +315,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {
                 label: t('app.editor.ui.rename'),
                 icon: 'i-lucide-pen-line',
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     if (item?.label)
                         renameFileModal.open({
                             fileIndexId: item.id,
@@ -331,7 +327,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 label: t('app.editor.ui.delete'),
                 color: 'error',
                 icon: 'i-lucide-trash-2',
-                async onSelect(e: Event) {
+                async onSelect(_e: Event) {
                     deleteFilesModal.open({
                         fileIndexIds: [item.id]
                     })
@@ -375,7 +371,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 </UButton>
             </UContextMenu>
         </template>
-        <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}" class="p-0">
+        <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
             <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
                 <div :key="`${item.id}-file-tree-item`" :class="['inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none', onlyFolders ? item.id == activeTabUuid ? 'border border-primary bg-primary/30 text-primary' : '' : '' ]">
                     <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />

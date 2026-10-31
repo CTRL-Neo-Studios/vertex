@@ -3,9 +3,9 @@ import type {YamlFormData} from "@type32/yaml-editor-form";
 
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({ default: '' })
-const contentSaved = defineModel<boolean>('contentSaved', {default: false})
+defineModel<boolean>('contentSaved', {default: false})
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
     renaming: boolean,
     filePath?: string,
     disabled?: boolean

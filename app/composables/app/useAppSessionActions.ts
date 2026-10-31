@@ -76,9 +76,9 @@ export function useAppSessionActions() {
             if (openImmediately) {
                 await openSinglespaceFromPath(path)
             }
-        } catch(e: any) {
+        } catch(e) {
             console.error(e)
-            $qt.error(t('app.home.createFailed'), e.message);
+            $qt.error(t('app.home.createFailed'), e instanceof Error ? e.message : String(e));
         }
 
         return path;

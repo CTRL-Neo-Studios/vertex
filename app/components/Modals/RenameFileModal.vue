@@ -4,7 +4,6 @@ import {isValidFilename} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 
 const { t } = useI18n()
 
@@ -29,7 +28,7 @@ const state = reactive({
     filename: props.currentFileName,
 })
 
-const validate = (state: any): FormError[] => {
+const validate = (state: { filename: string }): FormError[] => {
     const errors = []
     if (!state.filename) errors.push({ name: 'filename', message: t('app.generic.required') })
     if (!isValidFilename(state.filename)) errors.push({ name: 'filename', message: t('app.generic.ui.invalidFileName') })

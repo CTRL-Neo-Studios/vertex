@@ -64,6 +64,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         if (!old || !isIndexTemporary(uuid)) throw new Error('The file is not temporary.')
         if (unref(fileIndex)[path]) throw new Error('A file with the same path exists. Please switch to another save path or file name.')
         fileIndex.value[path] = defaultActiveSinglespaceFileIndex({uuid, fullPath: path, fileName: fileNameOf(path), properties: propertiesOf(path, unref(contentRef))})
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- Vue 3 proxies deleteProperty on the reactive index
         delete fileIndex.value[old.fullPath]
         return fileIndex.value[path]
     }
@@ -77,6 +78,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
     function removeFileFromIndex(path: string): ActiveSinglespaceFileIndex[] {
         const node = unref(fileIndex)[path]
         if (!node) return []
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- Vue 3 proxies deleteProperty on the reactive index
         delete fileIndex.value[path]
         return [node]
     }
@@ -85,6 +87,7 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
         const node = unref(fileIndex)[oldPath]
         if (!node || oldPath === newPath) return
         runtime().selfWrites.mark(oldPath, newPath)
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- Vue 3 proxies deleteProperty on the reactive index
         delete fileIndex.value[oldPath]
         fileIndex.value[newPath] = {...node, fullPath: newPath, fileName: fileNameOf(newPath)}
     }

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useFileIO} from "~/composables/io/useFileIO";

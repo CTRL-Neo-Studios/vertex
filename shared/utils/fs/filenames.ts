@@ -6,6 +6,7 @@ import type {PossiblyRef} from "#shared/types/types";
  * This is the most restrictive set, ensuring cross-platform compatibility.
  * Includes: < > : " / \ | ? * and control characters (0-31 and 127).
  */
+// eslint-disable-next-line no-control-regex -- control characters are illegal in filenames
 const ILEGAL_CHARACTERS_REGEX = /[<>:"/\\|?*\x00-\x1f\x7f]/g;
 
 /**

@@ -4,7 +4,7 @@ import {useFrontmatterTypes} from "~/composables/utility/editor/useFrontmatterTy
 
 const data = defineModel<YamlFormData>({ required: true })
 const fields = useFrontmatterTypes()
-const props = withDefaults(defineProps<{ size?: "xl" | "lg" | "md" | "sm" | "xs", disabled?: boolean }>(), {
+withDefaults(defineProps<{ size?: "xl" | "lg" | "md" | "sm" | "xs", disabled?: boolean }>(), {
     size: 'sm',
     disabled: false
 })

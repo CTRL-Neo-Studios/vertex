@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import ReferenceForelinksListComponent from "~/components/ReferenceForelinksListComponent.vue";
-import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
-import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import WritersInfoPanelComponent from "~/components/WritersInfoPanelComponent.vue";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import type {TabsItem} from "@nuxt/ui";
 import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
@@ -17,16 +13,11 @@ import {isBasesFile} from "#shared/utils/fs/filenames";
 const { t } = useI18n()
 
 const $route = useRoute()
-const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string), $tabId = computed<string>(() => $route.params.tabId as string)
 const {
-    fileTree,
     getFileByUuid
 } = useActiveWorkspaceIndex($sesh.getSession($sessionId))
-const {
-    openTab,
-} = useActiveTabs($sesh.getSession($sessionId))
 const {
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))

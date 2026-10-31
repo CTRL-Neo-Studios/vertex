@@ -18,12 +18,10 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
     const {t} = useI18n()
     const updateLinksModal = $ovl.create(UpdateLinksModal)
     const {
-        fileIndex,
         getFileByUuid,
         addFileToIndex,
         moveFileInIndex,
         removeFileFromIndex,
-        hasPropertiesFile,
         getPropertiesFile,
         getRenameImpact,
         markSelfWrite,
