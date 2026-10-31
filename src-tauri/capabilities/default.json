@@ -237,6 +237,7 @@
     "notification:allow-register-listener",
     "notification:allow-remove-active",
     "notification:allow-request-permission",
-    "notification:allow-show"
+    "notification:allow-show",
+    "updater:default"
   ]
 }
