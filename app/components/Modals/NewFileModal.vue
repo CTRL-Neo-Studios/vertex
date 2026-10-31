@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import type { FormError, FormSubmitEvent } from '@nuxt/ui'
 import {isValidFilename} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+
+const { t } = useI18n()
+
 const props = defineProps<{
     modalTitle?: string,
     atFileIndexId?: string,

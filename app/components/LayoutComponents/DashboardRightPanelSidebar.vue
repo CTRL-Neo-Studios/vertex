@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import ReferenceForelinksListComponent from "~/components/ReferenceForelinksListComponent.vue";
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
@@ -15,6 +13,8 @@ import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 import ReferenceBacklinksListComponent from "~/components/ReferenceBacklinksListComponent.vue";
 import {computed} from "vue";
 import {isBasesFile} from "#shared/utils/fs/filenames";
+
+const { t } = useI18n()
 
 const $route = useRoute()
 const $navi = useAppNavigator()

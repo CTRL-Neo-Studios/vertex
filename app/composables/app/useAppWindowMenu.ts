@@ -7,8 +7,6 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {sendNotification} from "@tauri-apps/plugin-notification";
 import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 
 interface MenuState {
     canSave: boolean;
@@ -18,6 +16,7 @@ interface MenuState {
 }
 
 export function useAppWindowMenu() {
+    const { t } = useNuxtApp().$i18n
     const $route = useRoute();
     const { and, or, not, evaluate, evaluateUnref } = usePredicateLogic()
     const $win = useAppWebviewWindows()

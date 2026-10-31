@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import type {CommandPaletteGroup, CommandPaletteItem} from "@nuxt/ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
@@ -10,6 +8,8 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useFileIO} from "~/composables/io/useFileIO";
+
+const { t } = useI18n()
 
 const $route = useRoute()
 const $ovl = useOverlay()

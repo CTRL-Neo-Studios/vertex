@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import FileTreeComponent from "~/components/FileTreeComponent.vue";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
@@ -13,6 +11,8 @@ import useUuid from "~/composables/utility/useUuid";
 import type {CommandPaletteGroup, CommandPaletteItem, ContextMenuItem, TreeItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {computed} from "vue";
+
+const { t } = useI18n()
 
 const $route = useRoute()
 const $navi = useAppNavigator()

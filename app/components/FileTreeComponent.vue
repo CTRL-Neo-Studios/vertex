@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
 import useUuid from "~/composables/utility/useUuid";
@@ -19,6 +17,8 @@ import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveF
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+
+const { t } = useI18n()
 
 const props = defineProps<{
     nodes: UITreeNode[],
