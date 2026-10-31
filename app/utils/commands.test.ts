@@ -10,9 +10,9 @@ describe('resolveMenu', () => {
 
     it('enables registered handlers and respects their enabled() guard', () => {
         const run = () => {}
-        const entries = resolveMenu({'file.save': {run}, 'file.saveAs': {run, enabled: () => false}})
+        const entries = resolveMenu({'file.save': {run}, 'file.newFolder': {run, enabled: () => false}})
         expect(entries.find(e => e.id === 'file.save')).toMatchObject({enabled: true, run})
-        expect(entries.find(e => e.id === 'file.saveAs')!.enabled).toBe(false)
+        expect(entries.find(e => e.id === 'file.newFolder')!.enabled).toBe(false)
     })
 
     it('every layout id is unique and has an i18n label key', () => {
@@ -26,7 +26,7 @@ describe('menuSections', () => {
     it('inserts a separator only between groups', () => {
         const file = menuSections(resolveMenu({})).get('file')!
         expect(file.map(e => e?.id ?? '---')).toEqual([
-            'file.newFile', 'file.newFolder', '---', 'file.openFile', 'file.openFolder', '---', 'file.save', 'file.saveAs',
+            'file.newFile', 'file.newFolder', '---', 'file.openFile', 'file.openFolder', '---', 'file.save',
         ])
     })
 })

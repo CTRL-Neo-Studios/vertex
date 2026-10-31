@@ -123,13 +123,20 @@ export function isUnreadableAsText(extension: PossiblyRef<string>) {
     return isImage(extension) || isPdf(extension) || isVideo(extension)
 }
 
+/** Last path segment (either separator); with `omitExtension`, drops the extension (a leading dot is not one). */
+export function fileNameFromPath(path: PossiblyRef<string>, omitExtension = false) {
+    const p = unref(path)
+    const name = p.slice(Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1)
+    const dot = name.lastIndexOf('.')
+    return omitExtension && dot > 0 ? name.slice(0, dot) : name
+}
+
 /**
  * Lower-cased extension of the last path segment, without the dot; `'unknown'` when there is none.
  * Dots in folder names and a leading dot (".obsidian") are not extensions.
  */
 export function getFileExtensionFromPath(path: PossiblyRef<string>) {
-    const p = unref(path)
-    const name = p.slice(Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1)
+    const name = fileNameFromPath(path)
     const dot = name.lastIndexOf('.')
     return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'unknown'
 }

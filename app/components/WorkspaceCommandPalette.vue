@@ -6,8 +6,6 @@ import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
-import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
-import {useFileIO} from "~/composables/io/useFileIO";
 
 const { t } = useI18n()
 
@@ -60,7 +58,6 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 icon: 'i-lucide-file-plus',
                 onSelect() {
                     newFileModal.open({
-                        isFolder: false,
                         modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                         asFolder: false,
                         asLevel: 'same',
@@ -74,7 +71,6 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 icon: 'i-lucide-folder-dot',
                 onSelect() {
                     newFileModal.open({
-                        isFolder: true,
                         modalTitle: t('app.editor.ui.filetree.newFolder'),
                         asFolder: true,
                         asLevel: 'same'

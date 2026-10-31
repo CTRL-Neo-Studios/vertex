@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {useOsPlatform} from "~/composables/utility/useOsPlatform";
+import {platform} from "@tauri-apps/plugin-os";
 
 const props = withDefaults(defineProps<{
     detectOs: string,
@@ -9,7 +9,7 @@ const props = withDefaults(defineProps<{
     class: 'w-24'
 })
 
-const $platform = useOsPlatform()
+const $platform = platform()
 </script>
 
 <template>

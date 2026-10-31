@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { getFileExtensionFromPath, isValidFilename, sanitizeFilename } from './filenames'
+import { fileNameFromPath, getFileExtensionFromPath, isValidFilename, sanitizeFilename } from './filenames'
+
+describe('fileNameFromPath', () => {
+    it.each([
+        ['/v/notes/B.md', false, 'B.md'],
+        ['/v/notes/B.md', true, 'B'],
+        ['C:\\v\\a.b.txt', true, 'a.b'],
+        ['/v/.env', true, '.env'],
+        ['/v/my.vault/README', true, 'README'],
+    ])('%s (omitExt=%s) → %s', (path, omit, name) => {
+        expect(fileNameFromPath(path, omit)).toBe(name)
+    })
+})
 
 describe('getFileExtensionFromPath', () => {
     it.each([

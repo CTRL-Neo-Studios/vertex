@@ -1,33 +1,20 @@
 <script setup lang="ts">
-import {ScrollAreaRoot, ScrollAreaViewport, ScrollAreaScrollbar, ScrollAreaThumb} from "reka-ui";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
-import {useFileIO} from "~/composables/io/useFileIO";
+import {fileNameFromPath} from "#shared/utils/fs/filenames";
 
 interface RecentRecord {name: string, path: string, workspace: boolean}
 
 const openingFile = ref(false)
-const loadingRecents = ref(true)
 const $act = useAppSessionActions()
 const $sessions = useAppSessions()
-const $fio = useFileIO()
 const {t} = useI18n()
 
-const recentsList = computedAsync(async (onCancel) => {
-    const abortController = new AbortController()
-    onCancel(() => abortController.abort())
-    const results: RecentRecord[] = []
-
-    for (const s of unref($sessions.appSessions)) {
-        results.push({
-            name: await $fio.getFileNameFromPath(s.rootFileOrFolderAbsolutePath || t('app.home.untitled')),
-            path: s.rootFileOrFolderAbsolutePath || '',
-            workspace: s.sessionType == 'workspace'
-        })
-    }
-
-    return results;
-}, [], loadingRecents)
+const recentsList = computed<RecentRecord[]>(() => unref($sessions.appSessions).map(s => ({
+    name: s.rootFileOrFolderAbsolutePath ? fileNameFromPath(s.rootFileOrFolderAbsolutePath) : t('app.home.untitled'),
+    path: s.rootFileOrFolderAbsolutePath || '',
+    workspace: s.sessionType == 'workspace',
+})))
 
 
 async function openFile(path?: string) {
@@ -76,10 +63,7 @@ async function openPath(path: string | undefined, workspace: boolean) {
             </div>
         </div>
         <div class="bg-submuted border-l border-l-default flex flex-col w-full max-h-screen select-none relative">
-            <div class="p-4 h-full w-full" v-if="loadingRecents">
-                <UProgress class="max-w-lg"/>
-            </div>
-            <template v-else>
+            <template v-if="recentsList.length">
                 <div class="absolute align-middle bottom-0 w-full text-muted bg-default text-xs font-mono border-t border-default z-10">
                     <div class="flex p-1 px-2 pt-1.5 items-center justify-start align-middle w-full bg-submuted">{{ $t('app.home.recentFiles') }}</div>
                 </div>

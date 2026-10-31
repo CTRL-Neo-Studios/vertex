@@ -8,8 +8,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import useUuid from "~/composables/utility/useUuid";
-import type {CommandPaletteGroup, CommandPaletteItem, ContextMenuItem, TreeItem} from "@nuxt/ui";
+import type {ContextMenuItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {computed} from "vue";
 
@@ -20,20 +19,8 @@ const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $ovl = useOverlay()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {
-    fileTree,
-    fileIndex
-} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
-const {
-    isTabOpened,
-    openTab,
-    closeTab,
-    tabs,
-    activeTabUuid,
-    setActiveTab,
-    getActiveTab,
-    clearTabs
-} = useActiveTabs($sesh.getSession($sessionId))
+const {fileTree} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
+const {openTab, activeTabUuid} = useActiveTabs($sesh.getSession($sessionId))
 const {
     leftPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
@@ -55,9 +42,8 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
         {
             label: t('app.editor.ui.filetree.newMarkdownFile'),
             icon: 'i-lucide-file-plus',
-            onSelect(e) {
+            onSelect() {
                 newFileModal.open({
-                    isFolder: false,
                     modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                     asFolder: false,
                     asLevel: 'same',
@@ -68,9 +54,8 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
         {
             label: t('app.editor.ui.filetree.newFolder'),
             icon: 'i-lucide-folder-dot',
-            onSelect(e) {
+            onSelect() {
                 newFileModal.open({
-                    isFolder: true,
                     modalTitle: t('app.editor.ui.filetree.newFolder'),
                     asFolder: true,
                     asLevel: 'same'

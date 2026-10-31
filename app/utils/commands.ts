@@ -31,7 +31,6 @@ export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, labe
     {id: 'file.openFile', section: 'file', group: 1, label: 'app.commands.openFile', accelerator: 'CmdOrCtrl+O'},
     {id: 'file.openFolder', section: 'file', group: 1, label: 'app.commands.openFolder', accelerator: 'CmdOrCtrl+Shift+O'},
     {id: 'file.save', section: 'file', group: 2, label: 'app.commands.save', accelerator: 'CmdOrCtrl+S'},
-    {id: 'file.saveAs', section: 'file', group: 2, label: 'app.commands.saveAs', accelerator: 'CmdOrCtrl+Shift+S'},
 
     {id: 'view.reload', section: 'view', group: 0, label: 'app.commands.reload', accelerator: 'CmdOrCtrl+R'},
     {id: 'view.toggleFullscreen', section: 'view', group: 0, label: 'app.commands.toggleFullscreen', accelerator: 'Ctrl+CmdOrCtrl+F'},

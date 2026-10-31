@@ -5,7 +5,7 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 import {defaultActiveSession} from "#shared/utils/defaults/actives";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
+import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 
 const FILE_PICKER_FILTERS = [
@@ -49,8 +49,9 @@ export function useAppSessionNavigator() {
         const parentPath = await dirname(path)
         if ($sesh.hasSessionWithPath(path) || $sesh.hasSessionWithPath(parentPath)) return
         const session = $sesh.addSession(defaultActiveSession({uuid, workspaceSession: false, rootPath: parentPath}))
-        const index = await useActiveSinglespaceIndex(session).initializeIndex(path)
-        await $navi.toSinglespaceTab(uuid, useActiveTabs(session).openTab(index.uuid))
+        const node = await useActiveWorkspaceIndex(session).openFile(path)
+        if (!node) return
+        await $navi.toSinglespaceTab(uuid, useActiveTabs(session).openTab(node.uuid))
         return {redirect: 'singlespace', workingSession: session}
     }
 

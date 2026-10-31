@@ -6,8 +6,6 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
-import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
-import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
@@ -26,14 +24,7 @@ const {
     getActiveTab,
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
-const {
-    getFileByUuid: getWorkspaceFileByUuid
-} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
-const {
-    getFileByUuid: getSinglespaceFileByUuid,
-    isIndexTemporary: isSinglespaceIndexTemporary,
-    setTemporaryIndex: setSinglespaceTempIndex
-} = useActiveSinglespaceIndex($sesh.getSession(sessionId))
+const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     leftPanelCollapsed,
     rightPanelCollapsed
@@ -93,15 +84,12 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
         [{
             label: t('app.editor.ui.newTab'),
             icon: 'i-lucide-plus',
-            async onSelect() {
-                openTab(setSinglespaceTempIndex().uuid)
-            },
-            disabled: true // Disabled for now; I'm currently figuring out what's the best user experience for tabs.
+            disabled: true, // not implemented yet
         }], [], [{
             label: t('app.editor.ui.clearAllTabs'),
             icon: 'i-lucide-x',
             color: 'error',
-            async onSelect(e: Event) {
+            async onSelect() {
                 await clearAllTabs()
             },
             disabled: !unref(isWorkspace)
@@ -109,11 +97,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
     ]
 
     unref(tabs)?.forEach(i => {
-        let node: ActiveSinglespaceFileIndex | ActiveWorkspaceFileIndex | null
-        if ($sesh.isSessionWorkspace(sessionId))
-            node = getWorkspaceFileByUuid(i.fileUuid)
-        else
-            node = getSinglespaceFileByUuid(i.fileUuid)
+        const node = getFileByUuid(i.fileUuid)
 
         if (node) {
             items[1]?.push({
@@ -136,7 +120,7 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                         $qt.warning(t('app.editor.ui.saving'))
                     }
                 },
-                async onSelect(e: Event) {
+                async onSelect() {
                     await toTab(i);
                 }
             })
@@ -147,10 +131,6 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 })
 
 const firstTabItem = computed(() => unref(dropdownItems)[1]?.[0])
-
-const panelsCollapsed = computed(() => {
-    return $sesh.isSessionWorkspace(sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
-})
 
 const scrollArea = useTemplateRef('scrollArea')
 

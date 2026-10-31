@@ -44,6 +44,7 @@ describe('path helpers', () => {
 
     it('parentPathOf', () => {
         expect(parentPathOf('/v/notes/B.md')).toBe('/v/notes')
+        expect(parentPathOf('A.md')).toBe('')
     })
 })
 

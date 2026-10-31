@@ -45,10 +45,8 @@ export const StateKey = {
     rightPanel: (s: string) => `active.layouts.right-panel.${s}`,
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
-    singlespaceIndex: (s: string) => `active.singlespace.indexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,
     activeTreeItem: (s: string) => `active.workspace.active-tree-item-${s}`,
-    fileTreeLabels: (s: string) => `active.workspace.${s}.processed-file-labels`,
 } as const
 
 /**

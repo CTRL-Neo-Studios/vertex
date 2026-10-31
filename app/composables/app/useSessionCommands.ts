@@ -1,6 +1,6 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveFileTools} from "~/composables/active/useActiveFileTools";
+import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import {useCommands} from "~/composables/app/useAppWindowMenu";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -14,9 +14,9 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 export function useSessionCommands(session?: ActiveSession) {
     const route = useRoute()
     const {t} = useI18n()
-    const $qt = useQuickToasts()
     const $navi = useAppNavigator()
-    const $tools = useActiveFileTools(session)
+    const $tools = useActiveWorkspaceTools(session)
+    const $qt = useQuickToasts()
     const {tabs, activeTabUuid, closeTab, clearTabs, getActiveTab, setTabSavedState} = useActiveTabs(session)
     const newFileModal = useOverlay().create(NewFileModal)
     const isWorkspace = !!session?.workspaceSession
@@ -30,15 +30,12 @@ export function useSessionCommands(session?: ActiveSession) {
     }
 
     /** Explicit save: writes the current buffer now instead of waiting for autosave. */
-    async function save(forceDialog: boolean) {
+    async function save() {
         const id = tabId()
         if (!id) return
         const {content} = useActiveEditorContent(session, getActiveTab(id))
         try {
-            if ($tools.isTemporary(id) || forceDialog) {
-                if (!$tools.isTemporary(id)) return $qt.warning(t('app.commands.saveAsUnsupported'))
-                await $tools.saveTemporaryFileAs(id, content.value)
-            } else await $tools.saveContent(id, content.value)
+            await $tools.saveContent(id, content.value)
             setTabSavedState(id, true)
         } catch (error) {
             $qt.error(t('app.editor.ui.saveFailed'), String(error))
@@ -46,11 +43,9 @@ export function useSessionCommands(session?: ActiveSession) {
     }
 
     useCommands({
-        'file.save': {run: () => save(false), enabled: hasTab},
-        // Save As currently exists for unsaved "Untitled" buffers only; for files on disk use rename/move.
-        'file.saveAs': {run: () => save(true), enabled: () => hasTab() && $tools.isTemporary(tabId()!)},
+        'file.save': {run: save, enabled: hasTab},
         ...(isWorkspace ? {
-            'file.newFolder': {run: () => newFileModal.open({isFolder: true, asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
+            'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
             'view.closeTab': {
                 run: async () => {
                     const id = tabId()

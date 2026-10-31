@@ -23,7 +23,7 @@ export interface ViewerDefinition {
 export const viewers: ViewerDefinition[] = [
     {id: 'markdown', loadsText: true, extras: ['editorInstance', 'internalLinks', 'codeBlocks'], match: isPlainTextFile},
     {id: 'image', loadsText: false, extras: ['imageSrc'], match: isImage},
-    {id: 'bases', loadsText: true, extras: ['editorInstance', 'internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
+    {id: 'bases', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
     {id: 'yaml', loadsText: true, extras: [], match: isYamlFile},
     {id: 'latex', loadsText: true, extras: ['editorInstance'], match: isLatexFile},
     {id: 'code', loadsText: true, extras: ['editorInstance'], match: ext => !isUnreadableAsText(ext)},
