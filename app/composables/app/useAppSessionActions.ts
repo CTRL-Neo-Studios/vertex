@@ -187,11 +187,6 @@ export function useAppSessionActions() {
         // Actions with known paths (for "Open Recent", drag & drop, etc.)
         openWorkspaceFromPath,
         openSinglespaceFromPath,
-        
-        // Aliases for backward compatibility (if needed)
-        openFolderAction: openWorkspaceAction,
-        openFileAction: openSinglespaceAction,
-
         createNewFileForSinglespace
     }
 }

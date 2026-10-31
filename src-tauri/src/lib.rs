@@ -18,15 +18,6 @@ struct FileReadResult {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct FileStatResult {
-    path: String,
-    size: Option<u64>,
-    created: Option<i64>,  // Unix timestamp in milliseconds
-    modified: Option<i64>, // Unix timestamp in milliseconds
-    error: Option<String>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
 struct DirectoryEntry {
     path: String,
     name: String,
@@ -53,47 +44,6 @@ fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
                 Err(e) => FileReadResult {
                     path: path.clone(),
                     content: None,
-                    error: Some(e.to_string()),
-                }
-            }
-        })
-        .collect()
-}
-
-/// Gets file metadata (size, created time, modified time) for multiple files in parallel.
-/// Much faster than calling stat() multiple times from the frontend due to reduced IPC overhead.
-#[tauri::command]
-fn stat_files_batch(paths: Vec<String>) -> Vec<FileStatResult> {
-    paths.par_iter()
-        .map(|path| {
-            match fs::metadata(path) {
-                Ok(metadata) => {
-                    let size = Some(metadata.len());
-                    
-                    // Convert system times to Unix timestamps in milliseconds
-                    let created = metadata.created()
-                        .ok()
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| d.as_millis() as i64);
-                    
-                    let modified = metadata.modified()
-                        .ok()
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| d.as_millis() as i64);
-                    
-                    FileStatResult {
-                        path: path.clone(),
-                        size,
-                        created,
-                        modified,
-                        error: None,
-                    }
-                },
-                Err(e) => FileStatResult {
-                    path: path.clone(),
-                    size: None,
-                    created: None,
-                    modified: None,
                     error: Some(e.to_string()),
                 }
             }
@@ -226,7 +176,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_startup_file, 
             read_text_files_batch, 
-            stat_files_batch,
             scan_directory_recursive
         ])
         .setup(|app| {

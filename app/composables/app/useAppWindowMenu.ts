@@ -8,13 +8,6 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import {sendNotification} from "@tauri-apps/plugin-notification";
 import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
 
-interface MenuState {
-    canSave: boolean;
-    hasSelection: boolean;
-    hasUndo: boolean;
-    hasRedo: boolean;
-}
-
 export function useAppWindowMenu() {
     const { t } = useNuxtApp().$i18n
     const $route = useRoute();
@@ -25,13 +18,6 @@ export function useAppWindowMenu() {
     const $ce = useAppCrossWindowEvents()
 
     const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
-
-    const menuState = useState<MenuState>(`window.menu.state.${$sessions.getCurrentAppSession()?.uuid}`, () => ({
-        canSave: false,
-        hasSelection: false,
-        hasUndo: false,
-        hasRedo: false,
-    } satisfies MenuState));
 
     onUnmounted(() => {
         dispatcher.unmount()
@@ -405,16 +391,8 @@ export function useAppWindowMenu() {
     function handleAboutSoftware() {
         dispatcher.emit('categories.about.toSoftware')
     }
-
-    // Update menu state and rebuild
-    async function updateMenuState(newState:  Partial<MenuState>) {
-        menuState.value = { ... menuState.value, ...newState };
-        await setMenu();
-    }
-
     return {
         setMenu,
-        // updateMenu,
         canCreateItems: $canCreateItems,
         dispatcher
     }

@@ -7,7 +7,6 @@ import {defaultAppSession} from "#shared/utils/defaults/apps";
 
 interface AppSessionsStore {
     openedSessions: AppSession[],
-    lastOpenedSession?: string
 }
 
 /*
@@ -43,7 +42,6 @@ export function useAppSessions() {
 
     // State to hold the list of all active sessions (viewable by 'main')
     const appSessions = useState<AppSession[]>('app.sessions', () => []);
-    const lastOpenedSession = useState<string | undefined>('app.sessions.lastOpened')
 
     // State to hold the session data SPECIFIC to the current running window
     const currentAppSession = useState<AppSession | null>('app.sessions.current', () => null);
@@ -172,7 +170,6 @@ export function useAppSessions() {
                 const bTime = b?.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
                 return bTime - aTime; // Descending order (newest first)
             });
-            lastOpenedSession.value = data.lastOpenedSession
 
             // Automatically sanitize sessions after loading
             await sanitizeAppSessions();
@@ -185,7 +182,6 @@ export function useAppSessions() {
     async function save() {
         await store.set('data', {
             openedSessions: unref(appSessions),
-            lastOpenedSession: unref(lastOpenedSession)
         } satisfies AppSessionsStore);
         await store.save(); // Crucial: actually writes to the file system
     }
@@ -269,10 +265,6 @@ export function useAppSessions() {
         }
 
         return removedCount;
-    }
-
-    async function updateLastOpenedSession(session: AppSession) {
-
     }
 
     /**

@@ -40,17 +40,6 @@ interface FileReadResult {
 }
 
 /**
- * Result type for batch file stat from Rust backend
- */
-interface FileStatResult {
-    path: string;
-    size?: number;
-    created?: number;  // Unix timestamp in milliseconds
-    modified?: number; // Unix timestamp in milliseconds
-    error?: string;
-}
-
-/**
  * Directory entry from Rust recursive scan
  */
 interface DirectoryEntry {
@@ -80,24 +69,6 @@ async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>>
     }
 
     return contentMap;
-}
-
-/**
- * Gets file metadata for multiple files in a single batch call to Rust backend.
- * Much faster than individual stat calls due to reduced IPC overhead.
- */
-async function statFilesBatch(paths: string[]): Promise<Map<string, FileStatResult>> {
-    const results = await invoke<FileStatResult[]>('stat_files_batch', { paths });
-    const statMap = new Map<string, FileStatResult>();
-
-    for (const result of results) {
-        statMap.set(result.path, result);
-        if (result.error) {
-            console.error(`Failed to stat ${result.path}:`, result.error);
-        }
-    }
-
-    return statMap;
 }
 
 /**
@@ -835,42 +806,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
     }
 
-    /**
-     * Reads a file at a given path, parses its properties, and updates the index.
-     */
-    async function updateFrontmatterForPath(path: string, index = fileIndex.value) {
-        const node = index[path];
-        if (!node || node.isFolder) return;
-
-        const extension = getFileExtensionFromPath(path);
-        if (isUnreadableAsText(extension)) {
-            console.log(`Skipping text read for binary file: ${path}`);
-            return;
-        }
-
-        try {
-            const content = await readTextFile(path);
-            const parsed = _parseFileContentProperties(path, content);
-            node.properties = parsed.properties;
-            node.modifiedTime = new Date();
-
-            const fileName = node.fileName;
-            if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
-                const parentPath = path.substring(0, path.lastIndexOf('/'));
-                const parentNode = index[parentPath];
-                if (parentNode && parentNode.isFolder) {
-                    parentNode.properties = parsed.properties;
-                    parentNode.modifiedTime = new Date();
-                }
-            }
-        } catch (readError) {
-            console.error(`Failed to read file for properties parsing: ${path}`, readError);
-        }
-    }
-
-    /**
-     * Finds a file in the index by its stable UUID.
-     */
     /**
      * Finds a file in the index by its stable UUID.
      * O(1) lookup using the uuid-to-path map.

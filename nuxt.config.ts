@@ -1,11 +1,10 @@
 export default defineNuxtConfig({
     devtools: {enabled: true},
+    $production: {devtools: {enabled: false}},
 
     modules: [
       "@nuxt/ui",
-      "nuxt-auth-utils",
       "@vueuse/nuxt",
-      "@nuxt/image",
       "@nuxt/icon",
       "@nuxt/fonts",
       "@nuxtjs/i18n",
@@ -41,7 +40,7 @@ export default defineNuxtConfig({
         ]
     },
 
-    // Enable SSG
+    // SPA: `nuxt generate` emits static files that Tauri serves; there is no server at runtime.
     ssr: false,
     ignore: ['**/src-tauri/**'],
     // Enables the development server to be discoverable by other devices when running on iOS physical devices
@@ -78,25 +77,11 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/event",
                 "@tauri-apps/api/core",
                 "tailwindcss/colors",
-                "@vueuse/integrations/useSortable",
-                "sortablejs",
                 "vue-mermaid-string",
-                "yaml",
-                "@vue/devtools-core",
-                "@vue/devtools-kit",
-                "@internationalized/date",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod"
             ]
         },
     },
-	runtimeConfig: {
-		public: {
-			vertex: {
-				workflowsVersion: 1,
-				workflowsNightlyVersion: 1,
-			}
-		}
-	}
 });

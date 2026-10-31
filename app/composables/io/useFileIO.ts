@@ -201,11 +201,6 @@ export function useFileIO() {
         return await exists(fullPath);
     }
 
-    async function getFileInfo(fullPathRef: PossiblyRef<string>) {
-        const fullPath = unref(fullPathRef);
-        return await stat(fullPath);
-    }
-
     async function listDirectory(fullPathRef: PossiblyRef<string>) {
         const fullPath = unref(fullPathRef);
         return await readDir(fullPath);
@@ -312,7 +307,6 @@ export function useFileIO() {
         copyFileTo,
         createFolder,
         pathExists,
-        getFileInfo,
         listDirectory,
         moveFileOrFolder,
         getFileNameFromPath,

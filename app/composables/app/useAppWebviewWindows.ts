@@ -74,20 +74,6 @@ export function useAppWebviewWindows() {
             return getCurrentAppWindow().label.replace('session-', '')
     }
 
-    async function destroyAllWindows() {
-        const windows = await getAppWindows()
-        for (const window of windows) {
-            await window.destroy()
-        }
-    }
-
-    async function closeAllWindows() {
-        const windows = await getAppWindows()
-        for (const window of windows) {
-            await window.close()
-        }
-    }
-
     async function closeAllSessionWindows() {
         const windows = await getSessionWindows()
         for (const window of windows) {
@@ -148,30 +134,6 @@ export function useAppWebviewWindows() {
         const windows = await getAppWindows()
         return windows.filter(i => i.label.startsWith('session-'))
     }
-
-    async function showLatestSessionWindow(setFocus: boolean = true): Promise<WebviewWindow | undefined> {
-        const windows = await getSessionWindows()
-
-        async function openLastWindow(index: number) {
-            if (index < 0) return;
-
-            const w = windows[index]
-            if (w) {
-                await w.unminimize()
-                await w.show()
-                if (setFocus)
-                    await w.setFocus()
-                return w;
-            } else {
-                return await openLastWindow(index - 1)
-            }
-        }
-
-        if (windows.length > 0) {
-            return await openLastWindow(windows.length - 1);
-        }
-    }
-
     return {
         getCurrentAppWindow,
         getFocusedAppWindow,
@@ -181,15 +143,12 @@ export function useAppWebviewWindows() {
         isCurrentAppWindowMain,
         isCurrentAppWindowSession,
         isCurrentAppWindowSettings,
-        closeAllWindows,
         closeAllSessionWindows,
         closeAllSessionWindowsExceptCurrent,
-        destroyAllWindows,
         getAppWindows,
         hideMainWindow,
         showMainWindow,
         getSessionWindows,
-        showLatestSessionWindow,
         getCurrentAppWindowSessionIdFromLabel,
         showWindowWithLabel,
         hideWindowWithLabel,
