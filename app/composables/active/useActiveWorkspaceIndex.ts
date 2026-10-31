@@ -1,3 +1,4 @@
+import {sessionScope, StateKey} from "#shared/constants/app";
 import type {
     ActiveWorkspaceFileIndex,
     UITreeNode,
@@ -166,12 +167,9 @@ function _parseDocumentInitial(path: string, content: string, index: Record<stri
 }
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
-    if (!session) {
-        console.error("useActiveWorkspaceIndex was called without a session!");
-    }
-
-    const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
-    const uuidToFilePathIndex = useState<Map<string, string>>(`active.workspace.uuidToFilePathIndexMap.${session?.uuid ?? useUuid()}`, () => new Map());
+    const scope = sessionScope(session, 'useActiveWorkspaceIndex')
+    const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(StateKey.workspaceIndex(scope), () => ({}));
+    const uuidToFilePathIndex = useState<Map<string, string>>(StateKey.workspaceUuidToPath(scope), () => new Map());
 
     const fileTree = computed<UITreeNode[]>(() => {
         const index = unref(fileIndex);

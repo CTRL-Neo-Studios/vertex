@@ -1,3 +1,5 @@
+import {StateKey} from "#shared/constants/app";
+import {TauriEvent} from "@tauri-apps/api/event";
 import {open} from "@tauri-apps/plugin-dialog";
 import {stat} from "@tauri-apps/plugin-fs"
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
@@ -142,7 +144,7 @@ export function useAppSessionNavigator() {
             const {getFileByUuid} = useActiveWorkspaceIndex(session)
             const {activeTabUuid} = useActiveTabs(session)
             const {getFromIdMeta} = useActiveFileTreeMemo(session)
-            const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${session?.uuid ?? useUuid()}`, () => [])
+            const expandedFolders = useState<string[]>(StateKey.expandedFolders(session.uuid), () => [])
             const tabId = unref(activeTabUuid)
 
             await $asesh.updateAppSession(currentAppSession.uuid, {
@@ -177,11 +179,11 @@ export function useAppSessionNavigator() {
 
         if (!currentAppSession) return;
 
-        const unlistenClose = await currentWindow.listen('tauri://close-requested', async function (event) {
+        const unlistenClose = await currentWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async function (event) {
             await destroyWindowAndTryReturnToLastWindow(session)
         })
 
-        const unlistenDestroyed = await currentWindow.listen('tauri://destroyed', async function (event) {
+        const unlistenDestroyed = await currentWindow.listen(TauriEvent.WINDOW_DESTROYED, async function (event) {
             await destroyWindowAndTryReturnToLastWindow(session)
         })
 

@@ -1,47 +1,19 @@
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {PossiblyRef} from "#shared/types/types";
+import {Routes, type SessionMode} from "#shared/constants/app";
 
 export function useAppNavigator() {
-    async function toWorkspaceTab(sessionId: PossiblyRef<string | undefined>, tab: ActiveTab | undefined) {
-        if (unref(sessionId)) {
-            if (tab)
-                await navigateTo(`/sessions/${unref(sessionId)}/workspace/tabs/${tab.fileUuid}`)
-            else
-                await toWorkspaceEmptyTab(sessionId)
-        } else
-            await navigateTo(`/sessions/${unref(sessionId)}/workspace/error`)
-    }
-
-    async function toSinglespaceTab(sessionId: PossiblyRef<string | undefined>, tab: ActiveTab) {
-        if (unref(sessionId))
-            await navigateTo(`/sessions/${unref(sessionId)}/singlespace/tabs/${tab.fileUuid}`)
-        else
-            await navigateTo(`/sessions/${unref(sessionId)}/singlespace/error`)
-    }
-
-    async function toWorkspaceEmptyTab(sessionId: PossiblyRef<string | undefined>) {
-        if (unref(sessionId))
-            await navigateTo(`/sessions/${unref(sessionId)}/workspace/tabs`)
-        else
-            await navigateTo(`/error`)
-    }
-
-    async function toSinglespaceEmptyTab(sessionId: PossiblyRef<string | undefined>) {
-        if (unref(sessionId))
-            await navigateTo(`/sessions/${unref(sessionId)}/singlespace/tabs`)
-        else
-            await navigateTo(`/error`)
-    }
-
-    async function toHome() {
-        await navigateTo('/')
+    async function toTab(mode: SessionMode, sessionId: PossiblyRef<string | undefined>, tab: ActiveTab | undefined) {
+        const id = unref(sessionId)
+        if (!id) return navigateTo(Routes.error)
+        return navigateTo(tab ? Routes.sessionTab(id, mode, tab.fileUuid) : Routes.sessionTabs(id, mode))
     }
 
     return {
-        toWorkspaceTab,
-        toSinglespaceTab,
-        toWorkspaceEmptyTab,
-        toSinglespaceEmptyTab,
-        toHome
+        toWorkspaceTab: (sessionId: PossiblyRef<string | undefined>, tab: ActiveTab | undefined) => toTab('workspace', sessionId, tab),
+        toSinglespaceTab: (sessionId: PossiblyRef<string | undefined>, tab: ActiveTab | undefined) => toTab('singlespace', sessionId, tab),
+        toWorkspaceEmptyTab: (sessionId: PossiblyRef<string | undefined>) => toTab('workspace', sessionId, undefined),
+        toSinglespaceEmptyTab: (sessionId: PossiblyRef<string | undefined>) => toTab('singlespace', sessionId, undefined),
+        toHome: () => navigateTo(Routes.home),
     }
 }

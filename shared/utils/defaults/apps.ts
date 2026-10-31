@@ -1,4 +1,3 @@
-import useUuid from "~/composables/utility/useUuid";
 import type {AppSettings, AppViewConfig} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
@@ -10,13 +9,13 @@ export function defaultAppSettings(data?: DeepPartial<AppSettings>): AppSettings
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
-		deviceId: data?.deviceId || useUuid()
+		deviceId: data?.deviceId || crypto.randomUUID()
     } satisfies AppSettings
 }
 
 export function defaultAppSession(data?: Partial<AppSession>): AppSession {
     return {
-        uuid: data?.uuid || useUuid(),
+        uuid: data?.uuid || crypto.randomUUID(),
         sessionType: data?.sessionType || 'workspace',
         rootFileOrFolderAbsolutePath: data?.rootFileOrFolderAbsolutePath || '',
         context: defaultAppSessionContext(data?.context),

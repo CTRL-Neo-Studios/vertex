@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {StateKey} from "#shared/constants/app";
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
 import useUuid from "~/composables/utility/useUuid";
@@ -59,7 +60,10 @@ const {
 const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
 const renameFileModal = $ovl.create(RenameFileModal)
-const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${props?.sessionId ?? useUuid()}`, () => [])
+// No sessionId → standalone picker (MoveFileModal): keep expansion local instead of sharing the sidebar's.
+const expandedFolders = props.sessionId
+    ? useState<string[]>(StateKey.expandedFolders(props.sessionId), () => [])
+    : ref<string[]>([])
 const $ftMemo = useActiveFileTreeMemo(getSession($sessionId))
 
 const formattedTreeData = computed<TreeItem[]>(() => {

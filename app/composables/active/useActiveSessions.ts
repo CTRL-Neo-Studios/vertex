@@ -1,8 +1,9 @@
+import {StateKey} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
 
 export function useActiveSessions() {
-    const sessions = useState<ActiveSession[]>('active.sessions', () => []);
+    const sessions = useState<ActiveSession[]>(StateKey.activeSessions, () => []);
 
     function addSession(sesh: ActiveSession) {
         sessions.value.push(sesh)

@@ -1,3 +1,4 @@
+import {Routes, sessionWindowLabel, StateKey} from "#shared/constants/app";
 import type { PossiblyRef } from "#shared/types/types";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
@@ -41,10 +42,10 @@ export function useAppSessions() {
     const $fio = useFileIO()
 
     // State to hold the list of all active sessions (viewable by 'main')
-    const appSessions = useState<AppSession[]>('app.sessions', () => []);
+    const appSessions = useState<AppSession[]>(StateKey.appSessions, () => []);
 
     // State to hold the session data SPECIFIC to the current running window
-    const currentAppSession = useState<AppSession | null>('app.sessions.current', () => null);
+    const currentAppSession = useState<AppSession | null>(StateKey.currentAppSession, () => null);
 
     /**
      * Adds a new session to the list and persists it.
@@ -293,7 +294,7 @@ export function useAppSessions() {
         if (!session.rootFileOrFolderAbsolutePath) return;
 
         const windowTitle = await $fio.getFileNameFromPath(session.rootFileOrFolderAbsolutePath, false)
-        const window = $win.createAppWebviewWindow('/loading', `session-${session.uuid}`, windowTitle)
+        const window = $win.createAppWebviewWindow(Routes.loading, sessionWindowLabel(session.uuid), windowTitle)
 
         // if (unref(hideMainWindow)) {
         //     await $win.hideMainWindow()
@@ -307,7 +308,7 @@ export function useAppSessions() {
             await load(); // Reload to avoid overwriting updates from other windows
         }
 
-        return await $win.getAppWindowWithLabel(`session-${unref(appSession).uuid}`)
+        return await $win.getAppWindowWithLabel(sessionWindowLabel(unref(appSession).uuid))
     }
 
     return {

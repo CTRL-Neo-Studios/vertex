@@ -4,6 +4,8 @@ import type { AppSettings } from "#shared/types/app/settings";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import type {DeepPartial} from "#shared/types/types";
+import {Routes, StateKey, WindowLabel} from "#shared/constants/app";
+import {TauriEvent} from "@tauri-apps/api/event";
 
 const STORE_FILENAME = 'settings.json';
 const STORE_KEY = 'settings';
@@ -14,9 +16,9 @@ const STORE_KEY = 'settings';
  * provides default values, and shares the config reactively across the app.
  */
 export function useAppSettings() {
-    const config = useState<AppSettings | null>(`${STORE_KEY}.data`, () => null);
+    const config = useState<AppSettings | null>(StateKey.settings, () => null);
 
-    const isLoaded = useState<boolean>(`${STORE_KEY}.is_loaded`, () => false);
+    const isLoaded = useState<boolean>(StateKey.settingsLoaded, () => false);
 
     const fileStore = new LazyStore(STORE_FILENAME);
 
@@ -99,18 +101,18 @@ export function useAppSettings() {
     }
 
     async function createOrFocusSettingsWindow() {
-        const window = await $win.getAppWindowWithLabel('settings')
+        const window = await $win.getAppWindowWithLabel(WindowLabel.settings)
         if (window) {
-            await $win.showWindowWithLabel('settings')
+            await $win.showWindowWithLabel(WindowLabel.settings)
         } else {
-            const settingsWindow = $win.createAppWebviewWindow('/settings', 'settings', 'Settings')
+            const settingsWindow = $win.createAppWebviewWindow(Routes.settings, WindowLabel.settings, 'Settings')
 
-            const closeUnlisten = await settingsWindow.listen('tauri://close-requested', async function (e) {
+            const closeUnlisten = await settingsWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async function (e) {
                 await settingsWindow.destroy()
                 closeUnlisten()
             })
 
-            const destroyUnlisten = await settingsWindow.listen('tauri://destroyed', async function (e) {
+            const destroyUnlisten = await settingsWindow.listen(TauriEvent.WINDOW_DESTROYED, async function (e) {
                 await settingsWindow.destroy()
                 destroyUnlisten()
             })

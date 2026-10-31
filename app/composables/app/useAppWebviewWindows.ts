@@ -1,5 +1,5 @@
 import {getAllWebviewWindows, WebviewWindow, getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
-import {exit} from "@tauri-apps/plugin-process"
+import {sessionUuidFromLabel, WindowLabel} from "#shared/constants/app";
 
 /*
 This composable serves as a helper for creating or finding windows. It does not do any session management. For that, check on `useActiveWindowSessions`.
@@ -51,27 +51,26 @@ export function useAppWebviewWindows() {
     }
 
     async function getMainAppWindow() {
-        return await getAppWindowWithLabel('main')
+        return await getAppWindowWithLabel(WindowLabel.main)
     }
 
     function isCurrentAppWindowMain() {
         const window = getCurrentAppWindow()
-        return window.label == 'main'
+        return window.label == WindowLabel.main
     }
 
     function isCurrentAppWindowSession() {
         const window = getCurrentAppWindow()
-        return window.label.startsWith('session-')
+        return window.label.startsWith(WindowLabel.sessionPrefix)
     }
 
     function isCurrentAppWindowSettings() {
         const window = getCurrentAppWindow()
-        return window.label == 'settings'
+        return window.label == WindowLabel.settings
     }
 
     function getCurrentAppWindowSessionIdFromLabel(): string | undefined {
-        if (isCurrentAppWindowSession())
-            return getCurrentAppWindow().label.replace('session-', '')
+        return sessionUuidFromLabel(getCurrentAppWindow().label)
     }
 
     async function closeAllSessionWindows() {
@@ -132,7 +131,7 @@ export function useAppWebviewWindows() {
 
     async function getSessionWindows() {
         const windows = await getAppWindows()
-        return windows.filter(i => i.label.startsWith('session-'))
+        return windows.filter(i => i.label.startsWith(WindowLabel.sessionPrefix))
     }
     return {
         getCurrentAppWindow,

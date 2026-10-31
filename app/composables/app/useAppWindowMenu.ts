@@ -7,6 +7,7 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {sendNotification} from "@tauri-apps/plugin-notification";
 import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
+import {Routes} from "#shared/constants/app";
 
 export function useAppWindowMenu() {
     const { t } = useNuxtApp().$i18n
@@ -35,11 +36,11 @@ export function useAppWindowMenu() {
 
     const $inWorkspace = hasRoute('/workspace')
 
-    const $inMain = isRoute('/')
+    const $inMain = isRoute(Routes.home)
 
-    const $inSettings = isRoute('/settings')
+    const $inSettings = isRoute(Routes.settings)
 
-    const $inLoading = isRoute('/loading')
+    const $inLoading = isRoute(Routes.loading)
 
     const $inFunctional = or($inSettings, $inLoading)
 

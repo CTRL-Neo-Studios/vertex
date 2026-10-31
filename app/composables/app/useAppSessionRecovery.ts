@@ -1,3 +1,4 @@
+import {StateKey} from "#shared/constants/app";
 import { useAppSessionNavigator } from "~/composables/app/useAppSessionNavigator";
 import { useAppWebviewWindows } from "~/composables/app/useAppWebviewWindows";
 import { useActiveWorkspaceIndex } from "~/composables/active/useActiveWorkspaceIndex";
@@ -23,7 +24,7 @@ export function useAppSessionRecovery() {
     const $open = useAppSessionNavigator();
     const $win = useAppWebviewWindows();
     const $navi = useAppNavigator()
-    const lastRedirect = useState<{redirect: "workspace" | "singlespace", workingSession: ActiveSession} | undefined>('app.store.lastRedirected', () => undefined)
+    const lastRedirect = useState<{redirect: "workspace" | "singlespace", workingSession: ActiveSession} | undefined>(StateKey.lastRedirect, () => undefined)
 
     /**
      * Saturates a session window by:
@@ -76,7 +77,7 @@ export function useAppSessionRecovery() {
             const files = getFilesByPaths(openedFilePaths);
             const fileUuids = files.map(file => file.uuid);
             const folders = getFilesByPaths(openedFolderPaths)
-            const expandedFolders = useState<string[]>(`active.workspace.expanded-file-tree-items-${activeSession?.uuid ?? useUuid()}`, () => [])
+            const expandedFolders = useState<string[]>(StateKey.expandedFolders(activeSession.uuid), () => [])
 
             console.log(`Recovered opened tabs: ${fileUuids}`)
 

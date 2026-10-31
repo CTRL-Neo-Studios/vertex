@@ -1,3 +1,4 @@
+import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {
     ActiveSinglespaceFileIndex,
@@ -50,15 +51,13 @@ function _parseFileContentProperties(path: string, content: string): { frontmatt
 }
 
 export function useActiveSinglespaceIndex(session?: ActiveSession) {
-    if (!session) {
-        console.error("useActiveSinglespaceIndex was called without a session!");
-    }
+    const scope = sessionScope(session, 'useActiveSinglespaceIndex')
 
     const $fio = useFileIO()
     const $win = useAppWebviewWindows()
     const $asesh = useAppSessions()
 
-    const fileIndex = useState<Record<string, ActiveSinglespaceFileIndex>>(`active.singlespace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
+    const fileIndex = useState<Record<string, ActiveSinglespaceFileIndex>>(StateKey.singlespaceIndex(scope), () => ({}));
 
     async function initializeIndex(firstFilePath: PossiblyRef<string>) {
         const firstFp = unref(firstFilePath)

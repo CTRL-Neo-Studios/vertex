@@ -1,4 +1,5 @@
 import {listen} from "@tauri-apps/api/event";
+import {AppEvent} from "#shared/constants/app";
 import {invoke} from "@tauri-apps/api/core";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
@@ -15,7 +16,7 @@ export function useAppFileStartHandler() {
 
         // --- 1. SET UP LISTENER (Warm Start & Late Cold Start) ---
         // Start listening immediately
-        const unlisten = await listen<string>('open-file', async (event) => {
+        const unlisten = await listen<string>(AppEvent.openFile, async (event) => {
             const filePath = event.payload;
             console.log("[JS] Warm File Startup Event Received:", filePath);
 

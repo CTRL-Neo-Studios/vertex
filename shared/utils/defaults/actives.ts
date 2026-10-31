@@ -1,5 +1,4 @@
 import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex, UITreeNode} from "#shared/types/active/workspace";
-import useUuid from "~/composables/utility/useUuid";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 
@@ -9,7 +8,7 @@ export function defaultActiveWorkspaceFileIndex(data?: Partial<ActiveWorkspaceFi
         fileName: data?.fileName ?? '',
         fileExt: data?.fileExt ?? '',
         properties: data?.properties ?? {},
-        uuid: data?.uuid ?? useUuid(),
+        uuid: data?.uuid ?? crypto.randomUUID(),
         fullPath: data?.fullPath ?? '',
         isFolder: data?.isFolder ?? false,
         size: data?.size ?? 0,
@@ -25,7 +24,7 @@ export function defaultActiveSinglespaceFileIndex(data?: Partial<ActiveSinglespa
     return {
         fileName: data?.fileName ?? '',
         properties: data?.properties ?? {},
-        uuid: data?.uuid ?? useUuid(),
+        uuid: data?.uuid ?? crypto.randomUUID(),
         fullPath: data?.fullPath ?? '',
     } satisfies ActiveSinglespaceFileIndex
 }
@@ -36,7 +35,7 @@ export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {
         fileName: data?.fileName ?? '',
         fileExt: data?.fileExt ?? '',
         properties: data?.properties ?? {},
-        uuid: data?.uuid ?? useUuid(),
+        uuid: data?.uuid ?? crypto.randomUUID(),
         fullPath: data?.fullPath ?? '',
         isFolder: data?.isFolder ?? false,
         size: data?.size ?? 0,
@@ -51,13 +50,13 @@ export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {
 export function defaultActiveTab(data?: Partial<ActiveTab>): ActiveTab {
     return {
         changesSaved: data?.changesSaved ?? false,
-        fileUuid: data?.fileUuid ?? useUuid()
+        fileUuid: data?.fileUuid ?? crypto.randomUUID()
     } satisfies ActiveTab
 }
 
 export function defaultActiveSession(data?: Partial<ActiveSession>): ActiveSession {
     return {
-        uuid: data?.uuid ?? useUuid(),
+        uuid: data?.uuid ?? crypto.randomUUID(),
         workspaceSession: data?.workspaceSession ?? false,
         rootPath: data?.rootPath || ''
     } satisfies ActiveSession

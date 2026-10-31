@@ -1,5 +1,5 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
-import useUuid from "~/composables/utility/useUuid";
+import {sessionScope, StateKey} from "#shared/constants/app";
 import {useFileIO} from "~/composables/io/useFileIO";
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 
@@ -7,14 +7,11 @@ interface FileTreeMemo { ext: string, name: string, unextName: string }
 interface FileTreeIdMemo {fid: string}
 
 export function useActiveFileTreeMemo(session?: ActiveSession) {
-    if (!session) {
-        console.error('Invalid session.')
-    }
-
+    const scope = sessionScope(session, 'useActiveFileTreeMemo')
     const $fio = useFileIO()
 
-    const fileNameCache = useState<Map<string, FileTreeMemo>>(`active.workspace.${session?.uuid ?? useUuid()}.processed-file-labels`, () => new Map())
-    const fileNameIdCache = useState<Map<string, FileTreeIdMemo>>(`active.workspace.${session?.uuid ?? useUuid()}.processed-file-label-id-meta`, () => new Map())
+    const fileNameCache = useState<Map<string, FileTreeMemo>>(StateKey.fileTreeLabels(scope), () => new Map())
+    const fileNameIdCache = useState<Map<string, FileTreeIdMemo>>(StateKey.fileTreeIdMeta(scope), () => new Map())
 
     function putToLabel(fullLabel: string): FileTreeMemo {
         const name = fullLabel.slice(0, fullLabel.length - 4)

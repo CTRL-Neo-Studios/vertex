@@ -1,3 +1,4 @@
+import {TauriEvent} from "@tauri-apps/api/event";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSettings} from "~/composables/app/useAppSettings";
@@ -30,7 +31,7 @@ export default defineNuxtPlugin({
         const $menu = useAppWindowMenu()
         await $menu.setMenu()
 
-        await $win.getCurrentAppWindow().listen('tauri://focus', async () => {
+        await $win.getCurrentAppWindow().listen(TauriEvent.WINDOW_FOCUS, async () => {
             await Promise.all([
                 $menu.setMenu(),
                 $settings.load(true),
@@ -40,15 +41,15 @@ export default defineNuxtPlugin({
             $bus.emit('focus')
         })
 
-        await $win.getCurrentAppWindow().listen('tauri://blur', () => {
+        await $win.getCurrentAppWindow().listen(TauriEvent.WINDOW_BLUR, () => {
             $bus.emit('blur')
         })
 
-        await $win.getCurrentAppWindow().listen('tauri://close-requested', () => {
+        await $win.getCurrentAppWindow().listen(TauriEvent.WINDOW_CLOSE_REQUESTED, () => {
             $bus.emit('closeRequested')
         })
 
-        await $win.getCurrentAppWindow().listen('tauri://destroyed', () => {
+        await $win.getCurrentAppWindow().listen(TauriEvent.WINDOW_DESTROYED, () => {
             $bus.emit('destroyed')
         })
 
