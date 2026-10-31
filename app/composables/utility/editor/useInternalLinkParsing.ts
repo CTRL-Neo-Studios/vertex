@@ -21,8 +21,8 @@ export function useInternalLinkParsing() {
                 if (isEmbed) i++; // Skip the "!" for embeds
 
                 i += 2; // Skip the initial "[["
-                let linkStart = i;
-                let bracketDepth = 0;
+                const linkStart = i;
+                const bracketDepth = 0;
 
                 // Find the closing "]]"
                 while (i < text.length - 1) {
@@ -180,7 +180,7 @@ export function useInternalLinkParsing() {
                 if (isEmbed) i++; // Skip the "!" for embeds
 
                 i += 2; // Skip the initial "[["
-                let contentStart = i;
+                const contentStart = i;
                 let foundClose = false;
 
                 // Find the closing "]]"

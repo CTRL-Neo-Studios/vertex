@@ -4,6 +4,9 @@ import {isValidFilename} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+
+const { t } = useI18n()
+
 const props = defineProps<{
     modalTitle?: string,
     atFileIndexId?: string,
@@ -28,14 +31,14 @@ const $qt = useQuickToasts()
 
 const validate = (state: any): FormError[] => {
     const errors = []
-    if (!state.filename) errors.push({ name: 'filename', message: 'Required' })
-    if (!isValidFilename(state.filename)) errors.push({ name: 'filename', message: 'Invalid File Name' })
+    if (!state.filename) errors.push({ name: 'filename', message: t('app.generic.required') })
+    if (!isValidFilename(state.filename)) errors.push({ name: 'filename', message: t('app.generic.ui.invalidFileName') })
     return errors
 }
 
 async function onSubmit(event: FormSubmitEvent<typeof state>) {
     await $wt.createFile(props.atFileIndexId, `${event.data.filename}${props?.fileExt && !props?.asFolder ? '.' + props?.fileExt : ''}`, props.asFolder, props.asLevel)
-    $qt.success(`Created file ${event.data.filename}.`)
+    $qt.success(t('app.generic.ui.createdFile', { filename: event.data.filename }))
     emit('close', false)
 }
 </script>
@@ -43,12 +46,12 @@ async function onSubmit(event: FormSubmitEvent<typeof state>) {
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="props?.modalTitle ?? 'New File'"
+        :title="props?.modalTitle ?? $t('app.editor.ui.filetree.newMarkdownFile')"
         size="sm"
     >
         <template #body>
             <UForm :validate :state class="p-2 w-full" @submit="onSubmit">
-                <UFormField label="File Name" name="filename" required>
+                <UFormField :label="$t('app.generic.fileName')" name="filename" required>
                     <UInput v-model="state.filename" class="w-full" autofocus/>
                 </UFormField>
             </UForm>

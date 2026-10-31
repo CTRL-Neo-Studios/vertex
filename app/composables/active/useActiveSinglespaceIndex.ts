@@ -1,408 +1,199 @@
+import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {
-    ActiveSinglespaceFileIndex,
-    ActiveWorkspaceFileIndex,
-    WorkspaceIndexListener,
-    SinglespaceIndexEvent,
-    SinglespaceIndexListener
-} from "#shared/types/active/workspace";
-import useUuid from "~/composables/utility/useUuid";
+import type {ActiveSinglespaceFileIndex, SinglespaceIndexEvent, SinglespaceIndexListener} from "#shared/types/active/workspace";
+import type {PossiblyRef} from "#shared/types/types";
 import {defaultActiveSinglespaceFileIndex} from "#shared/utils/defaults/actives";
 import {readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
-import {useFileIO} from "~/composables/io/useFileIO";
-import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
-import type {WebviewWindow} from "@tauri-apps/api/webviewWindow";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppSessions} from "~/composables/app/useAppSessions";
-import type {ActiveTab} from "#shared/types/active/tabs";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import type {UnlistenFn} from "@tauri-apps/api/event";
-import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
-import type {FrontmatterProperties} from "#shared/types/types";
+import {getFileExtensionFromPath, isUnreadableAsText} from "#shared/utils/fs/filenames";
+import {type ContentParsers, parentPathOf, parseProperties} from "#shared/utils/index/parse";
+import {RecentWrites} from "#shared/utils/index/selfWrites";
 
-const watcherRegistry = new Map<string, UnwatchFn>();
-const listenerRegistry = new Map<string, Set<SinglespaceIndexListener>>();
+interface SessionRuntime {
+    unwatch?: UnwatchFn
+    listeners: Set<SinglespaceIndexListener>
+    selfWrites: RecentWrites
+}
+const runtimes = new Map<string, SessionRuntime>()
+
+const parsers: ContentParsers = {parseYaml, parseFrontmatter, getInternalLinks}
+const TEMPORARY_PREFIX = '/!temporary!/-'
+const fileNameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 
 /**
- * Private helper function to parse file content properties (frontmatter, etc.)
- * Only parses plain text files (.txt, .md) to avoid attempting to parse binary or other file types.
- * 
- * @param {string} path - The absolute file path
- * @param {string} content - The file content
- * @returns {object} Object containing frontmatterProperties and any other parsed properties
- * @private
+ * Index for a single-file session: one entry (plus an optional unsaved "Untitled" entry).
+ * Shares parsing and the self-write guard with the workspace index; it has no link graph.
  */
-function _parseFileContentProperties(path: string, content: string): { frontmatterProperties: FrontmatterProperties } {
-    const extension = getFileExtensionFromPath(path);
-    
-    // Only parse frontmatter for plain text files
-    if (!isPlainTextFile(extension)) {
-        return { frontmatterProperties: {} };
-    }
-    
-    const fmResult = parseFrontmatter(content);
-    if (fmResult.error) {
-        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-        return { frontmatterProperties: {} };
-    }
-    
-    return { frontmatterProperties: fmResult.data || {} };
-}
-
 export function useActiveSinglespaceIndex(session?: ActiveSession) {
-    if (!session) {
-        console.error("useActiveSinglespaceIndex was called without a session!");
+    const scope = sessionScope(session, 'useActiveSinglespaceIndex')
+    const fileIndex = useState<Record<string, ActiveSinglespaceFileIndex>>(StateKey.singlespaceIndex(scope), () => ({}))
+
+    function runtime(): SessionRuntime {
+        let rt = runtimes.get(scope)
+        if (!rt) {
+            rt = {listeners: new Set(), selfWrites: new RecentWrites()}
+            runtimes.set(scope, rt)
+        }
+        return rt
     }
 
-    const $fio = useFileIO()
-    const $win = useAppWebviewWindows()
-    const $asesh = useAppSessions()
+    const propertiesOf = (path: string, content: string) => parseProperties(path, content, parsers).properties
 
-    const fileIndex = useState<Record<string, ActiveSinglespaceFileIndex>>(`active.singlespace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
-
-    async function initializeIndex(firstFilePath: PossiblyRef<string>) {
-        const firstFp = unref(firstFilePath)
-
-        const entryContent = await $fio.readTextFromFile(firstFp)
-        const parsed = _parseFileContentProperties(firstFp, entryContent)
-        fileIndex.value[firstFp] = defaultActiveSinglespaceFileIndex({
-            uuid: useUuid(),
-            fullPath: firstFp,
-            fileName: await $fio.getFileNameFromPath(firstFp),
-            properties: parsed.frontmatterProperties,
-        })
-
-        return fileIndex.value[firstFp]
+    async function initializeIndex(pathRef: PossiblyRef<string>) {
+        const path = unref(pathRef)
+        const content = await readTextFile(path)
+        const node = defaultActiveSinglespaceFileIndex({fullPath: path, fileName: fileNameOf(path), properties: propertiesOf(path, content)})
+        fileIndex.value[path] = node
+        return node
     }
 
     function setTemporaryIndex() {
-        const uuid = useUuid()
-        const illegalPath = getIllegalPath(uuid)
-        fileIndex.value[illegalPath] = defaultActiveSinglespaceFileIndex({
-            uuid: uuid,
-            fullPath: illegalPath,
-            fileName: 'Untitled.md',
-            properties: {}
-        })
-
-        return fileIndex.value[illegalPath]
+        const uuid = crypto.randomUUID()
+        const path = `${TEMPORARY_PREFIX}${uuid}`
+        fileIndex.value[path] = defaultActiveSinglespaceFileIndex({uuid, fullPath: path, fileName: 'Untitled.md', properties: {}})
+        return fileIndex.value[path]
     }
 
-    function isIndexTemporary(fileUuid: PossiblyRef<string>) {
-        const uuid = unref(fileUuid)
-        const illegalPath = getIllegalPath(uuid)
-        return unref(fileIndex)[illegalPath] != null && unref(fileIndex)[illegalPath]?.fullPath == illegalPath
+    function isIndexTemporary(uuidRef: PossiblyRef<string>) {
+        return getFileByUuid(uuidRef)?.fullPath.startsWith(TEMPORARY_PREFIX) ?? false
     }
 
-    function getIllegalPath(uuid: PossiblyRef<string>) {
-        return `/!temporary!/-${unref(uuid)}`
+    async function convertTemporaryToValidIndex(uuidRef: PossiblyRef<string>, newPathRef: PossiblyRef<string>, contentRef: PossiblyRef<string>) {
+        const uuid = unref(uuidRef)
+        const path = unref(newPathRef)
+        const old = getFileByUuid(uuid)
+        if (!old || !isIndexTemporary(uuid)) throw new Error('The file is not temporary.')
+        if (unref(fileIndex)[path]) throw new Error('A file with the same path exists. Please switch to another save path or file name.')
+        fileIndex.value[path] = defaultActiveSinglespaceFileIndex({uuid, fullPath: path, fileName: fileNameOf(path), properties: propertiesOf(path, unref(contentRef))})
+        delete fileIndex.value[old.fullPath]
+        return fileIndex.value[path]
     }
 
-    function fileIndexWithUuidExists(fileUuid: PossiblyRef<string>) {
-        return getFileByUuid(fileUuid) != null
-    }
-
-
-    function fileIndexWithPathExists(absolutePath: PossiblyRef<string>) {
-        return getFileByPath(absolutePath) != null
-    }
-
-    async function convertTemporaryToValidIndex(fileUuid: PossiblyRef<string>, newPath: PossiblyRef<string>, fileContent: PossiblyRef<string>): Promise<ActiveSinglespaceFileIndex | undefined> {
-        if (!isIndexTemporary(fileUuid)) throw new Error('The file is not temporary.'); // return if the targeted file is not marked as temporary
-
-        const np = unref(newPath)
-        const fid = unref(fileUuid)
-
-        if (fileIndexWithPathExists(np)) throw new Error('A file with the same path exists. Please switch to another save path or file name.'); // return if the target path already exists in the index
-
-        const oldIndex = getFileByUuid(fid)
-
-        if (!oldIndex) throw new Error('No such file exists.')
-
-        const parsed = _parseFileContentProperties(np, unref(fileContent))
-        fileIndex.value[np] = defaultActiveSinglespaceFileIndex({
-            uuid: fid,
-            fileName: await $fio.getFileNameFromPath(np),
-            fullPath: np,
-            properties: parsed.frontmatterProperties
-        })
-
-        delete unref(fileIndex)[getIllegalPath(fid)] // delete the temporary index
-
-        return unref(fileIndex)[np] // returns the updated index
-    }
-
+    /** Re-parse frontmatter after the content changed (in-app save or external edit). */
     async function updateIndex(path: string, content: string) {
-        const index = unref(fileIndex);
-        const node = index[path];
-
-        if (!node) return;
-
-        // Parse file content properties (frontmatter, etc.) - only for plain text files
-        const parsed = _parseFileContentProperties(path, content);
-        node.properties = parsed.frontmatterProperties;
+        const node = unref(fileIndex)[path]
+        if (node) node.properties = propertiesOf(path, content)
     }
 
-    /**
-     * Removes a file or folder (and all its children recursively) from the index.
-     */
     function removeFileFromIndex(path: string): ActiveSinglespaceFileIndex[] {
-        const nodeToRemove = unref(fileIndex)[path];
-        if (!nodeToRemove) return [];
-        const removedNodes: ActiveSinglespaceFileIndex[] = []
-
-        removedNodes.push(defaultActiveSinglespaceFileIndex(nodeToRemove))
-        delete unref(fileIndex)[path];
-        console.log(`Removed from index: ${path}`);
-
-        return removedNodes
+        const node = unref(fileIndex)[path]
+        if (!node) return []
+        delete fileIndex.value[path]
+        return [node]
     }
 
-    /**
-     * Handles a file or folder being renamed/moved.
-     * This version preserves UUIDs to maintain UI state (e.g., open tabs)
-     * and recursively updates all child paths in-memory for moved folders.
-     */
-    async function moveFileInIndex(oldPath: string, newPath: string, workspaceRoot: string) {
-        const fileIndexState = fileIndex.value; // Work with a local reference for clarity
-        const nodeToMove = fileIndexState[oldPath];
-
-        if (!nodeToMove) {
-            console.warn(`Attempted to move a node that is not in the index: ${oldPath}`);
-            return;
-        }
-
-        const newNodeData: ActiveSinglespaceFileIndex = {
-            ...nodeToMove,
-            uuid: nodeToMove.uuid,
-            fullPath: newPath,
-            fileName: newPath.substring(newPath.lastIndexOf('/') + 1)
-        }
-
-        delete fileIndexState[oldPath]
-        fileIndexState[newPath] = newNodeData
+    async function moveFileInIndex(oldPath: string, newPath: string) {
+        const node = unref(fileIndex)[oldPath]
+        if (!node || oldPath === newPath) return
+        runtime().selfWrites.mark(oldPath, newPath)
+        delete fileIndex.value[oldPath]
+        fileIndex.value[newPath] = {...node, fullPath: newPath, fileName: fileNameOf(newPath)}
     }
 
-    /**
-     * Finds a file in the index by its stable UUID.
-     * Returns the full file object or null if not found.
-     *
-     * Optimize: Can be optimized via adding a separate uuidToFilePathIndexMap later but it's hard to manage right now, i.e. premature optimization.
-     */
+    function markSelfWrite(...paths: string[]) {
+        runtime().selfWrites.mark(...paths)
+    }
+
     function getFileByUuid(uuidRef: PossiblyRef<string | undefined>): ActiveSinglespaceFileIndex | null {
         const uuid = unref(uuidRef)
-        if (!uuid) return null;
-
-        for (const path in unref(fileIndex)) {
-            if (unref(fileIndex)[path]?.uuid === uuid) {
-                return unref(fileIndex)[path] || null;
-            }
-        }
-
-        return null;
+        return uuid ? Object.values(unref(fileIndex)).find(f => f.uuid === uuid) ?? null : null
     }
 
-    function getFileByPath(absolutePathRef: PossiblyRef<string>) {
-        return unref(fileIndex)[unref(absolutePathRef)]
-    }
-
-    /**
-     * Clears the File index map.
-     */
     function clearIndex() {
         fileIndex.value = {}
+        runtimes.delete(scope)
     }
 
-    /**
-     * Broadcasts an event to all registered listeners for this session.
-     * @private
-     */
-    function _broadcast(event: SinglespaceIndexEvent) {
-        const listeners = listenerRegistry.get(session!.uuid);
-        if (listeners) {
-            listeners.forEach(listener => listener(event));
-        }
+    function broadcast(event: SinglespaceIndexEvent) {
+        for (const listener of runtime().listeners) listener(event)
     }
 
-    /**
-     * Starts the file system watcher for a single file.
-     * It will automatically update the fileIndex on modify, remove, or rename events.
-     *
-     * @param {string} filePath The absolute path of the file to watch.
-     */
-    async function startWatcher(filePath: string) {
-        // Before starting a new one, check if a watcher for this session already exists
-        if (watcherRegistry.has(session!.uuid)) {
-            console.log(`Watcher for session ${session!.uuid} already exists. Stopping it first.`);
-            await stopWatcher();
-        }
+    async function handleWatchEvent(event: WatchEvent) {
+        const type = event.type
+        if (typeof type !== 'object' || type === null || 'access' in type || 'metadata' in type) return
+        const rt = runtime()
+        const tracked = (p: string) => !!unref(fileIndex)[p] && !rt.selfWrites.has(p)
 
-        console.log(`Starting watcher for session ${session!.uuid} on: ${filePath}`);
-
-        const activeWatcher = await watch(filePath, async (event: WatchEvent) => {
-            // Ignore .DS_Store files
-            if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
-
-            // Ignore metadata-only changes
-            if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && event.type.modify.kind === 'metadata'))) return;
-
-            if (typeof event.type === 'object' && event.type !== null) {
-                
-                // --- Remove Event Handling ---
-                if ('remove' in event.type) {
-                    for (const path of event.paths) {
-                        console.log(`Remove detected: ${path}`);
-                        const removedNodes = removeFileFromIndex(path);
-                        if (removedNodes[0]) {
-                            _broadcast({ type: 'remove', path, removedNode: removedNodes[0] });
-                        }
-                    }
-                    return;
-                }
-
-                // --- Rename Event Handling ---
-                if ('modify' in event.type && event.type.modify.kind === 'rename') {
-                    // Standard rename with both paths
-                    if (event.paths.length >= 2) {
-                        const [oldPath, newPath] = event.paths;
-                        console.log(`Rename detected: ${oldPath} -> ${newPath}`);
-                        await moveFileInIndex(oldPath || '', newPath || '', '');
-                        _broadcast({ type: 'rename', oldPath: oldPath || '', newPath: newPath || '' });
-                        return;
-                    }
-
-                    // Incomplete rename with only one path
-                    if (event.paths.length === 1) {
-                        const path = event.paths[0];
-                        if (!path) return;
-
-                        setTimeout(async () => {
-                            try {
-                                await stat(path);
-                                // File still exists - might be a case-only rename or noisy event
-                                const node = fileIndex.value[path];
-                                if (!node) return;
-
-                                const fileName = path.substring(path.lastIndexOf('/') + 1);
-                                const actualFileName = await $fio.getFileNameFromPath(path);
-
-                                // If the file name changed (case-only rename), update it
-                                if (actualFileName !== node.fileName) {
-                                    console.log(`Case-only rename detected: ${node.fileName} -> ${actualFileName}`);
-                                    const parentPath = path.substring(0, path.lastIndexOf('/'));
-                                    const newPath = `${parentPath}/${actualFileName}`;
-                                    await moveFileInIndex(path, newPath, '');
-                                    _broadcast({ type: 'rename', oldPath: path, newPath: newPath });
-                                } else {
-                                    console.log('Ignoring noisy single-path rename event:', path);
-                                }
-                            } catch (error) {
-                                // File no longer exists - treat as remove
-                                console.log(`File at '${path}' no longer exists. Treating as remove.`);
-                                const removedNodes = removeFileFromIndex(path);
-                                if (removedNodes[0]) {
-                                    _broadcast({ type: 'remove', path, removedNode: removedNodes[0] });
-                                }
-                            }
-                        }, 100);
-                        return;
-                    }
-                }
-
-                // --- Modify Event Handling (Content Change) ---
-                if ('modify' in event.type && event.type.modify.kind === 'data') {
-                    for (const path of event.paths) {
-                        // console.log(`Modify detected: ${path}`);
-                        
-                        // Don't attempt to read binary files (images, PDFs, videos) as text
-                        const extension = getFileExtensionFromPath(path);
-                        if (isUnreadableAsText(extension)) {
-                            // console.log(`Skipping text read for binary file: ${path}`);
-                            continue;
-                        }
-
-                        try {
-                            const content = await readTextFile(path);
-                            await updateIndex(path, content);
-                            _broadcast({ type: 'modify', path });
-                        } catch (error) {
-                            console.error(`Failed to read file for update: ${path}`, error);
-                        }
-                    }
-                    return;
-                }
-
-                console.log('[Executed Watcher Event]: ', event);
-            } else {
-                // Simple string event type
-                console.log(`Received simple string event type: "${event.type}"`);
+        if ('remove' in type) {
+            for (const path of event.paths.filter(tracked)) {
+                const removedNodes = removeFileFromIndex(path)
+                if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})
             }
-        }, { recursive: false, delayMs: 5 });
+            return
+        }
+        if (!('modify' in type)) return
 
-        // Store the new unwatch function in the registry
-        watcherRegistry.set(session!.uuid, activeWatcher);
-        console.log(`Watcher started and registered for session ${session!.uuid}.`);
+        if (type.modify.kind === 'rename') {
+            const [oldPath, newPath] = event.paths
+            if (oldPath && newPath) {
+                if (!tracked(oldPath)) return
+                await moveFileInIndex(oldPath, newPath)
+                broadcast({type: 'rename', oldPath, newPath})
+                return
+            }
+            // Single-path rename: the file was moved away (or deleted) from under us.
+            if (oldPath && tracked(oldPath)) {
+                try {
+                    await stat(oldPath)
+                } catch {
+                    const removedNodes = removeFileFromIndex(oldPath)
+                    if (removedNodes.length) broadcast({type: 'remove', path: oldPath, removedNodes})
+                }
+            }
+            return
+        }
 
-        return activeWatcher;
+        if (type.modify.kind === 'data' || type.modify.kind === 'any') {
+            for (const path of event.paths.filter(tracked)) {
+                if (isUnreadableAsText(getFileExtensionFromPath(path))) continue
+                try {
+                    await updateIndex(path, await readTextFile(path))
+                    broadcast({type: 'modify', path})
+                } catch (error) {
+                    console.error(`[singlespace index] could not read ${path}`, error)
+                }
+            }
+        }
     }
 
     /**
-     * Stops the currently active file system watcher.
-     * This is crucial for cleanup when closing a file to prevent memory leaks.
+     * Watches the folder containing the file: editors that save via temp-file + rename replace the
+     * inode, which a watch on the file itself would lose.
      */
+    async function startWatcher(folder: string) {
+        await stopWatcher()
+        let queue: Promise<void> = Promise.resolve()
+        runtime().unwatch = await watch(folder, (event) => {
+            queue = queue.then(() => handleWatchEvent(event)).catch(e => console.error('[singlespace index] watcher event failed', e))
+        }, {recursive: false, delayMs: 50})
+    }
+
     async function stopWatcher() {
-        const unwatchFn = watcherRegistry.get(session!.uuid);
-
-        if (unwatchFn) {
-            console.log(`Stopping file watcher for session ${session!.uuid}...`);
-            unwatchFn();
-            watcherRegistry.delete(session!.uuid);
-            // Clean up listeners to prevent memory leaks
-            listenerRegistry.delete(session!.uuid);
-            console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
-        } else {
-            console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
-        }
+        const rt = runtimes.get(scope)
+        rt?.unwatch?.()
+        if (rt) rt.unwatch = undefined
     }
 
-    /**
-     * Subscribes a listener to file system events for this session.
-     * Returns an unsubscribe function to remove the listener.
-     * 
-     * @param {SinglespaceIndexListener} listener - The callback function to handle events
-     * @returns {Function} Unsubscribe function to remove the listener
-     */
     function on(listener: SinglespaceIndexListener): () => void {
-        // Get or create the listener set for this session
-        if (!listenerRegistry.has(session!.uuid)) {
-            listenerRegistry.set(session!.uuid, new Set());
-        }
-        const listeners = listenerRegistry.get(session!.uuid)!;
-
-        // Add the new listener
-        listeners.add(listener);
-
-        // Return an unsubscribe function
-        // This is CRITICAL for preventing memory leaks in components
-        return () => {
-            listeners.delete(listener);
-        };
+        const listeners = runtime().listeners
+        listeners.add(listener)
+        return () => listeners.delete(listener)
     }
 
     return {
+        fileIndex,
         initializeIndex,
         updateIndex,
         removeFileFromIndex,
         getFileByUuid,
         moveFileInIndex,
+        markSelfWrite,
         isIndexTemporary,
         setTemporaryIndex,
         clearIndex,
         convertTemporaryToValidIndex,
-        fileIndexWithPathExists,
-        fileIndexWithUuidExists,
         startWatcher,
         stopWatcher,
         on,
+        parentPathOf,
     }
 }

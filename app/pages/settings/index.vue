@@ -9,10 +9,10 @@ const $opener = useAppOpener()
 </script>
 
 <template>
-    <SettingsScrollLayout title="About">
+    <SettingsScrollLayout :title="$t('app.settings.nav.about')">
         <div class="w-full grid grid-cols-1 gap-3">
-            <UPageCard :title="`Vertex, ${$appConfig.versioning.version}`" description="The app's current version." spotlight/>
-            <UPageCard @click="$opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex')" class="cursor-pointer" icon="i-lucide-github" spotlight :title="`GitHub Repository`" description="The app's open-source source code on GitHub."/>
+            <UPageCard :title="`Vertex, ${$appConfig.versioning.version}`" :description="$t('app.settings.about.version')" spotlight/>
+            <UPageCard @click="$opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex')" class="cursor-pointer" icon="i-lucide-github" spotlight :title="$t('app.settings.about.repo')" :description="$t('app.settings.about.repoDescription')"/>
         </div>
     </SettingsScrollLayout>
 </template>

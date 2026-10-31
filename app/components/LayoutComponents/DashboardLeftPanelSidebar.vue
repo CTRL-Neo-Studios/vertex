@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {StateKey} from "#shared/constants/app";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import FileTreeComponent from "~/components/FileTreeComponent.vue";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
@@ -11,6 +12,8 @@ import useUuid from "~/composables/utility/useUuid";
 import type {CommandPaletteGroup, CommandPaletteItem, ContextMenuItem, TreeItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {computed} from "vue";
+
+const { t } = useI18n()
 
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -34,7 +37,7 @@ const {
 const {
     leftPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
-const activeTreeItem = useState<string>(`active.workspace.active-tree-item-${unref($sessionId) ?? useUuid()}`, () => '')
+const activeTreeItem = useState<string>(StateKey.activeTreeItem(unref($sessionId)), () => '')
 const newFileModal = $ovl.create(NewFileModal)
 
 watch(activeTabUuid, (newValue) => {
@@ -50,12 +53,12 @@ async function onClickFile(item: Partial<UITreeNode>) {
 const contextMenuItems = ref<ContextMenuItem[][]>([
     [
         {
-            label: 'New Markdown File',
+            label: t('app.editor.ui.filetree.newMarkdownFile'),
             icon: 'i-lucide-file-plus',
             onSelect(e) {
                 newFileModal.open({
                     isFolder: false,
-                    modalTitle: 'New Markdown File',
+                    modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                     asFolder: false,
                     asLevel: 'same',
                     fileExt: 'md'
@@ -63,12 +66,12 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
             }
         },
         {
-            label: 'New Folder',
+            label: t('app.editor.ui.filetree.newFolder'),
             icon: 'i-lucide-folder-dot',
             onSelect(e) {
                 newFileModal.open({
                     isFolder: true,
-                    modalTitle: 'New Folder',
+                    modalTitle: t('app.editor.ui.filetree.newFolder'),
                     asFolder: true,
                     asLevel: 'same'
                 })

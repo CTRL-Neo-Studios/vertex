@@ -1,135 +1,87 @@
-import { LazyStore } from "@tauri-apps/plugin-store";
-import { defaultAppSettings } from "#shared/utils/defaults/apps";
-import type { AppSettings } from "#shared/types/app/settings";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {TauriEvent} from "@tauri-apps/api/event";
+import {defaultAppSettings} from "#shared/utils/defaults/apps";
+import type {AppSettings} from "#shared/types/app/settings";
 import type {DeepPartial} from "#shared/types/types";
-
-const STORE_FILENAME = 'settings.json';
-const STORE_KEY = 'settings';
+import {Routes, StateKey, WindowLabel} from "#shared/constants/app";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {stateClient} from "~/utils/stateClient";
 
 /**
- * A composable for managing the application's configuration.
- * It handles loading from and saving to the Tauri store,
- * provides default values, and shares the config reactively across the app.
+ * Per-window mirror of app settings. Rust (src-tauri/src/state.rs) is the only writer of settings.json
+ * and broadcasts every change, so all windows converge on the latest saved value without re-reading disk.
  */
 export function useAppSettings() {
-    const config = useState<AppSettings | null>(`${STORE_KEY}.data`, () => null);
-
-    const isLoaded = useState<boolean>(`${STORE_KEY}.is_loaded`, () => false);
-
-    const fileStore = new LazyStore(STORE_FILENAME);
-
+    const config = useState<AppSettings | null>(StateKey.settings, () => null)
+    const isLoaded = useState<boolean>(StateKey.settingsLoaded, () => false)
     const $win = useAppWebviewWindows()
-    const $qt = useQuickToasts()
 
-    /**
-     * Loads the configuration from the Tauri store.
-     * If no config exists, it creates one with default values and saves it.
-     * This function is safe to call multiple times; it will only read from disk once.
-     */
-    async function load(forceLoad: boolean = false) {
-        if (isLoaded.value && !forceLoad) {
-            return config.value;
-        }
-
+    async function load() {
+        if (isLoaded.value) return unref(config)
         try {
-            await fileStore.init();
-            const storedData = await fileStore.get<AppSettings>(STORE_KEY);
-
-            config.value = defaultAppSettings(storedData);
-
-            if (!storedData) {
-                await fileStore.set(STORE_KEY, unref(config));
-                await fileStore.save();
-            }
-
+            const stored = await stateClient.getSettings()
+            config.value = defaultAppSettings(stored ?? undefined)
+            // First launch, or a legacy file that still needs migrating to the current shape.
+            if (!stored || !('recoverSessions' in stored)) await stateClient.setSettings(config.value)
         } catch (error) {
-            console.error("Fatal: Failed to load application config:", error);
-            config.value = defaultAppSettings();
+            console.error("[useAppSettings] failed to load settings:", error)
+            config.value = defaultAppSettings()
         } finally {
-            isLoaded.value = true;
+            isLoaded.value = true
         }
-
-        return unref(config);
+        return unref(config)
     }
 
     /**
-     * Saves the configuration to the Tauri store.
-     * @param newData - An optional object with partial config values to update.
-     *                  If not provided, the current state will be saved.
+     * Subscribe once per window (called from the init plugin). Broadcasts equal to the local value are this
+     * window's own save echoing back; ignoring them keeps deep `watch(config…, save)` from looping.
      */
-    async function save(newData?: PossiblyRef<Partial<AppSettings>>): Promise<boolean> {
-        let success: boolean = true
-
-        if (!unref(config)) {
-            console.warn("Attempted to save config before it was loaded. Operation skipped.");
-            success = false
-            return success;
-        }
-
-        const updateData = unref(newData);
-
-        if (updateData) {
-            config.value = defaultAppSettings({
-                ...config.value,
-                ...updateData,
-            });
-        }
-
-        try {
-            await fileStore.set(STORE_KEY, unref(config));
-            await fileStore.save();
-        } catch (error) {
-            console.error("Failed to save application config:", error);
-            success = false
-        }
-
-        return success
+    function listen() {
+        return stateClient.onSettingsChanged(s => {
+            const next = defaultAppSettings(s)
+            if (JSON.stringify(next) !== JSON.stringify(config.value)) config.value = next
+        })
     }
 
-    function set(data: DeepPartial<AppSettings>, source?: string) {
-        // console.log('Old', source, unref(config))
-        if (config.value)
-            config.value = defaultAppSettings({
-                ...unref(config),
-                ...data
-            })
-        // console.log('New', source, unref(config))
+    /** Update in memory only; call `save()` to persist and broadcast. */
+    function set(data: DeepPartial<AppSettings>) {
+        if (config.value) config.value = defaultAppSettings({...unref(config), ...data})
+    }
+
+    async function save(data?: DeepPartial<AppSettings>): Promise<boolean> {
+        if (!config.value) {
+            console.warn("[useAppSettings] save() before load(); skipped")
+            return false
+        }
+        if (data) set(data)
+        try {
+            await stateClient.setSettings(config.value)
+            return true
+        } catch (error) {
+            console.error("[useAppSettings] failed to save settings:", error)
+            return false
+        }
     }
 
     async function createOrFocusSettingsWindow() {
-        const window = await $win.getAppWindowWithLabel('settings')
-        if (window) {
-            await $win.showWindowWithLabel('settings')
-        } else {
-            const settingsWindow = $win.createAppWebviewWindow('/settings', 'settings', 'Settings')
-
-            const closeUnlisten = await settingsWindow.listen('tauri://close-requested', async function (e) {
-                await settingsWindow.destroy()
-                closeUnlisten()
-            })
-
-            const destroyUnlisten = await settingsWindow.listen('tauri://destroyed', async function (e) {
-                await settingsWindow.destroy()
-                destroyUnlisten()
-            })
+        if (await $win.getAppWindowWithLabel(WindowLabel.settings)) {
+            await $win.showWindowWithLabel(WindowLabel.settings)
+            return
         }
+        const settingsWindow = $win.createAppWebviewWindow(Routes.settings, WindowLabel.settings, 'Settings')
+        // Settings has nothing to flush; let close proceed immediately.
+        const unlisten = await settingsWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
+            unlisten()
+            await settingsWindow.destroy()
+        })
     }
 
     return {
-        /**
-         * The reactive application configuration object.
-         * Will be `null` until `load()` has been successfully called.
-         */
         config,
-        /**
-         * A reactive boolean indicating if the configuration has been loaded from the store.
-         */
         isLoaded,
         load,
-        save,
+        listen,
         set,
-        createOrFocusSettingsWindow
-    };
+        save,
+        createOrFocusSettingsWindow,
+    }
 }

@@ -1,4 +1,6 @@
 import type {PossiblyRef} from "#shared/types/types";
+import type { FileHandle
+} from "@tauri-apps/plugin-fs";
 import {
     copyFile,
     exists,
@@ -10,7 +12,7 @@ import {
     rename,
     stat,
     writeTextFile,
-    create, FileHandle
+    create
 } from "@tauri-apps/plugin-fs";
 import {basename, dirname, join} from "@tauri-apps/api/path";
 
@@ -34,7 +36,8 @@ export function useFileIO() {
         const fullPath = unref(fullPathRef);
         const data = unref(dataRef);
 
-        if (!fullPath || !data) return;
+        // Empty string is valid content (user cleared the note); only a missing path or value is not.
+        if (!fullPath || data === undefined) return;
         await writeTextFile(fullPath, data);
     }
 
@@ -199,11 +202,6 @@ export function useFileIO() {
         return await exists(fullPath);
     }
 
-    async function getFileInfo(fullPathRef: PossiblyRef<string>) {
-        const fullPath = unref(fullPathRef);
-        return await stat(fullPath);
-    }
-
     async function listDirectory(fullPathRef: PossiblyRef<string>) {
         const fullPath = unref(fullPathRef);
         return await readDir(fullPath);
@@ -310,7 +308,6 @@ export function useFileIO() {
         copyFileTo,
         createFolder,
         pathExists,
-        getFileInfo,
         listDirectory,
         moveFileOrFolder,
         getFileNameFromPath,

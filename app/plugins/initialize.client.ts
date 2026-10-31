@@ -1,80 +1,48 @@
+import {isPermissionGranted, requestPermission} from "@tauri-apps/plugin-notification";
 import {useAppSessions} from "~/composables/app/useAppSessions";
-import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
-import {useAppWindowEventBus} from "~/composables/app/useAppWindowEventBus";
-import {isPermissionGranted, requestPermission} from "@tauri-apps/plugin-notification";
-import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
-import {exit} from "@tauri-apps/plugin-process";
+import {resolveLocale} from "#shared/utils/locale";
 
+/**
+ * Runs once per window. Only wires services: every window mirrors the Rust-owned sessions/settings via
+ * change events; the main window additionally recovers saved sessions. Anything that needs component
+ * context (menus, toasts, the OS open queue) starts in app.vue.
+ */
 export default defineNuxtPlugin({
     name: 'initialize',
     async setup(nuxtApp) {
-        console.log('initializing')
-        
         const $asesh = useAppSessions()
         const $win = useAppWebviewWindows()
         const $settings = useAppSettings()
-        const $bus = useAppWindowEventBus()
         const $theme = useAppTheme()
-        const $ce = useAppCrossWindowEvents()
 
         const cfg = await $settings.load()
+        $theme.loadThemeFromConfig()
+        // Window lifetime == listener lifetime; Tauri drops webview listeners when the window is destroyed.
+        await $settings.listen()
+        await $asesh.listen()
+        await $asesh.initializeCurrentAppSession()
 
-        // Initialize the current window session
-        // Gets whether the current window is a `main` or a `session-` window
-        if (!(await isPermissionGranted())) await requestPermission()
-        const sesh = await $asesh.initializeCurrentAppSession()
-        const $menu = useAppWindowMenu()
-        await $menu.setMenu()
+        // Re-apply theme whenever another window (e.g. Settings) saves.
+        watch(() => $settings.config.value?.themeConfig, () => $theme.loadThemeFromConfig(), {deep: true})
 
-        await $win.getCurrentAppWindow().listen('tauri://focus', async () => {
-            await Promise.all([
-                $menu.setMenu(),
-                $settings.load(true),
-                $asesh.load()
-            ])
-            $theme.loadThemeFromConfig()
-            $bus.emit('focus')
-        })
-
-        await $win.getCurrentAppWindow().listen('tauri://blur', () => {
-            $bus.emit('blur')
-        })
-
-        await $win.getCurrentAppWindow().listen('tauri://close-requested', () => {
-            $bus.emit('closeRequested')
-        })
-
-        await $win.getCurrentAppWindow().listen('tauri://destroyed', () => {
-            $bus.emit('destroyed')
-        })
-
-
-        
-        // Attempts to recover the saved sessions on the `main` window
-        // This function does not run on other windows
-
-        if ($win.isCurrentAppWindowMain()) {
-            if (cfg?.openLastOpenedWindows)
-                await $asesh.recoverSavedAppSessions()
-
-            await $ce.listenQuitVertex(async (event) => {
-                await $win.closeAllSessionWindows()
-                await $win.hideMainWindow()
-                const {isPending} = useTimeout(500, {controls: true})
-                // await until($win.sessionWindowCount).toMatch(v => v != undefined && v.length <= 0)
-                await until(isPending).toBe(false)
-                await exit()
-            })
+        // UI language: setting (or OS language when `system`), applied in every window and on every change.
+        const i18n = nuxtApp.$i18n
+        const applyLocale = async () => {
+            const codes = i18n.locales.value.map(l => (typeof l === 'string' ? l : l.code))
+            const locale = resolveLocale($settings.config.value?.language ?? 'system', codes, navigator.languages)
+            // setLocale lazy-loads the messages; await it so the first render/menu already uses them.
+            if (i18n.locale.value !== locale) await i18n.setLocale(locale as typeof i18n.locale.value)
+            document.documentElement.lang = locale
         }
+        await applyLocale()
+        watch(() => $settings.config.value?.language, applyLocale)
 
-        await useAppFileStartHandler().initializeOnMain()
-        
-        // Saturation logic moved to /loading
-        
-        console.log('initialized')
+        if (!$win.isCurrentAppWindowMain()) return
+
+        if (!(await isPermissionGranted())) await requestPermission()
+        if (cfg) await $asesh.recoverSavedAppSessions(cfg.recoverSessions)
     }
 })

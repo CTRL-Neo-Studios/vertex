@@ -38,7 +38,7 @@ watchDebounced(formData, (newValue) => {
 
 <template>
     <UModal v-model:open="open" :default-open="false">
-        <UButton variant="link" icon="i-lucide-file-braces-corner" size="sm" color="neutral" block class="justify-center" label="Frontmatter"/>
+        <UButton variant="link" icon="i-lucide-file-braces-corner" size="sm" color="neutral" block class="justify-center" :label="$t('app.generic.frontmatter')"/>
         <template #content>
             <UScrollArea class="w-full max-h-96 rounded-lg p-3">
                 <template v-if="!formError">
@@ -48,8 +48,8 @@ watchDebounced(formData, (newValue) => {
                     <UEmpty
                         variant="naked"
                         icon="i-lucide-circle-x"
-                        title="Cannot parse frontmatter"
-                        description="There must be something wrong with your frontmatter; to prevent further corruption of your content, the editor form will hidden."
+                        :title="$t('app.editor.ui.frontmatterError')"
+                        :description="$t('app.editor.ui.frontmatterErrorDescription')"
                     />
                 </slot>
             </UScrollArea>

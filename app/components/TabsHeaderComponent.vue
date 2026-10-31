@@ -8,17 +8,15 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveSinglespaceIndex} from "~/composables/active/useActiveSinglespaceIndex";
 import type {ActiveSinglespaceFileIndex, ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
-import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
-import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
-const $aseshNavi = useAppSessionNavigator()
+const {t} = useI18n()
 const $qt = useQuickToasts()
 const {
     closeTab,
@@ -40,31 +38,9 @@ const {
     leftPanelCollapsed,
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession(sessionId))
-const $menu = useAppWindowMenu()
 const $win = useAppWebviewWindows()
 
 const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
-
-onMounted(() => {
-    // const its = unref(dropdownItems)[1]
-    // if (its && its.length > 0 && unref(activeTabUuid) != null) {
-    //     const index = unref(tabs).findIndex(v => v.fileUuid == unref(activeTabUuid))
-    //     scrollToItem(index)
-    //     console.log(`scroll to ${index}`)
-    // }
-})
-
-$menu.dispatcher.on('categories.view.closeTab', async () => {
-    if (unref(tabs).length > 0 && unref(isWorkspace)) {
-        const tab = getActiveTab(tabId)
-        if (tab)
-            await exitTab(tab)
-    }
-})
-
-$menu.dispatcher.on('categories.view.clearTabs', async () => {
-    await clearAllTabs()
-})
 
 async function navigateTabInContext(sessionId: PossiblyRef<string | undefined>, tab?: ActiveTab) {
     if (tab) {
@@ -113,16 +89,16 @@ async function exitTab(tab: ActiveTab) {
 }
 
 const dropdownItems = computed<DropdownMenuItem[][]>(() => {
-    let items: DropdownMenuItem[][] = [
+    const items: DropdownMenuItem[][] = [
         [{
-            label: 'New Tab',
+            label: t('app.editor.ui.newTab'),
             icon: 'i-lucide-plus',
             async onSelect() {
                 openTab(setSinglespaceTempIndex().uuid)
             },
             disabled: true // Disabled for now; I'm currently figuring out what's the best user experience for tabs.
         }], [], [{
-            label: 'Clear All Tabs',
+            label: t('app.editor.ui.clearAllTabs'),
             icon: 'i-lucide-x',
             color: 'error',
             async onSelect(e: Event) {
@@ -153,15 +129,11 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
                     if (i.changesSaved) {
                         if (unref(isWorkspace))
                             await exitTab(i)
-                        else {
-                            const sesh = $sesh.getSession(sessionId)
-                            if (sesh)
-                                await $aseshNavi.destroyWindowAndTryReturnToLastWindow(sesh)
-                            else
-                                $qt.error('Please restart your app. An error has occurred.')
-                        }
+                        else
+                            // Closing a singlespace's only tab closes its window through the normal close path.
+                            await $win.getCurrentAppWindow().close()
                     } else {
-                        $qt.warning('Saving file...')
+                        $qt.warning(t('app.editor.ui.saving'))
                     }
                 },
                 async onSelect(e: Event) {
@@ -204,7 +176,7 @@ function scrollToItem(index: number) {
             virtualize
         >
             <div v-if="tabs.length == 0" class="w-full items-center text-center">
-                <span class="text-sm text-dimmed">Select a file...</span>
+                <span class="text-sm text-dimmed">{{ $t('app.editor.ui.selectFileShort') }}</span>
             </div>
             <div
                 v-else
@@ -220,7 +192,7 @@ function scrollToItem(index: number) {
                     :icon="item.icon"
                     @click="item.toTab()"
                 />
-                <UTooltip text="Close Tab" :kbds="['meta', 'w']">
+                <UTooltip :text="$t('app.editor.ui.closeTab')" :kbds="['meta', 'w']">
                     <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" @click="item?.exitTab()" class="group-hover:visible invisible duration-200 transition-all absolute right-1 justify-self-center z-10"/>
                 </UTooltip>
             </div>

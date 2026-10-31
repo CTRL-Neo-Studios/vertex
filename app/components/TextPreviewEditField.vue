@@ -29,7 +29,8 @@ const emit = defineEmits<{
 
 const isEditing = ref(false)
 const previousValue = ref('')
-const inputRef = ref<HTMLInputElement | null>(null)
+// UInput is a component; it exposes its native <input> as `inputRef`.
+const inputRef = ref<{ inputRef?: HTMLInputElement } | null>(null)
 
 // --- Functions ---
 
@@ -47,8 +48,8 @@ async function startEditing() {
 
     // Wait for the DOM to update, then focus and select the input text.
     await nextTick()
-    inputRef.value?.focus()
-    inputRef.value?.select()
+    inputRef.value?.inputRef?.focus()
+    inputRef.value?.inputRef?.select()
 }
 
 /**

@@ -1,12 +1,10 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
+import {sessionScope, StateKey} from "#shared/constants/app";
 
 export function useActiveLayouts(session?: ActiveSession) {
-    if (!session) {
-        console.error('Invalid session.')
-    }
-
-    const leftPanelCollapsed = useState<boolean>(`active.layouts.left-panel.${session?.uuid}`, () => false)
-    const rightPanelCollapsed = useState<boolean>(`active.layouts.right-panel.${session?.uuid}`, () => true)
+    const scope = sessionScope(session, 'useActiveLayouts')
+    const leftPanelCollapsed = useState<boolean>(StateKey.leftPanel(scope), () => false)
+    const rightPanelCollapsed = useState<boolean>(StateKey.rightPanel(scope), () => true)
 
     return {
         leftPanelCollapsed,

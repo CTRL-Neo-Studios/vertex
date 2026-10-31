@@ -1,0 +1,224 @@
+{
+	"app": {
+		"menu": {
+			"file": "File",
+			"edit": "Edit",
+			"view": "View",
+			"help": "Help"
+		},
+		"commands": {
+			"settings": "Settings…",
+			"about": "About Vertex",
+			"quit": "Quit Vertex",
+			"newFile": "New File…",
+			"newFolder": "New Folder…",
+			"openFile": "Open File…",
+			"openFolder": "Open Folder…",
+			"save": "Save",
+			"saveAs": "Save As…",
+			"saveAsUnsupported": "Save As is only available for unsaved files. Use Rename or Move instead.",
+			"reload": "Reload",
+			"toggleFullscreen": "Toggle Full Screen",
+			"closeTab": "Close Tab",
+			"closeAllTabs": "Close All Tabs",
+			"closeWindow": "Close Window",
+			"docs": "Documentation",
+			"reportIssue": "Report an Issue",
+			"repo": "Source Code on GitHub"
+		},
+		"home": {
+			"newFile": "New File…",
+			"newWorkspace": "New Workspace…",
+			"openFile": "Open File…",
+			"openFolder": "Open Folder…",
+			"recentFiles": "Recent Files",
+			"untitled": "Untitled",
+			"loading": "Loading…",
+			"createFileDialog": "Create New Markdown or Text File",
+			"fileExists": "A file already exists at that path.",
+			"notMarkdown": "The file must be a Markdown or text file.",
+			"createFailed": "Unable to create the file."
+		},
+		"settings": {
+			"title": "Settings",
+			"saving": "Saving…",
+			"nav": {
+				"about": "About",
+				"general": "General",
+				"theme": "Theme",
+				"view": "View"
+			},
+			"about": {
+				"version": "The app's current version.",
+				"repo": "GitHub Repository",
+				"repoDescription": "The app's open-source code on GitHub."
+			},
+			"general": {
+				"title": "General",
+				"startup": "Startup",
+				"recovery": {
+					"label": "Reopen windows on launch",
+					"description": "Which windows from your last session are reopened when Vertex starts.",
+					"none": "None",
+					"workspaces": "Workspaces only",
+					"singlespaces": "Single files only",
+					"both": "Workspaces and single files"
+				},
+				"language": {
+					"title": "Language",
+					"label": "App language",
+					"description": "The language of menus and the interface.",
+					"system": "Same as system"
+				}
+			},
+			"theme": {
+				"title": "Theme",
+				"reset": "Reset Theme",
+				"colorsAndModes": "Colors & Modes",
+				"primaryColors": "Primary Colors",
+				"primaryColorsDescription": "The primary color of the app.",
+				"neutralColors": "Neutral Colors",
+				"neutralColorsDescription": "The neutral color of the app.",
+				"radiusDescription": "The corner radius of certain UI elements.",
+				"colorMode": "Color Mode",
+				"colorModeDescription": "The color mode of the app.",
+				"appFont": "App Font",
+				"appFontDescription": "The app's font.",
+				"appMonoFont": "App Mono Font",
+				"appMonoFontDescription": "The app's monospace font.",
+				"editorFont": "Editor Font",
+				"editorFontDescription": "The text editor's font.",
+				"editorCodeFont": "Editor Code Font",
+				"editorCodeFontDescription": "The text editor's monospace font."
+			},
+			"view": {
+				"title": "View",
+				"editor": "Editor",
+				"editorDescription": "Editor layout settings.",
+				"fileTree": "File Tree",
+				"editorPanel": "Editor Panel",
+				"showExtInName": "Show Extension in File Name",
+				"showExtInNameDescription": "Shows the file extension in the item name label.",
+				"showExtAsTag": "Show Extension as Tag",
+				"showExtAsTagDescription": "Shows the file extension as a tag at the end of the item entry.",
+				"showFileIcons": "Show File Icons",
+				"showFileIconsDescription": "Shows the file item icon.",
+				"showFolderIcons": "Show Folder Icons",
+				"showFolderIconsDescription": "Shows the folder item icons.",
+				"showFoldArrows": "Show Folder Fold Arrows",
+				"showFoldArrowsDescription": "Shows the folder folding arrows on the right side.",
+				"customFileIcons": "Allow Custom File Icons",
+				"customFileIconsDescription": "Allow displaying custom icons configured in the file.",
+				"customFolderIcons": "Allow Custom Folder Icons",
+				"customFolderIconsDescription": "Allow displaying custom icons configured in the folder.",
+				"statusBar": "Show Status Bar",
+				"statusBarDescription": "Display mode of the status bar.",
+				"statusBarOnHover": "Show On Hover",
+				"statusBarAlways": "Always Shown",
+				"statusBarNever": "Always Hidden"
+			}
+		},
+		"editor": {
+			"ui": {
+				"selectFile": "Select a file from the left side.",
+				"selectFileShort": "Select a file…",
+				"noViewer": "Vertex can't display .{ext} files yet.",
+				"saving": "Saving file…",
+				"saveFailed": "Could not save the file.",
+				"moveFailed": "Could not move {file}.",
+				"newTab": "New Tab",
+				"clearAllTabs": "Clear All Tabs",
+				"closeTab": "Close Tab",
+				"duplicate": "Duplicate",
+				"rename": "Rename",
+				"delete": "Delete",
+				"forelinks": "Forelinks",
+				"backlinks": "Backlinks",
+				"noForelinks": "No forelinks.",
+				"noBacklinks": "No backlinks.",
+				"analyzeText": "Analyze Text",
+				"previewMermaid": "Preview Mermaid Graph",
+				"copiedMermaid": "Copied Mermaid diagram code.",
+				"frontmatterError": "Cannot parse frontmatter",
+				"frontmatterErrorDescription": "Something is wrong with this frontmatter. The form editor is hidden to avoid corrupting your content.",
+				"palette": {
+					"quickActions": "Quick Actions",
+					"newFileDescription": "Creates a new Markdown file in the workspace root.",
+					"newFolderDescription": "Creates a new folder in the workspace root.",
+					"files": "Files ({count})"
+				},
+				"bases": {
+					"views": "Views",
+					"view": "View",
+					"addView": "Add View",
+					"remove": "Remove",
+					"sortAscending": "Sort Ascending",
+					"sortDescending": "Sort Descending",
+					"clearSorting": "Clear Sorting",
+					"hideAll": "Hide all",
+					"addFormula": "Add formula",
+					"table": "Table",
+					"cards": "Cards",
+					"list": "List",
+					"map": "Map"
+				},
+				"filetree": {
+					"newMarkdownFile": "New Markdown File",
+					"aboveLevel": "Above Level",
+					"thisLevel": "This Level",
+					"underLevel": "Under Level",
+					"newFolder": "New Folder",
+					"newCanvas": "New Canvas",
+					"newBase": "New Base",
+					"newOpenFolderProperties": "New/Open Folder Properties"
+				},
+				"openInNewTab": "Open in New Tab",
+				"openInDefaultApp": "Open in Default App",
+				"copyFullPath": "Copy full path",
+				"copyRelativePath": "Copy relative path",
+				"revealInFileExplorer": "Reveal in File Explorer",
+				"moveFileTo": "Move file to…",
+				"functions": {
+					"writersTools": "Writer's Tools",
+					"tableOfContents": "Table of Contents"
+				},
+				"updateLinks": {
+					"title": "Update links to “{name}”?",
+					"description": "{links} link(s) in {files} note(s) point to the old name.",
+					"update": "Update links",
+					"keep": "Keep as is",
+					"done": "Updated {links} link(s).",
+					"failed": "Could not update links in {file}."
+				},
+				"viewImage": "Click to view image"
+			}
+		},
+		"frontmatter": {
+			"color": "Color"
+		},
+		"generic": {
+			"name": "Name",
+			"type": "Type",
+			"cancel": "Cancel",
+			"delete": "Delete",
+			"required": "Required",
+			"ui": {
+				"invalidFileName": "Invalid file name",
+				"createdFile": "Created file {filename}.",
+				"renamedFile": "Renamed to {filename}.",
+				"renameFailed": "Could not rename the file.",
+				"deleteConfirm": "Delete {count} file(s)?",
+				"renameFile": "Rename File"
+			},
+			"fileName": "File Name",
+			"fonts": "Fonts",
+			"radius": "Radius",
+			"black": "Black",
+			"properties": "Properties",
+			"frontmatter": "Frontmatter",
+			"words": "Words",
+			"lines": "Lines",
+			"paragraphs": "Paragraphs"
+		}
+	}
+}

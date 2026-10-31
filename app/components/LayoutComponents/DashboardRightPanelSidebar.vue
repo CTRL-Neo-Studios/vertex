@@ -14,6 +14,8 @@ import ReferenceBacklinksListComponent from "~/components/ReferenceBacklinksList
 import {computed} from "vue";
 import {isBasesFile} from "#shared/utils/fs/filenames";
 
+const { t } = useI18n()
+
 const $route = useRoute()
 const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
@@ -34,34 +36,34 @@ const emit = defineEmits<{
 const isBases = computed(() => isBasesFile(getFileByUuid($tabId)?.fileExt || ''))
 
 const activeRightPanel = ref('0')
-const rightPanelItems: TabsItem[] = [
+const rightPanelItems = computed<TabsItem[]>(() => [
     {
         value: '0',
-        label: 'Foreinks',
+        label: t('app.editor.ui.forelinks'),
         icon: 'i-lucide-square-arrow-out-up-right'
     },
     {
         value: '1',
-        label: 'Backlinks',
+        label: t('app.editor.ui.backlinks'),
         icon: 'i-lucide-square-arrow-out-down-left'
     },
     {
         value: '2',
-        label: 'Writer\'s Tools',
+        label: t('app.editor.ui.functions.writersTools'),
         icon: 'i-lucide-pencil'
     },
     {
         value: '3',
-        label: 'Table of Contents',
+        label: t('app.editor.ui.functions.tableOfContents'),
         icon: 'i-lucide-table-of-contents'
     }
-]
+])
 const basesPanelItems: TabsItem[] = [
     {
         value: ''
     }
 ]
-const tabItems = computed(() => unref(isBases) ? basesPanelItems : rightPanelItems)
+const tabItems = computed(() => unref(isBases) ? basesPanelItems : unref(rightPanelItems))
 
 watch($tabId, () => {
     if (unref(isBases))

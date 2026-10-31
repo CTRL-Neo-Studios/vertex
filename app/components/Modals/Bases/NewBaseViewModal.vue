@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import type { FormSubmitEvent } from '@nuxt/ui'
+import type { FormSubmitEvent,SelectItem } from '@nuxt/ui'
 import type {View} from "@type32/obsidian-bases-parser";
-import type {SelectItem} from "@nuxt/ui";
 import {z} from 'zod'
 
 const schema = z.custom<View>()
@@ -19,23 +18,24 @@ const state = reactive<Partial<Schema>>({
     type: props.view?.type || 'table',
 })
 
-const availableTypes: SelectItem[] = [{
-    label: 'Table',
+const {t} = useI18n()
+const availableTypes = computed<SelectItem[]>(() => [{
+    label: t('app.editor.ui.bases.table'),
     value: 'table',
     icon: 'i-lucide-sheet'
 }, {
-    label: 'Cards',
+    label: t('app.editor.ui.bases.cards'),
     value: 'cards',
     icon: 'i-lucide-layout-grid'
 }, {
-    label: 'List',
+    label: t('app.editor.ui.bases.list'),
     value: 'list',
     icon: 'i-lucide-rows-3'
 }, {
-    label: 'Map',
+    label: t('app.editor.ui.bases.map'),
     value: 'map',
     icon: 'i-lucide-map'
-}]
+}])
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
     emit('close', {
@@ -53,10 +53,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     >
         <template #body>
             <UForm :schema="schema" :state class="p-2 w-full" @submit="onSubmit">
-                <UFormField label="Name" name="name" required size="sm">
+                <UFormField :label="$t('app.generic.name')" name="name" required size="sm">
                     <UInput v-model="state.name" class="w-full" autofocus/>
                 </UFormField>
-                <UFormField label="Type" name="type" required size="sm">
+                <UFormField :label="$t('app.generic.type')" name="type" required size="sm">
                     <USelect v-model="state.type" :items="availableTypes" class="w-full"/>
                 </UFormField>
             </UForm>

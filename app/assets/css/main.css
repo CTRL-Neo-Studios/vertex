@@ -3,6 +3,7 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
+
 @utility no-scrollbar {
     @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
@@ -17,8 +18,6 @@
     --font-editor-code: var(--font-mono, monospace), monospace, ui-monospace;
 
     --font-math: 'Arbutus Slab', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-
-    --list-indent: 1.5rem;
 
     --color-submuted: var(--ui-bg-muted);
 

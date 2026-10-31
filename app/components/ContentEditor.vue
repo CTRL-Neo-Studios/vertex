@@ -59,9 +59,9 @@ const emit = defineEmits<{
         <div class="bg-default absolute z-10 left-0 right-0 bottom-0 h-fit">
             <div class="bg-submuted inline-flex justify-center items-center w-full border-t border-default">
                 <div class="text-center flex justify-center items-center gap-3 text-dimmed text-xs p-1 px-3 pb-1.5 select-none">
-                    <div class="font-mono!">{{ $du.getWordCount(content || '') }} Words</div>
+                    <div class="font-mono!">{{ $du.getWordCount(content || '') }} {{ $t('app.generic.words') }}</div>
                     <USeparator orientation="vertical" class="h-3 w-fit"/>
-                    <div class="font-mono!">{{ $du.getLineCount(content || '') }} Lines</div>
+                    <div class="font-mono!">{{ $du.getLineCount(content || '') }} {{ $t('app.generic.lines') }}</div>
                 </div>
                 <div class="grow"/>
             </div>

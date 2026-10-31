@@ -2,10 +2,12 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
 import {defaultActiveTab} from "#shared/utils/defaults/actives";
+import {sessionScope, StateKey} from "#shared/constants/app";
 
 export function useActiveTabs(session?: ActiveSession) {
-    const tabs = useState<ActiveTab[]>(`active.tabs.${session?.uuid}`, () => [])
-    const activeTabUuid = useState<string | null>(`active.tabs.uuid.${session?.uuid}`, () => null);
+    const scope = sessionScope(session, 'useActiveTabs')
+    const tabs = useState<ActiveTab[]>(StateKey.tabs(scope), () => [])
+    const activeTabUuid = useState<string | null>(StateKey.activeTab(scope), () => null);
 
     /**
      * Opens a new tab for a given file UUID.

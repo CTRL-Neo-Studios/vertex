@@ -1,27 +1,12 @@
 <script setup lang="ts">
-
-import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
-import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
-import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
-import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
-
 definePageMeta({
-    layout: 'singlespace'
+    layout: 'session'
 })
-
-const $route = useRoute()
+const {t} = useI18n()
 </script>
 
 <template>
     <div class="w-full h-full flex flex-col items-center justify-center">
-        <div class="text-muted">Select a file from left side.</div>
+        <div class="text-muted">{{ t('app.editor.ui.selectFile') }}</div>
     </div>
 </template>
-
-<style>
-@reference "~/assets/css/main.css";
-
-div[data-tauri-decorum-tb] {
-    pointer-events: none;
-}
-</style>

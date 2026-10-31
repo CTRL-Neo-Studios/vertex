@@ -55,13 +55,13 @@ watch(() => unref($settings.config)?.themeConfig, () => {
 <template>
     <div class="space-y-4">
         <fieldset class="grid grid-cols-1 gap-3">
-            <UButton variant="outline" color="error" @click="resetTheme" block label="Reset Theme"/>
+            <UButton variant="outline" color="error" @click="resetTheme" block :label="$t('app.settings.theme.reset')"/>
         </fieldset>
-        <UPageCard title="Colors & Modes" :ui="{ container: 'space-y-4' }">
-            <UFormField label="Primary Colors" description="The primary color of the app.">
+        <UPageCard :title="$t('app.settings.theme.colorsAndModes')" :ui="{ container: 'space-y-4' }">
+            <UFormField :label="$t('app.settings.theme.primaryColors')" :description="$t('app.settings.theme.primaryColorsDescription')">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
-                        label="Black"
+                        :label="$t('app.generic.black')"
                         :color="(appConfig.theme.blackAsPrimary) ? 'primary' : 'neutral'"
                         :variant="(appConfig.theme.blackAsPrimary) ? 'solid' : 'outline'"
                         @click="setBlackAsPrimary(true)"
@@ -86,7 +86,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     />
                 </div>
             </UFormField>
-            <UFormField label="Neutral Colors" description="The neutral color of the app.">
+            <UFormField :label="$t('app.settings.theme.neutralColors')" :description="$t('app.settings.theme.neutralColorsDescription')">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
                         v-for="color in neutralColors"
@@ -99,7 +99,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     />
                 </div>
             </UFormField>
-            <UFormField label="Radius" description="The corner radius of certain UI elements.">
+            <UFormField :label="$t('app.generic.radius')" :description="$t('app.settings.theme.radiusDescription')">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
                         v-for="r in radiuses"
@@ -111,7 +111,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     />
                 </div>
             </UFormField>
-            <UFormField label="Color Mode" description="The color mode of the app." orientation="horizontal">
+            <UFormField :label="$t('app.settings.theme.colorMode')" :description="$t('app.settings.theme.colorModeDescription')" orientation="horizontal">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
                         v-for="m in modes"
@@ -125,8 +125,8 @@ watch(() => unref($settings.config)?.themeConfig, () => {
             </UFormField>
         </UPageCard>
 
-        <UPageCard title="Fonts" class="space-y-3 grid grid-cols-1 gap-3" :ui="{ container: 'space-y-4' }">
-            <UFormField label="App Font" description="The app's font." orientation="horizontal">
+        <UPageCard :title="$t('app.generic.fonts')" class="space-y-3 grid grid-cols-1 gap-3" :ui="{ container: 'space-y-4' }">
+            <UFormField :label="$t('app.settings.theme.appFont')" :description="$t('app.settings.theme.appFontDescription')" orientation="horizontal">
                 <USelect
                     v-model="appFont"
                     size="sm"
@@ -137,7 +137,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
                 />
             </UFormField>
-            <UFormField label="App Mono Font" description="The app's monospace font." orientation="horizontal">
+            <UFormField :label="$t('app.settings.theme.appMonoFont')" :description="$t('app.settings.theme.appMonoFontDescription')" orientation="horizontal">
                 <USelect
                     v-model="appMonoFont"
                     size="sm"
@@ -148,7 +148,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
                 />
             </UFormField>
-            <UFormField label="Editor Font" description="The text editor's font." orientation="horizontal">
+            <UFormField :label="$t('app.settings.theme.editorFont')" :description="$t('app.settings.theme.editorFontDescription')" orientation="horizontal">
                 <USelect
                     v-model="editorFont"
                     size="sm"
@@ -159,7 +159,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
                 />
             </UFormField>
-            <UFormField label="Editor Code Font" description="The text editor's monospace font." orientation="horizontal">
+            <UFormField :label="$t('app.settings.theme.editorCodeFont')" :description="$t('app.settings.theme.editorCodeFontDescription')" orientation="horizontal">
                 <USelect
                     v-model="editorMonoFont"
                     size="sm"

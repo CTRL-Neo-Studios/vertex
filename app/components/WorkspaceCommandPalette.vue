@@ -9,6 +9,8 @@ import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {useActiveFileTreeMemo} from "~/composables/active/memoization/useActiveFileTreeMemo";
 import {useFileIO} from "~/composables/io/useFileIO";
 
+const { t } = useI18n()
+
 const $route = useRoute()
 const $ovl = useOverlay()
 const sessionId = computed<string>(() => $route.params.sessionId as string)
@@ -50,16 +52,16 @@ const paletteItemFiles = computed(() => {
 const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     {
         id: 'quick-actions',
-        label: 'Quick Actions',
+        label: t('app.editor.ui.palette.quickActions'),
         items: [
             {
-                label: 'New Markdown File',
-                description: 'Creates a new markdown file in the workspace root directory.',
+                label: t('app.editor.ui.filetree.newMarkdownFile'),
+                description: t('app.editor.ui.palette.newFileDescription'),
                 icon: 'i-lucide-file-plus',
                 onSelect() {
                     newFileModal.open({
                         isFolder: false,
-                        modalTitle: 'New Markdown File',
+                        modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                         asFolder: false,
                         asLevel: 'same',
                         fileExt: 'md'
@@ -67,13 +69,13 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             },
             {
-                label: 'New Folder',
-                description: 'Creates a new folder in the workspace root directory.',
+                label: t('app.editor.ui.filetree.newFolder'),
+                description: t('app.editor.ui.palette.newFolderDescription'),
                 icon: 'i-lucide-folder-dot',
                 onSelect() {
                     newFileModal.open({
                         isFolder: true,
-                        modalTitle: 'New Folder',
+                        modalTitle: t('app.editor.ui.filetree.newFolder'),
                         asFolder: true,
                         asLevel: 'same'
                     })
@@ -83,7 +85,7 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
     },
     {
         id: 'files',
-        label: `Files (${unref(paletteItemFiles).length} recursed)`,
+        label: t('app.editor.ui.palette.files', {count: unref(paletteItemFiles).length}),
         items: unref(paletteItemFiles),
     }
 ])

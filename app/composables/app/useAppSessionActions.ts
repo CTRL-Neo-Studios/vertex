@@ -1,46 +1,29 @@
-import {useAppSessions} from "~/composables/app/useAppSessions";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
-import useUuid from "~/composables/utility/useUuid";
-import {defaultAppSession, defaultAppSessionContext} from "#shared/utils/defaults/apps";
-import {useFileIO} from "~/composables/io/useFileIO";
-import type {AppSession} from "#shared/types/app/sessions";
 import {save} from "@tauri-apps/plugin-dialog";
+import {defaultAppSession, defaultAppSessionContext} from "#shared/utils/defaults/apps";
+import type {AppSession} from "#shared/types/app/sessions";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import {useFileIO} from "~/composables/io/useFileIO";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 /**
- * High-level actions for session/window management.
- * 
- * This composable provides reusable actions that can be triggered from:
- * - Native application menus
- * - Keyboard shortcuts
- * - UI buttons
- * - Context menus
- * 
- * Architecture Note:
- * This is a Layer 4 composable that orchestrates window creation by:
- * 1. Creating AppSession (Layer 1: useAppSessions)
- * 2. Creating the webview window (Window Manager)
- * 3. Hiding the main window (following the anchor pattern)
- * 
- * The newly created window will then:
- * 1. Initialize itself (plugin: initialize.client.ts)
- * 2. Fetch its AppSession
- * 3. Saturate itself (Layer 3: useAppSessionRecovery)
+ * User-facing "open something" actions, callable from menus, buttons and the OS open queue.
+ * Each opened path gets one persisted AppSession and one `session-{uuid}` window; reopening a path
+ * focuses its existing window. The new window initializes itself from /loading.
  */
 export function useAppSessionActions() {
     const $sessions = useAppSessions()
-    const $win = useAppWebviewWindows()
     const $open = useAppSessionNavigator()
     const $fio = useFileIO()
     const $qt = useQuickToasts()
+    const {t} = useI18n()
 
     /**
      * Opens a folder picker and creates a new workspace session window.
      * Intended to be called from the main window.
      */
     async function openWorkspaceAction() {
-        const path = await $open.retrieveFolderOrFileAbsolutePath(false) // false = folder
+        const path = await $open.pickPath(false)
         if (!path) return; // User cancelled
 
         return await openWorkspaceFromPath(path)
@@ -51,14 +34,14 @@ export function useAppSessionActions() {
      * Intended to be called from the main window.
      */
     async function openSinglespaceAction() {
-        const path = await $open.retrieveFolderOrFileAbsolutePath(true) // true = file
+        const path = await $open.pickPath(true)
         if (!path) return; // User cancelled
 
         return await openSinglespaceFromPath(path)
     }
 
     async function createNewFileForSinglespace(openImmediately: boolean = true) {
-        let path = await save({
+        const path = await save({
             filters: [{
                 name: 'Markdown Files',
                 extensions: ['md']
@@ -66,13 +49,13 @@ export function useAppSessionActions() {
                 name: 'Text Files',
                 extensions: ['txt']
             }],
-            title: 'Create new Markdown/Text File',
+            title: t('app.home.createFileDialog'),
         })
 
         if (!path) return;
 
         if (await $fio.pathExists(path)) {
-            $qt.error('A file already exists in that path.')
+            $qt.error(t('app.home.fileExists'))
             return;
         }
 
@@ -82,7 +65,7 @@ export function useAppSessionActions() {
         // If the returned file path does not end with any extensions listed above
         console.log(`returned path ${path}`)
         if (allowedExtensions.findIndex(i => fileName.endsWith(i)) == -1) {
-            $qt.error('Your file must be a Markdown/Text file.')
+            $qt.error(t('app.home.notMarkdown'))
             return;
         }
 
@@ -95,89 +78,33 @@ export function useAppSessionActions() {
             }
         } catch(e: any) {
             console.error(e)
-            $qt.error('Unable to create file', e.message);
+            $qt.error(t('app.home.createFailed'), e.message);
         }
 
         return path;
     }
 
-    /**
-     * Generic action to open a workspace from a known path.
-     * Useful for "Open Recent" functionality.
-     * 
-     * @param path Absolute path to the folder
-     */
-    async function openWorkspaceFromPath(path?: string) {
-        if (!path || !(await $fio.pathExists(path))) return;
+    async function openFromPath(path: string | undefined, sessionType: AppSession['sessionType']) {
+        if (!path || !(await $fio.pathExists(path))) return
 
-        async function createWindow(path: string, existingSession?: AppSession) {
-            let session
-            if (!existingSession)
-                session = await $sessions.addAppSession(defaultAppSession({
-                    uuid: useUuid(),
-                    rootFileOrFolderAbsolutePath: path,
-                    sessionType: 'workspace',
-                    context: defaultAppSessionContext({
-                        openedAbsoluteFilePaths: [] as string[],
-                    })
-                }))
-            else
-                session = existingSession
-
-            return await $sessions.createWindowFromAppSession(session)
+        await $sessions.load()
+        const existing = $sessions.getAppSessionFromAbsolutePath(path)
+        if (existing) {
+            const window = await $sessions.getWebviewWindowWithAppSession(existing)
+            if (window) return window.setFocus()
         }
-
-        const sesh = await $sessions.getAppSessionFromAbsolutePath(path)
-        if (sesh) {
-            const window = await $sessions.getWebviewWindowWithAppSession(sesh)
-            if (window) {
-                await window.setFocus()
-            } else {
-                return await createWindow(path, sesh)
-            }
-        } else {
-            return await createWindow(path)
-        }
+        const session = existing ?? await $sessions.addAppSession(defaultAppSession({
+            rootFileOrFolderAbsolutePath: path,
+            sessionType,
+            context: defaultAppSessionContext({openedAbsoluteFilePaths: sessionType === 'singlespace' ? [path] : []}),
+        }))
+        await $sessions.createWindowFromAppSession(session)
     }
 
-    /**
-     * Generic action to open a singlespace from a known path.
-     * Useful for "Open Recent" functionality.
-     * 
-     * @param path Absolute path to the file
-     */
-    async function openSinglespaceFromPath(path?: string) {
-        if (!path || !(await $fio.pathExists(path))) return;
-
-        async function createWindow(path: string, existingSession?: AppSession) {
-            let session
-            if (!existingSession)
-                session = await $sessions.addAppSession(defaultAppSession({
-                    uuid: useUuid(),
-                    rootFileOrFolderAbsolutePath: path,
-                    sessionType: 'singlespace',
-                    context: defaultAppSessionContext({
-                        openedAbsoluteFilePaths: [path] as string[],
-                    })
-                }))
-            else
-                session = existingSession
-
-            return await $sessions.createWindowFromAppSession(session)
-        }
-
-        const sesh = await $sessions.getAppSessionFromAbsolutePath(path)
-        if (sesh) {
-            const window = await $sessions.getWebviewWindowWithAppSession(sesh)
-            if (window) {
-                await window.setFocus()
-            } else {
-                return await createWindow(path, sesh)
-            }
-        } else {
-            return await createWindow(path)
-        }
-    }
+    /** Open a folder as a workspace (e.g. "Open Recent"). */
+    const openWorkspaceFromPath = (path?: string) => openFromPath(path, 'workspace')
+    /** Open a single file as a singlespace (e.g. "Open Recent", OS file association). */
+    const openSinglespaceFromPath = (path?: string) => openFromPath(path, 'singlespace')
 
     return {
         // Actions with file picker
@@ -187,11 +114,6 @@ export function useAppSessionActions() {
         // Actions with known paths (for "Open Recent", drag & drop, etc.)
         openWorkspaceFromPath,
         openSinglespaceFromPath,
-        
-        // Aliases for backward compatibility (if needed)
-        openFolderAction: openWorkspaceAction,
-        openFileAction: openSinglespaceAction,
-
         createNewFileForSinglespace
     }
 }

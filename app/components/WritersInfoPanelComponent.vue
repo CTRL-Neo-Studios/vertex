@@ -37,7 +37,7 @@ async function openNewTab(uuid: string) {
     <div class="w-full h-full">
         <template v-if="$tabId && $sessionId">
             <div class="w-full grid grid-cols-1">
-                <UButton label="Analyze Text" block/>
+                <UButton :label="$t('app.editor.ui.analyzeText')" block/>
             </div>
         </template>
     </div>

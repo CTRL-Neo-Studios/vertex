@@ -6,10 +6,17 @@ import {useFileIO} from "~/composables/io/useFileIO";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
+import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
+import UpdateLinksModal from "~/components/Modals/UpdateLinksModal.vue";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 export function useActiveWorkspaceTools(session?: ActiveSession) {
     const $fileio = useFileIO()
     const $tabs = useActiveTabs(session)
+    const $ovl = useOverlay()
+    const $qt = useQuickToasts()
+    const {t} = useI18n()
+    const updateLinksModal = $ovl.create(UpdateLinksModal)
     const {
         fileIndex,
         getFileByUuid,
@@ -17,8 +24,53 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         moveFileInIndex,
         removeFileFromIndex,
         hasPropertiesFile,
-        getPropertiesFile
+        getPropertiesFile,
+        getRenameImpact,
+        markSelfWrite,
+        updateIndex,
     } = useActiveWorkspaceIndex(session)
+
+    /**
+     * Moves/renames a file on disk and in the index. If other notes link to it, asks whether to rewrite
+     * those links; if declined they stay as-is and become unresolved (never silently dropped).
+     */
+    async function relocate(file: ActiveWorkspaceFileIndex, move: () => Promise<string>) {
+        const impact = file.isFolder ? [] : getRenameImpact(file.uuid)
+        const oldRel = file.relativePath
+        const oldPath = file.fullPath
+        markSelfWrite(oldPath)
+        const newPath = await move()
+        markSelfWrite(newPath)
+        await moveFileInIndex(oldPath, newPath, session!.rootPath!)
+        if (impact.length === 0) return newPath
+
+        const newRel = getFileByUuid(file.uuid)!.relativePath
+        const linkCount = impact.reduce((n, i) => n + i.targets.length, 0)
+        const accepted = await updateLinksModal.open({
+            fileName: file.fileName,
+            referencingFiles: impact.map(i => i.file.relativePath),
+            linkCount,
+        }).result
+        if (!accepted) return newPath
+
+        let rewritten = 0
+        for (const {file: ref, targets} of impact) {
+            try {
+                const content = await $fileio.readTextFromFile(ref.fullPath)
+                const result = rewriteLinks(content, renameTargets(targets, oldRel, newRel))
+                if (result.count === 0) continue
+                markSelfWrite(ref.fullPath)
+                await $fileio.writeTextToFile(ref.fullPath, result.text)
+                await updateIndex(ref.fullPath, result.text)
+                rewritten += result.count
+            } catch (error) {
+                console.error(`[relocate] could not update links in ${ref.fullPath}`, error)
+                $qt.error(t('app.editor.ui.updateLinks.failed', {file: ref.relativePath}))
+            }
+        }
+        $qt.success(t('app.editor.ui.updateLinks.done', {links: rewritten}))
+        return newPath
+    }
 
     /**
      * Creates a new file or folder in the workspace.
@@ -111,23 +163,12 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         }
     }
 
+    /** Renames a file/folder (keeping its extension if `newName` has none). Throws on failure so callers can revert UI. */
     async function renameFile(uuidRef: PossiblyRef<string>, newNameRef: PossiblyRef<string>) {
-        const uuid = unref(uuidRef);
-        const newName = unref(newNameRef);
-        if (!session?.rootPath || !uuid || !newName) return;
-
-        const file = getFileByUuid(uuid);
-        if (!file) {
-            console.error(`[renameFile] File with UUID ${uuid} not found.`);
-            return;
-        }
-
-        try {
-            const newPath = await $fileio.renameFileOrFolder(file.fullPath, newName);
-            await moveFileInIndex(file.fullPath, newPath, session.rootPath);
-        } catch (error) {
-            console.error(`[renameFile] Error renaming file:`, error);
-        }
+        const file = getFileByUuid(uuidRef)
+        const newName = unref(newNameRef)
+        if (!session?.rootPath || !file || !newName) return
+        return relocate(file, () => $fileio.renameFileOrFolder(file.fullPath, newName))
     }
 
     async function deleteFiles(uuidRefs: PossiblyRef<string[]>) {
@@ -172,10 +213,10 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             if (sourceFile.fullPath === destFolder.fullPath) continue;
 
             try {
-                const newPath = await $fileio.moveFileOrFolder(sourceFile.fullPath, destFolder.fullPath);
-                await moveFileInIndex(sourceFile.fullPath, newPath, session.rootPath);
+                await relocate(sourceFile, () => $fileio.moveFileOrFolder(sourceFile.fullPath, destFolder.fullPath));
             } catch (error) {
                 console.error(`[moveFiles] Error moving file ${sourceFile.fullPath} to ${destFolder.fullPath}:`, error);
+                $qt.error(t('app.editor.ui.moveFailed', {file: sourceFile.fileName}))
             }
         }
     }

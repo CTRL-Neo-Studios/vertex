@@ -5,11 +5,9 @@
  * Provides scrollable content area with sticky header
  */
 
-const props = withDefaults(defineProps<{
+defineProps<{
     title?: string,
-}>(), {
-    title: 'Settings'
-})
+}>()
 </script>
 
 <template>
@@ -19,7 +17,7 @@ const props = withDefaults(defineProps<{
             <div class="px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="font-semibold">{{ title }}</h1>
+                        <h1 class="font-semibold">{{ title ?? $t('app.settings.title') }}</h1>
                     </div>
                     <div class="flex items-center gap-2">
                         <slot name="header-trailing"/>

@@ -1,1026 +1,443 @@
-import type {
-    ActiveWorkspaceFileIndex,
-    UITreeNode,
-    WorkspaceIndexEvent,
-    WorkspaceIndexListener
-} from "#shared/types/active/workspace";
-import {
-    type DirEntry,
-    readDir,
-    readTextFile,
-    stat,
-    type UnwatchFn,
-    watch,
-    type WatchEvent
-} from "@tauri-apps/plugin-fs";
+import {sessionScope, StateKey} from "#shared/constants/app";
+import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
+import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path"
 import {invoke} from "@tauri-apps/api/core"
 import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/defaults/actives";
-import useUuid from "~/composables/utility/useUuid";
-import type {FrontmatterProperties, PossiblyRef} from "#shared/types/types";
+import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useAppSessions} from "~/composables/app/useAppSessions";
-import type {UnlistenFn} from "@tauri-apps/api/event";
 import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
-import type {YamlFormData} from "@type32/yaml-editor-form";
-
-const watcherRegistry = new Map<string, UnwatchFn>();
-const listenerRegistry = new Map<string, Set<WorkspaceIndexListener>>();
+import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseProperties} from "#shared/utils/index/parse";
+import {LinkGraph} from "#shared/utils/index/linkGraph";
+import {RecentWrites} from "#shared/utils/index/selfWrites";
 
 /**
- * Result type for batch file reading from Rust backend
+ * Per-session runtime objects that must not be deep-reactive (watcher handle, listeners, link graph).
+ * Keyed by session uuid; created on first use, dropped by `clearIndex`.
  */
-interface FileReadResult {
-    path: string;
-    content?: string;
-    error?: string;
+interface SessionRuntime {
+    unwatch?: UnwatchFn
+    listeners: Set<WorkspaceIndexListener>
+    graph: LinkGraph
+    selfWrites: RecentWrites
+    root: string
 }
+const runtimes = new Map<string, SessionRuntime>()
 
-/**
- * Result type for batch file stat from Rust backend
- */
-interface FileStatResult {
-    path: string;
-    size?: number;
-    created?: number;  // Unix timestamp in milliseconds
-    modified?: number; // Unix timestamp in milliseconds
-    error?: string;
-}
-
-/**
- * Directory entry from Rust recursive scan
- */
+interface FileReadResult { path: string, content?: string, error?: string }
 interface DirectoryEntry {
-    path: string;
-    name: string;
-    is_directory: boolean;
-    size: number;
-    created?: number;  // Unix timestamp in milliseconds
-    modified?: number; // Unix timestamp in milliseconds
-    children: string[]; // Paths of direct children
+    path: string
+    name: string
+    is_directory: boolean
+    size: number
+    created?: number
+    modified?: number
+    children: string[]
 }
 
-/**
- * Reads multiple text files in a single batch call to Rust backend.
- * Much faster than individual readTextFile calls due to reduced IPC overhead.
- */
-async function readTextFilesBatch(paths: string[]): Promise<Map<string, string>> {
-    const results = await invoke<FileReadResult[]>('read_text_files_batch', { paths });
-    const contentMap = new Map<string, string>();
-    
-    for (const result of results) {
-        if (result.content) {
-            contentMap.set(result.path, result.content);
-        } else if (result.error) {
-            console.error(`Failed to read ${result.path}:`, result.error);
-        }
-    }
-    
-    return contentMap;
+const parsers: ContentParsers = {parseYaml, parseFrontmatter, getInternalLinks}
+
+/** Only formats that carry properties or links are read during indexing. */
+const isIndexedText = (path: string) => {
+    const ext = getFileExtensionFromPath(path)
+    return isPlainTextFile(ext) || isYamlFile(ext)
 }
 
-/**
- * Gets file metadata for multiple files in a single batch call to Rust backend.
- * Much faster than individual stat calls due to reduced IPC overhead.
- */
-async function statFilesBatch(paths: string[]): Promise<Map<string, FileStatResult>> {
-    const results = await invoke<FileStatResult[]>('stat_files_batch', { paths });
-    const statMap = new Map<string, FileStatResult>();
-    
-    for (const result of results) {
-        statMap.set(result.path, result);
-        if (result.error) {
-            console.error(`Failed to stat ${result.path}:`, result.error);
-        }
-    }
-    
-    return statMap;
-}
-
-/**
- * Private helper function to extract file extension from a filename.
- * Handles edge cases like .env.dev (returns 'dev') or .env (returns 'env').
- * Returns empty string if no extension.
- *
- * @param {string} fileName - The file name
- * @returns {string} The file extension without the dot
- * @private
- */
-function _extractFileExtension(fileName: string): string {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex === -1 || lastDotIndex === 0) {
-        // No extension or file starts with dot (hidden file with no extension)
-        return '';
-    }
-    return fileName.substring(lastDotIndex + 1);
-}
-
-/**
- * Private helper function to parse file content properties (frontmatter for text files, YAML for .yml/.yaml files)
- *
- * @param {string} path - The absolute file path
- * @param {string} content - The file content
- * @returns {object} Object containing properties
- * @private
- */
-function _parseFileContentProperties(path: string, content: string): { properties: YamlFormData } {
-    const extension = getFileExtensionFromPath(path);
-
-    // Handle .yml/.yaml files as pure YAML
-    if (isYamlFile(extension)) {
-        try {
-            const yamlResult = parseYaml(content);
-            if (yamlResult.error) {
-                console.error(`YAML parsing error in ${path}:`, yamlResult.error);
-                return { properties: {} };
-            }
-            return { properties: yamlResult.data || {} };
-        } catch (error) {
-            console.error(`Failed to parse YAML in ${path}:`, error);
-            return { properties: {} };
-        }
-    }
-
-    // Only parse frontmatter for plain text files
-    if (!isPlainTextFile(extension)) {
-        return { properties: {} };
-    }
-
-    const fmResult = parseFrontmatter(content);
-    if (fmResult.error) {
-        console.error(`Frontmatter parsing error in ${path}:`, fmResult.error);
-        return { properties: {} };
-    }
-
-    return { properties: fmResult.data || {} };
-}
-
-/**
- * Simplified document parser for initial indexing.
- * Only extracts properties and raw internal links without resolving them.
- * Much faster than updateIndex since it doesn't build link maps or update backlinks.
- * 
- * @param {string} path - The absolute file path
- * @param {string} content - The file content (pre-loaded)
- * @param {Record<string, ActiveWorkspaceFileIndex>} index - The index being built
- * @param {object} timings - Optional timing accumulator
- * @private
- */
-function _parseDocumentInitial(path: string, content: string, index: Record<string, ActiveWorkspaceFileIndex>, timings?: {properties: number, links: number}) {
-    const node = index[path];
-    if (!node || node.isFolder) return;
-
-    const extension = getFileExtensionFromPath(path);
-    if (isUnreadableAsText(extension)) return;
-
-    try {
-        // Parse properties
-        const propsStart = Date.now();
-        const parsed = _parseFileContentProperties(path, content);
-        node.properties = parsed.properties;
-        if (timings) timings.properties += Date.now() - propsStart;
-        
-        // Extract raw internal links (don't resolve yet)
-        const linksStart = Date.now();
-        const internalLinks = getInternalLinks(content);
-        (node as any)._rawInternalLinks = internalLinks; // Temporary storage
-        if (timings) timings.links += Date.now() - linksStart;
-        
-    } catch (parseError) {
-        console.error(`Failed to parse file content for: ${path}`, parseError);
-    }
+function fileExtOf(fileName: string) {
+    const dot = fileName.lastIndexOf('.')
+    return dot > 0 ? fileName.slice(dot + 1) : ''
 }
 
 export function useActiveWorkspaceIndex(session?: ActiveSession) {
-    if (!session) {
-        console.error("useActiveWorkspaceIndex was called without a session!");
+    const scope = sessionScope(session, 'useActiveWorkspaceIndex')
+    const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(StateKey.workspaceIndex(scope), () => ({}))
+    const uuidToFilePathIndex = useState<Map<string, string>>(StateKey.workspaceUuidToPath(scope), () => new Map())
+
+    function runtime(): SessionRuntime {
+        let rt = runtimes.get(scope)
+        if (!rt) {
+            rt = {listeners: new Set(), graph: new LinkGraph(), selfWrites: new RecentWrites(), root: session?.rootPath ?? ''}
+            runtimes.set(scope, rt)
+        }
+        return rt
     }
 
-    const $win = useAppWebviewWindows()
-    const $asesh = useAppSessions()
+    const relativeOf = (path: string) => path.slice(runtime().root.length).replace(/^\//, '')
 
-    const fileIndex = useState<Record<string, ActiveWorkspaceFileIndex>>(`active.workspace.indexMap.${session?.uuid ?? useUuid()}`, () => ({}));
-    const uuidToFilePathIndex = useState<Map<string, string>>(`active.workspace.uuidToFilePathIndexMap.${session?.uuid ?? useUuid()}`, () => new Map());
+    /** Copy the graph's view of these files' links into the reactive index. */
+    function syncLinks(uuids: Iterable<string>) {
+        const g = runtime().graph
+        for (const uuid of uuids) {
+            const node = getFileByUuid(uuid)
+            if (!node) continue
+            node.forelinks = g.forelinks(uuid)
+            node.backlinks = g.backlinks(uuid)
+        }
+    }
+
+    /** Re-sync a file and every file its links touch (before and after a change). */
+    function syncAround(uuid: string, before: string[] = []) {
+        const g = runtime().graph
+        syncLinks(new Set([uuid, ...before, ...g.forelinks(uuid), ...g.backlinks(uuid), ...g.referencingFiles(uuid)]))
+    }
 
     const fileTree = computed<UITreeNode[]>(() => {
-        const index = unref(fileIndex);
-        if (Object.keys(index).length === 0) return [];
-
-        const getNode = (path: string): UITreeNode => {
-            const file = index[path];
-            return defaultUITreeNode({
-                ...file,
-                children: file?.children.map(getNode) || []
-            });
-        };
-
-        const rootNodes: UITreeNode[] = [];
-        for (const path in index) {
-            const parentPath = path.substring(0, path.lastIndexOf('/'));
-            if (!index[parentPath]) {
-                rootNodes.push(getNode(path));
-            }
+        const index = unref(fileIndex)
+        const toNode = (path: string): UITreeNode => {
+            const file = index[path]
+            return defaultUITreeNode({...file, children: file?.children.map(toNode) ?? []})
         }
-        return rootNodes;
-    });
+        return Object.keys(index).filter(p => !index[parentPathOf(p)]).map(toNode)
+    })
 
-    /**
-     * Builds index from a root path using Rust's native recursive directory scan.
-     * Much faster than JavaScript recursion due to eliminated IPC overhead.
-     */
-    async function buildIndex(workspaceRootFilePath: PossiblyRef<string>) {
-        const newIndex: Record<string, ActiveWorkspaceFileIndex> = {};
-        const workspaceRoot = unref(workspaceRootFilePath)
-        const time = new Date().getTime()
-        const propertiesFiles: string[] = [];
-
-        // Phase 1: Scan directory tree in Rust (single IPC call)
-        const _dirProcessTime = new Date().getTime();
-        const entries = await invoke<DirectoryEntry[]>('scan_directory_recursive', { rootPath: workspaceRoot });
-        console.log(`Directory processing took: ${(new Date()).getTime() - _dirProcessTime}ms`)
-
-        // Convert Rust entries to index format
-        for (const entry of entries) {
-            newIndex[entry.path] = defaultActiveWorkspaceFileIndex({
-                uuid: useUuid(),
-                fullPath: entry.path,
-                relativePath: entry.path.replace(workspaceRoot, '').substring(1),
-                fileName: entry.name,
-                fileExt: _extractFileExtension(entry.name),
-                isFolder: entry.is_directory,
-                size: entry.size,
-                children: entry.children,
-                properties: {},
-                forelinks: [],
-                backlinks: [],
-                createdTime: entry.created ? new Date(entry.created) : new Date(),
-                modifiedTime: entry.modified ? new Date(entry.modified) : new Date(),
-            });
-
-            // Track properties files for later processing
-            if (!entry.is_directory && (entry.name === 'properties.yml' || entry.name === 'properties.yaml')) {
-                propertiesFiles.push(entry.path);
-            }
+    function applyProperties(path: string, content: string) {
+        const node = unref(fileIndex)[path]
+        if (!node || node.isFolder) return
+        const {properties, error} = parseProperties(path, content, parsers)
+        if (error) console.warn(`[index] could not parse properties of ${path}:`, error)
+        node.properties = properties
+        if (isPropertiesFile(node.fileName)) {
+            const parent = unref(fileIndex)[parentPathOf(path)]
+            if (parent?.isFolder) parent.properties = properties
         }
-
-        // Phase 2: Batch read files (metadata already from Rust scan)
-        const _fileProcessTime = new Date().getTime();
-        
-        // Collect paths that need content parsing
-        const pathsToRead: string[] = [];
-        
-        for (const path in newIndex) {
-            const node = newIndex[path];
-            if (!node) continue;
-
-            // Collect paths that need content parsing
-            if (!node.isFolder) {
-                const extension = getFileExtensionFromPath(path);
-                if (isPlainTextFile(extension) || isYamlFile(extension)) {
-                    pathsToRead.push(path);
-                }
-            }
-        }
-
-        // Batch read all text files
-        const batchReadStart = Date.now();
-        const fileContents = await readTextFilesBatch(pathsToRead);
-        const batchReadTime = Date.now() - batchReadStart;
-
-        // Parse all loaded file contents
-        const parseTimings = {properties: 0, links: 0};
-        const parseStart = Date.now();
-        
-        for (const path of pathsToRead) {
-            const content = fileContents.get(path);
-            if (content) {
-                _parseDocumentInitial(path, content, newIndex, parseTimings);
-            }
-        }
-        
-        const totalParseTime = Date.now() - parseStart;
-        const totalFileProcessTime = Date.now() - _fileProcessTime;
-        
-        console.log(`File processing took: ${totalFileProcessTime}ms`);
-        console.log(`  - batch file reading: ${pathsToRead.length} files, ${batchReadTime}ms`);
-        console.log(`  - parsing: ${pathsToRead.length} files, ${totalParseTime}ms total, ${(totalParseTime/pathsToRead.length).toFixed(2)}ms avg`);
-        if (pathsToRead.length > 0) {
-            console.log(`    • property parsing: ${parseTimings.properties}ms (${(parseTimings.properties/pathsToRead.length).toFixed(2)}ms avg)`);
-            console.log(`    • link extraction: ${parseTimings.links}ms (${(parseTimings.links/pathsToRead.length).toFixed(2)}ms avg)`);
-        }
-
-        const _propertiesProcessTime = new Date().getTime();
-        // Process properties files and assign to parent folders
-        for (const propertiesPath of propertiesFiles) {
-            const parentPath = propertiesPath.substring(0, propertiesPath.lastIndexOf('/'));
-            const parentNode = newIndex[parentPath];
-
-            if (parentNode && parentNode.isFolder) {
-                try {
-                    const content = await readTextFile(propertiesPath);
-                    const parsed = _parseFileContentProperties(propertiesPath, content);
-                    parentNode.properties = parsed.properties;
-                } catch (error) {
-                    console.error(`Failed to read properties file ${propertiesPath}:`, error);
-                }
-            }
-        }
-        console.log(`Properties processing took: ${(new Date()).getTime() - _propertiesProcessTime}ms`);
-
-        const _linkProcessTime = new Date().getTime();
-        // Phase 3: Build link target map and resolve forelinks (single pass)
-        const linkTargetToUuidMap = new Map<string, string>();
-        
-        for (const path in newIndex) {
-            const file = newIndex[path];
-            if (!file) continue;
-            
-            // Populate uuid-to-path map
-            unref(uuidToFilePathIndex).set(file.uuid, path);
-            
-            // Build link target map for non-folders
-            if (!file.isFolder) {
-                const baseName = file.fileName.substring(0, file.fileName.lastIndexOf('.')) || file.fileName;
-                if (!linkTargetToUuidMap.has(baseName)) {
-                    linkTargetToUuidMap.set(baseName, file.uuid);
-                }
-                const relativePathWithoutExt = file.relativePath.substring(0, file.relativePath.lastIndexOf('.')) || file.relativePath;
-                if (!linkTargetToUuidMap.has(relativePathWithoutExt)) {
-                    linkTargetToUuidMap.set(relativePathWithoutExt, file.uuid);
-                }
-                if (!linkTargetToUuidMap.has(file.relativePath)) {
-                    linkTargetToUuidMap.set(file.relativePath, file.uuid);
-                }
-            }
-        }
-        console.log(`Link processing took: ${(new Date()).getTime() - _linkProcessTime}ms`);
-        const _linksProcessTime = new Date().getTime();
-        // Resolve forelinks and compute backlinks
-        for (const path in newIndex) {
-            const file = newIndex[path];
-            if (!file || file.isFolder) continue;
-
-            // Resolve raw internal links to UUIDs
-            const rawLinks = (file as any)._rawInternalLinks as InternalLinkNode[] | undefined;
-            if (rawLinks) {
-                const forelinks = new Set<string>();
-                for (const linkNode of rawLinks) {
-                    const targetUuid = linkTargetToUuidMap.get(linkNode.path);
-                    if (targetUuid) {
-                        forelinks.add(targetUuid);
-                    }
-                }
-                file.forelinks = Array.from(forelinks);
-                delete (file as any)._rawInternalLinks; // Clean up temporary data
-            }
-
-            // Compute backlinks
-            for (const forelinkUuid of file.forelinks) {
-                const targetPath = unref(uuidToFilePathIndex).get(forelinkUuid);
-                if (targetPath) {
-                    const targetFile = newIndex[targetPath];
-                    if (targetFile && !targetFile.backlinks.includes(file.uuid)) {
-                        targetFile.backlinks.push(file.uuid);
-                    }
-                }
-            }
-        }
-        console.log(
-          `Links processing took: ${new Date().getTime() - _linksProcessTime}ms`
-        );
-
-        fileIndex.value = newIndex;
-        console.log(`Indexing took: ${(new Date()).getTime() - time}ms`)
-        return newIndex;
     }
 
-    /**
-     * Clears the File index map and uuid map.
-     */
+    /** Full scan. Used once per window open; everything after is incremental. */
+    async function buildIndex(rootRef: PossiblyRef<string>) {
+        const root = unref(rootRef)
+        const rt = runtime()
+        rt.root = root
+        rt.graph = new LinkGraph()
+        const started = Date.now()
+
+        const entries = await invoke<DirectoryEntry[]>('scan_directory_recursive', {rootPath: root})
+        const next: Record<string, ActiveWorkspaceFileIndex> = {}
+        const uuidMap = unref(uuidToFilePathIndex)
+        uuidMap.clear()
+        for (const e of entries) {
+            const node = defaultActiveWorkspaceFileIndex({
+                fullPath: e.path,
+                relativePath: e.path.slice(root.length).replace(/^\//, ''),
+                fileName: e.name,
+                fileExt: fileExtOf(e.name),
+                isFolder: e.is_directory,
+                size: e.size,
+                children: e.children,
+                createdTime: e.created ? new Date(e.created) : new Date(),
+                modifiedTime: e.modified ? new Date(e.modified) : new Date(),
+            })
+            next[e.path] = node
+            uuidMap.set(node.uuid, e.path)
+            if (!node.isFolder) rt.graph.addFile({id: node.uuid, relativePath: node.relativePath})
+        }
+
+        const textPaths = Object.values(next).filter(n => !n.isFolder && isIndexedText(n.fullPath)).map(n => n.fullPath)
+        const results = await invoke<FileReadResult[]>('read_text_files_batch', {paths: textPaths})
+        fileIndex.value = next
+        for (const r of results) {
+            if (r.error || r.content === undefined) {
+                console.warn(`[index] could not read ${r.path}: ${r.error}`)
+                continue
+            }
+            applyProperties(r.path, r.content)
+            rt.graph.setLinks(next[r.path]!.uuid, parseLinkTargets(r.path, r.content, parsers))
+        }
+        syncLinks(uuidMap.keys())
+        console.log(`[index] ${entries.length} entries, ${textPaths.length} parsed in ${Date.now() - started}ms`)
+        return next
+    }
+
     function clearIndex() {
         fileIndex.value = {}
         unref(uuidToFilePathIndex).clear()
+        runtimes.delete(scope)
     }
 
-    /**
-     * Fetches metadata for a single path and adds it to the index.
-     * Handles linking to its parent.
-     */
-    async function addFileToIndex(path: string, workspaceRoot: string, autoSort: boolean = true) {
-        if (unref(fileIndex)[path]) {
-            console.warn(`[addFileToIndex] Skipped: ${path} already exists in the index.`);
-            return unref(fileIndex)[path];
-        }
-        console.log(`[addFileToIndex] ${path}`)
+    async function addFileToIndex(path: string, root: string = runtime().root) {
+        const existing = unref(fileIndex)[path]
+        if (existing) return existing
+        runtime().root = root
         try {
-            const fileStats = await stat(path);
-            const parentPath = path.substring(0, path.lastIndexOf('/'));
-            const isDirectory = fileStats.isDirectory;
-            const uuid = useUuid()
-            const fileName = path.substring(path.lastIndexOf('/') + 1);
-
-            const createdTime = fileStats.birthtime ? new Date(fileStats.birthtime) : new Date();
-            const modifiedTime = fileStats.mtime ? new Date(fileStats.mtime) : new Date();
-            const size = fileStats.size || 0;
-
-            const newEntry: ActiveWorkspaceFileIndex = defaultActiveWorkspaceFileIndex({
-                uuid: uuid,
+            const info = await stat(path)
+            const fileName = path.slice(path.lastIndexOf('/') + 1)
+            const node = defaultActiveWorkspaceFileIndex({
                 fullPath: path,
-                relativePath: path.replace(workspaceRoot, '').substring(1),
-                fileName: fileName,
-                fileExt: _extractFileExtension(fileName),
-                isFolder: isDirectory,
-                size: size,
-                children: [],
-                properties: {},
-                forelinks: [],
-                backlinks: [],
-                createdTime,
-                modifiedTime
-            });
-            unref(fileIndex)[path] = newEntry;
-            
-            // Update uuid map
-            unref(uuidToFilePathIndex).set(uuid, path);
-
-            const parentNode = fileIndex.value[parentPath];
-            if (parentNode && !parentNode.children.includes(path)) {
-                parentNode.children.push(path);
-                if (autoSort) parentNode.children.sort();
-                parentNode.modifiedTime = new Date();
+                relativePath: relativeOf(path),
+                fileName,
+                fileExt: fileExtOf(fileName),
+                isFolder: info.isDirectory,
+                size: info.size || 0,
+                createdTime: info.birthtime ? new Date(info.birthtime) : new Date(),
+                modifiedTime: info.mtime ? new Date(info.mtime) : new Date(),
+            })
+            unref(fileIndex)[path] = node
+            unref(uuidToFilePathIndex).set(node.uuid, path)
+            const parent = unref(fileIndex)[parentPathOf(path)]
+            if (parent && !parent.children.includes(path)) {
+                parent.children.push(path)
+                parent.children.sort()
             }
-
-            // Handle properties files
-            if (!isDirectory && (fileName === 'properties.yml' || fileName === 'properties.yaml')) {
-                if (parentNode) {
-                    try {
-                        const content = await readTextFile(path);
-                        const parsed = _parseFileContentProperties(path, content);
-                        parentNode.properties = parsed.properties;
-                        parentNode.modifiedTime = new Date();
-                    } catch (error) {
-                        console.error(`Failed to read properties file ${path}:`, error);
-                    }
-                }
-            } else if (!isDirectory) {
-                const extension = getFileExtensionFromPath(path);
-                if (isPlainTextFile(extension)) {
-                    console.log('Preparsing Non-Dir: ', path, extension)
-                    await preparseDocument(path, unref(fileIndex));
-                }
+            if (!node.isFolder) {
+                runtime().graph.addFile({id: node.uuid, relativePath: node.relativePath})
+                if (isIndexedText(path)) await reparse(path)
+                syncAround(node.uuid)
             }
-
-            console.log(`Added to index: ${path}`);
-            return newEntry;
-
+            return node
         } catch (error) {
-            console.error(`Failed to add file to index: ${path}`, error);
-            return null;
+            console.error(`[index] could not add ${path}`, error)
+            return null
         }
     }
 
-    /**
-     * Removes a file or folder (and all its children recursively) from the index.
-     */
     function removeFileFromIndex(path: string): ActiveWorkspaceFileIndex[] {
-        const nodeToRemove = unref(fileIndex)[path];
-        if (!nodeToRemove) return [];
-        const removedNodes: ActiveWorkspaceFileIndex[] = []
-
-        if (nodeToRemove.isFolder) {
-            [...nodeToRemove.children].forEach(childId => {
-                removedNodes.push(...removeFileFromIndex(childId));
-            });
+        const node = unref(fileIndex)[path]
+        if (!node) return []
+        const removed: ActiveWorkspaceFileIndex[] = []
+        if (node.isFolder) for (const child of [...node.children]) removed.push(...removeFileFromIndex(child))
+        else {
+            const g = runtime().graph
+            const touched = [...g.forelinks(node.uuid), ...g.backlinks(node.uuid), ...g.referencingFiles(node.uuid)]
+            g.removeFile(node.uuid)
+            syncLinks(touched)
         }
-
-        // Clean up backlinks and forelinks using uuid map (O(1) lookups)
-        if (!nodeToRemove.isFolder) {
-            // Remove this file from the backlinks of files it references (its forelinks)
-            for (const forelinkUuid of nodeToRemove.forelinks) {
-                const targetPath = unref(uuidToFilePathIndex).get(forelinkUuid);
-                if (targetPath) {
-                    const file = unref(fileIndex)[targetPath];
-                    if (file) {
-                        const backlinkIndex = file.backlinks.indexOf(nodeToRemove.uuid);
-                        if (backlinkIndex > -1) {
-                            file.backlinks.splice(backlinkIndex, 1);
-                        }
-                    }
-                }
-            }
-
-            // Remove this file from the forelinks of files that reference it (its backlinks)
-            for (const backlinkUuid of nodeToRemove.backlinks) {
-                const targetPath = unref(uuidToFilePathIndex).get(backlinkUuid);
-                if (targetPath) {
-                    const file = unref(fileIndex)[targetPath];
-                    if (file) {
-                        const forelinkIndex = file.forelinks.indexOf(nodeToRemove.uuid);
-                        if (forelinkIndex > -1) {
-                            file.forelinks.splice(forelinkIndex, 1);
-                        }
-                    }
-                }
-            }
-        }
-
-        const parentPath = path.substring(0, path.lastIndexOf('/'));
-        const parentNode = unref(fileIndex)[parentPath];
-        if (parentNode) {
-            const childIndex = parentNode.children.indexOf(path);
-            if (childIndex > -1) {
-                parentNode.children.splice(childIndex, 1);
-            }
-        }
-
-        removedNodes.push(defaultActiveWorkspaceFileIndex(unref(fileIndex)[path]))
-        
-        // Remove from uuid map
-        unref(uuidToFilePathIndex).delete(nodeToRemove.uuid);
-        
-        delete unref(fileIndex)[path];
-        console.log(`Removed from index: ${path}`);
-
-        return removedNodes
+        const parent = unref(fileIndex)[parentPathOf(path)]
+        if (parent) parent.children = parent.children.filter(c => c !== path)
+        unref(uuidToFilePathIndex).delete(node.uuid)
+        delete unref(fileIndex)[path]
+        removed.push(node)
+        return removed
     }
 
     /**
-     * Handles a file or folder being renamed/moved.
-     * This version preserves UUIDs to maintain UI state (e.g., open tabs)
-     * and recursively updates all child paths in-memory for moved folders.
+     * Rename/move, keeping uuids (and therefore open tabs). Links written against the old name are kept
+     * as unresolved targets; `getRenameImpact` lets the UI offer to rewrite them.
      */
-    async function moveFileInIndex(oldPath: string, newPath: string, workspaceRoot: string) {
-        const fileIndexState = fileIndex.value;
-        const nodeToMove = fileIndexState[oldPath];
+    async function moveFileInIndex(oldPath: string, newPath: string, root: string = runtime().root) {
+        const index = fileIndex.value
+        if (!index[oldPath] || oldPath === newPath) return
+        runtime().root = root
+        runtime().selfWrites.mark(oldPath, newPath)
 
-        if (!nodeToMove) {
-            console.warn(`Attempted to move a node that is not in the index: ${oldPath}`);
-            return;
-        }
-
-        const recursivelyUpdatePaths = async (currentOldPath: string, currentNewPath: string) => {
-            const node = fileIndexState[currentOldPath];
-            if (!node) return;
-
-            const newFileName = currentNewPath.substring(currentNewPath.lastIndexOf('/') + 1);
-            const newNodeData: ActiveWorkspaceFileIndex = {
-                ...node,
-                uuid: node.uuid,
-                fullPath: currentNewPath,
-                relativePath: currentNewPath.replace(workspaceRoot, '').substring(1),
-                fileName: newFileName,
-                fileExt: _extractFileExtension(newFileName),
-                modifiedTime: new Date()
-            };
-
+        const moved: string[] = []
+        const relocate = async (from: string, to: string) => {
+            const node = index[from]
+            if (!node) return
+            const fileName = to.slice(to.lastIndexOf('/') + 1)
+            const next = {...node, fullPath: to, relativePath: relativeOf(to), fileName, fileExt: fileExtOf(fileName), modifiedTime: new Date()}
             if (node.isFolder) {
-                const updatedChildrenPaths: string[] = [];
-                for (const childOldPath of node.children) {
-                    const childName = childOldPath.substring(childOldPath.lastIndexOf('/') + 1);
-                    const childNewPath = await join(currentNewPath, childName);
-                    await recursivelyUpdatePaths(childOldPath, childNewPath);
-                    updatedChildrenPaths.push(childNewPath);
+                next.children = []
+                for (const child of node.children) {
+                    const childTo = await join(to, child.slice(child.lastIndexOf('/') + 1))
+                    await relocate(child, childTo)
+                    next.children.push(childTo)
                 }
-                newNodeData.children = updatedChildrenPaths;
-            }
+            } else moved.push(node.uuid)
+            delete index[from]
+            index[to] = next
+            unref(uuidToFilePathIndex).set(node.uuid, to)
+        }
+        await relocate(oldPath, newPath)
 
-            delete fileIndexState[currentOldPath];
-            fileIndexState[currentNewPath] = newNodeData;
-            
-            // Update uuid map with new path
-            unref(uuidToFilePathIndex).set(node.uuid, currentNewPath);
-        };
-
-        await recursivelyUpdatePaths(oldPath, newPath);
-
-        const oldParentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
-        const newParentPath = newPath.substring(0, newPath.lastIndexOf('/'));
-
-        const oldParentNode = fileIndexState[oldParentPath];
-        if (oldParentNode) {
-            const childIndex = oldParentNode.children.indexOf(oldPath);
-            if (childIndex > -1) {
-                oldParentNode.children.splice(childIndex, 1);
-                oldParentNode.modifiedTime = new Date();
-            }
+        const oldParent = index[parentPathOf(oldPath)]
+        if (oldParent) oldParent.children = oldParent.children.filter(c => c !== oldPath)
+        const newParent = index[parentPathOf(newPath)]
+        if (newParent && !newParent.children.includes(newPath)) {
+            newParent.children.push(newPath)
+            newParent.children.sort()
         }
 
-        const newParentNode = fileIndexState[newParentPath];
-        if (newParentNode) {
-            if (!newParentNode.children.includes(newPath)) {
-                newParentNode.children.push(newPath);
-                newParentNode.children.sort();
-                newParentNode.modifiedTime = new Date();
-            }
+        const g = runtime().graph
+        const touched = new Set<string>()
+        for (const uuid of moved) {
+            for (const id of [...g.backlinks(uuid), ...g.referencingFiles(uuid)]) touched.add(id)
+            g.moveFile(uuid, index[unref(uuidToFilePathIndex).get(uuid)!]!.relativePath)
+            for (const id of [uuid, ...g.forelinks(uuid), ...g.backlinks(uuid), ...g.referencingFiles(uuid)]) touched.add(id)
         }
+        syncLinks(touched)
     }
 
-    async function updateIndex(path: string, content: string, index = fileIndex.value) {
-        const node = index[path];
-        if (!node || node.isFolder) return;
-
-        const parsed = _parseFileContentProperties(path, content);
-        node.properties = parsed.properties;
-        node.modifiedTime = new Date();
-
-        // If this is a properties file, also update parent folder
-        const fileName = node.fileName;
-        if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
-            const parentPath = path.substring(0, path.lastIndexOf('/'));
-            const parentNode = index[parentPath];
-            if (parentNode && parentNode.isFolder) {
-                parentNode.properties = parsed.properties;
-                parentNode.modifiedTime = new Date();
-            }
-        }
-
-        const internalLinks: InternalLinkNode[] = getInternalLinks(content);
-        const forelinks = new Set<string>();
-        const linkTargetToUuidMap = new Map<string, string>();
-
-        for (const p in index) {
-            const file = index[p];
-            if (file && !file.isFolder) {
-                const baseName = file.fileName.substring(0, file.fileName.lastIndexOf('.')) || file.fileName;
-                if (!linkTargetToUuidMap.has(baseName)) {
-                    linkTargetToUuidMap.set(baseName, file.uuid);
-                }
-                const relativePathWithoutExt = file.relativePath.substring(0, file.relativePath.lastIndexOf('.')) || file.relativePath;
-                if (!linkTargetToUuidMap.has(relativePathWithoutExt)) {
-                    linkTargetToUuidMap.set(relativePathWithoutExt, file.uuid);
-                }
-
-                if (!linkTargetToUuidMap.has(file.relativePath)) {
-                    linkTargetToUuidMap.set(file.relativePath, file.uuid);
-                }
-            }
-        }
-
-        for (const linkNode of internalLinks) {
-            const linkTarget = linkNode.path;
-            if (linkTargetToUuidMap.has(linkTarget)) {
-                forelinks.add(linkTargetToUuidMap.get(linkTarget)!);
-            }
-        }
-
-        // Store old forelinks to compute backlink changes
-        const oldForelinks = new Set(node.forelinks);
-        const newForelinks = Array.from(forelinks);
-        node.forelinks = newForelinks;
-
-        // Update backlinks: remove this file from old targets, add to new targets
-        const addedLinks = newForelinks.filter(uuid => !oldForelinks.has(uuid));
-        const removedLinks = Array.from(oldForelinks).filter(uuid => !forelinks.has(uuid));
-
-        // Remove from old backlinks using uuid map (O(1) lookup)
-        for (const removedUuid of removedLinks) {
-            const targetPath = unref(uuidToFilePathIndex).get(removedUuid);
-            if (targetPath) {
-                const file = index[targetPath];
-                if (file) {
-                    const backlinkIndex = file.backlinks.indexOf(node.uuid);
-                    if (backlinkIndex > -1) {
-                        file.backlinks.splice(backlinkIndex, 1);
-                    }
-                }
-            }
-        }
-
-        // Add to new backlinks using uuid map (O(1) lookup)
-        for (const addedUuid of addedLinks) {
-            const targetPath = unref(uuidToFilePathIndex).get(addedUuid);
-            if (targetPath) {
-                const file = index[targetPath];
-                if (file && !file.backlinks.includes(node.uuid)) {
-                    file.backlinks.push(node.uuid);
-                }
-            }
-        }
+    /** Re-parse one document's properties and links after its content changed (in-app save or external edit). */
+    async function updateIndex(path: string, content: string) {
+        const node = unref(fileIndex)[path]
+        if (!node || node.isFolder) return
+        node.modifiedTime = new Date()
+        applyProperties(path, content)
+        const g = runtime().graph
+        const before = g.forelinks(node.uuid)
+        g.setLinks(node.uuid, parseLinkTargets(path, content, parsers))
+        syncAround(node.uuid, before)
     }
 
-    async function preparseDocument(path: string, index = fileIndex.value) {
-        const node = index[path];
-        if (!node || node.isFolder) return;
-
-        const extension = getFileExtensionFromPath(path);
-        if (isUnreadableAsText(extension)) {
-            console.log(`Skipping text read for binary file: ${path}`);
-            return;
-        }
-
+    async function reparse(path: string) {
+        if (isUnreadableAsText(getFileExtensionFromPath(path))) return
         try {
-            const content = await readTextFile(path);
-            await updateIndex(path, content, index);
-        } catch (readError) {
-            console.error(`Failed to read file for preparsing: ${path}`, readError);
+            await updateIndex(path, await readTextFile(path))
+        } catch (error) {
+            console.error(`[index] could not read ${path}`, error)
         }
     }
 
-    function _broadcast(event: WorkspaceIndexEvent) {
-        const listeners = listenerRegistry.get(session!.uuid);
-        if (listeners) {
-            listeners.forEach(listener => listener(event));
-        }
+    /** Call right before the app writes a file itself, so the watcher does not re-process it. */
+    function markSelfWrite(...paths: string[]) {
+        runtime().selfWrites.mark(...paths)
     }
 
-    /**
-     * Starts the file system watcher for the specified workspace root.
-     */
-    async function startWatcher(workspaceRoot: string) {
-        if (watcherRegistry.has(session!.uuid)) {
-            console.log(`Watcher for session ${session!.uuid} already exists. Stopping it first.`);
-            await stopWatcher();
-        }
+    /** Files whose links currently point at `uuid`, with the exact link text — used to offer link rewriting on rename. */
+    function getRenameImpact(uuid: string) {
+        const g = runtime().graph
+        return g.referencingFiles(uuid)
+            .map(id => ({file: getFileByUuid(id)!, targets: g.targetsPointingAt(id, uuid)}))
+            .filter(r => r.file && r.targets.length > 0)
+    }
 
-        console.log(`Starting watcher for session ${session!.uuid} on: ${workspaceRoot}`);
+    function broadcast(event: WorkspaceIndexEvent) {
+        for (const listener of runtime().listeners) listener(event)
+    }
 
-        let activeWatcher = await watch(workspaceRoot, (event: WatchEvent) => {
-            const currentTabId = useRoute().params.tabId as string;
-            if (event.paths.findIndex(i => i.endsWith('.DS_Store')) >= 0) return;
+    async function handleWatchEvent(event: WatchEvent) {
+        const type = event.type
+        if (typeof type !== 'object' || type === null) return
+        const paths = event.paths.filter(p => !p.endsWith('.DS_Store'))
+        if (paths.length === 0 || 'access' in type || 'metadata' in type) return
+        const rt = runtime()
 
-            if (typeof event.type === 'object' && event.type !== null && ('metadata' in event.type || ('modify' in event.type && (event.type.modify.kind === 'metadata' || event.type.modify.kind === 'data')))) return;
-
-            if (typeof event.type === 'object' && event.type !== null) {
-
-                if ('remove' in event.type) {
-                    for (const path of event.paths) {
-                        console.log(`Remove detected: ${path}`);
-                        const removedNodes = removeFileFromIndex(path);
-                        _broadcast({ type: 'remove', path, removedNodes });
-                    }
-                    return;
-                }
-
-                if ('modify' in event.type && event.type.modify.kind === 'rename') {
-                    if (event.paths.length >= 2) {
-                        const [oldPath, newPath] = event.paths;
-                        console.log(`Rename detected: ${oldPath} -> ${newPath}`);
-                        moveFileInIndex(oldPath || '', newPath || '', workspaceRoot).then(() => {
-                            _broadcast({ type: 'rename', oldPath: oldPath || '', newPath: newPath || '' });
-                        });
-                        return;
-                    }
-
-                    if (event.paths.length === 1) {
-                        const path = event.paths[0];
-                        if (!path) return;
-
-                        setTimeout(async () => {
-                            try {
-                                await stat(path);
-                                const node = fileIndex.value[path];
-                                if (!node) return;
-
-                                const parentPath = path.substring(0, path.lastIndexOf('/'));
-                                const entries = await readDir(parentPath);
-                                const eventFileName = path.substring(path.lastIndexOf('/') + 1);
-                                const actualEntry = entries.find(e => e.name.toLowerCase() === eventFileName.toLowerCase());
-
-                                if (actualEntry && actualEntry.name !== node.fileName) {
-                                    console.log(`Case-only rename detected: ${node.fileName} -> ${actualEntry.name}`);
-                                    const newPath = await join(parentPath, actualEntry.name);
-                                    await moveFileInIndex(path, newPath, workspaceRoot);
-                                    _broadcast({ type: 'rename', oldPath: path, newPath: newPath });
-                                } else {
-                                    console.log('Ignoring noisy single-path rename event:', path);
-                                }
-                            } catch (error) {
-                                console.log(`File at '${path}' no longer exists. Treating as remove.`);
-                                const removedNodes = removeFileFromIndex(path);
-                                _broadcast({ type: 'remove', path, removedNodes });
-                            }
-                        }, 100);
-                        return;
-                    }
-                }
-
-                if ('create' in event.type) {
-                    for (const path of event.paths) {
-                        console.log(`Create detected: ${path}`);
-                        addFileToIndex(path, workspaceRoot).then(() => {
-                            _broadcast({ type: 'create', path });
-                        });
-                    }
-                    return;
-                }
-
-                console.log('[Executed Watcher Event]: ', event);
-
-            } else {
-                console.log(`Received simple string event type: "${event.type}"`);
+        if ('remove' in type) {
+            for (const path of paths) {
+                if (rt.selfWrites.has(path)) continue
+                broadcast({type: 'remove', path, removedNodes: removeFileFromIndex(path)})
             }
+            return
+        }
 
-        }, { recursive: true, delayMs: 5 });
+        if ('create' in type) {
+            for (const path of paths) {
+                if (rt.selfWrites.has(path) || unref(fileIndex)[path]) continue
+                await addFileToIndex(path)
+                broadcast({type: 'create', path})
+            }
+            return
+        }
 
-        watcherRegistry.set(session!.uuid, activeWatcher);
-        console.log(`Watcher started and registered for session ${session!.uuid}.`);
+        if (!('modify' in type)) return
+        const kind = type.modify.kind
 
-        return activeWatcher
+        if (kind === 'rename') {
+            if (paths.length >= 2) {
+                const [oldPath, newPath] = paths as [string, string]
+                if (rt.selfWrites.has(oldPath) && rt.selfWrites.has(newPath)) return
+                await moveFileInIndex(oldPath, newPath)
+                broadcast({type: 'rename', oldPath, newPath})
+                return
+            }
+            // macOS reports some renames as two single-path events; resolve from disk.
+            const path = paths[0]!
+            if (rt.selfWrites.has(path)) return
+            const settled = Promise.withResolvers<void>()
+            setTimeout(settled.resolve, 100)
+            await settled.promise
+            try {
+                await stat(path)
+                const node = unref(fileIndex)[path]
+                if (!node) {
+                    await addFileToIndex(path)
+                    broadcast({type: 'create', path})
+                    return
+                }
+                const actual = (await readDir(parentPathOf(path))).find(e => e.name.toLowerCase() === node.fileName.toLowerCase())
+                if (actual && actual.name !== node.fileName) {
+                    const newPath = await join(parentPathOf(path), actual.name)
+                    await moveFileInIndex(path, newPath)
+                    broadcast({type: 'rename', oldPath: path, newPath})
+                }
+            } catch {
+                broadcast({type: 'remove', path, removedNodes: removeFileFromIndex(path)})
+            }
+            return
+        }
+
+        // Content changes from other editors, git, sync tools… — previously dropped, leaving links stale.
+        if (kind === 'data' || kind === 'any') {
+            for (const path of paths) {
+                if (rt.selfWrites.has(path) || !isIndexedText(path) || !unref(fileIndex)[path]) continue
+                await reparse(path)
+                broadcast({type: 'modify', path})
+            }
+        }
     }
 
-    /**
-     * Stops the currently active file system watcher.
-     */
+    async function startWatcher(root: string) {
+        await stopWatcher()
+        const rt = runtime()
+        rt.root = root
+        // Serialize events so an async handler never interleaves with the next one.
+        let queue: Promise<void> = Promise.resolve()
+        rt.unwatch = await watch(root, (event) => {
+            queue = queue.then(() => handleWatchEvent(event)).catch(e => console.error('[index] watcher event failed', e))
+        }, {recursive: true, delayMs: 50})
+    }
+
     async function stopWatcher() {
-        const unwatchFn = watcherRegistry.get(session!.uuid);
-
-        if (unwatchFn) {
-            console.log(`Stopping file watcher for session ${session!.uuid}...`);
-            unwatchFn();
-            watcherRegistry.delete(session!.uuid);
-            listenerRegistry.delete(session!.uuid);
-            console.log(`File watcher for session ${session!.uuid} stopped and de-registered.`);
-        } else {
-            console.log(`No active watcher found in the registry for session ${session!.uuid}.`);
-        }
+        const rt = runtimes.get(scope)
+        rt?.unwatch?.()
+        if (rt) rt.unwatch = undefined
     }
 
-    /**
-     * Reads a file at a given path, parses its properties, and updates the index.
-     */
-    async function updateFrontmatterForPath(path: string, index = fileIndex.value) {
-        const node = index[path];
-        if (!node || node.isFolder) return;
-
-        const extension = getFileExtensionFromPath(path);
-        if (isUnreadableAsText(extension)) {
-            console.log(`Skipping text read for binary file: ${path}`);
-            return;
-        }
-
-        try {
-            const content = await readTextFile(path);
-            const parsed = _parseFileContentProperties(path, content);
-            node.properties = parsed.properties;
-            node.modifiedTime = new Date();
-
-            const fileName = node.fileName;
-            if (fileName === 'properties.yml' || fileName === 'properties.yaml') {
-                const parentPath = path.substring(0, path.lastIndexOf('/'));
-                const parentNode = index[parentPath];
-                if (parentNode && parentNode.isFolder) {
-                    parentNode.properties = parsed.properties;
-                    parentNode.modifiedTime = new Date();
-                }
-            }
-        } catch (readError) {
-            console.error(`Failed to read file for properties parsing: ${path}`, readError);
-        }
-    }
-
-    /**
-     * Finds a file in the index by its stable UUID.
-     */
-    /**
-     * Finds a file in the index by its stable UUID.
-     * O(1) lookup using the uuid-to-path map.
-     */
     function getFileByUuid(uuidRef: PossiblyRef<string | undefined>): ActiveWorkspaceFileIndex | null {
         const uuid = unref(uuidRef)
-        if (!uuid) return null;
-
-        const path = unref(uuidToFilePathIndex).get(uuid);
-        if (!path) return null;
-
-        return unref(fileIndex)[path] || null;
+        const path = uuid ? unref(uuidToFilePathIndex).get(uuid) : undefined
+        return path ? unref(fileIndex)[path] ?? null : null
     }
 
-    /**
-     * Finds a file in the index by its path.
-     */
-    function getFileByPath(absoluteFilePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
-        return unref(fileIndex)[unref(absoluteFilePath)]
+    function getFileByPath(path: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        return unref(fileIndex)[unref(path)]
     }
 
-    function getFilesByPaths(absoluteFilePaths: PossiblyRef<string[]>): ActiveWorkspaceFileIndex[] {
-        let results: ActiveWorkspaceFileIndex[] = []
-        for (const fp of unref(absoluteFilePaths)) {
-            const f = getFileByPath(fp)
-            if (f)
-                results.push(f)
-        }
-        return results
+    function getFilesByPaths(paths: PossiblyRef<string[]>): ActiveWorkspaceFileIndex[] {
+        return unref(paths).map(p => unref(fileIndex)[p]).filter((f): f is ActiveWorkspaceFileIndex => !!f)
     }
 
-    /**
-     * Returns all files in the index that match the provided filter conditions.
-     */
     function getFilteredFiles(filter: (file: ActiveWorkspaceFileIndex) => boolean): ActiveWorkspaceFileIndex[] {
-        return Object.values(unref(fileIndex)).filter(filter);
+        return Object.values(unref(fileIndex)).filter(filter)
     }
 
-    /**
-     * Convenience method to get files by a specific extension (e.g., 'md', 'png').
-     */
     function getFilesByExtension(extension: string): ActiveWorkspaceFileIndex[] {
-        const ext = extension.startsWith('.') ? extension.slice(1).toLowerCase() : extension.toLowerCase();
-        return getFilteredFiles((file) => {
-            if (file.isFolder) return false;
-            const fileExt = file.fileName.split('.').pop()?.toLowerCase();
-            return fileExt === ext;
-        });
+        const ext = extension.replace(/^\./, '').toLowerCase()
+        return getFilteredFiles(f => !f.isFolder && getFileExtensionFromPath(f.fileName) === ext)
     }
 
-    /**
-     * Checks if a file/folder has a properties.yml or properties.yaml file.
-     */
-    function hasPropertiesFile(fileUuid: PossiblyRef<string>): boolean {
-        const uuid = unref(fileUuid);
-        const node = getFileByUuid(uuid);
-
-        if (!node) return false;
-
-        if (node.isFolder) {
-            const index = unref(fileIndex);
-            return node.children.some(childPath => {
-                const childNode = index[childPath];
-                if (!childNode || childNode.isFolder) return false;
-
-                const fileName = childNode.fileName;
-                return fileName === 'properties.yml' || fileName === 'properties.yaml';
-            });
-        }
-
-        return node.fileName === 'properties.yml' || node.fileName === 'properties.yaml';
+    /** Files whose `tags` property (frontmatter) contains `tag`. Accepts a list or a single string. */
+    function getFilesByTag(tag: string): ActiveWorkspaceFileIndex[] {
+        return getFilteredFiles(f => {
+            const tags = (f.properties as Record<string, unknown>)?.tags
+            return Array.isArray(tags) ? tags.includes(tag) : tags === tag
+        })
     }
 
-    /**
-     * Returns the UUID of the properties.yml/yaml file belonging to the given folder UUID,
-     * or undefined if none exists. If the UUID itself points to a properties file, returns
-     * its own UUID.
-     */
-    function getPropertiesFile(fileUuid: PossiblyRef<string | undefined>): string | undefined {
-        const uuid = unref(fileUuid);
-        if (!uuid) return undefined;
-
-        const node = getFileByUuid(uuid);
-        if (!node) return undefined;
-
-        if (node.isFolder) {
-            const index = unref(fileIndex);
-            for (const childPath of node.children) {
-                const childNode = index[childPath];
-                if (!childNode || childNode.isFolder) continue;
-                if (childNode.fileName === 'properties.yml' || childNode.fileName === 'properties.yaml') {
-                    return childNode.uuid;
-                }
-            }
-            return undefined;
-        }
-
-        if (node.fileName === 'properties.yml' || node.fileName === 'properties.yaml') {
-            return node.uuid;
-        }
-
-        return undefined;
+    function getPropertiesFile(uuidRef: PossiblyRef<string | undefined>): string | undefined {
+        const node = getFileByUuid(uuidRef)
+        if (!node) return
+        if (!node.isFolder) return isPropertiesFile(node.fileName) ? node.uuid : undefined
+        return node.children.map(c => unref(fileIndex)[c]).find(c => c && !c.isFolder && isPropertiesFile(c.fileName))?.uuid
     }
 
-    /**
-     * Gets the parent folder of a file given its absolute path.
-     */
-    function getParentFolderByPath(absolutePath: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
-        const path = unref(absolutePath);
-        if (!path) return undefined;
-
-        const parentPath = path.substring(0, path.lastIndexOf('/'));
-        if (!parentPath) return undefined;
-
-        const parentNode = unref(fileIndex)[parentPath];
-
-        if (parentNode && parentNode.isFolder) {
-            return parentNode;
-        }
-
-        return undefined;
+    function hasPropertiesFile(uuidRef: PossiblyRef<string>): boolean {
+        return getPropertiesFile(uuidRef) !== undefined
     }
 
-    /**
-     * Gets the parent folder of a file given its UUID.
-     */
-    function getParentFolderByUuid(fileUuid: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
-        const uuid = unref(fileUuid);
-        const node = getFileByUuid(uuid);
+    function getParentFolderByPath(path: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        const parent = unref(fileIndex)[parentPathOf(unref(path))]
+        return parent?.isFolder ? parent : undefined
+    }
 
-        if (!node) return undefined;
-        if (node.isFolder) return undefined;
-
-        return getParentFolderByPath(node.fullPath);
+    function getParentFolderByUuid(uuidRef: PossiblyRef<string>): ActiveWorkspaceFileIndex | undefined {
+        const node = getFileByUuid(uuidRef)
+        return node && !node.isFolder ? getParentFolderByPath(node.fullPath) : undefined
     }
 
     function on(listener: WorkspaceIndexListener): () => void {
-        if (!listenerRegistry.has(session!.uuid)) {
-            listenerRegistry.set(session!.uuid, new Set());
-        }
-        const listeners = listenerRegistry.get(session!.uuid)!;
-
-        listeners.add(listener);
-
-        return () => {
-            listeners.delete(listener);
-        };
+        const listeners = runtime().listeners
+        listeners.add(listener)
+        return () => listeners.delete(listener)
     }
 
     return {
@@ -1036,13 +453,16 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         clearIndex,
         on,
         updateIndex,
+        markSelfWrite,
+        getRenameImpact,
         getFileByPath,
         getFilesByPaths,
         getFilteredFiles,
         getFilesByExtension,
+        getFilesByTag,
         hasPropertiesFile,
         getPropertiesFile,
         getParentFolderByPath,
-        getParentFolderByUuid
-    };
+        getParentFolderByUuid,
+    }
 }

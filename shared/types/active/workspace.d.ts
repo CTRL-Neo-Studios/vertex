@@ -1,5 +1,5 @@
 import type {FrontmatterProperties} from "#shared/types/types";
-import {type TreeItem} from "@nuxt/ui";
+import type {TreeItem} from "@nuxt/ui";
 import type {InternalLinkNode} from "#codemirror-rich-obsidian-editor/editor-types"
 import type {YamlFormData} from "@type32/yaml-editor-form";
 
@@ -33,17 +33,14 @@ export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
     children: UITreeNode[]
 }
 
-export type WorkspaceIndexEvent =
+/** Emitted by both index kinds; `removedNodes` holds every entry removed (folder contents included). */
+export type IndexEvent<T = ActiveWorkspaceFileIndex> =
     | { type: 'create'; path: string; }
-    | { type: 'remove'; path: string; removedNodes: ActiveWorkspaceFileIndex[] }
+    | { type: 'remove'; path: string; removedNodes: T[] }
     | { type: 'rename'; oldPath: string; newPath: string; }
     | { type: 'modify'; path: string; };
 
+export type WorkspaceIndexEvent = IndexEvent<ActiveWorkspaceFileIndex>
 export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;
-
-export type SinglespaceIndexEvent =
-    | { type: 'remove'; path: string; removedNode: ActiveSinglespaceFileIndex }
-    | { type: 'rename'; oldPath: string; newPath: string; }
-    | { type: 'modify'; path: string; };
-
+export type SinglespaceIndexEvent = IndexEvent<ActiveSinglespaceFileIndex>
 export type SinglespaceIndexListener = (event: SinglespaceIndexEvent) => void;

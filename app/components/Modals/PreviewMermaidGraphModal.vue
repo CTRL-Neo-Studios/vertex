@@ -12,7 +12,7 @@ const emit = defineEmits<{ close: [boolean] }>()
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        title="Preview Mermaid Graph"
+        :title="$t('app.editor.ui.previewMermaid')"
         fullscreen
         :ui="{body: 'p-0 m-0'}"
     >
