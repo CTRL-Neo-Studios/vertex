@@ -8,6 +8,7 @@ import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppUpdater} from "~/composables/app/useAppUpdater";
+import {cssFontName} from "~/composables/app/useAppTheme";
 import {Routes} from "#shared/constants/app";
 import {stateClient} from "~/utils/stateClient";
 
@@ -65,10 +66,11 @@ watch([() => $route.path, $menu.handlers, locale], () => rebuildMenu())
 const color = computed(() => colorMode.value === 'dark' ? (colors as unknown as Record<string, Record<number, string>>)[appConfig.ui.colors.neutral]?.[900] ?? 'white' : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)
 const blackAsPrimary = computed(() => appConfig.theme.blackAsPrimary ? `:root { --ui-primary: black; } .dark { --ui-primary: white; }` : ':root {}')
-const appFont = computed(() => `:root { --font-sans: '${appConfig.theme.appFont}', 'Geist', 'Inter', sans-serif; }`)
-const appMonoFont = computed(() => `:root { --font-mono: '${appConfig.theme.appMonoFont}', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace; }`)
-const editorFont = computed(() => `:root { --font-editor: '${appConfig.theme.editorFont}', '${appConfig.theme.appFont}', 'Geist', 'Inter', var(--font-sans, sans-serif); }`)
-const editorMonoFont = computed(() => `:root { --font-editor-code: '${appConfig.theme.editorMonoFont}', '${appConfig.theme.appMonoFont}', 'JetBrains Mono', monospace, ui-monospace; }`)
+// Font names can be any installed family; cssFontName keeps them inside their quotes.
+const appFont = computed(() => `:root { --font-sans: '${cssFontName(appConfig.theme.appFont)}', 'Geist', 'Inter', sans-serif; }`)
+const appMonoFont = computed(() => `:root { --font-mono: '${cssFontName(appConfig.theme.appMonoFont)}', 'Geist Mono', monospace, ui-monospace; }`)
+const editorFont = computed(() => `:root { --font-editor: '${cssFontName(appConfig.theme.editorFont)}', '${cssFontName(appConfig.theme.appFont)}', 'Geist', 'Inter', sans-serif; }`)
+const editorMonoFont = computed(() => `:root { --font-editor-code: '${cssFontName(appConfig.theme.editorMonoFont)}', '${cssFontName(appConfig.theme.appMonoFont)}', 'Geist Mono', monospace, ui-monospace; }`)
 
 useHead({
     meta: [

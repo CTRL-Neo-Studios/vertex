@@ -1,3 +1,4 @@
+mod fonts;
 mod state;
 mod updater;
 
@@ -233,6 +234,7 @@ pub fn run() {
             updater::update_token_get,
             updater::update_token_set,
             updater::update_channels,
+            fonts::system_fonts,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

@@ -88,71 +88,59 @@ async function setToken(token: string) {
 
 <template>
     <SettingsScrollLayout :title="t('app.settings.general.title')" v-if="config">
-		<div class="w-full space-y-4">
-			<UPageCard :title="t('app.settings.general.startup')">
-				<UFormField
-					size="sm"
-					:label="t('app.settings.general.recovery.label')"
-					:description="t('app.settings.general.recovery.description')"
-					orientation="horizontal"
-				>
-					<USelect
-						:model-value="config.recoverSessions"
-						:items="recoveryItems"
-						class="min-w-44"
-						@update:model-value="setRecovery($event as SessionRecoveryMode)"
-					/>
-				</UFormField>
-			</UPageCard>
-			<UPageCard :title="t('app.settings.general.language.title')">
-				<UFormField
-					size="sm"
-					:label="t('app.settings.general.language.label')"
-					:description="t('app.settings.general.language.description')"
-					orientation="horizontal"
-				>
-					<USelect
-						:model-value="config.language"
-						:items="languageItems"
-						class="min-w-44"
-						@update:model-value="setLanguage($event as string)"
-					/>
-				</UFormField>
-			</UPageCard>
-			<UPageCard :title="t('app.settings.updates.title')">
-				<UFormField
-					size="sm"
-					:label="t('app.settings.updates.channel.label')"
-					:description="t('app.settings.updates.channel.description')"
-					orientation="horizontal"
-				>
-					<USelect
-						:model-value="config.updateChannel"
-						:items="channelItems"
-						:loading="channelsLoading"
-						class="min-w-44"
-						@update:model-value="setUpdateChannel($event as string)"
-					/>
-				</UFormField>
-				<p v-if="channelsError" class="text-xs text-error mt-1">{{ channelsError }}</p>
-				<UFormField
-					size="sm"
-					:label="t('app.settings.updates.token.label')"
-					:description="t(hasToken ? 'app.settings.updates.token.saved' : 'app.settings.updates.token.description')"
-					:error="tokenError"
-					orientation="horizontal"
-				>
-					<UButton v-if="hasToken" color="neutral" variant="outline" icon="i-lucide-trash-2" @click="setToken('')">
-						{{ t('app.settings.updates.token.remove') }}
-					</UButton>
-					<UFieldGroup v-else>
-						<UInput v-model="tokenDraft" type="password" class="min-w-44" @keydown.enter="setToken(tokenDraft)"/>
-						<UButton color="neutral" variant="outline" :disabled="!tokenDraft.trim()" @click="setToken(tokenDraft)">
-							{{ t('app.settings.updates.token.save') }}
-						</UButton>
-					</UFieldGroup>
-				</UFormField>
-			</UPageCard>
-		</div>
+        <div class="space-y-4">
+            <SettingsSection :title="t('app.settings.general.startup')">
+                <SettingsRow :label="t('app.settings.general.recovery.label')" :description="t('app.settings.general.recovery.description')">
+                    <USelect
+                        :model-value="config.recoverSessions"
+                        :items="recoveryItems"
+                        class="w-52"
+                        @update:model-value="setRecovery($event as SessionRecoveryMode)"
+                    />
+                </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection :title="t('app.settings.general.language.title')">
+                <SettingsRow :label="t('app.settings.general.language.label')" :description="t('app.settings.general.language.description')">
+                    <USelect
+                        :model-value="config.language"
+                        :items="languageItems"
+                        class="w-52"
+                        @update:model-value="setLanguage($event as string)"
+                    />
+                </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection :title="t('app.settings.updates.title')">
+                <SettingsRow
+                    :label="t('app.settings.updates.channel.label')"
+                    :description="t('app.settings.updates.channel.description')"
+                    :error="channelsError"
+                >
+                    <USelect
+                        :model-value="config.updateChannel"
+                        :items="channelItems"
+                        :loading="channelsLoading"
+                        class="w-52"
+                        @update:model-value="setUpdateChannel($event as string)"
+                    />
+                </SettingsRow>
+                <SettingsRow
+                    :label="t('app.settings.updates.token.label')"
+                    :description="t(hasToken ? 'app.settings.updates.token.saved' : 'app.settings.updates.token.description')"
+                    :error="tokenError"
+                >
+                    <UButton v-if="hasToken" color="neutral" variant="outline" icon="i-lucide-trash-2" @click="setToken('')">
+                        {{ t('app.settings.updates.token.remove') }}
+                    </UButton>
+                    <UFieldGroup v-else class="w-52">
+                        <UInput v-model="tokenDraft" type="password" class="flex-1" @keydown.enter="setToken(tokenDraft)"/>
+                        <UButton color="neutral" variant="outline" :disabled="!tokenDraft.trim()" @click="setToken(tokenDraft)">
+                            {{ t('app.settings.updates.token.save') }}
+                        </UButton>
+                    </UFieldGroup>
+                </SettingsRow>
+            </SettingsSection>
+        </div>
     </SettingsScrollLayout>
 </template>

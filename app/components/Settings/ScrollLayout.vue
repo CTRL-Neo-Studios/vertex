@@ -19,7 +19,7 @@ defineProps<{
                     <div data-tauri-drag-region>
                         <h1 class="font-semibold select-none">{{ title ?? $t('app.settings.title') }}</h1>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 h-8">
                         <slot name="header-trailing"/>
                     </div>
                 </div>

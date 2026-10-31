@@ -36,6 +36,7 @@ rayon = "1.12"
 tokio = { version = "1", features = ["sync", "time"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+fontdb = "0.23"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tauri-plugin-single-instance = { version = "2.5.5", features = [] }
