@@ -21,7 +21,9 @@ export interface AppThemeConfig {
     editorFont: string,
     appMonoFont: string,
     editorMonoFont: string,
-    blackAsPrimary: boolean
+    blackAsPrimary: boolean,
+    /** Kept in settings (not the color-mode module's per-window storage) so every window follows it. */
+    colorMode: 'light' | 'dark' | 'system'
 }
 
 export interface AppAdvancedThemeConfig {

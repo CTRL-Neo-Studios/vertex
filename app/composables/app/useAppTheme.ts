@@ -1,184 +1,84 @@
-import { omit } from '#ui/utils'
 import colors from 'tailwindcss/colors'
+import {invoke} from '@tauri-apps/api/core'
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
+import {defaultAppThemeConfig} from "#shared/utils/defaults/themes";
+import type {AppThemeConfig} from "#shared/types/app/settings";
 
+/** Tailwind's gray ramps; only these may be the neutral, and none of them the primary. */
+export const NEUTRAL_COLORS = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'taupe', 'mauve', 'mist', 'olive']
+const NOT_A_RAMP = ['inherit', 'current', 'transparent', 'black', 'white', ...NEUTRAL_COLORS]
+export const PRIMARY_COLORS = Object.keys(colors).filter(name => !NOT_A_RAMP.includes(name))
+export const RADIUSES = [0, 0.125, 0.25, 0.375, 0.5, 0.75]
+
+/** Fonts shipped in public/fonts (nuxt.config `fonts.families`); always available, unlike system fonts. */
+export const BUNDLED_FONTS: FontFamily[] = [
+    {name: 'Geist', monospace: false},
+    {name: 'Inter', monospace: false},
+    {name: 'Inter Display', monospace: false},
+    {name: 'SF Pro', monospace: false},
+    {name: 'Geist Mono', monospace: true},
+    {name: 'SF Mono', monospace: true},
+]
+
+export interface FontFamily {
+    name: string
+    monospace: boolean
+}
+
+/** Font names end up inside a quoted CSS string; drop anything that could break out of it. */
+export function cssFontName(name: string) {
+    return name.replace(/['"\\;{}<>]/g, '')
+}
+
+// One scan per window; the Rust side caches across windows (src-tauri/src/fonts.rs).
+let systemFonts: Promise<FontFamily[]> | undefined
+export function loadSystemFonts() {
+    systemFonts ??= invoke<FontFamily[]>('system_fonts').catch((error) => {
+        console.error('[useAppTheme] could not list system fonts:', error)
+        systemFonts = undefined
+        return []
+    })
+    return systemFonts
+}
+
+/**
+ * The theme lives in settings (`themeConfig`), written by Rust and broadcast to every window; `apply()`
+ * copies it into app.config, which app.vue turns into CSS variables. Edits always save the whole object.
+ */
 export function useAppTheme() {
     const appConfig = useAppConfig()
     const colorMode = useColorMode()
     const $settings = useAppSettings()
+    const defaults = defaultAppThemeConfig()
 
-    const neutralColors = ['slate', 'gray', 'zinc', 'neutral', 'stone']
-    const neutral = computed({
-        get() {
-            return appConfig.ui.colors.neutral
-        },
-        set(option) {
-            appConfig.ui.colors.neutral = option
-            $settings.set({
-                themeConfig: {
-                    neutralColor: option
-                }
-            })
-        }
-    })
+    const theme = computed(() => $settings.config.value?.themeConfig ?? defaults)
 
-    const colorsToOmit = ['inherit', 'current', 'transparent', 'black', 'white', ...neutralColors]
-    const primaryColors = computed(() => Object.keys(omit(colors, colorsToOmit as (keyof typeof colors)[])))
-    const primary = computed({
-        get() {
-            return appConfig.ui.colors.primary
-        },
-        set(option) {
-            appConfig.ui.colors.primary = option
-            appConfig.theme.blackAsPrimary = false
-            $settings.set({
-                themeConfig: {
-                    primaryColor: option,
-                    blackAsPrimary: false
-                }
-            })
-        }
-    })
-
-    const radiuses = [0, 0.125, 0.25, 0.375, 0.5]
-    const radius = computed({
-        get() {
-            return appConfig.theme.radius
-        },
-        set(option) {
-            appConfig.theme.radius = option
-            $settings.set({
-                themeConfig: {
-                    roundedRadius: option
-                }
-            })
-        }
-    })
-
-    const fonts = ['Public Sans', 'DM Sans', 'Geist', 'Inter', 'Poppins', 'Outfit', 'Raleway', 'JetBrains Mono', 'Geist Mono', 'Google Sans Code']
-    const appFont = computed({
-        get() {
-            return appConfig.theme.appFont
-        },
-        set(option) {
-            appConfig.theme.appFont = option
-            $settings.set({
-                themeConfig: {
-                    appFont: option
-                }
-            })
-        }
-    })
-    const appMonoFont = computed({
-        get() {
-            return appConfig.theme.appMonoFont
-        },
-        set(option) {
-            appConfig.theme.appMonoFont = option
-            $settings.set({
-                themeConfig: {
-                    appMonoFont: option
-                }
-            })
-        }
-    })
-    const editorFont = computed({
-        get() {
-            return appConfig.theme.editorFont
-        },
-        set(option) {
-            appConfig.theme.editorFont = option
-            $settings.set({
-                themeConfig: {
-                    editorFont: option
-                }
-            })
-        }
-    })
-    const editorMonoFont = computed({
-        get() {
-            return appConfig.theme.editorMonoFont
-        },
-        set(option) {
-            appConfig.theme.editorMonoFont = option
-            $settings.set({
-                themeConfig: {
-                    editorMonoFont: option
-                }
-            })
-        }
-    })
-
-    const modes = [
-        { label: 'light', icon: appConfig.ui.icons.light },
-        { label: 'dark', icon: appConfig.ui.icons.dark },
-        { label: 'system', icon: appConfig.ui.icons.system }
-    ]
-    const mode = computed({
-        get() {
-            return colorMode.value
-        },
-        set(option) {
-            colorMode.preference = option
-        }
-    })
-
-    function setBlackAsPrimary(value: boolean) {
-        appConfig.theme.blackAsPrimary = value
-        $settings.set({
-            themeConfig: {
-                blackAsPrimary: value
-            }
-        })
+    function apply() {
+        const t = theme.value
+        appConfig.ui.colors.primary = t.primaryColor
+        appConfig.ui.colors.neutral = t.neutralColor
+        appConfig.theme.radius = t.roundedRadius
+        appConfig.theme.appFont = t.appFont
+        appConfig.theme.appMonoFont = t.appMonoFont
+        appConfig.theme.editorFont = t.editorFont
+        appConfig.theme.editorMonoFont = t.editorMonoFont
+        appConfig.theme.blackAsPrimary = t.blackAsPrimary
+        colorMode.preference = t.colorMode
     }
 
-    function resetTheme() {
-        $settings.set({
-            themeConfig: defaultAppThemeConfig(),
-            advancedThemeConfig: defaultAppAdvancedThemeConfig()
-        })
-
-        loadThemeFromConfig()
+    /** Saving broadcasts the settings; the init plugin's watcher re-applies them in every window, this one included. */
+    async function update(patch: Partial<AppThemeConfig>) {
+        await $settings.save({themeConfig: {...theme.value, ...patch}})
     }
 
-    async function saveTheme() {
-        // Note: Individual setters already call $settings.set() for their specific values
-        // This function just ensures everything is in sync and saves to disk
-        // We don't call $settings.set() again here to avoid triggering watchers
-        await $settings.save()
+    /** Whether any of `keys` differs from the stock theme; drives the per-section reset buttons. */
+    function isDirty(keys: (keyof AppThemeConfig)[]) {
+        return keys.some(key => theme.value[key] !== defaults[key])
     }
 
-    function loadThemeFromConfig() {
-        if (!$settings.config.value) return;
-
-        appConfig.ui.colors.primary = $settings.config.value.themeConfig.primaryColor
-        appConfig.ui.colors.neutral = $settings.config.value.themeConfig.neutralColor
-        appConfig.theme.radius = $settings.config.value.themeConfig.roundedRadius
-        appConfig.theme.appFont = $settings.config.value.themeConfig.appFont
-        appConfig.theme.appMonoFont = $settings.config.value.themeConfig.appMonoFont
-        appConfig.theme.editorFont = $settings.config.value.themeConfig.editorFont
-        appConfig.theme.editorMonoFont = $settings.config.value.themeConfig.editorMonoFont
-        appConfig.theme.blackAsPrimary = $settings.config.value.themeConfig.blackAsPrimary
+    function reset(keys: (keyof AppThemeConfig)[] = Object.keys(defaults) as (keyof AppThemeConfig)[]) {
+        return update(Object.fromEntries(keys.map(key => [key, defaults[key]])))
     }
 
-    return {
-        neutralColors,
-        neutral,
-        primaryColors,
-        primary,
-        setBlackAsPrimary,
-        radiuses,
-        radius,
-        fonts,
-        appFont,
-        editorFont,
-        appMonoFont,
-        editorMonoFont,
-        modes,
-        mode,
-        resetTheme,
-        saveTheme,
-        loadThemeFromConfig
-    }
+    return {theme, defaults, apply, update, isDirty, reset}
 }

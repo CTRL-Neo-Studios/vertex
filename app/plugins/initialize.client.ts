@@ -19,14 +19,14 @@ export default defineNuxtPlugin({
         const $theme = useAppTheme()
 
         const cfg = await $settings.load()
-        $theme.loadThemeFromConfig()
+        $theme.apply()
         // Window lifetime == listener lifetime; Tauri drops webview listeners when the window is destroyed.
         await $settings.listen()
         await $asesh.listen()
         await $asesh.initializeCurrentAppSession()
 
-        // Re-apply theme whenever another window (e.g. Settings) saves.
-        watch(() => $settings.config.value?.themeConfig, () => $theme.loadThemeFromConfig(), {deep: true})
+        // Re-apply the theme whenever any window (e.g. Settings) saves it.
+        watch(() => $settings.config.value?.themeConfig, () => $theme.apply(), {deep: true})
 
         // UI language: setting (or OS language when `system`), applied in every window and on every change.
         const i18n = nuxtApp.$i18n
