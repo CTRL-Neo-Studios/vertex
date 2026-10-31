@@ -7,6 +7,8 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {sendNotification} from "@tauri-apps/plugin-notification";
 import {useAppCrossWindowEvents} from "~/composables/app/useAppCrossWindowEvents";
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 interface MenuState {
     canSave: boolean;
@@ -127,7 +129,7 @@ export function useAppWindowMenu() {
                 }),
                 await MenuItem.new({
                     id: 'new-folder',
-                    text: 'New Folder',
+                    text: t('app.editor.ui.filetree.newFolder'),
                     accelerator: 'CmdOrCtrl+Shift+N',
                     action:  () => handleNewFolder(),
                     enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),

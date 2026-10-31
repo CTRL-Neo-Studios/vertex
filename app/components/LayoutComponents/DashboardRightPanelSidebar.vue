@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import ReferenceForelinksListComponent from "~/components/ReferenceForelinksListComponent.vue";
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
@@ -47,12 +49,12 @@ const rightPanelItems: TabsItem[] = [
     },
     {
         value: '2',
-        label: 'Writer\'s Tools',
+        label: t('app.editor.ui.functions.writersTools'),
         icon: 'i-lucide-pencil'
     },
     {
         value: '3',
-        label: 'Table of Contents',
+        label: t('app.editor.ui.functions.tableOfContents'),
         icon: 'i-lucide-table-of-contents'
     }
 ]

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import type {CommandPaletteGroup, CommandPaletteItem} from "@nuxt/ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
@@ -53,13 +55,13 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
         label: 'Quick Actions',
         items: [
             {
-                label: 'New Markdown File',
+                label: t('app.editor.ui.filetree.newMarkdownFile'),
                 description: 'Creates a new markdown file in the workspace root directory.',
                 icon: 'i-lucide-file-plus',
                 onSelect() {
                     newFileModal.open({
                         isFolder: false,
-                        modalTitle: 'New Markdown File',
+                        modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                         asFolder: false,
                         asLevel: 'same',
                         fileExt: 'md'
@@ -67,13 +69,13 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             },
             {
-                label: 'New Folder',
+                label: t('app.editor.ui.filetree.newFolder'),
                 description: 'Creates a new folder in the workspace root directory.',
                 icon: 'i-lucide-folder-dot',
                 onSelect() {
                     newFileModal.open({
                         isFolder: true,
-                        modalTitle: 'New Folder',
+                        modalTitle: t('app.editor.ui.filetree.newFolder'),
                         asFolder: true,
                         asLevel: 'same'
                     })

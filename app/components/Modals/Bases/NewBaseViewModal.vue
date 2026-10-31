@@ -53,10 +53,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     >
         <template #body>
             <UForm :schema="schema" :state class="p-2 w-full" @submit="onSubmit">
-                <UFormField label="Name" name="name" required size="sm">
+                <UFormField :label="$t('app.generic.name')" name="name" required size="sm">
                     <UInput v-model="state.name" class="w-full" autofocus/>
                 </UFormField>
-                <UFormField label="Type" name="type" required size="sm">
+                <UFormField :label="$t('app.generic.type')" name="type" required size="sm">
                     <USelect v-model="state.type" :items="availableTypes" class="w-full"/>
                 </UFormField>
             </UForm>

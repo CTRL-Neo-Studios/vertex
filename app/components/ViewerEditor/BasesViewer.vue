@@ -639,7 +639,7 @@ const filters = ref([])
                         >
                             <UButton
                                 size="sm"
-                                label="Properties"
+                                :label="$t('app.generic.properties')"
                                 icon="i-lucide-table-properties"
                                 color="neutral"
                                 variant="ghost"

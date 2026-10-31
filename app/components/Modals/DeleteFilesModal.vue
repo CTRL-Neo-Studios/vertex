@@ -35,8 +35,8 @@ async function onDelete() {
     >
         <template #footer>
             <div class="w-full inline-flex items-center justify-end gap-2">
-                <UButton size="sm" color="neutral" label="Cancel" @click="() => emit('close', false)" :disabled="deleting"/>
-                <UButton size="sm" color="error" label="Delete" @click="onDelete" :disabled="deleting"/>
+                <UButton size="sm" color="neutral" :label="$t('app.generic.cancel')" @click="() => emit('close', false)" :disabled="deleting"/>
+                <UButton size="sm" color="error" :label="$t('app.generic.delete')" @click="onDelete" :disabled="deleting"/>
             </div>
         </template>
     </UModal>

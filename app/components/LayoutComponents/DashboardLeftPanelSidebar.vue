@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import FileTreeComponent from "~/components/FileTreeComponent.vue";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
@@ -50,12 +52,12 @@ async function onClickFile(item: Partial<UITreeNode>) {
 const contextMenuItems = ref<ContextMenuItem[][]>([
     [
         {
-            label: 'New Markdown File',
+            label: t('app.editor.ui.filetree.newMarkdownFile'),
             icon: 'i-lucide-file-plus',
             onSelect(e) {
                 newFileModal.open({
                     isFolder: false,
-                    modalTitle: 'New Markdown File',
+                    modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                     asFolder: false,
                     asLevel: 'same',
                     fileExt: 'md'
@@ -63,12 +65,12 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
             }
         },
         {
-            label: 'New Folder',
+            label: t('app.editor.ui.filetree.newFolder'),
             icon: 'i-lucide-folder-dot',
             onSelect(e) {
                 newFileModal.open({
                     isFolder: true,
-                    modalTitle: 'New Folder',
+                    modalTitle: t('app.editor.ui.filetree.newFolder'),
                     asFolder: true,
                     asLevel: 'same'
                 })

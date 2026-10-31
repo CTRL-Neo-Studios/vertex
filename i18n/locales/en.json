@@ -1,3 +1,48 @@
 {
-	"welcome": "Welcome"
+	"welcome": "Welcome",
+	"app": {
+		"editor": {
+			"ui": {
+				"filetree": {
+					"newMarkdownFile": "New Markdown File",
+					"aboveLevel": "Above Level",
+					"thisLevel": "This Level",
+					"underLevel": "Under Level",
+					"newFolder": "New Folder",
+					"newCanvas": "New Canvas",
+					"newBase": "New Base",
+					"newOpenFolderProperties": "New/Open Folder Properties"
+				},
+				"openInNewTab": "Open in New Tab",
+				"openInDefaultApp": "Open in Default App",
+				"copyFullPath": "Copy full path",
+				"copyRelativePath": "Copy relative path",
+				"revealInFileExplorer": "Reveal in File Explorer",
+				"moveFileTo": "Move file to...",
+				"functions": {
+					"writersTools": "Writer's Tools",
+					"tableOfContents": "Table of Contents"
+				}
+			}
+		},
+		"generic": {
+			"name": "Name",
+			"type": "Type",
+			"cancel": "Cancel",
+			"delete": "Delete",
+			"ui": {
+				"invalidFileName": "Invalid File Name",
+				"createdFile": "Created file {filename}."
+			},
+			"fileName": "File Name",
+			"fonts": "Fonts",
+			"radius": "Radius",
+			"black": "Black",
+			"properties": "Properties",
+			"frontmatter": "Frontmatter",
+			"words": "Words",
+			"lines": "Lines",
+			"paragraphs": "Paragraphs"
+		}
+	}
 }

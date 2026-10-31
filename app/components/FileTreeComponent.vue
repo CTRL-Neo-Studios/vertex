@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import type { TreeItem, ContextMenuItem } from '@nuxt/ui';
 import type { UITreeNode } from '#shared/types/active/workspace';
 import useUuid from "~/composables/utility/useUuid";
@@ -131,18 +133,18 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
     return [
         [
             {
-                label: 'New Markdown File...',
+                label: t('app.editor.ui.filetree.newMarkdownFile'),
                 icon: 'i-lucide-file-plus',
                 children: [
                     {
-                        label: 'Above Level',
+                        label: t('app.editor.ui.filetree.aboveLevel'),
                         icon: 'i-lucide-folder-up',
                         disabled: itemLevel <= 1,
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Markdown File',
+                                modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                                 asFolder: false,
                                 asLevel: 'above',
                                 fileExt: 'md'
@@ -150,13 +152,13 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         },
                     },
                     {
-                        label: 'This Level',
+                        label: t('app.editor.ui.filetree.thisLevel'),
                         icon: 'i-lucide-folder-dot',
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Markdown File',
+                                modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                                 asFolder: false,
                                 asLevel: 'same',
                                 fileExt: 'md'
@@ -164,14 +166,14 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                         },
                     },
                     {
-                        label: 'Under Level',
+                        label: t('app.editor.ui.filetree.underLevel'),
                         icon: 'i-lucide-folder-down',
                         disabled: !isFolder,
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Markdown File',
+                                modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
                                 asFolder: false,
                                 asLevel: 'below',
                                 fileExt: 'md'
@@ -181,45 +183,45 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 ]
             },
             {
-                label: 'New Folder...',
+                label: t('app.editor.ui.filetree.newFolder'),
                 icon: 'i-lucide-file-plus',
                 children: [
                     {
-                        label: 'Above Level',
+                        label: t('app.editor.ui.filetree.aboveLevel'),
                         icon: 'i-lucide-folder-up',
                         disabled: itemLevel <= 1,
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Folder',
+                                modalTitle: t('app.editor.ui.filetree.newFolder'),
                                 asFolder: true,
                                 asLevel: 'above'
                             })
                         },
                     },
                     {
-                        label: 'This Level',
+                        label: t('app.editor.ui.filetree.thisLevel'),
                         icon: 'i-lucide-folder-dot',
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Folder',
+                                modalTitle: t('app.editor.ui.filetree.newFolder'),
                                 asFolder: true,
                                 asLevel: 'same'
                             })
                         },
                     },
                     {
-                        label: 'Under Level',
+                        label: t('app.editor.ui.filetree.underLevel'),
                         icon: 'i-lucide-folder-down',
                         disabled: !isFolder,
                         onSelect(e) {
                             newFileModal.open({
                                 isFolder: isFolder,
                                 atFileIndexId: item.id,
-                                modalTitle: 'New Folder',
+                                modalTitle: t('app.editor.ui.filetree.newFolder'),
                                 asFolder: true,
                                 asLevel: 'below'
                             })
@@ -228,17 +230,17 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 ]
             },
             {
-                label: 'New Canvas',
+                label: t('app.editor.ui.filetree.newCanvas'),
                 icon: 'i-lucide-file-plus',
                 disabled: true, // TODO: implement functionality
             },
             {
-                label: 'New Base',
+                label: t('app.editor.ui.filetree.newBase'),
                 icon: 'i-lucide-file-plus',
                 disabled: true, // TODO: implement functionality
             },
             {
-                label: 'New/Open Folder Properties',
+                label: t('app.editor.ui.filetree.newOpenFolderProperties'),
                 icon: 'i-lucide-file-plus',
                 disabled: !isFolder,
                 async onSelect(e: Event) {
@@ -259,7 +261,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         ],
         [
             {
-                label: 'Open in New Tab',
+                label: t('app.editor.ui.openInNewTab'),
                 icon: 'i-lucide-square-plus',
                 disabled: isFolder,
                 async onSelect(e: Event) {
@@ -268,7 +270,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 }
             },
             {
-                label: 'Open in Default App',
+                label: t('app.editor.ui.openInDefaultApp'),
                 icon: 'i-lucide-square-arrow-out-up-right',
                 async onSelect(e) {
                     const file = getFileByUuid(item.id)
@@ -279,21 +281,21 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         ],
         [
             {
-                label: 'Copy full path',
+                label: t('app.editor.ui.copyFullPath'),
                 icon: 'i-lucide-copy',
                 async onSelect(e: Event) {
                     await writeText(getFileByUuid(item.id)?.fullPath ?? '')
                 }
             },
             {
-                label: 'Copy relative path',
+                label: t('app.editor.ui.copyRelativePath'),
                 icon: 'i-lucide-copy',
                 async onSelect(e: Event) {
                     await writeText(getFileByUuid(item.id)?.relativePath ?? '')
                 }
             },
             {
-                label: 'Reveal in File Explorer',
+                label: t('app.editor.ui.revealInFileExplorer'),
                 icon: 'i-lucide-copy',
                 async onSelect(e) {
                     const file = getFileByUuid(item.id)
@@ -309,7 +311,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 disabled: true
             },
             {
-                label: 'Move file to...',
+                label: t('app.editor.ui.moveFileTo'),
                 icon: 'i-lucide-folder-tree',
                 disabled: true
             },

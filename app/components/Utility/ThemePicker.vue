@@ -61,7 +61,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
             <UFormField label="Primary Colors" description="The primary color of the app.">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
-                        label="Black"
+                        :label="$t('app.generic.black')"
                         :color="(appConfig.theme.blackAsPrimary) ? 'primary' : 'neutral'"
                         :variant="(appConfig.theme.blackAsPrimary) ? 'solid' : 'outline'"
                         @click="setBlackAsPrimary(true)"
@@ -99,7 +99,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
                     />
                 </div>
             </UFormField>
-            <UFormField label="Radius" description="The corner radius of certain UI elements.">
+            <UFormField :label="$t('app.generic.radius')" description="The corner radius of certain UI elements.">
                 <div class="grid grid-cols-3 gap-1">
                     <UtilityThemePickerButton
                         v-for="r in radiuses"
@@ -125,7 +125,7 @@ watch(() => unref($settings.config)?.themeConfig, () => {
             </UFormField>
         </UPageCard>
 
-        <UPageCard title="Fonts" class="space-y-3 grid grid-cols-1 gap-3" :ui="{ container: 'space-y-4' }">
+        <UPageCard :title="$t('app.generic.fonts')" class="space-y-3 grid grid-cols-1 gap-3" :ui="{ container: 'space-y-4' }">
             <UFormField label="App Font" description="The app's font." orientation="horizontal">
                 <USelect
                     v-model="appFont"

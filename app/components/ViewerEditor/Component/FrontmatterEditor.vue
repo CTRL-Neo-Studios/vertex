@@ -38,7 +38,7 @@ watchDebounced(formData, (newValue) => {
 
 <template>
     <UModal v-model:open="open" :default-open="false">
-        <UButton variant="link" icon="i-lucide-file-braces-corner" size="sm" color="neutral" block class="justify-center" label="Frontmatter"/>
+        <UButton variant="link" icon="i-lucide-file-braces-corner" size="sm" color="neutral" block class="justify-center" :label="$t('app.generic.frontmatter')"/>
         <template #content>
             <UScrollArea class="w-full max-h-96 rounded-lg p-3">
                 <template v-if="!formError">
