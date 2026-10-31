@@ -1,0 +1,16 @@
+# .github/workflows/release.yml
+name: Release
+on:
+    push:
+        branches: [main]            # the release branch you chose in 2.1
+    workflow_dispatch:
+jobs:
+    release:
+        uses: CTRL-Neo-Studios/tauri-updater-backend/.github/workflows/tauri-release.yml@main
+        with:
+            app: vertex                       # the app ID from 2.1
+            api: https://www.ctrl-neo.dev/apps     # your site + prefix
+        secrets: inherit
+        permissions:
+            contents: read
+            id-token: write                   # required: this is how CI proves who it is

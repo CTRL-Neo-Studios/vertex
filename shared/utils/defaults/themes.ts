@@ -8,8 +8,10 @@ export function defaultAppThemeConfig(data?: Partial<AppThemeConfig>): AppThemeC
         editorFont: data?.editorFont || 'Geist',
         appMonoFont: data?.appMonoFont || 'Geist Mono',
         editorMonoFont: data?.editorMonoFont || 'Geist Mono',
-        blackAsPrimary: data?.blackAsPrimary == undefined ? false : data?.blackAsPrimary,
-        roundedRadius: data?.roundedRadius || 0.25
+        blackAsPrimary: data?.blackAsPrimary ?? false,
+        // `??`, not `||`: 0 (square corners) is a valid radius.
+        roundedRadius: data?.roundedRadius ?? 0.25,
+        colorMode: data?.colorMode === 'light' || data?.colorMode === 'dark' ? data.colorMode : 'system'
     } satisfies AppThemeConfig
 }
 

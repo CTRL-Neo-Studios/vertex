@@ -13,13 +13,13 @@ defineProps<{
 <template>
     <div class="w-full h-screen flex flex-col overflow-hidden">
         <!-- Fixed Header -->
-        <div class="shrink-0 border-b border-default bg-default/75 backdrop-blur-lg z-10 w-full">
-            <div class="px-6 py-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="font-semibold">{{ title ?? $t('app.settings.title') }}</h1>
+        <div class="shrink-0 border-b border-default bg-default/75 backdrop-blur-lg z-10 w-full" data-tauri-drag-region>
+            <div class="px-6 py-4" data-tauri-drag-region>
+                <div class="flex items-center justify-between" data-tauri-drag-region>
+                    <div data-tauri-drag-region>
+                        <h1 class="font-semibold select-none">{{ title ?? $t('app.settings.title') }}</h1>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 h-8">
                         <slot name="header-trailing"/>
                     </div>
                 </div>

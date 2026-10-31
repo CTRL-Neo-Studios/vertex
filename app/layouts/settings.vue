@@ -3,14 +3,12 @@ import type {NavigationMenuItem} from "#ui/components/NavigationMenu.vue";
 import {Routes} from "#shared/constants/app";
 
 const {t} = useI18n()
-const open = ref(false)
-const close = () => { open.value = false }
 
 const links = computed(() => [
-    {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings, onSelect: close},
-    {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`, onSelect: close},
-    {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`, onSelect: close},
-    {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`, onSelect: close},
+    {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings},
+    {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
+    {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
+    {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
 ] satisfies NavigationMenuItem[])
 </script>
 
@@ -22,8 +20,6 @@ const links = computed(() => [
                 <SpaceOnOs detectOs="macos" showOnOs class="h-(--ui-header-height)"/>
                 
                 <UContainer class="w-full flex-1 overflow-y-auto">
-                    <UDashboardSearchButton class="bg-transparent ring-default w-full mb-4" />
-
                     <UNavigationMenu
                         :items="links"
                         orientation="vertical"

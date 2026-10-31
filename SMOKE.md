@@ -25,3 +25,7 @@ expected to fail until the noted phase lands; anything else failing is a regress
 | 18 | Window narrower than `lg` (1024 px) | Nuxt UI dashboard collapses to a single panel with the sidebar as a drawer | known; upstream `UDashboardSidebar` behaviour, not changed |
 | 19 | Single-file window: another program edits the file; a sibling file in the same folder is deleted | Tab reloads; window stays open | verified in P7 (merged index) |
 | 20 | Single-file window: type, wait 1 s | Written to disk | verified in P7 |
+| 21 | Settings → Theme: pick a primary, a neutral, radius 0 | Applies at once; other fields keep their values; per-section reset appears | verified (Red/Mauve/Emerald; radius 0 now sticks; reset restores stock) |
+| 22 | Settings → Theme → Appearance = Dark, look at another window | Every window switches | verified (was per-window before; now in settings) |
+| 23 | Settings → Theme → Editor font: search an installed family | Listed from the system, renders in its own face, applies to the preview | verified (Georgia) |
+| 24 | Settings → View: toggle a switch, then the section reset | Saved with the rest of `viewConfig` intact; reset restores defaults | verified |
