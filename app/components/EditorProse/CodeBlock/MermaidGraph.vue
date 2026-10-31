@@ -4,6 +4,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import PreviewMermaidGraphModal from "~/components/Modals/PreviewMermaidGraphModal.vue";
 
 const props = defineProps<{ codeContent?: string }>()
+const {t} = useI18n()
 const $qt = useQuickToasts()
 const $clip = useClipboard()
 const $ovl = useOverlay()
@@ -12,7 +13,7 @@ const previewGraphModal = $ovl.create(PreviewMermaidGraphModal)
 async function copyToClipboard() {
     if (props?.codeContent) {
         await $clip.copy(props.codeContent)
-        $qt.info('Copied mermaid diagram code.')
+        $qt.info(t('app.editor.ui.copiedMermaid'))
     }
 }
 

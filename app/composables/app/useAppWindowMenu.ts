@@ -1,380 +1,81 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
-import {stateClient} from "~/utils/stateClient";
-import {relaunch} from "@tauri-apps/plugin-process";
-import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import type {WindowMenuEvents} from "#shared/types/app/events";
-import {useAppSessions} from "~/composables/app/useAppSessions";
-import {useAppSettings} from "~/composables/app/useAppSettings";
-import {Routes} from "#shared/constants/app";
+import {type CommandHandlers, type MenuSection, menuSections, resolveMenu} from "~/utils/commands";
+
+/**
+ * Per-window native menu, built from the commands currently registered via `useCommands`.
+ * Rebuilt (debounced) whenever the set of registered commands changes, on focus and on route change.
+ */
+const handlers = shallowRef<CommandHandlers>({})
+const SECTION_TITLES: Record<MenuSection, string> = {
+    app: 'Vertex',
+    file: 'app.menu.file',
+    edit: 'app.menu.edit',
+    view: 'app.menu.view',
+    help: 'app.menu.help',
+}
+
+/**
+ * Register commands for as long as the calling component is mounted. Later registrations of the same id
+ * override earlier ones (e.g. a session layout overrides the app-wide "Open File").
+ */
+export function useCommands(commands: CommandHandlers) {
+    const previous: CommandHandlers = {}
+    onMounted(() => {
+        for (const id of Object.keys(commands)) previous[id] = handlers.value[id]!
+        handlers.value = {...handlers.value, ...commands}
+    })
+    onBeforeUnmount(() => {
+        const next = {...handlers.value}
+        for (const id of Object.keys(commands)) {
+            if (next[id] !== commands[id]) continue
+            if (previous[id]) next[id] = previous[id]
+            else delete next[id]
+        }
+        handlers.value = next
+    })
+}
 
 export function useAppWindowMenu() {
-    const { t } = useNuxtApp().$i18n
-    const $route = useRoute();
-    const { and, or, not, evaluate, evaluateUnref } = usePredicateLogic()
-    const $win = useAppWebviewWindows()
-    const $sessions = useAppSessions()
-    const $settings = useAppSettings()
-
-    const dispatcher = useEventDispatcher<WindowMenuEvents>(`window.menu.${$sessions.getCurrentAppSession()?.uuid}`)
-
-    onUnmounted(() => {
-        dispatcher.unmount()
-    })
-
-    const isRoute = definePredicate((path: string) => {
-        return $route.path == path
-    })
-
-    const hasRoute = definePredicate((...path: string[]) => {
-        return path.find(i => $route.path.includes(i)) != null
-    })
-
-    const $inSinglespace = hasRoute('/singlespace')
-
-    const $inWorkspace = hasRoute('/workspace')
-
-    const $inMain = isRoute(Routes.home)
-
-    const $inSettings = isRoute(Routes.settings)
-
-    const $inLoading = isRoute(Routes.loading)
-
-    const $inFunctional = or($inSettings, $inLoading)
-
-    const $inEditingSpace = or($inWorkspace, $inSinglespace)
-
-    const $canCreateItems = and($inEditingSpace, not($inMain), not($inFunctional))
-
-    const $canSaveItems = and($inEditingSpace, not($inMain), not($inFunctional))
+    const {t} = useNuxtApp().$i18n
 
     async function buildMenu() {
-        const aboutMenu = await buildVertexMenu();
-        const fileMenu = await buildFileMenu();
-        const editMenu = await buildEditMenu();
-        const viewMenu = await buildViewMenu();
-        const helpMenu = await buildHelpMenu();
-
-        // Create the main menu bar
-        return await Menu.new({
-            items: [aboutMenu, fileMenu, editMenu, viewMenu, helpMenu],
-        });
-    }
-
-    async function buildVertexMenu() {
-        return await Submenu.new({
-            text: 'Vertex',
-            items: [
-                await MenuItem.new({
-                    id: 'settings',
-                    text: 'Settings...',
-                    accelerator: 'CmdOrControl+,',
-                    async action() {
-                        await $settings.createOrFocusSettingsWindow()
-                    },
-                    enabled: evaluateUnref(not($inFunctional))
-                }),
-                await PredefinedMenuItem.new({ item: 'Separator' }),
-                await MenuItem.new({
-                    id: 'quit',
-                    text: 'Quit',
-                    accelerator: 'CmdOrControl+Q',
-                    action: () => stateClient.quit(),
-                }),
-            ],
-        });
-    }
-
-    // File Menu
-    async function buildFileMenu() {
-        const items = [];
-
-        const newSubmenu = await Submenu.new({
-            id: 'new',
-            text: 'New...',
-            items: [
-                await PredefinedMenuItem.new({item: 'Separator'}),
-                await MenuItem.new({
-                    id: 'new-file',
-                    text:  'New File',
-                    accelerator: 'CmdOrCtrl+N',
-                    action: () => handleNewFile(),
-                    // enabled: unref(evaluate(and($canCreateItems, $inWorkspace)))
-                }),
-                await MenuItem.new({
-                    id: 'new-folder',
-                    text: t('app.editor.ui.filetree.newFolder'),
-                    accelerator: 'CmdOrCtrl+Shift+N',
-                    action:  () => handleNewFolder(),
-                    enabled: unref(evaluate(and($canCreateItems,$inWorkspace))),
+        const sections = menuSections(resolveMenu(handlers.value))
+        const submenus: Submenu[] = []
+        for (const section of ['app', 'file', 'edit', 'view', 'help'] as MenuSection[]) {
+            const items = await Promise.all((sections.get(section) ?? []).map(entry => entry
+                ? MenuItem.new({
+                    id: entry.id,
+                    text: t(entry.label),
+                    accelerator: entry.accelerator,
+                    enabled: entry.enabled,
+                    action: () => entry.run?.(),
                 })
-            ],
-            enabled: evaluateUnref(not($inFunctional))
-        });
-
-        const openSubmenu = await Submenu.new({
-            id: 'open',
-            text: 'Open...',
-            items: [
-                await MenuItem.new({
-                    id: 'open-file',
-                    text: 'Open File',
-                    accelerator: 'CmdOrCtrl+O',
-                    action: () => handleOpenFile()
-                }),
-                await MenuItem.new({
-                    id: 'open-folder',
-                    text: 'Open folder',
-                    accelerator: 'CmdOrCtrl+Shift+O',
-                    action: () => handleOpenFolder()
-                })
-            ],
-            enabled: evaluateUnref(not($inFunctional))
-        })
-        // Open
-        items.push(openSubmenu);
-        items.push(newSubmenu);
-
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-
-        // Save
-        items.push(await MenuItem.new({
-            id: 'save',
-            text: 'Save',
-            accelerator: 'CmdOrCtrl+S',
-            action: () => handleSave(),
-            enabled: evaluateUnref($canSaveItems)
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'save-as',
-            text: 'Save As...',
-            accelerator: 'CmdOrCtrl+Shift+S',
-            action: () => handleSaveAs(),
-            enabled: evaluateUnref($canSaveItems)
-        }));
-
-        return await Submenu.new({
-            text: 'File',
-            items,
-        });
+                : PredefinedMenuItem.new({item: 'Separator'})))
+            if (section === 'edit') items.push(...await editItems())
+            const title = SECTION_TITLES[section]
+            submenus.push(await Submenu.new({text: title.startsWith('app.') ? t(title) : title, items}))
+        }
+        return Menu.new({items: submenus})
     }
 
-    // Edit Menu
-    async function buildEditMenu() {
-        const items = [];
-
-        items.push(await MenuItem.new({
-            id: 'undo',
-            text:  'Undo',
-            accelerator: 'CmdOrCtrl+Z',
-            action: () => document.execCommand('undo'),
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'redo',
-            text: 'Redo',
-            accelerator: 'CmdOrCtrl+Shift+Z',
-            action:  () => document.execCommand('redo'),
-        }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Cut' }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Copy' }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Paste' }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'SelectAll' }));
-
-        return await Submenu.new({
-            text: 'Edit',
-            items,
-        });
+    /** Clipboard/undo items are handled natively by the webview; they need no command. */
+    async function editItems() {
+        return Promise.all([
+            PredefinedMenuItem.new({item: 'Undo'}),
+            PredefinedMenuItem.new({item: 'Redo'}),
+            PredefinedMenuItem.new({item: 'Separator'}),
+            PredefinedMenuItem.new({item: 'Cut'}),
+            PredefinedMenuItem.new({item: 'Copy'}),
+            PredefinedMenuItem.new({item: 'Paste'}),
+            PredefinedMenuItem.new({item: 'Separator'}),
+            PredefinedMenuItem.new({item: 'SelectAll'}),
+        ])
     }
 
-    // View Menu
-    async function buildViewMenu() {
-        const items = [];
-
-        items.push(await MenuItem.new({
-            id: 'reload',
-            text: 'Reload',
-            accelerator: 'CmdOrCtrl+R',
-            async action() {
-                await relaunch()
-            },
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'toggle-fullscreen',
-            text: 'Toggle Fullscreen',
-            accelerator: 'F11',
-            action: async () => {
-                const window = $win.getCurrentAppWindow()
-                const isFullscreen = await window.isFullscreen();
-                await window.setFullscreen(!isFullscreen);
-            },
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'close-tab',
-            text: 'Close Current Tab',
-            accelerator: 'CmdOrCtrl+W',
-            action: () => handleCloseTab(),
-            enabled: evaluateUnref($inEditingSpace)
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'clear-tabs',
-            text: 'Close All Tabs',
-            accelerator: 'CmdOrCtrl+Shift+W',
-            action: () => handleClearTabs(),
-            enabled: evaluateUnref($inWorkspace)
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'close-window',
-            text: 'Close Current Window',
-            accelerator: 'CmdOrCtrl+Alt+W',
-            action: () => handleCloseWindow(),
-            enabled: evaluateUnref($inEditingSpace)
-        }));
-
-        items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-
-        items.push(await MenuItem.new({
-            id: 'zoom-in',
-            text: 'Zoom In',
-            accelerator: 'CmdOrCtrl+Plus',
-            action:  () => handleZoomIn(),
-            enabled: false
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'zoom-out',
-            text: 'Zoom Out',
-            accelerator: 'CmdOrCtrl+-',
-            action: () => handleZoomOut(),
-            enabled: false
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'reset-zoom',
-            text: 'Reset Zoom',
-            accelerator: 'CmdOrCtrl+0',
-            action:  () => handleResetZoom(),
-        }));
-
-        return await Submenu.new({
-            text: 'View',
-            items,
-        });
-    }
-
-    // Help Menu
-    async function buildHelpMenu() {
-        const items = [];
-
-        items.push(await MenuItem.new({
-            id: 'documentation',
-            text: 'Documentation',
-            action: () => handleOpenDocs(),
-        }));
-
-        items.push(await MenuItem.new({
-            id: 'report-issue',
-            text: 'Report Issue',
-            action:  () => handleReportIssue(),
-        }));
-
-        items.push(await PredefinedMenuItem. new({ item: 'Separator' }));
-
-        items.push(await MenuItem.new({
-            id: 'about',
-            text: 'About',
-            action: () => handleAboutSoftware(),
-        }));
-
-        return await Submenu.new({
-            text: 'Help',
-            items,
-        });
-    }
-
-    // Set the menu on the window
     async function setMenu() {
-        const menu = await buildMenu();
-        const window = $win.getCurrentAppWindow();
-        await menu.setAsWindowMenu(window)
+        const menu = await buildMenu()
         await menu.setAsAppMenu()
     }
 
-    // Action handlers
-    function handleNewFile() {
-        dispatcher.emit('categories.file.new.newFile')
-    }
-
-    function handleNewFolder() {
-        dispatcher.emit('categories.file.new.newFolder')
-    }
-
-    function handleOpenFile() {
-        dispatcher.emit('categories.file.open.openFile')
-    }
-
-    function handleOpenFolder() {
-        dispatcher.emit('categories.file.open.openFolder')
-    }
-
-    function handleSave() {
-        dispatcher.emit('categories.file.save')
-    }
-
-    function handleSaveAs() {
-        dispatcher.emit('categories.file.saveAs')
-    }
-
-    function handleCloseWindow() {
-        dispatcher.emit('categories.view.closeWindow')
-    }
-
-    function handleCloseTab() {
-        dispatcher.emit('categories.view.closeTab')
-    }
-
-    function handleClearTabs() {
-        dispatcher.emit('categories.view.clearTabs')
-    }
-
-    function handleZoomIn() {
-        document.body.style.zoom = `${parseFloat(document.body. style.zoom || '1') + 0.1}`;
-    }
-
-    function handleZoomOut() {
-        document.body.style.zoom = `${parseFloat(document.body.style.zoom || '1') - 0.1}`;
-    }
-
-    function handleResetZoom() {
-        document.body.style.zoom = '1';
-    }
-
-    function handleOpenDocs() {
-        dispatcher.emit('categories.about.toDocs')
-    }
-
-    function handleReportIssue() {
-        dispatcher.emit('categories.about.toRepoIssues')
-    }
-
-    function handleAboutSoftware() {
-        dispatcher.emit('categories.about.toSoftware')
-    }
-    return {
-        setMenu,
-        canCreateItems: $canCreateItems,
-        dispatcher
-    }
+    return {setMenu, handlers}
 }

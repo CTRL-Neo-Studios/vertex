@@ -3,6 +3,7 @@ import {useInternalLinkParsing} from "~/composables/utility/editor/useInternalLi
 
 export function useFrontmatterTypes(): YamlFieldType[] {
     const parse = useInternalLinkParsing()
+    const {t} = useI18n()
     return [
         {
             type: 'color',
@@ -10,7 +11,7 @@ export function useFrontmatterTypes(): YamlFieldType[] {
             component: 'color',
             baseType: 'string',
             icon: 'i-lucide-palette',
-            label: 'Color',
+            label: t('app.frontmatter.color'),
             detect: (value) => typeof value === 'string' && /^#([A-Fa-f0-9]{3}){1,2}$|^#([A-Fa-f0-9]{4}){1,2}$/.test(value)
         },
         // disabled for now for some complicated issues

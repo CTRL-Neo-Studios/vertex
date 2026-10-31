@@ -115,8 +115,8 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
 
         if ('remove' in type) {
             for (const path of event.paths.filter(tracked)) {
-                const [removedNode] = removeFileFromIndex(path)
-                if (removedNode) broadcast({type: 'remove', path, removedNode})
+                const removedNodes = removeFileFromIndex(path)
+                if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})
             }
             return
         }
@@ -135,8 +135,8 @@ export function useActiveSinglespaceIndex(session?: ActiveSession) {
                 try {
                     await stat(oldPath)
                 } catch {
-                    const [removedNode] = removeFileFromIndex(oldPath)
-                    if (removedNode) broadcast({type: 'remove', path: oldPath, removedNode})
+                    const removedNodes = removeFileFromIndex(oldPath)
+                    if (removedNodes.length) broadcast({type: 'remove', path: oldPath, removedNodes})
                 }
             }
             return

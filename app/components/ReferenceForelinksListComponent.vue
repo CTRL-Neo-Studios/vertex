@@ -35,7 +35,7 @@ async function openNewTab(uuid: string) {
         </template>
         <template v-else>
             <div class="w-full h-full inline-flex items-center justify-center">
-                <span class="text-dimmed text-xs select-none">No forelinks.</span>
+                <span class="text-dimmed text-xs select-none">{{ $t('app.editor.ui.noForelinks') }}</span>
             </div>
         </template>
     </div>

@@ -18,23 +18,24 @@ const state = reactive<Partial<Schema>>({
     type: props.view?.type || 'table',
 })
 
-const availableTypes: SelectItem[] = [{
-    label: 'Table',
+const {t} = useI18n()
+const availableTypes = computed<SelectItem[]>(() => [{
+    label: t('app.editor.ui.bases.table'),
     value: 'table',
     icon: 'i-lucide-sheet'
 }, {
-    label: 'Cards',
+    label: t('app.editor.ui.bases.cards'),
     value: 'cards',
     icon: 'i-lucide-layout-grid'
 }, {
-    label: 'List',
+    label: t('app.editor.ui.bases.list'),
     value: 'list',
     icon: 'i-lucide-rows-3'
 }, {
-    label: 'Map',
+    label: t('app.editor.ui.bases.map'),
     value: 'map',
     icon: 'i-lucide-map'
-}]
+}])
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
     emit('close', {

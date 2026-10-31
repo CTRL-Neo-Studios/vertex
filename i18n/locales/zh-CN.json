@@ -1,3 +1,224 @@
 {
-	"welcome": "欢迎来到王者荣耀"
+	"app": {
+		"menu": {
+			"file": "文件",
+			"edit": "编辑",
+			"view": "视图",
+			"help": "帮助"
+		},
+		"commands": {
+			"settings": "设置…",
+			"about": "关于 Vertex",
+			"quit": "退出 Vertex",
+			"newFile": "新建文件…",
+			"newFolder": "新建文件夹…",
+			"openFile": "打开文件…",
+			"openFolder": "打开文件夹…",
+			"save": "保存",
+			"saveAs": "另存为…",
+			"saveAsUnsupported": "“另存为”仅适用于尚未保存的文件。请改用重命名或移动。",
+			"reload": "重新加载",
+			"toggleFullscreen": "切换全屏",
+			"closeTab": "关闭标签页",
+			"closeAllTabs": "关闭所有标签页",
+			"closeWindow": "关闭窗口",
+			"docs": "文档",
+			"reportIssue": "报告问题",
+			"repo": "GitHub 上的源代码"
+		},
+		"home": {
+			"newFile": "新建文件…",
+			"newWorkspace": "新建工作区…",
+			"openFile": "打开文件…",
+			"openFolder": "打开文件夹…",
+			"recentFiles": "最近文件",
+			"untitled": "未命名",
+			"loading": "加载中…",
+			"createFileDialog": "新建 Markdown 或文本文件",
+			"fileExists": "该路径下已存在文件。",
+			"notMarkdown": "文件必须是 Markdown 或文本文件。",
+			"createFailed": "无法创建文件。"
+		},
+		"settings": {
+			"title": "设置",
+			"saving": "正在保存…",
+			"nav": {
+				"about": "关于",
+				"general": "通用",
+				"theme": "主题",
+				"view": "视图"
+			},
+			"about": {
+				"version": "应用的当前版本。",
+				"repo": "GitHub 仓库",
+				"repoDescription": "应用在 GitHub 上的开源代码。"
+			},
+			"general": {
+				"title": "通用",
+				"startup": "启动",
+				"recovery": {
+					"label": "启动时重新打开窗口",
+					"description": "Vertex 启动时重新打开上次会话中的哪些窗口。",
+					"none": "不重新打开",
+					"workspaces": "仅工作区",
+					"singlespaces": "仅单个文件",
+					"both": "工作区和单个文件"
+				},
+				"language": {
+					"title": "语言",
+					"label": "应用语言",
+					"description": "菜单和界面使用的语言。",
+					"system": "跟随系统"
+				}
+			},
+			"theme": {
+				"title": "主题",
+				"reset": "重置主题",
+				"colorsAndModes": "颜色与模式",
+				"primaryColors": "主色",
+				"primaryColorsDescription": "应用的主色调。",
+				"neutralColors": "中性色",
+				"neutralColorsDescription": "应用的中性色调。",
+				"radiusDescription": "部分界面元素的圆角大小。",
+				"colorMode": "颜色模式",
+				"colorModeDescription": "应用的明暗模式。",
+				"appFont": "应用字体",
+				"appFontDescription": "应用界面使用的字体。",
+				"appMonoFont": "应用等宽字体",
+				"appMonoFontDescription": "应用界面使用的等宽字体。",
+				"editorFont": "编辑器字体",
+				"editorFontDescription": "文本编辑器使用的字体。",
+				"editorCodeFont": "编辑器代码字体",
+				"editorCodeFontDescription": "文本编辑器使用的等宽字体。"
+			},
+			"view": {
+				"title": "视图",
+				"editor": "编辑器",
+				"editorDescription": "编辑器布局设置。",
+				"fileTree": "文件树",
+				"editorPanel": "编辑器面板",
+				"showExtInName": "在文件名中显示扩展名",
+				"showExtInNameDescription": "在条目名称中显示文件扩展名。",
+				"showExtAsTag": "以标签显示扩展名",
+				"showExtAsTagDescription": "在条目末尾以标签形式显示文件扩展名。",
+				"showFileIcons": "显示文件图标",
+				"showFileIconsDescription": "显示文件条目的图标。",
+				"showFolderIcons": "显示文件夹图标",
+				"showFolderIconsDescription": "显示文件夹条目的图标。",
+				"showFoldArrows": "显示文件夹折叠箭头",
+				"showFoldArrowsDescription": "在右侧显示文件夹折叠箭头。",
+				"customFileIcons": "允许自定义文件图标",
+				"customFileIconsDescription": "允许显示在文件中配置的自定义图标。",
+				"customFolderIcons": "允许自定义文件夹图标",
+				"customFolderIconsDescription": "允许显示在文件夹中配置的自定义图标。",
+				"statusBar": "显示状态栏",
+				"statusBarDescription": "状态栏的显示方式。",
+				"statusBarOnHover": "悬停时显示",
+				"statusBarAlways": "始终显示",
+				"statusBarNever": "始终隐藏"
+			}
+		},
+		"editor": {
+			"ui": {
+				"selectFile": "请从左侧选择一个文件。",
+				"selectFileShort": "选择文件…",
+				"noViewer": "Vertex 暂时无法显示 .{ext} 文件。",
+				"saving": "正在保存文件…",
+				"saveFailed": "无法保存文件。",
+				"moveFailed": "无法移动 {file}。",
+				"newTab": "新建标签页",
+				"clearAllTabs": "清除所有标签页",
+				"closeTab": "关闭标签页",
+				"duplicate": "创建副本",
+				"rename": "重命名",
+				"delete": "删除",
+				"forelinks": "出链",
+				"backlinks": "反向链接",
+				"noForelinks": "没有出链。",
+				"noBacklinks": "没有反向链接。",
+				"analyzeText": "分析文本",
+				"previewMermaid": "预览 Mermaid 图表",
+				"copiedMermaid": "已复制 Mermaid 图表代码。",
+				"frontmatterError": "无法解析前置元数据",
+				"frontmatterErrorDescription": "前置元数据有误。为避免损坏内容，已隐藏表单编辑器。",
+				"palette": {
+					"quickActions": "快捷操作",
+					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
+					"newFolderDescription": "在工作区根目录新建文件夹。",
+					"files": "文件（{count}）"
+				},
+				"bases": {
+					"views": "视图",
+					"view": "视图",
+					"addView": "添加视图",
+					"remove": "移除",
+					"sortAscending": "升序排列",
+					"sortDescending": "降序排列",
+					"clearSorting": "清除排序",
+					"hideAll": "全部隐藏",
+					"addFormula": "添加公式",
+					"table": "表格",
+					"cards": "卡片",
+					"list": "列表",
+					"map": "地图"
+				},
+				"filetree": {
+					"newMarkdownFile": "新建 Markdown 文件",
+					"aboveLevel": "上一级",
+					"thisLevel": "当前级",
+					"underLevel": "下一级",
+					"newFolder": "新建文件夹",
+					"newCanvas": "新建画布",
+					"newBase": "新建数据库",
+					"newOpenFolderProperties": "新建/打开文件夹属性"
+				},
+				"openInNewTab": "在新标签页中打开",
+				"openInDefaultApp": "用默认应用打开",
+				"copyFullPath": "复制完整路径",
+				"copyRelativePath": "复制相对路径",
+				"revealInFileExplorer": "在文件管理器中显示",
+				"moveFileTo": "移动文件到…",
+				"functions": {
+					"writersTools": "写作工具",
+					"tableOfContents": "目录"
+				},
+				"updateLinks": {
+					"title": "更新指向“{name}”的链接？",
+					"description": "{files} 篇笔记中有 {links} 个链接指向旧名称。",
+					"update": "更新链接",
+					"keep": "保持不变",
+					"done": "已更新 {links} 个链接。",
+					"failed": "无法更新 {file} 中的链接。"
+				},
+				"viewImage": "点击查看图片"
+			}
+		},
+		"frontmatter": {
+			"color": "颜色"
+		},
+		"generic": {
+			"name": "名称",
+			"type": "类型",
+			"cancel": "取消",
+			"delete": "删除",
+			"required": "必填",
+			"ui": {
+				"invalidFileName": "文件名无效",
+				"createdFile": "已创建文件 {filename}。",
+				"renamedFile": "已重命名为 {filename}。",
+				"renameFailed": "无法重命名文件。",
+				"deleteConfirm": "删除 {count} 个文件？",
+				"renameFile": "重命名文件"
+			},
+			"fileName": "文件名",
+			"fonts": "字体",
+			"radius": "圆角",
+			"black": "黑色",
+			"properties": "属性",
+			"frontmatter": "前置元数据",
+			"words": "词",
+			"lines": "行",
+			"paragraphs": "段"
+		}
+	}
 }

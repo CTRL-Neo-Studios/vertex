@@ -14,7 +14,7 @@ onMounted(async () => {
 <template>
     <div class="w-full min-h-screen">
         <div class="w-full min-h-screen flex flex-col gap-2 justify-center items-center">
-            <div class="text-center text-muted">Loading...</div>
+            <div class="text-center text-muted">{{ $t('app.home.loading') }}</div>
             <UProgress class="max-w-sm"/>
         </div>
     </div>

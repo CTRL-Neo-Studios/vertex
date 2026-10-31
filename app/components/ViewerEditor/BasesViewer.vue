@@ -27,6 +27,7 @@ import {getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {convertFileSrc} from "@tauri-apps/api/core";
 
+const {t} = useI18n()
 const $ovl = useOverlay()
 const loadingData = ref(false)
 
@@ -85,7 +86,7 @@ function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
             size: 'sm',
             items: [[
                 {
-                    label: 'Sort Ascending',
+                    label: t('app.editor.ui.bases.sortAscending'),
                     type: 'checkbox',
                     icon: 'i-lucide-arrow-up-narrow-wide',
                     checked: isSorted === 'asc',
@@ -100,7 +101,7 @@ function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
                     }
                 },
                 {
-                    label: 'Sort Descending',
+                    label: t('app.editor.ui.bases.sortDescending'),
                     icon: 'i-lucide-arrow-down-wide-narrow',
                     type: 'checkbox',
                     checked: isSorted === 'desc',
@@ -115,7 +116,7 @@ function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
                     }
                 }
             ], [{
-                label: 'Clear Sorting',
+                label: t('app.editor.ui.bases.clearSorting'),
                 icon: 'i-lucide-trash',
                 color: 'error',
                 onSelect: () => {
@@ -300,13 +301,13 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
         {
             id: 'file.links',
             accessorKey: 'links',
-            header: ({ column }) => getHeader(column, 'Forelinks'),
+            header: ({ column }) => getHeader(column, t('app.editor.ui.forelinks')),
             cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.links'))
         },
         {
             id: 'file.backlinks',
             accessorKey: 'backlinks',
-            header: ({ column }) => getHeader(column, 'Backlinks'),
+            header: ({ column }) => getHeader(column, t('app.editor.ui.backlinks')),
             cell: ({row}) => getFileLinkBadgeList(row.getValue<string[]>('file.backlinks'))
         },
         {
@@ -369,7 +370,7 @@ function propogateDisplayDataColumns(): TableColumn<BaseSource<YamlFormData>>[] 
 						if (!internalLink) return;
 						if (isImage(getFileExtensionFromPath(`${internalLink.filePath}`)))
 							return h(UPopover, {}, {
-								default: () => h(UTooltip, { text: 'Click to view Image' }, () => h(UButton, { color: 'neutral', variant: 'ghost', size: 'xs', icon: 'i-lucide-image' })),
+								default: () => h(UTooltip, { text: t('app.editor.ui.viewImage') }, () => h(UButton, { color: 'neutral', variant: 'ghost', size: 'xs', icon: 'i-lucide-image' })),
 								content: () => h(EditorProseEmbedImageDisplay, { srcPath: convertFileSrc(`${getFileByUuid(internalLink.referenceId)?.fullPath}`), display: internalLink.name })
 							})
 						else
@@ -482,13 +483,13 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
             active: unref(activeView).includes(i.name),
             slot: 'view' as const,
             children: [[{
-                label: 'View',
+                label: t('app.editor.ui.bases.view'),
                 icon: 'i-lucide-eye',
                 onSelect(e) {
                     activeView.value = i.name
                 }
             }], [{
-                label: 'Remove',
+                label: t('app.editor.ui.bases.remove'),
                 icon: 'i-lucide-trash',
                 color: 'error',
 				onSelect(e) {
@@ -504,7 +505,7 @@ const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
     ],
     [
         {
-            label: 'Add View',
+            label: t('app.editor.ui.bases.addView'),
             icon: 'i-lucide-grid-2x2-plus',
             async onSelect(e) {
                 const view = await ModalNewBaseView.open()
@@ -538,14 +539,14 @@ const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
     return [cols,
         [
             {
-                label: 'Hide all',
+                label: t('app.editor.ui.bases.hideAll'),
                 icon: 'i-lucide-eye-off',
                 onSelect(e) {
                     setAllColumnsVisibility(false)
                 }
             },
             {
-                label: 'Add formula',
+                label: t('app.editor.ui.bases.addFormula'),
                 icon: 'i-lucide-square-function',
                 onSelect(e) {
 
@@ -613,7 +614,7 @@ const filters = ref([])
                             :items="baseViewsItems"
                             size="sm"
                         >
-                            <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" label="Views">
+                            <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" :label="$t('app.editor.ui.bases.views')">
                                 <template #trailing>
                                     <UBadge :label="activeView" size="xs" variant="subtle" color="neutral"/>
                                 </template>

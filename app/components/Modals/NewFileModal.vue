@@ -31,7 +31,7 @@ const $qt = useQuickToasts()
 
 const validate = (state: any): FormError[] => {
     const errors = []
-    if (!state.filename) errors.push({ name: 'filename', message: 'Required' })
+    if (!state.filename) errors.push({ name: 'filename', message: t('app.generic.required') })
     if (!isValidFilename(state.filename)) errors.push({ name: 'filename', message: t('app.generic.ui.invalidFileName') })
     return errors
 }
@@ -46,7 +46,7 @@ async function onSubmit(event: FormSubmitEvent<typeof state>) {
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="props?.modalTitle ?? 'New File'"
+        :title="props?.modalTitle ?? $t('app.editor.ui.filetree.newMarkdownFile')"
         size="sm"
     >
         <template #body>

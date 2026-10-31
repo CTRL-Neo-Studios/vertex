@@ -14,6 +14,7 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         : data?.openLastOpenedWindows ? 'workspaces' : 'none'
     return {
         recoverSessions,
+        language: data?.language || 'system',
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),

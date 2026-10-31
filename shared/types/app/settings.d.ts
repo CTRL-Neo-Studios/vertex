@@ -3,6 +3,8 @@ export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both
 export interface AppSettings {
     /** Which session windows to reopen on launch. Replaces the old `openLastOpenedWindows` boolean. */
     recoverSessions: SessionRecoveryMode,
+    /** UI language code (`en`, `zh-CN`), or `system` to follow the OS language. */
+    language: string,
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,

@@ -1,26 +1,54 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
 import {getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
-import {useAppWindowMenu} from "~/composables/app/useAppWindowMenu";
+import {relaunch} from "@tauri-apps/plugin-process";
+import {useAppWindowMenu, useCommands} from "~/composables/app/useAppWindowMenu";
 import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
+import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
+import {useAppSettings} from "~/composables/app/useAppSettings";
+import {Routes} from "#shared/constants/app";
+import {stateClient} from "~/utils/stateClient";
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
 const $menu = useAppWindowMenu()
-const {dispatcher} = $menu
 const $opener = useAppOpener()
+const $act = useAppSessionActions()
+const $settings = useAppSettings()
 const $route = useRoute()
+const $fileStart = useAppFileStartHandler()
+const REPO = 'https://github.com/CTRL-Neo-Studios/vertex'
+const notInUtilityPage = () => ![Routes.settings, Routes.loading].some(p => $route.path.startsWith(p))
 
-// The native menu is per-window on Windows/Linux but a single app menu on macOS, so the focused window
-// re-applies its own menu; route changes re-evaluate the enabled/disabled predicates.
+// Commands available in every window. Session layouts register more (save, new folder, tabs…).
+useCommands({
+    'app.settings': {run: () => $settings.createOrFocusSettingsWindow(), enabled: notInUtilityPage},
+    'app.about': {run: () => $settings.createOrFocusSettingsWindow()},
+    'app.quit': {run: () => stateClient.quit()},
+    'file.openFile': {run: () => $act.openSinglespaceAction(), enabled: notInUtilityPage},
+    'file.openFolder': {run: () => $act.openWorkspaceAction(), enabled: notInUtilityPage},
+    'file.newFile': {run: () => $act.createNewFileForSinglespace(), enabled: notInUtilityPage},
+    'view.reload': {run: () => relaunch()},
+    'view.toggleFullscreen': {run: async () => {
+        const w = getCurrentWebviewWindow()
+        await w.setFullscreen(!(await w.isFullscreen()))
+    }},
+    'view.closeWindow': {run: () => getCurrentWebviewWindow().close()},
+    'help.docs': {run: () => $opener.openUrlInBrowser(`${REPO}/wiki`)},
+    'help.reportIssue': {run: () => $opener.openUrlInBrowser(`${REPO}/issues`)},
+    'help.repo': {run: () => $opener.openUrlInBrowser(REPO)},
+})
+
+// macOS has one app menu for all windows, so the focused window re-applies its own; route and
+// command changes re-evaluate which items are enabled.
 let unlistenFocus: (() => void) | undefined
 let unlistenOpen: (() => void) | undefined
-const $fileStart = useAppFileStartHandler()
+const rebuildMenu = useDebounceFn(() => $menu.setMenu(), 50)
 onMounted(async () => {
     await $menu.setMenu()
     unlistenFocus = await getCurrentWebviewWindow().onFocusChanged(({payload: focused}) => {
-        if (focused) $menu.setMenu()
+        if (focused) rebuildMenu()
     })
     unlistenOpen = await $fileStart.initializeOnMain()
 })
@@ -28,7 +56,8 @@ onBeforeUnmount(() => {
     unlistenFocus?.()
     unlistenOpen?.()
 })
-watch(() => $route.path, () => $menu.setMenu())
+const {locale} = useI18n()
+watch([() => $route.path, $menu.handlers, locale], () => rebuildMenu())
 
 const color = computed(() => colorMode.value === 'dark' ? (colors as any)[appConfig.ui.colors.neutral][900] : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)
@@ -57,21 +86,6 @@ useHead({
     }
 })
 
-onBeforeUnmount(() => {
-    dispatcher.unmount()
-})
-
-dispatcher.on('categories.about.toRepo', async function () {
-    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex')
-})
-
-dispatcher.on('categories.about.toDocs', async function () {
-    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex/wiki')
-})
-
-dispatcher.on('categories.about.toRepoIssues', async function () {
-    await $opener.openUrlInBrowser('https://github.com/CTRL-Neo-Studios/vertex/issues')
-})
 </script>
 
 <template>

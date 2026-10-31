@@ -27,7 +27,7 @@ const selectedFolder = ref<string>('')
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="props?.modalTitle ?? 'New File'"
+        :title="props?.modalTitle ?? $t('app.editor.ui.moveFileTo')"
         size="sm"
     >
         <template #body>

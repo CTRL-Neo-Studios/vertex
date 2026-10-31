@@ -52,11 +52,11 @@ const paletteItemFiles = computed(() => {
 const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     {
         id: 'quick-actions',
-        label: 'Quick Actions',
+        label: t('app.editor.ui.palette.quickActions'),
         items: [
             {
                 label: t('app.editor.ui.filetree.newMarkdownFile'),
-                description: 'Creates a new markdown file in the workspace root directory.',
+                description: t('app.editor.ui.palette.newFileDescription'),
                 icon: 'i-lucide-file-plus',
                 onSelect() {
                     newFileModal.open({
@@ -70,7 +70,7 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
             },
             {
                 label: t('app.editor.ui.filetree.newFolder'),
-                description: 'Creates a new folder in the workspace root directory.',
+                description: t('app.editor.ui.palette.newFolderDescription'),
                 icon: 'i-lucide-folder-dot',
                 onSelect() {
                     newFileModal.open({
@@ -85,7 +85,7 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
     },
     {
         id: 'files',
-        label: `Files (${unref(paletteItemFiles).length} recursed)`,
+        label: t('app.editor.ui.palette.files', {count: unref(paletteItemFiles).length}),
         items: unref(paletteItemFiles),
     }
 ])

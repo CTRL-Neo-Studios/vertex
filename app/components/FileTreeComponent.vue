@@ -307,7 +307,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         ],
         [
             {
-                label: 'Duplicate',
+                label: t('app.editor.ui.duplicate'),
                 icon: 'i-lucide-files',
                 disabled: true
             },
@@ -317,7 +317,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 disabled: true
             },
             {
-                label: 'Rename',
+                label: t('app.editor.ui.rename'),
                 icon: 'i-lucide-pen-line',
                 async onSelect(e: Event) {
                     if (item?.label)
@@ -328,7 +328,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 }
             },
             {
-                label: 'Delete',
+                label: t('app.editor.ui.delete'),
                 color: 'error',
                 icon: 'i-lucide-trash-2',
                 async onSelect(e: Event) {

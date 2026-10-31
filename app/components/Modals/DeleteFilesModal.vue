@@ -29,7 +29,7 @@ async function onDelete() {
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="props?.modalTitle ?? `Are you sure you want to delete ${props.fileIndexIds.length} file(s)?`"
+        :title="props?.modalTitle ?? $t('app.generic.ui.deleteConfirm', {count: props.fileIndexIds.length})"
         size="sm"
         :dismissible="!deleting"
     >

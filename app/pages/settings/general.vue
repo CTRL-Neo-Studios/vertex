@@ -7,7 +7,7 @@ definePageMeta({
     layout: 'settings'
 })
 
-const {t} = useI18n()
+const {t, locales} = useI18n()
 const {config, load, save} = useAppSettings()
 
 onMounted(load)
@@ -15,8 +15,18 @@ onMounted(load)
 const recoveryItems = computed<SelectItem[]>(() => (['none', 'workspaces', 'singlespaces', 'both'] as SessionRecoveryMode[])
     .map(value => ({value, label: t(`app.settings.general.recovery.${value}`)})))
 
+// Language names are shown in their own language so they are recognisable whatever is selected.
+const languageItems = computed<SelectItem[]>(() => [
+    {value: 'system', label: t('app.settings.general.language.system')},
+    ...locales.value.map(l => (typeof l === 'string' ? {value: l, label: l} : {value: l.code, label: l.name ?? l.code})),
+])
+
 async function setRecovery(value: SessionRecoveryMode) {
     await save({recoverSessions: value})
+}
+
+async function setLanguage(value: string) {
+    await save({language: value})
 }
 </script>
 
@@ -34,6 +44,21 @@ async function setRecovery(value: SessionRecoveryMode) {
                     :items="recoveryItems"
                     class="min-w-44"
                     @update:model-value="setRecovery($event as SessionRecoveryMode)"
+                />
+            </UFormField>
+        </UPageCard>
+        <UPageCard :title="t('app.settings.general.language.title')">
+            <UFormField
+                size="sm"
+                :label="t('app.settings.general.language.label')"
+                :description="t('app.settings.general.language.description')"
+                orientation="horizontal"
+            >
+                <USelect
+                    :model-value="config.language"
+                    :items="languageItems"
+                    class="min-w-44"
+                    @update:model-value="setLanguage($event as string)"
                 />
             </UFormField>
         </UPageCard>

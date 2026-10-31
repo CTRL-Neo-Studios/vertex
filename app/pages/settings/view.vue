@@ -31,53 +31,54 @@ watch(() => unref(config)?.viewConfig, () => {
     saveSettings()
 }, {deep: true})
 
-const editorLayoutItems = [
+const {t} = useI18n()
+const editorLayoutItems = computed(() => [
     {
-        label: 'File Tree',
+        label: t('app.settings.view.fileTree'),
         icon: 'i-lucide-folder-tree',
         slot: 'file-tree' as const
     },
     {
-        label: 'Editor Panel',
+        label: t('app.settings.view.editorPanel'),
         icon: 'i-lucide-panel-left-right-dashed',
         slot: 'editor-panel' as const
     },
-] satisfies AccordionItem[]
+] satisfies AccordionItem[])
 </script>
 
 <template>
-    <SettingsScrollLayout title="View" v-if="config">
-        <UPageCard title="Editor" description="Editor layout settings.">
+    <SettingsScrollLayout :title="$t('app.settings.view.title')" v-if="config">
+        <UPageCard :title="$t('app.settings.view.editor')" :description="$t('app.settings.view.editorDescription')">
             <UAccordion :items="editorLayoutItems" type="multiple">
                 <template #file-tree>
                     <div class="w-full grid grid-cols-1 gap-3 pb-6 pt-3">
-                        <UFormField size="sm" label="Show Extension in File Name" description="Shows the file extension in the item name label." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.showExtInName')" :description="$t('app.settings.view.showExtInNameDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showFileExtInName"/>
                         </UFormField>
-                        <UFormField size="sm" label="Show Extension as Tag" description="Shows the file extension as a tag at the end of the item entry." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.showExtAsTag')" :description="$t('app.settings.view.showExtAsTagDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showFileExtAsTag"/>
                         </UFormField>
-                        <UFormField size="sm" label="Show File Icons" description="Shows the file item icon." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.showFileIcons')" :description="$t('app.settings.view.showFileIconsDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showDefaultFileIcons"/>
                         </UFormField>
-                        <UFormField size="sm" label="Show Folder Icons" description="Shows the folder item icons." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.showFolderIcons')" :description="$t('app.settings.view.showFolderIconsDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showDefaultFolderIcons"/>
                         </UFormField>
-                        <UFormField size="sm" label="Show Folder Fold Arrows" description="Shows the folder folding arrows on the right side." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.showFoldArrows')" :description="$t('app.settings.view.showFoldArrowsDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.showFoldArrows"/>
                         </UFormField>
-                        <UFormField size="sm" label="Allow Custom File Icons" description="Allow displaying custom icons shown in the entry configured in the file." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.customFileIcons')" :description="$t('app.settings.view.customFileIconsDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.allowCustomFileIcons"/>
                         </UFormField>
-                        <UFormField size="sm" label="Allow Custom Folder Icons" description="Allow displaying custom icons shown in the entry configured in the folder." orientation="horizontal">
+                        <UFormField size="sm" :label="$t('app.settings.view.customFolderIcons')" :description="$t('app.settings.view.customFolderIconsDescription')" orientation="horizontal">
                             <USwitch v-model="config.viewConfig.fileTree.allowCustomFolderIcons"/>
                         </UFormField>
                     </div>
                 </template>
                 <template #editor-panel>
                     <div class="w-full grid grid-cols-1 gap-3 pb-6 pt-3">
-                        <UFormField size="sm" label="Show Status Bar" class="capitalize" description="Display mode of the status bar." orientation="horizontal">
-                            <USelect v-model="config.viewConfig.editorPanel.showStatusBar" :items="[{label: 'Show On Hover', value: 'show-on-hover'}, {label: 'Always Shown', value: 'always-shown'}, {label: 'Always Hidden', value: 'always-hidden'}]"/>
+                        <UFormField size="sm" :label="$t('app.settings.view.statusBar')" class="capitalize" :description="$t('app.settings.view.statusBarDescription')" orientation="horizontal">
+                            <USelect v-model="config.viewConfig.editorPanel.showStatusBar" :items="[{label: $t('app.settings.view.statusBarOnHover'), value: 'show-on-hover'}, {label: $t('app.settings.view.statusBarAlways'), value: 'always-shown'}, {label: $t('app.settings.view.statusBarNever'), value: 'always-hidden'}]"/>
                         </UFormField>
                     </div>
                 </template>

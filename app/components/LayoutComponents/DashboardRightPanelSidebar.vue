@@ -36,15 +36,15 @@ const emit = defineEmits<{
 const isBases = computed(() => isBasesFile(getFileByUuid($tabId)?.fileExt || ''))
 
 const activeRightPanel = ref('0')
-const rightPanelItems: TabsItem[] = [
+const rightPanelItems = computed<TabsItem[]>(() => [
     {
         value: '0',
-        label: 'Foreinks',
+        label: t('app.editor.ui.forelinks'),
         icon: 'i-lucide-square-arrow-out-up-right'
     },
     {
         value: '1',
-        label: 'Backlinks',
+        label: t('app.editor.ui.backlinks'),
         icon: 'i-lucide-square-arrow-out-down-left'
     },
     {
@@ -57,13 +57,13 @@ const rightPanelItems: TabsItem[] = [
         label: t('app.editor.ui.functions.tableOfContents'),
         icon: 'i-lucide-table-of-contents'
     }
-]
+])
 const basesPanelItems: TabsItem[] = [
     {
         value: ''
     }
 ]
-const tabItems = computed(() => unref(isBases) ? basesPanelItems : rightPanelItems)
+const tabItems = computed(() => unref(isBases) ? basesPanelItems : unref(rightPanelItems))
 
 watch($tabId, () => {
     if (unref(isBases))

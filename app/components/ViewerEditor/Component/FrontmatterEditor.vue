@@ -48,8 +48,8 @@ watchDebounced(formData, (newValue) => {
                     <UEmpty
                         variant="naked"
                         icon="i-lucide-circle-x"
-                        title="Cannot parse frontmatter"
-                        description="There must be something wrong with your frontmatter; to prevent further corruption of your content, the editor form will hidden."
+                        :title="$t('app.editor.ui.frontmatterError')"
+                        :description="$t('app.editor.ui.frontmatterErrorDescription')"
                     />
                 </slot>
             </UScrollArea>

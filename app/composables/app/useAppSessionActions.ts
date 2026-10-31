@@ -16,6 +16,7 @@ export function useAppSessionActions() {
     const $open = useAppSessionNavigator()
     const $fio = useFileIO()
     const $qt = useQuickToasts()
+    const {t} = useI18n()
 
     /**
      * Opens a folder picker and creates a new workspace session window.
@@ -48,13 +49,13 @@ export function useAppSessionActions() {
                 name: 'Text Files',
                 extensions: ['txt']
             }],
-            title: 'Create new Markdown/Text File',
+            title: t('app.home.createFileDialog'),
         })
 
         if (!path) return;
 
         if (await $fio.pathExists(path)) {
-            $qt.error('A file already exists in that path.')
+            $qt.error(t('app.home.fileExists'))
             return;
         }
 
@@ -64,7 +65,7 @@ export function useAppSessionActions() {
         // If the returned file path does not end with any extensions listed above
         console.log(`returned path ${path}`)
         if (allowedExtensions.findIndex(i => fileName.endsWith(i)) == -1) {
-            $qt.error('Your file must be a Markdown/Text file.')
+            $qt.error(t('app.home.notMarkdown'))
             return;
         }
 
@@ -77,7 +78,7 @@ export function useAppSessionActions() {
             }
         } catch(e: any) {
             console.error(e)
-            $qt.error('Unable to create file', e.message);
+            $qt.error(t('app.home.createFailed'), e.message);
         }
 
         return path;

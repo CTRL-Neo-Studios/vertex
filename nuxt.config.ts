@@ -17,6 +17,10 @@ export default defineNuxtConfig({
 
 	i18n: {
 		defaultLocale: 'en',
+		// Desktop app: routes never carry a locale prefix; the language comes from app settings
+		// (applied in plugins/initialize.client.ts), not from the URL, cookies or browser detection.
+		strategy: 'no_prefix',
+		detectBrowserLanguage: false,
 		locales: [
 			{ code: 'en', name: 'English', file: 'en.json' },
 			{ code: 'zh-CN', name: '简体中文', file: 'zh-CN.json' }
