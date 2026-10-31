@@ -75,6 +75,23 @@ export function useAppSettings() {
         })
     }
 
+    async function createOrFocusAboutWindow() {
+        if (await $win.getAppWindowWithLabel(WindowLabel.about)) {
+            await $win.showWindowWithLabel(WindowLabel.about)
+            return
+        }
+        const aboutWindow = $win.createAppWebviewWindow(Routes.about, WindowLabel.about, undefined, {
+            width: 420,
+            height: 480,
+            resizable: false,
+            title: 'Vertex',
+        })
+        const unlisten = await aboutWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
+            unlisten()
+            await aboutWindow.destroy()
+        })
+    }
+
     return {
         config,
         isLoaded,
@@ -83,5 +100,6 @@ export function useAppSettings() {
         set,
         save,
         createOrFocusSettingsWindow,
+        createOrFocusAboutWindow,
     }
 }

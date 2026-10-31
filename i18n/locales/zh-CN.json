@@ -9,6 +9,7 @@
 		"commands": {
 			"settings": "设置…",
 			"about": "关于 Vertex",
+			"checkUpdates": "检查更新…",
 			"quit": "退出 Vertex",
 			"newFile": "新建文件…",
 			"newFolder": "新建文件夹…",
@@ -25,6 +26,25 @@
 			"docs": "文档",
 			"reportIssue": "报告问题",
 			"repo": "GitHub 上的源代码"
+		},
+		"about": {
+			"version": "版本",
+			"channel": "更新通道：{channel}",
+			"checkUpdates": "检查更新",
+			"repo": "GitHub 上的源代码"
+		},
+		"updates": {
+			"upToDate": {
+				"title": "已是最新版本",
+				"description": "Vertex 已是最新版本。"
+			},
+			"available": {
+				"title": "发现新版本",
+				"prompt": "新版本 {version} 可用。立即安装？"
+			},
+			"install": "安装",
+			"later": "稍后",
+			"error": "检查更新失败"
 		},
 		"home": {
 			"newFile": "新建文件…",
@@ -69,6 +89,21 @@
 					"label": "应用语言",
 					"description": "菜单和界面使用的语言。",
 					"system": "跟随系统"
+				}
+			},
+			"updates": {
+				"title": "更新",
+				"channel": {
+					"label": "更新通道",
+					"description": "Vertex 获取更新的发布通道。",
+					"loadFailed": "无法从更新服务器加载通道：{error}"
+				},
+				"token": {
+					"label": "通道令牌",
+					"description": "受限通道的可选访问令牌，保存在系统钥匙串中。",
+					"saved": "已有令牌保存在系统钥匙串中。",
+					"save": "保存",
+					"remove": "移除令牌"
 				}
 			},
 			"theme": {

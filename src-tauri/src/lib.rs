@@ -1,4 +1,5 @@
 mod state;
+mod updater;
 
 use rayon::prelude::*;
 use state::AppState;
@@ -230,6 +231,9 @@ pub fn run() {
             state::settings_set,
             state::take_open_requests,
             quit_app,
+            updater::update_token_get,
+            updater::update_token_set,
+            updater::update_channels,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

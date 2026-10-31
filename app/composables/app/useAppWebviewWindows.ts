@@ -11,16 +11,17 @@ export function useAppWebviewWindows() {
         return getCurrentWebviewWindow()
     }
 
-    function createAppWebviewWindow(route: string, label: string, titleSuffix?: string) {
+    function createAppWebviewWindow(route: string, label: string, titleSuffix?: string, options?: {width?: number, height?: number, resizable?: boolean, title?: string}) {
+        const {width = 900, height = 600, resizable = true, title} = options ?? {}
         return new WebviewWindow(label, {
             url: route,
             decorations: true,
             center: true,
             transparent: true,
-            width: 900,
-            height: 600,
-            resizable: true,
-            title: titleSuffix ? `Vertex - ${titleSuffix}` : "Vertex",
+            width,
+            height,
+            resizable,
+            title: title ?? (titleSuffix ? `Vertex - ${titleSuffix}` : "Vertex"),
             hiddenTitle: true,
             titleBarStyle: 'overlay',
             trafficLightPosition: new LogicalPosition(14, 21),

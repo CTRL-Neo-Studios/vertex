@@ -7,6 +7,7 @@ import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useAppFileStartHandler} from "~/composables/app/useAppFileStartHandler";
 import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
+import {useAppUpdater} from "~/composables/app/useAppUpdater";
 import {Routes} from "#shared/constants/app";
 import {stateClient} from "~/utils/stateClient";
 
@@ -16,15 +17,17 @@ const $menu = useAppWindowMenu()
 const $opener = useAppOpener()
 const $act = useAppSessionActions()
 const $settings = useAppSettings()
+const $updater = useAppUpdater()
 const $route = useRoute()
 const $fileStart = useAppFileStartHandler()
 const REPO = 'https://github.com/CTRL-Neo-Studios/vertex'
-const notInUtilityPage = () => ![Routes.settings, Routes.loading].some(p => $route.path.startsWith(p))
+const notInUtilityPage = () => ![Routes.settings, Routes.loading, Routes.about].some(p => $route.path.startsWith(p))
 
 // Commands available in every window. Session layouts register more (save, new folder, tabs…).
 useCommands({
-    'app.settings': {run: () => $settings.createOrFocusSettingsWindow(), enabled: notInUtilityPage},
-    'app.about': {run: () => $settings.createOrFocusSettingsWindow()},
+    'app.settings': {run: () => $settings.createOrFocusSettingsWindow(), enabled: () => !$route.path.startsWith(Routes.settings)},
+    'app.about': {run: () => $settings.createOrFocusAboutWindow()},
+    'app.checkUpdates': {run: () => $updater.checkForUpdates()},
     'app.quit': {run: () => stateClient.quit()},
     'file.openFile': {run: () => $act.openSinglespaceAction(), enabled: notInUtilityPage},
     'file.openFolder': {run: () => $act.openWorkspaceAction(), enabled: notInUtilityPage},

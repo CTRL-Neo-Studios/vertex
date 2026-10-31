@@ -24,6 +24,7 @@ export interface Command {
 export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, label: string, accelerator?: string}[] = [
     {id: 'app.settings', section: 'app', group: 0, label: 'app.commands.settings', accelerator: 'CmdOrCtrl+,'},
     {id: 'app.about', section: 'app', group: 0, label: 'app.commands.about'},
+    {id: 'app.checkUpdates', section: 'app', group: 0, label: 'app.commands.checkUpdates'},
     {id: 'app.quit', section: 'app', group: 1, label: 'app.commands.quit', accelerator: 'CmdOrCtrl+Q'},
 
     {id: 'file.newFile', section: 'file', group: 0, label: 'app.commands.newFile', accelerator: 'CmdOrCtrl+N'},

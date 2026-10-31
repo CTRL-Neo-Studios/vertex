@@ -30,12 +30,23 @@ tauri-plugin-store = { version = "2.5.0", features = [] }
 tauri-plugin-clipboard-manager = { version = "2.5.0", features = [] }
 tauri-plugin-opener = { version = "2.7.2", features = [] }
 tauri-plugin-os = { version = "2.4.0", features = [] }
-tauri-plugin-process = { version = "2", features = [] }
+tauri-plugin-process = { version = "2.4.0", features = [] }
 url = "2.5.8"
 tauri-plugin-notification = { version = "2.8.0", features = [] }
 rayon = "1.12"
 tokio = { version = "1", features = ["sync", "time"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tauri-plugin-single-instance = { version = "2.5.5", features = [] }
 tauri-plugin-updater = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3.6", features = ["apple-native"] }
+
+[target."cfg(windows)".dependencies]
+keyring = { version = "3.6", features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
