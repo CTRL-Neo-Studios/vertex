@@ -9,6 +9,7 @@
 		"commands": {
 			"settings": "Settings…",
 			"about": "About Vertex",
+			"checkUpdates": "Check for Updates…",
 			"quit": "Quit Vertex",
 			"newFile": "New File…",
 			"newFolder": "New Folder…",
@@ -25,6 +26,25 @@
 			"docs": "Documentation",
 			"reportIssue": "Report an Issue",
 			"repo": "Source Code on GitHub"
+		},
+		"about": {
+			"version": "Version",
+			"channel": "Channel: {channel}",
+			"checkUpdates": "Check for Updates",
+			"repo": "Source Code on GitHub"
+		},
+		"updates": {
+			"upToDate": {
+				"title": "You're up to date",
+				"description": "Vertex is already on the latest version."
+			},
+			"available": {
+				"title": "Update available",
+				"prompt": "Version {version} is available. Install now?"
+			},
+			"install": "Install",
+			"later": "Later",
+			"error": "Update check failed"
 		},
 		"home": {
 			"newFile": "New File…",
@@ -69,6 +89,17 @@
 					"label": "App language",
 					"description": "The language of menus and the interface.",
 					"system": "Same as system"
+				}
+			},
+			"updates": {
+				"title": "Updates",
+				"channel": {
+					"label": "Update channel",
+					"description": "The release channel to update from, e.g. stable or beta."
+				},
+				"token": {
+					"label": "Channel token",
+					"description": "Optional token for restricted (private) channels."
 				}
 			},
 			"theme": {

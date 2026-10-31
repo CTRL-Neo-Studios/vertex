@@ -28,6 +28,14 @@ async function setRecovery(value: SessionRecoveryMode) {
 async function setLanguage(value: string) {
     await save({language: value})
 }
+
+async function setUpdateChannel(value: string) {
+    await save({updateChannel: value})
+}
+
+async function setUpdateToken(value: string) {
+    await save({updateToken: value})
+}
 </script>
 
 <template>
@@ -59,6 +67,34 @@ async function setLanguage(value: string) {
                     :items="languageItems"
                     class="min-w-44"
                     @update:model-value="setLanguage($event as string)"
+                />
+            </UFormField>
+        </UPageCard>
+        <UPageCard :title="t('app.settings.updates.title')">
+            <UFormField
+                size="sm"
+                :label="t('app.settings.updates.channel.label')"
+                :description="t('app.settings.updates.channel.description')"
+                orientation="horizontal"
+            >
+                <UInput
+                    :model-value="config.updateChannel"
+                    class="min-w-44"
+                    placeholder="stable"
+                    @update:model-value="setUpdateChannel($event as string)"
+                />
+            </UFormField>
+            <UFormField
+                size="sm"
+                :label="t('app.settings.updates.token.label')"
+                :description="t('app.settings.updates.token.description')"
+                orientation="horizontal"
+            >
+                <UInput
+                    :model-value="config.updateToken"
+                    type="password"
+                    class="min-w-44"
+                    @update:model-value="setUpdateToken($event as string)"
                 />
             </UFormField>
         </UPageCard>

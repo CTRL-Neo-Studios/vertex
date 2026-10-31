@@ -8,7 +8,11 @@ export interface AppSettings {
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
-	deviceId: string
+	deviceId: string,
+    /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
+    updateChannel: string,
+    /** Optional token for restricted channels; sent as `x-updater-token`. */
+    updateToken: string
 }
 
 export interface AppThemeConfig {

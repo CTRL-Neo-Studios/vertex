@@ -8,6 +8,7 @@
 export const WindowLabel = {
     main: 'main',
     settings: 'settings',
+    about: 'about',
     sessionPrefix: 'session-',
 } as const
 
@@ -25,6 +26,7 @@ export const Routes = {
     home: '/',
     loading: '/loading',
     settings: '/settings',
+    about: '/about',
     error: '/error',
     sessionTabs: (sessionUuid: string, mode: SessionMode) => `/sessions/${sessionUuid}/${mode}/tabs`,
     sessionTab: (sessionUuid: string, mode: SessionMode, fileUuid: string) => `/sessions/${sessionUuid}/${mode}/tabs/${fileUuid}`,
