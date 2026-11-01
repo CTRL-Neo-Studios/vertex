@@ -69,8 +69,8 @@ async function openInTab(uuid: string) {
 
 function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean): ContextMenuItem[][] {
     const file = () => getFileByUuid(item.id)
-    /** Above / this / under level submenu for creating a file or folder relative to `item`. */
-    const newAt = (asFolder: boolean, title: string): ContextMenuItem[] => ([
+    /** Above / this / under level submenu for creating a file (with `ext`) or folder relative to `item`. */
+    const newAt = (asFolder: boolean, title: string, ext = 'md'): ContextMenuItem[] => ([
         ['aboveLevel', 'i-lucide-folder-up', 'above', itemLevel <= 1],
         ['thisLevel', 'i-lucide-folder-dot', 'same', false],
         ['underLevel', 'i-lucide-folder-down', 'below', !isFolder],
@@ -78,7 +78,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         label: t(`app.editor.ui.filetree.${key}`),
         icon,
         disabled,
-        onSelect: () => newFileModal.open({atFileIndexId: item.id, modalTitle: title, asFolder, asLevel, fileExt: asFolder ? undefined : 'md'}),
+        onSelect: () => newFileModal.open({atFileIndexId: item.id, modalTitle: title, asFolder, asLevel, fileExt: asFolder ? undefined : ext}),
     }))
 
     return [
@@ -87,6 +87,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-file-plus', children: newAt(true, t('app.editor.ui.filetree.newFolder'))},
             {label: t('app.editor.ui.filetree.newCanvas'), icon: 'i-lucide-file-plus', disabled: true}, // not implemented yet
             {label: t('app.editor.ui.filetree.newBase'), icon: 'i-lucide-file-plus', disabled: true}, // not implemented yet
+            {label: t('app.editor.ui.filetree.newWorkflow'), icon: 'i-lucide-workflow', children: newAt(false, t('app.editor.ui.filetree.newWorkflow'), 'workflow')},
             {
                 label: t('app.editor.ui.filetree.newOpenFolderProperties'),
                 icon: 'i-lucide-file-plus',

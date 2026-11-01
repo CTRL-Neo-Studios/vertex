@@ -10,6 +10,7 @@ import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFil
 import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseProperties} from "#shared/utils/index/parse";
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
+import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
 
 /**
  * Per-session runtime objects that must not be deep-reactive (watcher handle, listeners, link graph).

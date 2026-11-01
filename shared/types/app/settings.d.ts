@@ -8,9 +8,24 @@ export interface AppSettings {
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
+    workflowConfig: AppWorkflowConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
+}
+
+/** Trust records live here, in app data, so a vault can't mark its own workflows trusted (§11). */
+export interface AppWorkflowConfig {
+    /** Step limit per run (`limits.steps`): every node activation counts, so loops can't run forever. */
+    maxLoopIterations: number,
+    /** Call depth limit (`limits.depth`). */
+    maxStackDepth: number,
+    /** Wall-clock limit per run; 0 = none. */
+    wallClockTimeoutMs: number,
+    /** Ask before a run's first move to the vault trash. */
+    confirmTrash: boolean,
+    /** Program hash → the workflow's name and when it was trusted. Editing a program changes its hash. */
+    trustedPrograms: Record<string, {name: string, trustedAt: string}>,
 }
 
 export interface AppThemeConfig {

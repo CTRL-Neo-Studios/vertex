@@ -1,4 +1,4 @@
-import type {AppSettings, AppViewConfig, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppSettings, AppViewConfig, AppWorkflowConfig, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {DeepPartial} from "#shared/types/types";
@@ -18,9 +18,26 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
+        workflowConfig: defaultAppWorkflowConfig(data?.workflowConfig),
 		deviceId: data?.deviceId || crypto.randomUUID(),
         updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
+}
+
+const positiveInt = (value: unknown, fallback: number) =>
+    typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback
+
+export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
+    const trusted = data?.trustedPrograms
+    return {
+        maxLoopIterations: positiveInt(data?.maxLoopIterations, 100_000),
+        maxStackDepth: positiveInt(data?.maxStackDepth, 64),
+        wallClockTimeoutMs: data?.wallClockTimeoutMs === 0 ? 0 : positiveInt(data?.wallClockTimeoutMs, 30_000),
+        confirmTrash: data?.confirmTrash ?? true,
+        trustedPrograms: Object.fromEntries(Object.entries(trusted && typeof trusted === 'object' ? trusted : {})
+            .filter(([hash, r]) => /^[0-9a-f]{64}$/.test(hash) && typeof r?.name === 'string' && typeof r?.trustedAt === 'string')
+            .map(([hash, r]) => [hash, {name: r!.name!, trustedAt: r!.trustedAt!}])),
+    } satisfies AppWorkflowConfig
 }
 
 export function defaultAppSession(data?: Partial<AppSession>): AppSession {

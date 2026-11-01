@@ -64,7 +64,8 @@
 				"about": "关于",
 				"general": "通用",
 				"theme": "主题",
-				"view": "视图"
+				"view": "视图",
+				"workflows": "工作流"
 			},
 			"about": {
 				"version": "应用的当前版本。",
@@ -173,6 +174,24 @@
 				"statusBarOnHover": "悬停时显示",
 				"statusBarAlways": "始终显示",
 				"statusBarNever": "始终隐藏"
+			},
+			"workflows": {
+				"title": "工作流",
+				"limits": "限制",
+				"maxLoopIterations": "每次运行的步数",
+				"maxLoopIterationsDescription": "运行激活的每个节点都计数；超过后运行停止。",
+				"maxStackDepth": "调用深度",
+				"maxStackDepthDescription": "函数之间可以嵌套调用的层数。",
+				"wallClockTimeoutMs": "时间限制（毫秒）",
+				"wallClockTimeoutMsDescription": "运行超过此时间会停止。0 表示不限制。",
+				"safety": "安全",
+				"confirmTrash": "移到废纸篓前询问",
+				"confirmTrashDescription": "每次运行在工作流首次把文件移到仓库废纸篓前询问一次。",
+				"trusted": "已信任的工作流",
+				"trustedDescription": "无需询问即可运行的工作流。编辑过的工作流需要重新信任。",
+				"noTrusted": "暂无。工作流首次运行时会询问你。",
+				"revoke": "撤销信任",
+				"trustedAt": "信任于 {date}"
 			}
 		},
 		"editor": {
@@ -239,7 +258,8 @@
 					"newFolder": "新建文件夹",
 					"newCanvas": "新建画布",
 					"newBase": "新建数据库",
-					"newOpenFolderProperties": "新建/打开文件夹属性"
+					"newOpenFolderProperties": "新建/打开文件夹属性",
+					"newWorkflow": "新建工作流"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
@@ -259,7 +279,51 @@
 					"done": "已更新 {links} 个链接。",
 					"failed": "无法更新 {file} 中的链接。"
 				},
-				"viewImage": "点击查看图片"
+				"viewImage": "点击查看图片",
+				"workflow": {
+					"run": "运行",
+					"dryRun": "试运行",
+					"undo": "撤销运行",
+					"runDisabled": "请先解决问题。",
+					"problems": "问题",
+					"lastRun": "上次运行",
+					"noRun": "尚未运行。试运行会显示将要发生的更改，但不会改动任何文件。",
+					"ok": "完成 · {steps} 步",
+					"fault": "已停止 · {code}",
+					"aborted": "已中止",
+					"wouldChange": "将要更改",
+					"changed": "已更改",
+					"noChanges": "没有更改",
+					"declined": "未信任，因此没有运行。",
+					"failed": "工作流无法运行",
+					"undone": "已撤销 {count} 项更改",
+					"undoSkipped": "跳过 {count} 项：{reasons}",
+					"invalid": "Vertex 无法打开此工作流文件",
+					"invalidDescription": "它在这里保持只读。请在其他编辑器中修复 JSON，或从备份恢复。",
+					"ops": {
+						"rename": "重命名",
+						"move": "移动",
+						"trash": "移到废纸篓",
+						"property": "设置属性",
+						"links": "更新链接"
+					}
+				},
+				"workflowTrust": {
+					"title": "首次运行“{name}”？",
+					"description": "工作流可以修改你的笔记。请检查它将要做什么；只有在你信任后它才会运行，编辑后需要重新信任。",
+					"capabilities": "它可以",
+					"nothing": "不会访问程序以外的内容",
+					"plan": "试运行将会更改",
+					"dryRunFault": "试运行提前停止：{message}",
+					"cancel": "取消",
+					"trust": "信任并运行"
+				},
+				"workflowTrash": {
+					"title": "将文件移到废纸篓？",
+					"description": "“{name}”即将把文件移到此仓库的 .vertex/trash 文件夹。不会删除任何文件，并且可以撤销这次运行。",
+					"cancel": "停止运行",
+					"confirm": "移到废纸篓"
+				}
 			}
 		},
 		"frontmatter": {

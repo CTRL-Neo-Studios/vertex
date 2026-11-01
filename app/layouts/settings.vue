@@ -9,6 +9,7 @@ const links = computed(() => [
     {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
+    {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
 ] satisfies NavigationMenuItem[])
 </script>
 

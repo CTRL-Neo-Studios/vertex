@@ -1,8 +1,8 @@
 # Node Engine — Specification (Draft 2)
 
-> **Status**: Spec, pre-implementation. Supersedes the execution, trust and schema sections of [Workflows.md](Workflows.md).
-> **Date**: October 2026. Draft 2 (2026-10-31) adds subtyping and `Dictionary` (§3), the decision log (Appendix A) and research notes (Appendix B).
-> **Working name**: `engine` (packages `engine/core`, `engine/vue`). Rename once the home of the library is decided.
+> **Status**: Spec; M1 (`validate`), M2 (runtime, `std`), M3 (functions, variables, `migrate`, `hashProgram`), M4 (`testing`, typed run contexts), M5 (`vue`) and M6 (Vertex language, `.workflow` tab, dry run, trust, undo) implemented. Supersedes the execution, trust and schema sections of [Workflows.md](Workflows.md).
+> **Date**: October 2026. Draft 2 (2026-10-31) adds subtyping and `Dictionary` (§3), the decision log (Appendix A) and research notes (Appendix B). Implementation decisions are recorded as Appendix A #17–23 (M1), #24–30 (M2), #31–37 (M3), #38–43 (M4), #44–53 (M5) and #54–63 (M6).
+> **Name**: `@type32/workflows` (repo `CTRL-Neo-Studios/workflows-scripting-engine`), with subpath exports `./core`, `./core/std`, `./core/testing` and `./vue`. `engine/…` below means `@type32/workflows/…`.
 
 ---
 
@@ -30,8 +30,8 @@ A visual node-scripting toolkit. Developers define their own languages (types, n
 |---|---|---|
 | `engine/core` | Type system, language definition, manifest, document format, validation, migrations, runtime | none |
 | `engine/core/std` | Standard nodes (control flow, logic, strings, lists) | `engine/core` |
-| `engine/core/testing` | Recording effects, document builder, run helpers | `engine/core` |
-| `engine/vue` | Canvas, palette, input widgets, diagnostics and trace overlays, override slots | `engine/core`, `@vue-flow/core` |
+| `engine/core/testing` | `record(effects)` (recording proxy, `log()` lines like `fs.rename(/v/a.md, a_archive)`), `buildDocument(language, spec)` (node versions from the manifest, edges as `"a.port > b.port"`), `run(language, doc, { event, effects, … })` (compile, dispatch, captured trace), `formatTrace`, `assertValid`. No test framework dependency | `engine/core` |
+| `engine/vue` | `useWorkflowEditor`, `WorkflowCanvas`, `WorkflowNode`, `WorkflowPalette`, `WorkflowWidget`, `WorkflowDiagnostics`; `style.css` (§2.1) | `engine/core`, `vue`, `@vue-flow/core`, `@nuxt/ui` (optional peers) |
 
 Rules:
 - `engine/core` uses no DOM, Vue or Node APIs. It runs in a browser, a Worker, Node and Bun.
@@ -39,6 +39,23 @@ Rules:
 - New packages are split out only when a second consumer needs them.
 
 **Rete.js** was evaluated and rejected as the runtime. `rete-engine@2.1.1` `ControlFlow.execute` calls `forward()` without awaiting it, and `execute()` returns `void`. A test showed a two-iteration loop firing `done` before either async body finished. It also has no cancellation, limits or per-iteration values. VueFlow is used only for the canvas.
+
+### 2.1 `engine/vue`
+
+- **State.** `useWorkflowEditor(manifest, doc)` holds the document (deeply reactive), the current graph (`'main'` or a function id) and `analysis`, which is `validate` rerun on every program change. Edits go through its methods: `addNode`, `removeNodes`, `moveNode`, `connect`, `removeEdges`, `setLiteral`, `setTypeArg`, `setVariadic`. `snapshot()` returns a plain copy to save or run. Editors need only the manifest (§1).
+  - **Ids** are `n<k>`/`e<k>`, unique across the whole document.
+  - **Wiring** a used data input or exec output replaces its edge.
+  - **Connection checks.** `connectionProblem(from, to)` validates a copy with the edge added. It returns the first new error other than `E_REQUIRED_INPUT`, `E_LITERAL_INVALID` and `E_UNRESOLVED_TYPE`. While dragging, the canvas shows that message and refuses the drop, so the canvas never has a second rule set.
+  - **Trace.** `trace` holds the last run's events and is cleared on any program change. `traced` maps them to nodes (run count, fault, last output values) and to taken edges: exec edges from `exit`/`fire` ports, data edges from `value` ports.
+- **Canvas.** Exec ports are arrows. Data ports are circles (one value), squares (`List`) or diamonds (`Dictionary`), colored by resolved type and hollow until wired.
+  - Nodes are `UCard`s: the header shows a mode icon tile (a manifest `icon` replaces it), the label and `UBadge`s for `requires`, run count and diagnostics (`UTooltip` lists them). Values are badges, faults a `UAlert`. A footer holds type-parameter pins (`USelect`) and the variadic count (`UInputNumber`). The card's ring shows state: selected (primary), invalid (error), ran (success), faulted (error, glow).
+  - Edges are drawn invalid (red, dashed), converted (dotted) or taken (glowing, animated for exec).
+  - Edges whose node or port can't be rendered are left out; the diagnostics list them.
+- **Widgets.** An unwired input gets a Nuxt UI editor picked from its type's literal schema: `enum` → `USelect`, `boolean` → `USwitch`, `number`/`integer` → `UInputNumber`, `string` → `UInput`, anything else → JSON in a `UInput`. Opaque and unresolved types get none. Empty text unsets the literal.
+- **Overrides.** `WorkflowCanvas` slots: `#widget` replaces one input's editor (props: node, port, resolved type, schema, value, fallback, `update`); `#node` replaces a whole node (render `WorkflowNode` inside it to keep the default body). A `WorkflowNode` rendered from `#node` takes its own `#widget` slot; the canvas's applies only to nodes it renders.
+- **Styling.** Components are built from Nuxt UI (`@nuxt/ui/components/*.vue` imports), so they follow the host's theme: semantic colors, radius, light/dark. Modes map to semantic colors (event `error`, exec `info`, pure `success`, once `warning`). The host needs Nuxt UI set up and Tailwind scanning this package (`@source` on its `dist`). `style.css` covers only the canvas grid, ports, wires and the type palette: 17 named `--wf-*` colors and `--wf-type-*`. `TypeDef.color` takes a palette name or any CSS color; a type without one takes its nearest ancestor's, else a stable pick. `List`/`Dictionary` take their item's color.
+- **Palette.** Language nodes grouped by `category` (else namespace), plus variable get/set, calls, and a body's missing entry/return. Event nodes are hidden inside function bodies. Click adds a node at the view's center; drag drops it at the cursor (`PALETTE_MIME`).
+- **Not in M5:** view groups, editor undo/redo, editors for function and variable declarations, pins to parameterized types (the footer offers param-less types).
 
 ---
 
@@ -49,7 +66,7 @@ Rules:
 ```ts
 export type TypeTerm =
 	| { kind: 'con'; id: string; args?: TypeTerm[] }   // number, vertex.File, List<T>, Dictionary<K, V>
-	| { kind: 'var'; name: string; rigid?: true }      // rigid: a function's type parameter inside its own body
+	| { kind: 'var'; name: string; rigid?: true; bound?: TypeTerm }   // rigid: a function's type parameter inside its own body; bound: set by the engine
 ```
 
 - **Ground type:** a term containing no `var`.
@@ -64,14 +81,15 @@ export type Variance = 'out' | 'inv'   // out = covariant (read-only position), 
 export interface TypeDef {
 	id: string                // 'string', 'List', 'vertex.File'
 	params?: { name: string; variance: Variance }[]
-	extends?: TypeTerm        // single parent, nominal. Only on types without params. Default: any
+	extends?: TypeTerm        // single parent, nominal. Only on types without params, and the parent has none either. Default: any
 	key?: true                // may be used as a Dictionary key
 	schema?: SchemaTemplate   // absent = opaque: values only arrive over wires, never as literals
 	label?: string
 	color?: string
 }
 
-/** A JSON Schema subset (type, enum, const, items, properties, required, minimum, maximum, minLength, maxLength, pattern).
+/** A JSON Schema subset (type: string | number | integer | boolean | array | object, enum, const, items, properties, required,
+ *  additionalProperties, minimum, maximum, minLength, maxLength, pattern). Unsupported keywords are rejected when the type is defined.
  *  `{ $param: 'T' }` is replaced by the schema of the type bound to T. */
 export type SchemaTemplate = Record<string, unknown>
 
@@ -88,6 +106,8 @@ Built in, in core:
 | `Dictionary<K, V>` | `K: inv`, `V: out` | `any` | — | `{ type: 'object', additionalProperties: $V }` (K = `string` only; otherwise opaque) |
 
 There is no bottom type and no `null`: an absent value is modeled by the node, e.g. an empty `List` (§13).
+
+Run-time values: `List` is an array, `Dictionary` is a `ReadonlyMap` (so `number` and `boolean` keys stay distinct). Literals are JSON, so the runtime decodes a `Dictionary` literal (a JSON object, K = `string`) into a `Map`, recursively through `List` and `Dictionary`. Language types with a schema stay plain JSON. Values are immutable: nodes must not mutate their inputs.
 
 Rules `defineLanguage` enforces:
 - `extends` chains are acyclic and end at `any`.
@@ -124,7 +144,8 @@ Inference runs over the whole graph on every validation. Graphs are small, and i
 3. **Solve.** Repeat until nothing changes:
    - Each unpinned variable with lower bounds becomes the join of its lower bounds. That is the most specific type every source fits into.
    - Only when that settles, each variable that has no lower bounds but has upper bounds becomes the most specific of its upper bounds. Example: an `emptyList<T>` wired into a `List<vertex.File>` input resolves `T = vertex.File`.
-   - More than 64 rounds is a type that never settles: `E_INFINITE_TYPE`.
+   - A `typeParams` bound adds the upper bound `T <: bound` per instance, so a variable with no other bounds resolves to its bound. A solution from lower bounds is checked against the bound (`E_TYPE_MISMATCH`).
+   - More than 64 rounds beyond one per unpinned variable is a type that never settles: `E_INFINITE_TYPE`. A round moves a solution one edge further, so a chain of n generic nodes needs n rounds.
 4. **Check.** With all variables substituted:
    - every constraint must hold, else `E_TYPE_MISMATCH` on that edge;
    - every `Dictionary` key argument must be a key type, else `E_KEY_TYPE`.
@@ -136,7 +157,7 @@ Inference runs over the whole graph on every validation. Graphs are small, and i
 
 Properties:
 - **Order-independent.** Results don't depend on edge order, so the transactional, ordered unification of draft 1 is no longer needed.
-- **Rigid variables** (a generic function's own type parameters inside its body) are treated like pinned opaque types: `T <: T` only, and `T <: any`.
+- **Rigid variables** (a generic function's own type parameters inside its body) are fixed opaque types: `T <: T`, `T <: any`, and `T <: X` whenever its bound is a subtype of `X`; nothing but `T` is a subtype of `T`. A join involving `T` falls back to its bound. `T` is a key type if its bound is. No literal fits `T`, but `[]` fits `List<T>` and `{}` fits `Dictionary<string, T>`. Documents can't write rigid variables: `typeArgs` inside a body may name the function's parameters, and the engine rebuilds them as rigid with their bounds.
 - **Subtyping is erased at run time.** Upcasts need no code, because a `vertex.Note` value already is a `vertex.File` value.
 
 The analysis exposes `typeOf(nodeId, port, 'in' | 'out')`. The editor uses it to colour ports and render widgets.
@@ -174,6 +195,7 @@ export interface NodeManifest {
 	inputs?: Record<string, DataPortDef>
 	outputs?: Record<string, DataPortDef>
 	variadic?: VariadicDef
+	typeParams?: TypeParamDef[]               // every type variable in a port must be declared here
 	requires?: string[]                       // capability ids (§7)
 	label: string
 	category?: string
@@ -200,8 +222,9 @@ Settings are not a separate concept: they are inputs with `wire: false`.
 ```ts
 export interface PureContext<E> {
 	inputs: Record<string, unknown>
-	effects: E           // narrowed to the node's `requires`
+	effects: E           // only the node's `requires`; other capabilities are absent at run time
 	signal: AbortSignal
+	variadic: number     // this instance's variadic port count
 }
 
 export interface ExecContext<E> {
@@ -212,6 +235,7 @@ export interface ExecContext<E> {
 	fire(port: string, opts?: { scope?: true | Record<string, unknown> }): Promise<void>
 	effects: E
 	signal: AbortSignal
+	variadic: number
 }
 
 export type PureRun<E> = (ctx: PureContext<E>) => Record<string, unknown> | Promise<Record<string, unknown>>
@@ -220,7 +244,12 @@ export type ExecRun<E> = (ctx: ExecContext<E>) => string | void | Promise<string
 ```
 
 - A pure or once node must return every declared output, else the run faults with `E_OUTPUT_MISSING`.
-- `defineNode` infers `inputs` and `output()` types for ports whose types are ground. Generic ports are typed `unknown`.
+- `input`, `output` and `fire` on an undeclared port, or `run` returning an unknown exec output, fault `E_NODE_THREW`.
+- **Typed contexts.** `defineLanguage<E, V>()`: `E` is the effect interface, `V` maps the language's type ids to TypeScript value types (e.g. `{ "vertex.File": string }`). `.node()` infers each port from the definition, so inside `run`:
+  - `ctx.input`, `ctx.inputs()`, `ctx.output` (pure: `inputs` and the returned object) use the ports' value types: built-ins map themselves, `List` → `readonly T[]`, `Dictionary` → `ReadonlyMap`, ids in `V` → `V[id]`; variables and unmapped ids are `unknown`, recursively (`List<T>` → `readonly unknown[]`).
+  - An input without `required` or a `default` may be `undefined`. Variadic ports are `${prefix}${number}`, typed `T | undefined`.
+  - `ctx.effects` is `Pick<E, requires>`; `fire(port)` and `run`'s return take only declared exec outputs.
+  - Port-name typos, wrong value types, unknown exec outputs and undeclared capabilities are compile errors.
 
 ### 4.4 Built-in nodes in core
 
@@ -234,9 +263,13 @@ These live in core rather than std because their ports come from the document, n
 | `core.get` | `pure` | `ref` → the variable's type |
 | `core.set` | `exec` | `ref` → the variable's type |
 
+Rules: a function body has exactly one `core.entry` and one `core.return`, and they appear nowhere else (`E_FUNCTION_SHAPE`). A body has no event nodes: only a call starts it (`E_FUNCTION_SHAPE`). In an exec function the entry starts the body like an event (out port `then`) and the return is an exec node; in a pure function both are pure, and the body may contain no exec nodes. Every return input is required. `core.get`/`core.set` resolve `ref` to a local of the enclosing function first, then to a document variable; a bad `ref` is `E_UNKNOWN_REF`.
+
 ### 4.5 Standard nodes (`engine/core/std`, finalized in M2)
 
-`std.if`, `std.forEach`, `std.sequence` (variadic `execOut`), `std.try` (`body` / `catch`; `catch` scope gets `error: string`), `std.equals<T>`, `std.not`, `std.and`, `std.or`, `std.concat` (variadic string input), `std.length<T>`, `std.flatten<T>`, `std.dictGet<K, V>` (`found` / `missing` exec outputs), `std.dictSet<K, V>`, `std.dictKeys<K, V>`.
+`std.if`, `std.forEach`, `std.sequence` (variadic `execOut`), `std.try` (`body` / `catch`; `catch` scope gets `error: string`), `std.equals<T>`, `std.not`, `std.and`, `std.or`, `std.concat` (variadic string input), `std.length<T>`, `std.append<T>`, `std.flatten<T>`, `std.dictGet<K, V>` (`found` / `missing` exec outputs), `std.dictSet<K, V>`, `std.dictKeys<K, V>`.
+
+Semantics: `std.if` fires `then` or `else`, then continues on `done`, so values set in the branch stay visible (§8.3). `std.sequence` fires `then0` … `then{n-1}` in order. `std.try` fires `body`, on a fault fires `catch` with `error`, then continues on `done`. `std.dictSet` is pure and returns a new `Dictionary`. `std.equals` is structural for `List`, `Dictionary` and JSON objects and uses identity for opaque values.
 
 None of these are special to the runtime. Any language could write its own version.
 
@@ -285,8 +318,11 @@ export const vertex = defineLanguage<VertexEffects>({ id: 'vertex', version: 1, 
 			return 'then'
 		},
 	})
+	.build()   // flattens includes and runs every manifest check; throws on the first problem
 
 vertex.manifest   // JSON-serializable: everything except the code
+
+export interface TypeParamDef { name: string; bound?: TypeTerm }   // bound must be ground
 ```
 
 ---
@@ -323,11 +359,11 @@ export interface VariableDecl { id: string; name: string; type: TypeTerm; defaul
 export interface FunctionDecl {
 	id: string
 	name: string
-	typeParams?: string[]             // rigid inside the body, fresh per core.call outside it
+	typeParams?: TypeParamDef[]       // rigid inside the body, fresh per core.call outside it
 	exec: boolean                     // false = pure function: the body may contain no exec nodes
 	inputs: Record<string, DataPortDef>
 	outputs: Record<string, DataPortDef>
-	locals?: VariableDecl[]
+	locals?: VariableDecl[]           // types may use typeParams; created fresh per call from their defaults
 	graph: Graph                      // exactly one core.entry; exactly one core.return
 }
 
@@ -369,7 +405,8 @@ Rules:
 - A document or node newer than the code (`E_NEWER_FORMAT`, `E_NEWER_LANGUAGE`, `E_NEWER_NODE`) is not migrated, and the host opens it read-only.
 - Migrations are code, so an editor that only has the manifest shows outdated nodes as read-only (`E_NODE_OUTDATED`).
 - Migration never writes to disk. The host saves only on an explicit user action.
-- Migration code is kept indefinitely.
+- Migration code is kept indefinitely. A missing step for a declared version is a bug in the language: `migrate` throws.
+- `migrate` is the boundary for untrusted input. It parses `unknown` into a new `DocumentV1` that keeps only known fields (no `Object.assign`), defines keys with `Object.fromEntries` so `__proto__` can't reach a prototype, drops rigid flags and bounds from terms, and caps nesting (types 64, JSON literals 256). Anything else is `E_INVALID_DOCUMENT` with a path, e.g. `program.graph.nodes[7].version: expected an integer ≥ 1`.
 
 ---
 
@@ -396,8 +433,9 @@ export function hashProgram(doc: DocumentV1): Promise<string>
 
 export interface Analysis {
 	diagnostics: Diagnostic[]
-	typeOf(node: string, port: string, dir: 'in' | 'out'): TypeTerm
+	typeOf(node: string, port: string, dir: 'in' | 'out'): TypeTerm | undefined   // undefined for exec or unknown ports; unsolved variables stay `var`
 	convertedEdges: ReadonlySet<string>
+	ports(node: string): NodePorts | undefined   // variadics expanded, core.* ports from the document; undefined for nodes left out of analysis
 	capabilities: ReadonlySet<string>
 }
 
@@ -422,7 +460,7 @@ The event payload becomes the event node's data outputs in the root scope.
 
 ### 8.2 Control flow
 
-1. **Event activation.** An event node activates and counts as one step. Control continues on its `then` output.
+1. **Event activation.** An event node activates and counts as one step. Control continues on its first exec output (`then` by convention). Each event instance gets a fresh root scope.
 2. **Exec activation.** Activating an exec node counts one step and calls `run`.
    - Inside `run`, `fire(port)` runs the chain connected to `port` and resolves when it finishes.
    - The value `run` returns names the exec output to continue on, as a tail call. `void` or an unconnected output ends the chain.
@@ -455,11 +493,11 @@ Every pure or once evaluation that is not a cache hit counts one step.
 
 ### 8.5 Variables and functions
 
-- **Document variables** are mutable slots for the whole run, initialized from their `default`. Locals are created fresh per call.
+- **Document variables** are mutable slots for the whole run, initialized from their `default`. Locals are created fresh per call. Reading a slot that has no value yet faults `E_UNSET_VALUE`.
 - `core.get` reads the slot at the moment it's pulled. `core.set` writes it.
-- **Calling a function** increases the call depth; exceeding the limit faults with `E_DEPTH_LIMIT`. Recursion is allowed.
-  - An exec function runs its entry chain, and the call continues on `then` once `core.return` is reached.
-  - A pure function evaluates its `core.return` inputs.
+- **Calling a function** increases the call depth; exceeding the limit faults with `E_DEPTH_LIMIT` (fatal, like the step limit). Recursion is allowed.
+  - An exec function runs its entry chain. Reaching `core.return` ends the call at once, even inside a `std.forEach` or `std.try` (the unwind can't be caught), and the call continues on `then`. A chain that ends without reaching `core.return` faults `E_NO_RETURN` at the call node (catchable).
+  - A pure function evaluates its `core.return` inputs in the callee's frame; entry and return each count one step.
 - **Generic functions:** the body is type-checked once, with `typeParams` as rigid variables. Each call node instantiates them fresh.
 
 ### 8.6 Limits and cancellation
@@ -470,8 +508,10 @@ Every pure or once evaluation that is not a cache hit counts one step.
 | Call depth over `limits.depth` | `E_DEPTH_LIMIT` |
 | `signal` aborted or `timeoutMs` reached | `status: 'aborted'` |
 
-- The runtime checks the signal at every node boundary and passes it to `run` and to effects.
+- The runtime checks the signal at every node boundary and passes it to `run` as `ctx.signal`; nodes hand it on to their effect calls.
 - Cooperative cancellation can't stop a node that loops forever without awaiting. Use a Worker (§2).
+- Limit faults (`E_STEP_LIMIT`, `E_DEPTH_LIMIT`) and aborts are **fatal**: once raised, every later step re-throws them, so `std.try` can't swallow them. Node errors, `E_UNSET_VALUE`, `E_CONCURRENT_FIRE` and `E_OUTPUT_MISSING` are catchable.
+- When `dispatch` returns, the run is over: a chain still running (e.g. the other side of a concurrent fire) stops at its next step.
 
 ### 8.7 Trace events
 
@@ -479,6 +519,7 @@ Every pure or once evaluation that is not a cache hit counts one step.
 export type TraceEvent =
 	| { t: 'enter'; node: string; depth: number }            // pure: emitted after its inputs resolve
 	| { t: 'exit'; node: string; port?: string; depth: number }
+	| { t: 'fire'; node: string; port: string; depth: number }     // exec node's fire(port), before that chain runs
 	| { t: 'value'; node: string; port: string; value: unknown }   // only with trace: 'values'
 	| { t: 'fault'; node: string; fault: Fault }
 ```
@@ -499,10 +540,10 @@ export interface Fault { code: FaultCode; message: string; node?: string; cause?
 
 | Kind | Codes |
 |---|---|
-| Structure | `E_DUPLICATE_ID`, `E_UNKNOWN_NODE_TYPE`, `E_UNKNOWN_PORT`, `E_UNKNOWN_REF`, `E_KIND_MISMATCH`, `E_EXEC_FANOUT`, `E_DATA_FANIN`, `E_EXEC_CYCLE`, `E_DATA_CYCLE`, `E_CROSS_GRAPH`, `E_FUNCTION_SHAPE` |
-| Types | `E_TYPE_MISMATCH`, `E_NO_COMMON_TYPE`, `E_INFINITE_TYPE`, `E_KEY_TYPE`, `E_UNRESOLVED_TYPE`, `E_LITERAL_INVALID`, `E_REQUIRED_INPUT` |
-| Versions | `E_NEWER_FORMAT`, `E_NEWER_LANGUAGE`, `E_NEWER_NODE`, `E_NODE_OUTDATED` |
-| Runtime faults | `E_MISSING_EFFECT`, `E_STEP_LIMIT`, `E_DEPTH_LIMIT`, `E_UNSET_VALUE`, `E_CONCURRENT_FIRE`, `E_OUTPUT_MISSING`, `E_NODE_THREW` |
+| Structure | `E_DUPLICATE_ID`, `E_UNKNOWN_NODE_TYPE`, `E_UNKNOWN_PORT`, `E_UNKNOWN_REF`, `E_KIND_MISMATCH`, `E_EXEC_FANOUT`, `E_DATA_FANIN`, `E_EXEC_CYCLE`, `E_DATA_CYCLE`, `E_CROSS_GRAPH`, `E_FUNCTION_SHAPE`, `E_VARIADIC_COUNT`, `E_INVALID_DOCUMENT` |
+| Types | `E_TYPE_MISMATCH`, `E_NO_COMMON_TYPE`, `E_INFINITE_TYPE`, `E_KEY_TYPE`, `E_UNRESOLVED_TYPE`, `E_LITERAL_INVALID`, `E_REQUIRED_INPUT`, `E_INVALID_TYPE` |
+| Versions | `E_LANGUAGE_MISMATCH`, `E_NEWER_FORMAT`, `E_NEWER_LANGUAGE`, `E_NEWER_NODE`, `E_NODE_OUTDATED` |
+| Runtime faults | `E_MISSING_EFFECT`, `E_STEP_LIMIT`, `E_DEPTH_LIMIT`, `E_UNSET_VALUE`, `E_CONCURRENT_FIRE`, `E_OUTPUT_MISSING`, `E_NO_RETURN`, `E_NODE_THREW` |
 
 ---
 
@@ -591,30 +632,35 @@ The subtyping rules in §3.3–3.4 were checked by a second throwaway prototype:
 
 ## 11. Vertex as the First Language
 
+As built in M6. Pure logic lives in `shared/workflows/` (node-tested against a vault on disk); the app wiring in `app/composables/workflows/` and `app/components/ViewerEditor/WorkflowViewer.vue`.
+
 | Concern | Where it lives |
 |---|---|
-| Node set (`vertex.*`) | Vertex app, `defineLanguage({ id: 'vertex', include: [std] })` |
-| Type hierarchy | `vertex.Entry` ← `vertex.File` ← `vertex.Note` (markdown); `vertex.Entry` ← `vertex.Folder`. Move and Trash take `vertex.Entry`. `vertex.asNote` is the cast node (`ok` / `fail`). Frontmatter nodes should take `vertex.Note`, but a node that passes its input through (Rename returns the renamed file) can only keep the caller's subtype with bounded generics (§13 #7). Until then, §10 types these nodes with `vertex.File` |
-| Queries | `vertex.query*` nodes are `once` and wrap `useActiveWorkspaceIndex().getFilteredFiles`. To check first: whether `@type32/obsidian-bases-parser` evaluates Bases filter expressions. If it does, Query takes Bases filter syntax instead of a custom filter UI |
-| `index` capability (not mutating) | Handler wraps `useActiveWorkspaceIndex` |
-| `fs` capability (mutating) | Handler wraps `useActiveWorkspaceTools` / `useFileIO`, so the index and file watchers stay in sync |
-| Path confinement | `fs` handler. Rejects `..` segments, drive letters and `~`; compares against root + separator. Symlink escapes need canonicalizing in Rust (known limit) |
-| Trash | `fs` handler moves to `.vertex/trash/<runId>/`. Hard delete is never used |
-| Dry run | Simulating `fs` handler: a virtual path map plus a list of planned ops, shown as a diff |
-| Undo | The inverse of the applied op list. In memory only |
-| Trust | Keyed by program hash in `tauri-plugin-store`. First run of an unknown hash shows `program.capabilities` and the dry-run diff |
-| `.workflow` tab | Workspace mode only (singlespace has no index), next to `showBasesEditor` |
+| Node set (`vertex.*`) | `shared/workflows/vertex.ts`, `defineLanguage<VertexEffects, VertexValues>({ id: 'vertex', include: [std] })`: On Run (event), Notes Tagged (once), Name, Get Property (pure), Set Property, Rename, Move, Trash, As Note (exec) |
+| Type hierarchy | `vertex.Entry` ← `vertex.File` ← `vertex.Note` (markdown); `vertex.Entry` ← `vertex.Folder`. Values are vault-relative paths (`Notes/a.md`). Rename and Move are `<T: Entry>` and return the same `T`, so a Note stays a Note (§13 #7). Set/Get Property take `vertex.Note`; Trash takes `vertex.Entry`; As Note is the cast (`ok` / `fail`). Folder takes a typed path (string schema), so Move can point at one; the others only arrive over wires |
+| Queries | Notes Tagged wraps the workspace index: markdown notes whose frontmatter `tags` contain the tag, without `#`, case-insensitive, nested tags included; `List<vertex.Note>`, sorted by path. `@type32/obsidian-bases-parser` does evaluate filters (Bases uses it); a Bases-filter query node is left for later |
+| Effects | `shared/workflows/effects.ts` `createVertexEffects(vault, …)` over a `Vault` interface (entry, entries, linksTo, read, write, move). The app's `useWorkspaceVault` implements it over the index and Tauri fs, the same way the app's own edits go (self-write marks, `moveFileInIndex`/`updateIndex`, `notifyModified`), so the tree, backlinks and open tabs stay in sync |
+| `index` capability (not mutating) | `tagged(tag)`, `property(path, key)` |
+| `fs` capability (mutating) | `rename`, `move`, `trash`, `setProperty`. Rename and Move rewrite every link to the file, with the app's link graph and `rewriteLinks`; those writes are ops too |
+| Path confinement | `vaultPath` in the handlers: rejects absolute paths, drive letters, `~`, backslashes, empty/`.`/`..` segments and `.vertex/`. Symlinks inside the vault aren't resolved (known limit) |
+| Trash | Moves to `.vertex/trash/<runId>/<path>` (hidden from the index). Never deletes. Asked once per run before the first trash (setting `confirmTrash`) |
+| Dry run | The same effects over `overlayVault(vault)`, an in-memory overlay; its ops are the planned diff (moves by name, writes by changed lines) |
+| Undo | The last real run's ops, reverted newest first. In memory only. A file edited since the run (or a path taken since) is skipped with a reason, and so is anything depending on it |
+| Trust | `AppSettings.workflowConfig.trustedPrograms`, keyed by `hashProgram`, in app data via the Rust settings writer (`tauri-plugin-store` is no longer in the app). A vault can't write it. First run of an unknown hash shows its capabilities and dry-run diff; Settings → Workflows lists and revokes records |
+| `.workflow` tab | `viewers.ts` entry `workflow` (`modes: ['workspace']`, singlespace falls back to the code editor). The file is loaded through `migrate`; a file that doesn't load stays read-only with its diagnostics. Edits serialize back into the tab's text model, which autosaves. File tree → New Workflow creates one |
 
-Settings mapping:
-- `maxLoopIterations` → `limits.steps`
-- `maxStackDepth` → `limits.depth`
-- `wallClockTimeoutMs` → `limits.timeoutMs`
+Settings (Settings → Workflows, `AppSettings.workflowConfig`):
+- `maxLoopIterations` → `limits.steps` (default 100 000)
+- `maxStackDepth` → `limits.depth` (default 64)
+- `wallClockTimeoutMs` → `limits.timeoutMs` (default 30 000; 0 = none)
 - `runBehavior` is removed: `std.try` covers it
-- `destructiveBehavior` stays as a host-side prompt before `fs.trash`
+- `destructiveBehavior` became `confirmTrash`: a host-side prompt before a run's first `fs.trash`
 
-### 11.1 Fate of the current `t32/feature/workflows` code
+### 11.1 Fate of the old `t32/feature/workflows` code
 
-| Current | Becomes |
+By M6 the branch had been rebased onto `dev` and none of this code remained; M6 was built from scratch on the engine. The table records what the old design mapped to.
+
+| Old | Became |
 |---|---|
 | `WorkflowNodeTypeDefinition`, `WorkflowNodePort*` | `NodeManifest`, `DataPortDef` |
 | `WorkflowNodeExecutor`, `WorkflowNodeExecutorResult` | `ExecRun` / `PureRun` |
@@ -625,7 +671,7 @@ Settings mapping:
 | `WorkflowParameter` vs `WorkflowParameterDefinition`, `exposedInputs`, `input/outputMapping`, `subGraph`, `"group"` category | Deleted; replaced by `wire: false` inputs, functions and view groups |
 | `WorkflowExecutionState`, `WorkflowExecutionContext`, `WorkflowRuntimeVariable` and their defaults | Deleted; replaced by `RunResult`, `TraceEvent` and runtime internals |
 
-Known defects in the current branch code, observed 2026-10-30. They are why the code is replaced rather than extended:
+Known defects in the old branch code, observed 2026-10-30. They are why the code was replaced rather than extended (each is covered by M6: `vaultPath`, hash-keyed trust in app data, capabilities from analysis, core `migrate`):
 - **Path confinement fails open.** `isPathConfined` is a raw string-prefix check. `resolvePathRelative('../../etc/passwd', '/vault')` gives `/vault/../../etc/passwd`, which passes. `/vault-evil/x` also passes for root `/vault`.
 - **`graphHash` is stored in the file it protects**, so an attacker just recomputes it. It also covers `position`, so moving a node invalidates trust.
 - **`WorkflowTrustedRecord` is keyed by `workflowId`**, with no hash. A malicious file can reuse the ID of a trusted workflow.
@@ -634,7 +680,7 @@ Known defects in the current branch code, observed 2026-10-30. They are why the 
 - **Edge kind is stored twice** (`edge.edgeType`, `edge.data.edgeType`). `buildGraphFromVueFlow` reads `data`, while cycle detection and the sort read the top-level field.
 - **`migrateWorkflowSchema`** loops from `fromVersion` to the file's own version instead of from the file's version to the current one. Newer files pass through unchanged. Unversioned input is `Object.assign`ed, junk fields included.
 - **`parseWorkflowFile`** is an unchecked `JSON.parse` cast on an untrusted file.
-- **`useActiveWorkflows()`** is empty. There is no registry, runner, canvas or `.workflow` tab yet.
+- **`useActiveWorkflows()`** was empty. There was no registry, runner, canvas or `.workflow` tab.
 
 ---
 
@@ -642,15 +688,15 @@ Known defects in the current branch code, observed 2026-10-30. They are why the 
 
 | # | Deliverable | Done when |
 |---|---|---|
-| M1 | `core`: terms, subtyping, constraint solving, `TypeDef`/schema-subset validator, manifest, document types, `validate` | §10 inference, both static negative cases and the §10 subtyping checks pass as tests |
-| M2 | Runtime: modes, scopes, limits, faults, trace; `std` | §10 run, trace and both runtime negative cases pass as tests |
-| M3 | Variables, functions, rigid type parameters, call depth; `migrate`; `hashProgram` | A generic `map<T,U>` function type-checks and runs; migration chains tested |
-| M4 | `engine/core/testing` | The Vertex language test suite is written with it |
-| M5 | `engine/vue`: canvas, palette, widgets, live diagnostics, trace overlay, overrides | The §10 document is built and run by hand in a demo page |
-| M6 | Vertex language plus the `.workflow` tab, dry run, trust and undo | The §10 workflow runs against a real vault |
+| M1 | `core`: terms, subtyping, constraint solving, `TypeDef`/schema-subset validator, manifest, document types, `validate` | §10 inference, both static negative cases and the §10 subtyping checks pass as tests. **Done 2026-10-31** |
+| M2 | Runtime: modes, scopes, limits, faults, trace; `std` | §10 run, trace and both runtime negative cases pass as tests. **Done 2026-11-01** |
+| M3 | Variables, functions, rigid type parameters, call depth; `migrate`; `hashProgram` | A generic `map<T,U>` function type-checks and runs; migration chains tested. **Done 2026-11-01** |
+| M4 | `engine/core/testing`; typed run contexts | The Vertex language test suite is written with it. **Done 2026-11-01** for this repo's §10 vertex-language, runtime, std, function and migration suites; the Vertex suite (`shared/workflows/workflows.test.ts`) uses it for §10 against a vault on disk (Appendix A #38) |
+| M5 | `engine/vue`: canvas, palette, widgets, live diagnostics, trace overlay, overrides | The §10 document is built and run by hand in a demo page. **Done 2026-11-01**: `bun run play`, built by real pointer and keyboard input, run gives §10's 11 steps and effect order; the `e7` drag is refused and the `n8` fault shows on the node (Appendix A #44–52) |
+| M6 | Vertex language plus the `.workflow` tab, dry run, trust and undo | The §10 workflow runs against a real vault. **Done 2026-11-01**: the app (web build, Tauri IPC answered over a real folder) opened `Archive drafts.workflow`, dry-ran it (11 steps, disk untouched), asked to trust it, ran it (renames, `status: archived`, links rewritten on disk, tree updated), undid it byte for byte; a hand-built Trash workflow asked to trust, asked before trashing, moved `c.md` to `.vertex/trash/<run>/`, and undid. Live `tauri dev` check pending (SMOKE.md #25–28) (Appendix A #54–63) |
 | Later | Playground app (b); composite nodes, i.e. functions promoted into a language library (c) | — |
 
-**Next step:** decide the library's name and location (§13 #8) and bounded generics (§13 #7). Then start M1, with §10's checks as the first tests.
+**Next step:** the live `tauri dev` pass of SMOKE.md #25–28, then the "Later" row. Candidate first items: a Bases-filter query node, a variables/functions panel, view groups.
 
 ---
 
@@ -658,12 +704,12 @@ Known defects in the current branch code, observed 2026-10-30. They are why the 
 
 1. **Static detection of unset values.** A dominance analysis could warn about §10's `n8` case at edit time instead of at run time. Proposed: warning `W_MAYBE_UNSET` in M2 or M3.
 2. **Optional values.** There's no `Option<T>` yet. Queries that might return nothing return an empty `List`. Revisit when a node needs "maybe one".
-3. **Conversions on the canvas.** Should converted edges show a marker or an explicit inserted node?
+3. **Conversions on the canvas.** Provisionally a marker: converted edges are drawn dotted (Appendix A #51). An explicit inserted node is still open.
 4. **Worker host helper.** Should `core` ship a `runInWorker` helper, or leave it to hosts? Only matters once a second host exists.
 5. **Interfaces / multiple parents.** Single nominal inheritance can't express "File and Folder are both Renameable" without a common base class. If a language needs that, add structural interfaces, or allow several `extends` parents with join returning a set. Deferred until a real language needs it; Vertex's `Entry` base covers its cases.
 6. **Contravariant parameters.** No `in` variance yet, because there are no function-typed values (callbacks as data). Add it together with first-class function values, if those ever exist.
-7. **Bounded generics.** Type parameters have no bound, so a node can't say "any `T` that is a `vertex.Entry`, returned as the same `T`". Without it, Rename either returns `vertex.Entry` and loses `Note`, or accepts anything. The solver already supports this: a bound is one extra upper-bound constraint `T <: bound` per instance. What's needed: an explicit `typeParams: { name, bound? }[]` on `NodeManifest`, and the bound as the fallback for an unconstrained variable. Proposed: decide before M1, because §11's node set depends on it.
-8. **Name and location** of the library.
+7. **Bounded generics.** **Decided**: Appendix A #18. A node can say "any `T` that is a `vertex.Entry`, returned as the same `T`", so Rename keeps `Note`.
+8. **Name and location** of the library. **Decided**: Appendix A #17.
 
 ---
 
@@ -687,6 +733,53 @@ Known defects in the current branch code, observed 2026-10-30. They are why the 
 | 14 | 2026-10-31 | Subtyping: nominal single inheritance, declared variance, no implicit downcasts, no automatic widening to `any` | Owner pointed to Unity. Took Unity's upcasts. Rejected silent downcasts and silent widening, which turn type errors into runtime faults (Appendix B) |
 | 15 | 2026-10-31 | `Dictionary<K, V>` built in, with K invariant, V covariant, and K limited to key types | Owner request. Covariance is sound because values are immutable |
 | 16 | 2026-10-30 | Vertex's trash moves files to `.vertex/trash/<runId>/` and never hard-deletes | Makes undo uniform. [Not re-verified] the `trash` crate's restore APIs (`os_limited`) don't cover macOS |
+| 17 | 2026-10-31 | The library is `@type32/workflows`, in its own repo, with subpath exports | Owner's choice |
+| 18 | 2026-10-31 | Bounded generics in M1: `typeParams: { name, bound? }[]` on `NodeManifest` and `FunctionDecl`. Every type variable in a port must be declared | Owner's choice (§13 #7). Declaring them catches typos at definition time |
+| 19 | 2026-10-31 | `defineLanguage(…).build()` returns the `Language`. `build` flattens includes and runs the same `checkManifest` an editor runs on JSON | One explicit point where checks run, with no chain-order dependence |
+| 20 | 2026-10-31 | The schema subset adds `additionalProperties` and `type: 'integer'`. Schemas aren't inherited through `extends` | `Dictionary`'s schema needs `additionalProperties`. Inheriting would silently turn a `string` literal into a `vertex.Path`, an implicit downcast (#14) |
+| 21 | 2026-10-31 | New diagnostics: `E_VARIADIC_COUNT`, `E_INVALID_TYPE` (`typeArgs` naming an unknown parameter or type, not ground, or nested deeper than 32), `E_LANGUAGE_MISMATCH`. An edge into a `wire: false` input is `E_KIND_MISMATCH` | Cases the draft list didn't cover. The depth cap keeps hostile documents from overflowing the stack |
+| 22 | 2026-10-31 | Variadic inputs need an edge or a literal (`E_REQUIRED_INPUT`). Document-chosen variadic counts are capped at 1024 | They have no default. The cap bounds the work a document can request |
+| 23 | 2026-10-31 | A node reported as unknown, outdated or newer is left out of further checks, but its outgoing edges still count as wiring their targets | One diagnostic per broken node instead of follow-on errors |
+| 24 | 2026-11-01 | `Dictionary` values are `ReadonlyMap`s at run time; `Dictionary` literals are decoded to `Map` | Owner's choice. Correct for every key type; a plain object would coerce `number` keys to strings |
+| 25 | 2026-11-01 | Typed run contexts are deferred to M4 | Owner's choice. Additive later; nodes cast until then |
+| 26 | 2026-11-01 | Limit faults and aborts are fatal and re-thrown at every later step | `std.try` stays an ordinary node and still can't swallow a backstop |
+| 27 | 2026-11-01 | Contexts carry `variadic: number` | `std.sequence` needs to know how many outputs to fire |
+| 28 | 2026-11-01 | `std.if` and `std.try` continue on `done` after their branch | §8.3 relies on values from a branch staying visible afterwards |
+| 29 | 2026-11-01 | `ctx.effects` is narrowed at run time, not only in types | A node can't use a capability it didn't declare, so `program.capabilities` stays truthful |
+| 30 | 2026-11-01 | `E_MISSING_EFFECT` checks only capabilities reachable from the dispatched event type | Dispatching one event mustn't need handlers for the others |
+| 31 | 2026-11-01 | M3's `map<T,U>` is a lookup map, `map<T: string, U>(list: List<T>, table: Dictionary<T, U>) → List<U>`, built from `forEach`, `dictGet`, a local and the new pure `std.append` | Owner's choice. There are no function values (§13 #6); this exercises rigid parameters, bounds, locals and generic calls |
+| 32 | 2026-11-01 | `core.return` is an early return that unwinds the whole call | Owner's choice. What every language does; it unwinds like the fatal faults, so `std.try` stays an ordinary node |
+| 33 | 2026-11-01 | An exec function that ends without `core.return` faults `E_NO_RETURN` | Owner's choice. A missing branch is visible instead of silently stopping the caller |
+| 34 | 2026-11-01 | A rigid variable carries its bound on the term | Keeps `TypeTable` free of function context; rigid terms only ever come from the engine |
+| 35 | 2026-11-01 | Locals may use the function's type parameters; no literal fits a rigid `T`, but `[]` fits `List<T>` | An accumulator starting empty is the common case; anything more would be a downcast |
+| 36 | 2026-11-01 | `migrate` parses into a fresh document with known fields only and depth caps | Fixes the `Object.assign` and unchecked-cast defects of §11.1 |
+| 37 | 2026-11-01 | Each call frame gets a root scope without a parent, plus its own local slots | §8.3's isolation; recursion can't see the caller's values |
+| 38 | 2026-11-01 | M4's acceptance is met by rewriting this repo's tests on `testing`; the real Vertex language suite comes with M6 | Owner's choice. The Vertex language lives in the app (§11), which is M6 |
+| 39 | 2026-11-01 | Value types come from `defineLanguage<E, V>()`, one map per language | Owner's choice. Simple and fast to check |
+| 40 | 2026-11-01 | `.node()` infers one type parameter per property (inputs, outputs, exec outputs, requires, variadic) over a union discriminated by `mode`, with `NoInfer` on `run`'s result | A single parameter for the whole definition makes inference circular (`ctx` became `any`); overloads gave misleading errors. Checked on TS 7 and the TS 6.0.3 floor |
+| 41 | 2026-11-01 | Generic parts are `unknown` recursively, not whole ports | `List<T>` → `readonly unknown[]` still types `.length` and iteration |
+| 42 | 2026-11-01 | `testing` has no test framework dependency; `record` is a Proxy | Works with any runner; follows class-based effect objects and later method replacement |
+| 43 | 2026-11-01 | Event nodes are rejected inside function bodies | `dispatch` would otherwise start a body without a call frame |
+| 44 | 2026-11-01 | Components are SFCs, type-checked by vue-tsc on TypeScript 6.0.3; TypeScript 7 checks `src/core` alone with no DOM lib | Owner's choice. vue-tsc needs the TS API, which 7.0 lacks. The core-only check also enforces §2's no-DOM rule. `isolatedDeclarations` stays on for core; Volar's generated SFC code fails it |
+| 45 | 2026-11-01 | Connection checks validate a copy of the document with the edge added | One rule set (core's), including inference, cycles and conversions. Checks sit on each Handle: VueFlow's flow-level `isValidConnection` also runs on existing edges and drops invalid ones, which the editor must show |
+| 46 | 2026-11-01 | Wiring a used data input or exec output replaces its edge | Blueprint behavior; refusing with `E_DATA_FANIN`/`E_EXEC_FANOUT` makes rewiring a two-step chore |
+| 47 | 2026-11-01 | The canvas sets VueFlow's store (`setNodes`/`setEdges`) from the document instead of binding `:nodes`/`:edges` | VueFlow pauses its prop watcher while it applies its own changes; a document update in that window (trace cleared by a delete) was dropped |
+| 48 | 2026-11-01 | New trace event `fire` | Without it a trace can't tell which exec output fired mid-run; guessing from "both ends ran" is wrong for If branches merging into one node |
+| 49 | 2026-11-01 | `Analysis.ports(node)` | Editors render core.* and variadic ports from the same code `validate` uses |
+| 50 | 2026-11-01 | ~~Plain CSS with `--wf-*` variables; no Nuxt UI dependency~~ Superseded by #53 | — |
+| 51 | 2026-11-01 | Converted edges are drawn dotted | §13 #3, provisionally |
+| 52 | 2026-11-01 | Node selection doesn't raise nodes (`elevateNodesOnSelect: false`) | Otherwise a node added from the palette lands under the selected one and can't be grabbed |
+| 53 | 2026-11-01 | `engine/vue` is built from Nuxt UI components; `@nuxt/ui` is an optional peer dependency | Owner's choice, for visual consistency with the host app. Nuxt UI runs in Nuxt and plain Vue (its Vite plugin); explicit component imports keep the dist free of auto-import assumptions. Type colors on ports and wires stay library CSS |
+| 54 | 2026-11-01 | Vertex values are vault-relative `/` paths | Handlers confine one shape; traces and diffs read as `Notes/a.md`, not absolute paths |
+| 55 | 2026-11-01 | One effects implementation over a `Vault` interface; dry runs use an in-memory overlay vault | A dry run executes the real code, so the plan can't drift from what a run does. The op journal is the diff and the undo log |
+| 56 | 2026-11-01 | Rename and Move rewrite links automatically, without the interactive prompt | Owner's choice. Uses the app's link graph and `rewriteLinks`; the link writes are ops, so they show in the diff and undo |
+| 57 | 2026-11-01 | Undo skips files edited since the run, and ops that depend on them | Never overwrite later edits; report what was left |
+| 58 | 2026-11-01 | Trust records live in `AppSettings.workflowConfig`, keyed by program hash | `tauri-plugin-store` is gone from the app; the Rust settings writer already persists in app data, outside any vault, and broadcasts changes to every window |
+| 59 | 2026-11-01 | `vertex.Folder` has a string schema; Entry, File and Note stay opaque | Move needs a target; files only come from queries, so typed paths can't name arbitrary files |
+| 60 | 2026-11-01 | Notes Tagged matches without `#`, case-insensitively, nested tags included; markdown only | Obsidian's tag semantics; only markdown carries frontmatter tags, which makes the output `List<Note>` |
+| 61 | 2026-11-01 | Trash prompt once per run, before the first trash (`confirmTrash`, default on) | Replaces `destructiveBehavior`; per-call prompts in a loop would be unusable, and undo covers mistakes |
+| 62 | 2026-11-01 | `getInternalLinks` moved into Vertex (`shared/utils/index/rewriteLinks.ts`), on the same scanner as `rewriteLinks` | The editor package no longer exports it (0.2.x), which broke link indexing and three test files. One grammar for finding and rewriting links |
+| 63 | 2026-11-01 | Vertex depends on `@type32/workflows` via `file:../workflows` until it's published | Owner's choice. Vertex CI/release can't install it until the range points at npm |
 
 ---
 

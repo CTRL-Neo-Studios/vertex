@@ -64,7 +64,8 @@
 				"about": "About",
 				"general": "General",
 				"theme": "Theme",
-				"view": "View"
+				"view": "View",
+				"workflows": "Workflows"
 			},
 			"about": {
 				"version": "The app's current version.",
@@ -173,6 +174,24 @@
 				"statusBarOnHover": "Show On Hover",
 				"statusBarAlways": "Always Shown",
 				"statusBarNever": "Always Hidden"
+			},
+			"workflows": {
+				"title": "Workflows",
+				"limits": "Limits",
+				"maxLoopIterations": "Steps per run",
+				"maxLoopIterationsDescription": "Every node a run activates counts; a run that goes over stops.",
+				"maxStackDepth": "Call depth",
+				"maxStackDepthDescription": "How deep functions may call each other.",
+				"wallClockTimeoutMs": "Time limit (ms)",
+				"wallClockTimeoutMsDescription": "A run that takes longer stops. 0 means no limit.",
+				"safety": "Safety",
+				"confirmTrash": "Ask before trashing",
+				"confirmTrashDescription": "Ask once per run before a workflow moves files to the vault trash.",
+				"trusted": "Trusted workflows",
+				"trustedDescription": "Workflows that may run without asking. A workflow you edit has to be trusted again.",
+				"noTrusted": "None yet. The first run of a workflow asks you.",
+				"revoke": "Revoke",
+				"trustedAt": "Trusted {date}"
 			}
 		},
 		"editor": {
@@ -239,7 +258,8 @@
 					"newFolder": "New Folder",
 					"newCanvas": "New Canvas",
 					"newBase": "New Base",
-					"newOpenFolderProperties": "New/Open Folder Properties"
+					"newOpenFolderProperties": "New/Open Folder Properties",
+					"newWorkflow": "New Workflow"
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",
@@ -259,7 +279,51 @@
 					"done": "Updated {links} link(s).",
 					"failed": "Could not update links in {file}."
 				},
-				"viewImage": "Click to view image"
+				"viewImage": "Click to view image",
+				"workflow": {
+					"run": "Run",
+					"dryRun": "Dry run",
+					"undo": "Undo run",
+					"runDisabled": "Fix the problems first.",
+					"problems": "Problems",
+					"lastRun": "Last run",
+					"noRun": "Not run yet. A dry run shows what would change without touching any file.",
+					"ok": "Done · {steps} steps",
+					"fault": "Stopped · {code}",
+					"aborted": "Aborted",
+					"wouldChange": "Would change",
+					"changed": "Changed",
+					"noChanges": "No changes",
+					"declined": "Not trusted, so nothing ran.",
+					"failed": "The workflow couldn’t run",
+					"undone": "Undid {count} changes",
+					"undoSkipped": "{count} skipped: {reasons}",
+					"invalid": "This file isn’t a workflow Vertex can open",
+					"invalidDescription": "It stays read-only here. Fix the JSON in another editor or restore it from a backup.",
+					"ops": {
+						"rename": "Rename",
+						"move": "Move",
+						"trash": "Trash",
+						"property": "Set properties",
+						"links": "Update links"
+					}
+				},
+				"workflowTrust": {
+					"title": "Run “{name}” for the first time?",
+					"description": "Workflows can change your notes. Check what this one would do; it runs only after you trust it, and editing it asks again.",
+					"capabilities": "It can",
+					"nothing": "Nothing outside the program",
+					"plan": "A dry run would change",
+					"dryRunFault": "The dry run stopped early: {message}",
+					"cancel": "Cancel",
+					"trust": "Trust and run"
+				},
+				"workflowTrash": {
+					"title": "Move files to the trash?",
+					"description": "“{name}” is about to move files into this vault’s .vertex/trash folder. Nothing is deleted, and you can undo the run.",
+					"cancel": "Stop the run",
+					"confirm": "Move to trash"
+				}
 			}
 		},
 		"frontmatter": {
