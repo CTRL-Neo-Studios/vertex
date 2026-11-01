@@ -76,6 +76,19 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                         asLevel: 'same'
                     })
                 }
+            },
+            {
+                label: t('app.editor.ui.filetree.newWorkflow'),
+                description: t('app.editor.ui.palette.newWorkflowDescription'),
+                icon: 'i-lucide-workflow',
+                onSelect() {
+                    newFileModal.open({
+                        modalTitle: t('app.editor.ui.filetree.newWorkflow'),
+                        asFolder: false,
+                        asLevel: 'same',
+                        fileExt: 'workflow'
+                    })
+                }
             }
         ]
     },

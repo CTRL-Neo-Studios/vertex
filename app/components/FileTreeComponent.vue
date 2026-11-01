@@ -3,7 +3,7 @@ import {StateKey} from "#shared/constants/app";
 import type {TreeItem, ContextMenuItem} from '@nuxt/ui';
 import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
-import {fileNameFromPath, getFileExtensionFromPath} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
@@ -39,6 +39,7 @@ const expandedFolders = useState<string[]>(StateKey.expandedFolders(props.sessio
 const formattedTreeData = computed<TreeItem[]>(() => {
     const build = (nodes: UITreeNode[]): TreeItem[] => nodes.map(node => {
         const icon = isPropertiesFile(node.fileName) ? 'i-lucide-file-cog'
+            : isWorkflowFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-workflow'
             : typeof node.properties.icon === 'string' && node.properties.icon ? node.properties.icon : undefined
         const item: TreeItem = {
             id: node.uuid,

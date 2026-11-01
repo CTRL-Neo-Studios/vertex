@@ -13,6 +13,7 @@
 			"quit": "退出 Vertex",
 			"newFile": "新建文件…",
 			"newFolder": "新建文件夹…",
+			"newWorkflow": "新建工作流…",
 			"openFile": "打开文件…",
 			"openFolder": "打开文件夹…",
 			"save": "保存",
@@ -221,6 +222,7 @@
 					"quickActions": "快捷操作",
 					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
 					"newFolderDescription": "在工作区根目录新建文件夹。",
+					"newWorkflowDescription": "在工作区根目录新建工作流。",
 					"files": "文件（{count}）"
 				},
 				"bases": {

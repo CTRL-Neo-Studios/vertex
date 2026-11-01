@@ -13,6 +13,7 @@
 			"quit": "Quit Vertex",
 			"newFile": "New File…",
 			"newFolder": "New Folder…",
+			"newWorkflow": "New Workflow…",
 			"openFile": "Open File…",
 			"openFolder": "Open Folder…",
 			"save": "Save",
@@ -221,6 +222,7 @@
 					"quickActions": "Quick Actions",
 					"newFileDescription": "Creates a new Markdown file in the workspace root.",
 					"newFolderDescription": "Creates a new folder in the workspace root.",
+					"newWorkflowDescription": "Creates a new workflow in the workspace root.",
 					"files": "Files ({count})"
 				},
 				"bases": {
