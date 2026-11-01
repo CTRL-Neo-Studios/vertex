@@ -19,6 +19,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
+		"@catppuccin/codemirror": "^1.0.3",
 		"@iconify-json/lucide": "^1.2.150",
 		"@nuxt/fonts": "1.2.0",
 		"@nuxt/icon": "2.6.2",
