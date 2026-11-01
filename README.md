@@ -4,7 +4,7 @@
 A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
 > [!WARNING]
-> Since the app is in ***ALPHA***, I highly suggest you to **NOT USE IT ON IMPORTANT VAULTS**. I've warned you here and I won't be responsible for any loss caused by the software.
+> Since the app is in ***EARLY ACCESS***, I highly suggest you to **NOT USE IT ON IMPORTANT VAULTS**. I've warned you here and I won't be responsible for any loss caused by the software.
 
 > [!NOTE]
 > This project falls strictly under the AGPL v3 License.
@@ -25,6 +25,12 @@ A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nu
 Please check out [Concepts and Structures.md](Concepts%20and%20Structures.md) to grasp general concepts of the Vertex.
 
 For the history of this project, check out https://www.ctrl-neo.dev/projects/vertex
+
+## Installation
+
+- [Windows](https://ctrl-neo.dev/apps/download/vertex/windows-x86_64)
+- [MacOS](https://ctrl-neo.dev/apps/download/vertex/darwin-aarch64)
+- [Linux](https://ctrl-neo.dev/apps/download/vertex/linux-x86_64)
 
 ## Development Roadmap
 
