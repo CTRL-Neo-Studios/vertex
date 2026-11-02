@@ -26,6 +26,8 @@ export interface AppWorkflowConfig {
     confirmTrash: boolean,
     /** Program hash → the workflow's name and when it was trusted. Editing a program changes its hash. */
     trustedPrograms: Record<string, {name: string, trustedAt: string}>,
+    /** Workspace root path → when it was trusted. Every workflow in a trusted workspace runs without asking. */
+    trustedWorkspaces: Record<string, {trustedAt: string}>,
 }
 
 export interface AppThemeConfig {

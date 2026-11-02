@@ -34,7 +34,8 @@
 				"trafficLightPosition": {
 					"x": 14,
 					"y": 21
-				}
+				},
+				"dragDropEnabled": false
 			}
 		],
 		"security": {
@@ -74,6 +75,15 @@
 			},
 			{
 				"ext": [
+					"workflow"
+				],
+				"mimeType": "text/workflow",
+				"name": "Vertex Workflow",
+				"description": "The Vertex Workflow Format",
+				"role": "Editor"
+			},
+			{
+				"ext": [
 					"txt"
 				],
 				"mimeType": "text/plain",
@@ -88,7 +98,10 @@
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc4NzIzOUUyOUI5Qzc0RTQKUldUa2RKeWI0amx5ZUhoUTdZVTUyMm1Tak9JeUgvWitzUHhBblV5d1F4Vlc4cXV3VzZWOEdJemYK",
 			"endpoints": [
 				"https://www.ctrl-neo.dev/apps/updates/vertex/{{target}}/{{arch}}/{{current_version}}"
-			]
+			],
+			"windows": {
+				"installMode": "passive"
+			}
 		}
 	}
 }

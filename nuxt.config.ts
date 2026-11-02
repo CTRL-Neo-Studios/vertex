@@ -101,7 +101,7 @@ export default defineNuxtConfig({
                 "alfaaz"
             ],
             // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
-            exclude: ["@type32/workflows"]
+            // exclude: ["@type32/workflows"]
         },
     },
 });

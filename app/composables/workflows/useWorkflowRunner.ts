@@ -139,22 +139,31 @@ export function useWorkflowRunner(session: ActiveSession) {
 
     const dryRun = (doc: DocumentV1, name: string, context: RunContext = {}, live?: LiveOptions) => execute(doc, name, true, context, live)
 
-    /** Asks, with its capabilities and dry-run diff, unless the program's hash is already trusted. */
-    async function trust(doc: DocumentV1, name: string, context: RunContext = {}): Promise<boolean> {
+    /**
+     * Asks before a real run, unless the program's hash or the workspace is trusted. The prompt shows the
+     * capabilities, and the dry-run diff when there's one to show: a program that talks to the user (`ui`) isn't
+     * dry-run first, or its questions and messages would come before the prompt and again after it.
+     */
+    async function trust(doc: DocumentV1, name: string): Promise<boolean> {
         const hash = await hashProgram(doc)
-        const current = settings()
-        if (current.trustedPrograms[hash]) return true
-        const plan = await dryRun(doc, name, context)
+        const root = session.rootPath!
+        if (settings().trustedPrograms[hash] || settings().trustedWorkspaces[root]) return true
         const used = compile(doc, vertexLanguage).capabilities
         const capabilities = manifest.value.capabilities.filter(c => used.has(c.id))
-        const accepted = await trustModal.open({name, capabilities, plan}).result
-        if (accepted) await save({workflowConfig: {...current, trustedPrograms: {...current.trustedPrograms, [hash]: {name, trustedAt: new Date().toISOString()}}}})
-        return Boolean(accepted)
+        const plan = used.has('ui') ? undefined : await dryRun(doc, name)
+        const answer = await trustModal.open({name, capabilities, plan}).result
+        if (!answer) return false
+        const current = settings()
+        const trustedAt = new Date().toISOString()
+        await save({workflowConfig: answer === 'workspace'
+            ? {...current, trustedWorkspaces: {...current.trustedWorkspaces, [root]: {trustedAt}}}
+            : {...current, trustedPrograms: {...current.trustedPrograms, [hash]: {name, trustedAt}}}})
+        return true
     }
 
     /** `undefined` when the user declined to trust the program. Call `trust` first to ask outside a live run. */
     async function run(doc: DocumentV1, name: string, context: RunContext = {}, live?: LiveOptions): Promise<RunOutcome | undefined> {
-        if (!await trust(doc, name, context)) return undefined
+        if (!await trust(doc, name)) return undefined
         const outcome = await execute(doc, name, false, context, live)
         undoable.value = outcome.ops
         return outcome
@@ -196,9 +205,9 @@ export function useWorkflowRunner(session: ActiveSession) {
         try {
             const {doc, problems} = parseWorkflow(await vault.read(path))
             if (!doc) return $qt.error(t('app.editor.ui.workflow.invalid'), problems[0]?.message)
-            if (!dry && !await trust(doc, name, context)) return $qt.info(t('app.editor.ui.workflow.declined'))
             const outcome = dry ? await dryRun(doc, name, context) : await run(doc, name, context)
-            if (outcome) report(name, outcome)
+            if (!outcome) return $qt.info(t('app.editor.ui.workflow.declined'))
+            report(name, outcome)
         } catch (error) {
             $qt.error(t('app.editor.ui.workflow.failed'), error instanceof CompileError ? error.diagnostics[0]?.message : String(error))
         }

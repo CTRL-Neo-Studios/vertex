@@ -29,6 +29,7 @@ const positiveInt = (value: unknown, fallback: number) =>
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
     const trusted = data?.trustedPrograms
+    const workspaces = data?.trustedWorkspaces
     return {
         maxLoopIterations: positiveInt(data?.maxLoopIterations, 100_000),
         maxStackDepth: positiveInt(data?.maxStackDepth, 64),
@@ -37,6 +38,9 @@ export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>):
         trustedPrograms: Object.fromEntries(Object.entries(trusted && typeof trusted === 'object' ? trusted : {})
             .filter(([hash, r]) => /^[0-9a-f]{64}$/.test(hash) && typeof r?.name === 'string' && typeof r?.trustedAt === 'string')
             .map(([hash, r]) => [hash, {name: r!.name!, trustedAt: r!.trustedAt!}])),
+        trustedWorkspaces: Object.fromEntries(Object.entries(workspaces && typeof workspaces === 'object' ? workspaces : {})
+            .filter(([root, r]) => /^(\/|[a-zA-Z]:[\\/])/.test(root) && typeof r?.trustedAt === 'string')
+            .map(([root, r]) => [root, {trustedAt: r!.trustedAt!}])),
     } satisfies AppWorkflowConfig
 }
 

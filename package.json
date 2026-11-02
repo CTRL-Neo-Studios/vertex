@@ -40,7 +40,7 @@
 		"@type32/latex2vue": "^3.1.18",
 		"@type32/nuxt-predicates": "^1.1.0",
 		"@type32/obsidian-bases-parser": "^0.3.4",
-		"@type32/workflows": "file:../workflows",
+		"@type32/workflows": "^0.1.1",
 		"@type32/yaml-editor-form": "0.2.4",
 		"@vue-flow/core": "^1.48.2",
 		"@vueuse/nuxt": "15.0.0",
@@ -57,6 +57,7 @@
 	"devDependencies": {
 		"@nuxt/eslint": "^1.17.0",
 		"@tauri-apps/cli": "^2.12.4",
+		"@types/node": "^24",
 		"eslint": "^10.14.0",
 		"typescript": "6.0.3",
 		"vitest": "^5.0.5",

@@ -192,7 +192,10 @@
 				"trustedDescription": "Workflows that may run without asking. A workflow you edit has to be trusted again.",
 				"noTrusted": "None yet. The first run of a workflow asks you.",
 				"revoke": "Revoke",
-				"trustedAt": "Trusted {date}"
+				"trustedAt": "Trusted {date}",
+				"trustedWorkspaces": "Trusted workspaces",
+				"trustedWorkspacesDescription": "Every workflow in these workspaces runs without asking, edited or not.",
+				"noTrustedWorkspaces": "None. Trust a workspace from a workflow’s first-run prompt."
 			}
 		},
 		"editor": {
@@ -417,7 +420,10 @@
 					"plan": "A dry run would change",
 					"dryRunFault": "The dry run stopped early: {message}",
 					"cancel": "Cancel",
-					"trust": "Trust and run"
+					"trust": "Trust and run",
+					"noPlan": "It asks you questions as it runs, so it isn’t previewed here. Use Dry run to see what it would change.",
+					"trustWorkspace": "Trust this workspace",
+					"trustWorkspaceDescription": "Every workflow in this workspace, including ones you edit or add later, runs without asking. Revoke it in Settings → Workflows."
 				},
 				"workflowTrash": {
 					"title": "Move files to the trash?",

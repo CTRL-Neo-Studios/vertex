@@ -192,7 +192,10 @@
 				"trustedDescription": "无需询问即可运行的工作流。编辑过的工作流需要重新信任。",
 				"noTrusted": "暂无。工作流首次运行时会询问你。",
 				"revoke": "撤销信任",
-				"trustedAt": "信任于 {date}"
+				"trustedAt": "信任于 {date}",
+				"trustedWorkspaces": "受信任的工作区",
+				"trustedWorkspacesDescription": "这些工作区中的所有工作流都会直接运行，无论是否编辑过。",
+				"noTrustedWorkspaces": "暂无。可在工作流首次运行的提示中信任工作区。"
 			}
 		},
 		"editor": {
@@ -417,7 +420,10 @@
 					"plan": "试运行将会更改",
 					"dryRunFault": "试运行提前停止：{message}",
 					"cancel": "取消",
-					"trust": "信任并运行"
+					"trust": "信任并运行",
+					"noPlan": "它会在运行时向你提问，所以这里不做预览。可以用“试运行”查看它将要做出的更改。",
+					"trustWorkspace": "信任此工作区",
+					"trustWorkspaceDescription": "此工作区中的所有工作流（包括之后编辑或新增的）都会直接运行，不再询问。可在“设置 → 工作流”中撤销。"
 				},
 				"workflowTrash": {
 					"title": "将文件移到废纸篓？",

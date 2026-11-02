@@ -37,11 +37,15 @@ describe('defaultAppWorkflowConfig', () => {
     })
 
     it('keeps only well-formed trust records', () => {
-        const c = defaultAppWorkflowConfig({trustedPrograms: {
-            [hash]: {name: 'Archive', trustedAt: '2026-11-01'},
-            'not-a-hash': {name: 'x', trustedAt: 'y'},
-            ['b'.repeat(64)]: {name: 'missing date'},
-        }})
+        const c = defaultAppWorkflowConfig({
+            trustedPrograms: {
+                [hash]: {name: 'Archive', trustedAt: '2026-11-01'},
+                'not-a-hash': {name: 'x', trustedAt: 'y'},
+                ['b'.repeat(64)]: {name: 'missing date'},
+            },
+            trustedWorkspaces: {'/Users/me/Vault': {trustedAt: '2026-11-02'}, 'relative/path': {trustedAt: 'x'}, '/no-date': {}},
+        })
         expect(c.trustedPrograms).toEqual({[hash]: {name: 'Archive', trustedAt: '2026-11-01'}})
+        expect(c.trustedWorkspaces).toEqual({'/Users/me/Vault': {trustedAt: '2026-11-02'}})
     })
 })
