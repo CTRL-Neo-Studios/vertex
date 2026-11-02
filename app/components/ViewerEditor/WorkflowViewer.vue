@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {CompileError, DOCUMENT_FORMAT, migrate, type Diagnostic, type DocumentV1} from "@type32/workflows/core"
-import {useWorkflowEditor, WorkflowCanvas, WorkflowDiagnostics, WorkflowPalette} from "@type32/workflows/vue"
+import {defaultMessages, useWorkflowEditor, WorkflowWorkbench, type WorkflowMessages} from "@type32/workflows/vue"
+import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager"
 import type {UndoResult} from "#shared/workflows/effects"
 import {vertexLanguage} from "#shared/workflows/vertex"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
@@ -48,7 +49,26 @@ function parse(text: string): { doc?: DocumentV1, problems: Diagnostic[] } {
 
 const initial = parse(content.value)
 const loadProblems = ref(initial.problems)
-const editor = useWorkflowEditor(vertexLanguage.manifest, initial.doc ?? emptyDocument())
+
+// The canvas's own strings, translated; a getter, so a locale switch reaches them.
+const wf = (key: string, params: Record<string, unknown> = {}) => t(`app.editor.ui.workflowCanvas.${key}`, params)
+const messages = (): WorkflowMessages => ({
+    ...Object.fromEntries(Object.keys(defaultMessages).map(key => [key, wf(key)])) as unknown as WorkflowMessages,
+    cantConnect: reason => wf('cantConnect', {reason}),
+    getVariable: name => wf('getVariable', {name}),
+    setVariable: name => wf('setVariable', {name}),
+    defaultValue: value => wf('defaultValue', {value}),
+    selected: count => wf('selected', {count}),
+    referenceIn: (graph, node) => wf('referenceIn', {graph, node}),
+    variableName: n => wf('variableName', {n}),
+    blockName: n => wf('blockName', {n}),
+    usedBy: count => wf('usedBy', {count}),
+    returnVia: exit => wf('returnVia', {exit}),
+})
+const editor = useWorkflowEditor(vertexLanguage.manifest, initial.doc ?? emptyDocument(), {
+    messages,
+    clipboard: {read: readText, write: writeText},
+})
 const canvasKey = ref(0)
 
 // Text ↔ document. `written` is the last text this viewer produced, so its own saves don't reload it.
@@ -146,21 +166,16 @@ const status = computed(() => {
         </div>
         <div
             v-else
-            class="workflow-viewer grid w-full grid-cols-[14rem_1fr_20rem] border-t border-default"
+            class="workflow-viewer w-full border-t border-default"
             :style="{height: 'calc(100vh - var(--ui-header-height) - 3rem)'}"
         >
-            <aside class="overflow-y-auto border-e border-default">
-                <WorkflowPalette :editor="editor"/>
-            </aside>
-            <main class="min-w-0">
-                <WorkflowCanvas :key="canvasKey" :editor="editor"/>
-            </main>
-            <aside class="flex flex-col gap-5 overflow-y-auto border-s border-default p-4">
-                <div class="flex flex-wrap gap-2">
+            <WorkflowWorkbench :key="canvasKey" :editor="editor">
+                <template #toolbar>
                     <UTooltip :text="errors.length ? t('app.editor.ui.workflow.runDisabled') : undefined" :disabled="!errors.length">
                         <UButton
                             size="sm"
                             icon="i-lucide-play"
+                            class="shadow-sm"
                             :label="t('app.editor.ui.workflow.run')"
                             :loading="busy"
                             :disabled="busy || errors.length > 0"
@@ -172,6 +187,7 @@ const status = computed(() => {
                         color="neutral"
                         variant="outline"
                         icon="i-lucide-flask-conical"
+                        class="bg-default shadow-sm"
                         :label="t('app.editor.ui.workflow.dryRun')"
                         :disabled="busy || errors.length > 0"
                         @click="act('dry')"
@@ -179,38 +195,35 @@ const status = computed(() => {
                     <UButton
                         size="sm"
                         color="neutral"
-                        variant="ghost"
+                        variant="outline"
                         icon="i-lucide-undo-2"
-                        :label="t('app.editor.ui.workflow.undo')"
+                        class="bg-default shadow-sm"
+                        :aria-label="t('app.editor.ui.workflow.undo')"
                         :disabled="busy || !runner.canUndo.value"
                         @click="undo"
                     />
-                </div>
-
-                <section>
-                    <h3 class="mb-2 text-xs font-medium text-dimmed">{{ t('app.editor.ui.workflow.problems') }}</h3>
-                    <WorkflowDiagnostics :editor="editor"/>
-                </section>
-
-                <section>
-                    <h3 class="mb-2 text-xs font-medium text-dimmed">{{ t('app.editor.ui.workflow.lastRun') }}</h3>
-                    <p v-if="!status" class="text-sm text-muted">{{ t('app.editor.ui.workflow.noRun') }}</p>
-                    <div v-else class="space-y-2">
-                        <UAlert :color="status.color" variant="subtle" :icon="status.icon" :title="status.title" :description="status.description"/>
-                        <h4 class="text-xs text-dimmed">{{ outcome!.dry ? t('app.editor.ui.workflow.wouldChange') : t('app.editor.ui.workflow.changed') }}</h4>
-                        <WorkflowOps :ops="outcome!.ops"/>
-                    </div>
-                    <UAlert
-                        v-if="undone"
-                        class="mt-2"
-                        :color="undone.skipped.length ? 'warning' : 'success'"
-                        variant="subtle"
-                        icon="i-lucide-undo-2"
-                        :title="t('app.editor.ui.workflow.undone', {count: undone.undone})"
-                        :description="undone.skipped.length ? t('app.editor.ui.workflow.undoSkipped', {count: undone.skipped.length, reasons: [...new Set(undone.skipped.map(s => s.reason))].join('; ')}) : ''"
-                    />
-                </section>
-            </aside>
+                </template>
+                <template #inspector>
+                    <section class="border-t border-default p-3">
+                        <h3 class="mb-2 text-xs font-medium text-dimmed">{{ t('app.editor.ui.workflow.lastRun') }}</h3>
+                        <p v-if="!status" class="text-sm text-muted">{{ t('app.editor.ui.workflow.noRun') }}</p>
+                        <div v-else class="space-y-2">
+                            <UAlert :color="status.color" variant="subtle" :icon="status.icon" :title="status.title" :description="status.description"/>
+                            <h4 class="text-xs text-dimmed">{{ outcome!.dry ? t('app.editor.ui.workflow.wouldChange') : t('app.editor.ui.workflow.changed') }}</h4>
+                            <WorkflowOps :ops="outcome!.ops"/>
+                        </div>
+                        <UAlert
+                            v-if="undone"
+                            class="mt-2"
+                            :color="undone.skipped.length ? 'warning' : 'success'"
+                            variant="subtle"
+                            icon="i-lucide-undo-2"
+                            :title="t('app.editor.ui.workflow.undone', {count: undone.undone})"
+                            :description="undone.skipped.length ? t('app.editor.ui.workflow.undoSkipped', {count: undone.skipped.length, reasons: [...new Set(undone.skipped.map(s => s.reason))].join('; ')}) : ''"
+                        />
+                    </section>
+                </template>
+            </WorkflowWorkbench>
         </div>
     </ViewerEditorLayoutWrapper>
 </template>
