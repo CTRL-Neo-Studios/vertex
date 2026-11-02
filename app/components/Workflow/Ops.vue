@@ -6,7 +6,10 @@ import {baseNameOf, parentOf} from "#shared/workflows/vault"
 const props = defineProps<{ ops: Op[] }>()
 const {t} = useI18n()
 
-const ICONS = {rename: 'i-lucide-pencil-line', move: 'i-lucide-folder-input', trash: 'i-lucide-trash-2', property: 'i-lucide-list-plus', links: 'i-lucide-link'} as const
+const ICONS = {
+    rename: 'i-lucide-pencil-line', move: 'i-lucide-folder-input', trash: 'i-lucide-trash-2', property: 'i-lucide-list-plus', links: 'i-lucide-link',
+    text: 'i-lucide-file-pen-line', tag: 'i-lucide-tag', note: 'i-lucide-file-plus', folder: 'i-lucide-folder-plus', copy: 'i-lucide-copy',
+} as const
 
 /** Lines only in `before` (−) and only in `after` (+); enough to show a property or a link change. */
 function changedLines(before: string, after: string, max = 4) {
@@ -19,6 +22,7 @@ function changedLines(before: string, after: string, max = 4) {
 
 const rows = computed(() => props.ops.map(op => {
     if (op.kind === 'write') return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.path, detail: '', lines: changedLines(op.before, op.after)}
+    if (op.kind === 'create') return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.path, detail: '', lines: op.text ? changedLines('', op.text) : []}
     const detail = op.why === 'rename' ? `→ ${baseNameOf(op.to)}` : op.why === 'move' ? `→ ${parentOf(op.to) || '/'}` : ''
     return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.from, detail, lines: []}
 }))

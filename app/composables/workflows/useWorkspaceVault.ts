@@ -1,5 +1,6 @@
 import {exists, mkdir, readDir, readTextFile, rename, writeTextFile} from "@tauri-apps/plugin-fs"
 import type {ActiveSession} from "#shared/types/active/sessions"
+import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace"
 import {parentOf, type Vault, type VaultEntry} from "#shared/workflows/vault"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
@@ -17,11 +18,18 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
     const abs = (path: string) => (path ? `${root}/${path}` : root)
     const hidden = (path: string) => path.startsWith('.vertex/')
 
-    const toEntry = (node: {relativePath: string, isFolder: boolean, properties: unknown}): VaultEntry => ({
+    const toEntry = (node: ActiveWorkspaceFileIndex): VaultEntry => ({
         path: node.relativePath,
         isFolder: node.isFolder,
         properties: (node.properties ?? {}) as Record<string, unknown>,
+        size: node.isFolder ? 0 : node.size,
+        created: new Date(node.createdTime).getTime(),
+        modified: new Date(node.modifiedTime).getTime(),
     })
+
+    async function refuseExisting(path: string) {
+        if (await exists(abs(path))) throw new Error(`"${path}" already exists`)
+    }
 
     /** Indexes a path and, for a folder, everything under it (hidden names skipped, as in a scan). */
     async function addTree(path: string) {
@@ -43,6 +51,10 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
             if (!node || node.isFolder) return []
             return $index.getRenameImpact(node.uuid).map(({file, targets}) => ({file: file.relativePath, targets}))
         },
+        linksFrom(path) {
+            const node = $index.getFileByPath(abs(path))
+            return (node?.forelinks ?? []).flatMap(uuid => $index.getFileByUuid(uuid)?.relativePath ?? [])
+        },
         read: path => readTextFile(abs(path)),
         async write(path, text) {
             const full = abs(path)
@@ -51,10 +63,22 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
             await $index.updateIndex(full, text)
             $index.notifyModified(full)
         },
+        async create(path, text) {
+            await refuseExisting(path)
+            $index.markSelfWrite(abs(path))
+            await writeTextFile(abs(path), text)
+            await $index.addFileToIndex(abs(path), root)
+        },
+        async createFolder(path) {
+            await refuseExisting(path)
+            $index.markSelfWrite(abs(path))
+            await mkdir(abs(path))
+            await $index.addFileToIndex(abs(path), root)
+        },
         async move(from, to) {
             const [src, dest] = [abs(from), abs(to)]
-            if (from.toLowerCase() !== to.toLowerCase() && await exists(dest)) throw new Error(`"${to}" already exists`)
-            // Mark every folder this creates, so the watcher doesn't index `.vertex/…` on its create events.
+            if (from.toLowerCase() !== to.toLowerCase()) await refuseExisting(to)
+            // Marks every folder this creates, so the watcher doesn't index `.vertex/…` on its create events.
             const created: string[] = []
             for (let dir = parentOf(to); dir && !(await exists(abs(dir))); dir = parentOf(dir)) created.push(abs(dir))
             $index.markSelfWrite(src, dest, ...created)

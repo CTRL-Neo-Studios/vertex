@@ -15,6 +15,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 
 const {t} = useI18n()
 
@@ -27,9 +28,11 @@ const $navi = useAppNavigator()
 const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, activeTabUuid} = useActiveTabs(session)
-const {getFileByUuid, getPropertiesFile} = useActiveWorkspaceIndex(session)
+const {getFileByUuid, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
 const {createFile} = useActiveWorkspaceTools(session)
 const {config} = useAppSettings()
+// Workflows run on a workspace folder; a session without one gets no run items.
+const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 
 const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
@@ -82,7 +85,32 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         onSelect: () => newFileModal.open({atFileIndexId: item.id, modalTitle: title, asFolder, asLevel, fileExt: asFolder ? undefined : ext}),
     }))
 
-    return [
+    const node = item.originalNodeData as UITreeNode
+    const ext = getFileExtensionFromPath(node.fileName)
+    /** `.workflow`: Run / Dry run. A note: run one of the vault's workflows on it. */
+    const runItems = (): ContextMenuItem[] => {
+        if (!runner || isFolder) return []
+        if (isWorkflowFile(ext)) return [
+            {label: t('app.editor.ui.workflow.run'), icon: 'i-lucide-play', onSelect: () => runner.runFile(node.relativePath, false)},
+            {label: t('app.editor.ui.workflow.dryRun'), icon: 'i-lucide-flask-conical', onSelect: () => runner.runFile(node.relativePath, true)},
+        ]
+        if (ext.toLowerCase() !== 'md') return []
+        const workflows = getFilteredFiles(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName)))
+        return [{
+            label: t('app.editor.ui.workflow.runOnNote'),
+            icon: 'i-lucide-workflow',
+            disabled: !workflows.length,
+            children: workflows.map(w => ({
+                label: fileNameFromPath(w.fileName, true),
+                description: w.relativePath,
+                icon: 'i-lucide-workflow',
+                onSelect: () => runner.runFile(w.relativePath, false, {note: node.relativePath}),
+            })),
+        }]
+    }
+
+    const groups: ContextMenuItem[][] = [
+        runItems(),
         [
             {label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', children: newAt(false, t('app.editor.ui.filetree.newMarkdownFile'))},
             {label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-file-plus', children: newAt(true, t('app.editor.ui.filetree.newFolder'))},
@@ -115,6 +143,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: [item.id]})},
         ],
     ]
+    return groups.filter(group => group.length)
 }
 </script>
 

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import {CompileError, DOCUMENT_FORMAT, migrate, type Diagnostic, type DocumentV1} from "@type32/workflows/core"
-import {defaultMessages, useWorkflowEditor, WorkflowWorkbench, type WorkflowMessages} from "@type32/workflows/vue"
+import {CompileError, type TypeTerm} from "@type32/workflows/core"
+import {defaultMessages, useWorkflowEditor, WorkflowWidget, WorkflowWorkbench, type WorkflowMessages} from "@type32/workflows/vue"
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager"
 import type {UndoResult} from "#shared/workflows/effects"
-import {vertexLanguage} from "#shared/workflows/vertex"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
-import {useWorkflowRunner, type RunOutcome} from "~/composables/workflows/useWorkflowRunner"
+import {useWorkflowManifest} from "~/composables/workflows/useWorkflowManifest"
+import {newWorkflow, parseWorkflow, useWorkflowRunner, type RunOutcome} from "~/composables/workflows/useWorkflowRunner"
 
 /**
  * The `.workflow` editor (workspace mode only). The file is untrusted JSON: it's loaded through `migrate`, and
@@ -28,26 +28,7 @@ const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(props.sessionId)!
 const runner = useWorkflowRunner(session)
 
-const emptyDocument = (): DocumentV1 => ({
-    format: DOCUMENT_FORMAT,
-    language: {id: vertexLanguage.manifest.language.id, version: vertexLanguage.manifest.language.version},
-    program: {graph: {nodes: [], edges: []}, variables: [], functions: []},
-    view: {positions: {}, groups: []},
-})
-
-function parse(text: string): { doc?: DocumentV1, problems: Diagnostic[] } {
-    if (!text.trim()) return {doc: emptyDocument(), problems: []}
-    let raw: unknown
-    try {
-        raw = JSON.parse(text)
-    } catch (error) {
-        return {problems: [{code: 'E_INVALID_DOCUMENT', severity: 'error', message: String(error)}]}
-    }
-    const loaded = migrate(raw, vertexLanguage)
-    return 'doc' in loaded ? {doc: loaded.doc, problems: []} : {problems: loaded.diagnostics}
-}
-
-const initial = parse(content.value)
+const initial = parseWorkflow(content.value)
 const loadProblems = ref(initial.problems)
 
 // The canvas's own strings, translated; a getter, so a locale switch reaches them.
@@ -64,11 +45,22 @@ const messages = (): WorkflowMessages => ({
     blockName: n => wf('blockName', {n}),
     usedBy: count => wf('usedBy', {count}),
     returnVia: exit => wf('returnVia', {exit}),
+    pausedBefore: node => wf('pausedBefore', {node}),
 })
-const editor = useWorkflowEditor(vertexLanguage.manifest, initial.doc ?? emptyDocument(), {
+// Node labels follow the app's language as of opening the tab.
+const editor = useWorkflowEditor(useWorkflowManifest().value, initial.doc ?? newWorkflow(), {
     messages,
     clipboard: {read: readText, write: writeText},
 })
+
+/** The picker an Entry, File, Note or Folder literal gets, by its resolved type. */
+const PATH_WIDGETS: Record<string, {kind: 'file' | 'folder' | 'any', extensions?: string}> = {
+    'vertex.Entry': {kind: 'any'},
+    'vertex.File': {kind: 'file'},
+    'vertex.Note': {kind: 'file', extensions: 'md'},
+    'vertex.Folder': {kind: 'folder'},
+}
+const pathWidget = (type: TypeTerm | undefined) => (type?.kind === 'con' ? PATH_WIDGETS[type.id] : undefined)
 const canvasKey = ref(0)
 
 // Text ↔ document. `written` is the last text this viewer produced, so its own saves don't reload it.
@@ -84,7 +76,7 @@ watch(() => editor.document.value, () => {
 watch(content, text => {
     if (text === written) return
     written = text
-    const next = parse(text)
+    const next = parseWorkflow(text)
     loadProblems.value = next.problems
     if (next.doc) {
         editor.document.value = next.doc
@@ -97,21 +89,23 @@ const busy = ref(false)
 const outcome = shallowRef<RunOutcome>()
 const undone = shallowRef<UndoResult>()
 
+// Runs go through the editor, so the canvas shows them live and can pause, step or cancel them. Trust is asked
+// first, so the run bar doesn't show over the prompt.
 async function act(kind: 'dry' | 'run') {
-    busy.value = true
+    if (busy.value || editor.running.value || errors.value.length) return
     undone.value = undefined
     try {
         const doc = editor.snapshot()
-        const out = kind === 'dry' ? await runner.dryRun(doc) : await runner.run(doc, fileName.value || 'Workflow')
+        const name = fileName.value || 'Workflow'
+        if (kind === 'run' && !await runner.trust(doc, name)) return $qt.info(t('app.editor.ui.workflow.declined'))
+        const out = await editor.run(live => kind === 'dry' ? runner.dryRun(doc, name, {}, live) : runner.run(doc, name, {}, live))
         if (!out) return $qt.info(t('app.editor.ui.workflow.declined'))
         outcome.value = out
-        editor.trace.value = out.trace
     } catch (error) {
         $qt.error(t('app.editor.ui.workflow.failed'), error instanceof CompileError ? error.diagnostics[0]?.message : String(error))
-    } finally {
-        busy.value = false
     }
 }
+defineShortcuts({meta_enter: () => act('run'), meta_shift_enter: () => act('dry')})
 
 async function undo() {
     busy.value = true
@@ -170,6 +164,18 @@ const status = computed(() => {
             :style="{height: 'calc(100vh - var(--ui-header-height) - 3rem)'}"
         >
             <WorkflowWorkbench :key="canvasKey" :editor="editor">
+                <template #widget="w">
+                    <WorkflowPathWidget
+                        v-if="pathWidget(w.type)"
+                        :kind="pathWidget(w.type)!.kind"
+                        :extensions="pathWidget(w.type)!.extensions"
+                        :session-id="props.sessionId"
+                        :value="w.value"
+                        :fallback="w.fallback"
+                        :update="w.update"
+                    />
+                    <WorkflowWidget v-else v-bind="w"/>
+                </template>
                 <template #toolbar>
                     <UTooltip :text="errors.length ? t('app.editor.ui.workflow.runDisabled') : undefined" :disabled="!errors.length">
                         <UButton
@@ -177,8 +183,8 @@ const status = computed(() => {
                             icon="i-lucide-play"
                             class="shadow-sm"
                             :label="t('app.editor.ui.workflow.run')"
-                            :loading="busy"
-                            :disabled="busy || errors.length > 0"
+                            :loading="editor.running.value"
+                            :disabled="busy || editor.running.value || errors.length > 0"
                             @click="act('run')"
                         />
                     </UTooltip>
@@ -189,7 +195,7 @@ const status = computed(() => {
                         icon="i-lucide-flask-conical"
                         class="bg-default shadow-sm"
                         :label="t('app.editor.ui.workflow.dryRun')"
-                        :disabled="busy || errors.length > 0"
+                        :disabled="busy || editor.running.value || errors.length > 0"
                         @click="act('dry')"
                     />
                     <UButton
@@ -199,7 +205,7 @@ const status = computed(() => {
                         icon="i-lucide-undo-2"
                         class="bg-default shadow-sm"
                         :aria-label="t('app.editor.ui.workflow.undo')"
-                        :disabled="busy || !runner.canUndo.value"
+                        :disabled="busy || editor.running.value || !runner.canUndo.value"
                         @click="undo"
                     />
                 </template>

@@ -3,8 +3,10 @@ import type {CommandPaletteGroup, CommandPaletteItem} from "@nuxt/ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import type {UITreeNode} from "#shared/types/active/workspace";
+import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 
 const { t } = useI18n()
@@ -15,12 +17,16 @@ const sessionId = computed<string>(() => $route.params.sessionId as string)
 const $sesh = useActiveSessions()
 const $navi = useAppNavigator()
 const {
-    fileIndex
+    fileIndex,
+    getFileByUuid,
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
-    openTab
+    openTab,
+    activeTabUuid,
 } = useActiveTabs($sesh.getSession(sessionId))
 const newFileModal = $ovl.create(NewFileModal)
+const session = $sesh.getSession(sessionId)
+const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 
 async function onClickFile(item: Partial<UITreeNode>) {
     if (!item || !item.uuid) return;
@@ -45,6 +51,22 @@ const paletteItemFiles = computed(() => {
             })
     }
     return items
+})
+
+// Each workflow, run on the open note when there is one (for Current note).
+const paletteItemWorkflows = computed<CommandPaletteItem[]>(() => {
+    if (!runner) return []
+    const active = getFileByUuid(activeTabUuid.value ?? undefined)
+    const note = active && getFileExtensionFromPath(active.fileName) === 'md' ? active.relativePath : undefined
+    return Object.values(unref(fileIndex))
+        .filter(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName)))
+        .map(f => ({
+            id: `run:${f.uuid}`,
+            label: t('app.editor.ui.palette.runWorkflow', {name: fileNameFromPath(f.fileName, true)}),
+            description: note ? t('app.editor.ui.palette.runWorkflowOn', {note}) : f.relativePath,
+            icon: 'i-lucide-play',
+            onSelect: () => runner.runFile(f.relativePath, false, {note}),
+        }))
 })
 
 const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
@@ -91,6 +113,11 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             }
         ]
+    },
+    {
+        id: 'workflows',
+        label: t('app.editor.ui.palette.workflows'),
+        items: unref(paletteItemWorkflows),
     },
     {
         id: 'files',
