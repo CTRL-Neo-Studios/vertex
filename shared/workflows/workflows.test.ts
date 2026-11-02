@@ -340,6 +340,22 @@ describe('making and editing files', () => {
         expect(ui.asked).toEqual(['askText'])
         expect((await snapshot(root))['Idea.md']).toBe('---\ntags:\n  - inbox\n---\n\n')
     })
+
+    it('a program makes a note in each picked folder; picking none faults', async () => {
+        const doc = buildDocument(vertexLanguage, {
+            nodes: {
+                go: 'vertex.onManual',
+                pick: 'vertex.pickFolders',
+                each: 'std.forEach',
+                make: {type: 'vertex.createNote', literals: {name: 'Picked'}},
+            },
+            edges: ['go.then > pick.exec', 'pick.then > each.exec', 'pick.folders > each.list', 'each.body > make.exec', 'each.item > make.folder'],
+        })
+        expect((await runOn(vault, doc, stubUi({pick: async () => ['', 'Notes']}))).result.status).toBe('ok')
+        const after = await snapshot(root)
+        expect([after['Picked.md'], after['Notes/Picked.md']]).toEqual(['', ''])
+        expect((await runOn(vault, doc, stubUi({pick: async () => []}))).result.fault?.message).toBe('pick: Cancelled')
+    })
 })
 
 describe('helpers', () => {

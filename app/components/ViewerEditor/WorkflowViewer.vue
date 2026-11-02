@@ -174,6 +174,14 @@ const status = computed(() => {
                         :fallback="w.fallback"
                         :update="w.update"
                     />
+                    <WorkflowDataWidget
+                        v-else-if="w.schema?.type === 'array' || w.schema?.type === 'object'"
+                        :port="w.port"
+                        :schema="w.schema"
+                        :value="w.value"
+                        :fallback="w.fallback"
+                        :update="w.update"
+                    />
                     <WorkflowWidget v-else v-bind="w"/>
                 </template>
                 <template #toolbar>

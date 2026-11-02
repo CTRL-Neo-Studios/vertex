@@ -1070,6 +1070,14 @@
 									"folder": "folder"
 								}
 							},
+							"pickFolders": {
+								"label": "Pick folders: {prompt}",
+								"description": "Waits for one or more folders from the vault. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"prompt": "prompt",
+									"folders": "folders"
+								}
+							},
 							"showMessage": {
 								"label": "Show {message}",
 								"description": "Shows a message and continues at once. Other values than text are shown as JSON.",
@@ -1092,6 +1100,11 @@
 					"root": "Vault root",
 					"choose": "Choose…",
 					"picked": "{count} picked"
+				},
+				"workflowData": {
+					"addItem": "Type, then Enter",
+					"list": "List ({count})",
+					"dictionary": "Dictionary ({count})"
 				}
 			}
 		},

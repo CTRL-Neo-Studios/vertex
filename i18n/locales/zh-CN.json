@@ -1070,6 +1070,14 @@
 									"folder": "文件夹"
 								}
 							},
+							"pickFolders": {
+								"label": "选择文件夹：{prompt}",
+								"description": "等待从仓库中选择一个或多个文件夹。取消会使节点出错。试运行也会询问。",
+								"ports": {
+									"prompt": "提示",
+									"folders": "文件夹"
+								}
+							},
 							"showMessage": {
 								"label": "显示 {message}",
 								"description": "显示一条消息并立即继续。文本以外的值以 JSON 显示。",
@@ -1092,6 +1100,11 @@
 					"root": "仓库根目录",
 					"choose": "选择…",
 					"picked": "已选择 {count} 项"
+				},
+				"workflowData": {
+					"addItem": "输入后按回车",
+					"list": "列表（{count}）",
+					"dictionary": "字典（{count}）"
 				}
 			}
 		},

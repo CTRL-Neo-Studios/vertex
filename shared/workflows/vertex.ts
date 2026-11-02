@@ -676,6 +676,25 @@ export const vertexLanguage: Language<VertexEffects> = defineLanguage<VertexEffe
         },
     })
     .node({
+        type: 'vertex.pickFolders',
+        version: 1,
+        mode: 'exec',
+        label: 'Pick folders: {prompt}',
+        category: 'vertex.ask',
+        icon: 'i-lucide-folders',
+        description: 'Waits for one or more folders from the vault. Cancelling faults the node. Dry runs ask too.',
+        exec: {out: ['then']},
+        inputs: {prompt: {type: str, default: ''}},
+        outputs: {folders: {type: t('List', Folder)}},
+        requires: ['ui'],
+        async run(ctx) {
+            const folders = await ctx.effects.ui.pick(await ctx.input('prompt'), {kind: 'folder', multiple: true, extensions: ''})
+            cancelled(folders[0])
+            ctx.output('folders', folders)
+            return 'then'
+        },
+    })
+    .node({
         type: 'vertex.showMessage',
         version: 1,
         mode: 'exec',
