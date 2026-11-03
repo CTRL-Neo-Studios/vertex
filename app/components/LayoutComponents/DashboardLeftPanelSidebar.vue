@@ -61,6 +61,18 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
                     asLevel: 'same'
                 })
             },
+        },
+        {
+            label: t('app.editor.ui.filetree.newWorkflow'),
+            icon: 'i-lucide-workflow',
+            onSelect() {
+                newFileModal.open({
+                    modalTitle: t('app.editor.ui.filetree.newWorkflow'),
+                    asFolder: false,
+                    asLevel: 'same',
+                    fileExt: 'workflow'
+                })
+            }
         }
     ]
 ])

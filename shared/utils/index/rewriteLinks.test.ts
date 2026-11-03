@@ -1,6 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {getInternalLinks} from '../../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/internalLinks.js'
-import {renameTargets, rewriteLinks} from './rewriteLinks'
+import {getInternalLinks, renameTargets, rewriteLinks} from './rewriteLinks'
 
 const r = (text: string, pairs: [string, string][]) => rewriteLinks(text, new Map(pairs))
 
@@ -25,12 +24,24 @@ describe('rewriteLinks', () => {
         expect(r(input, [['B', 'C']])).toEqual({text: input, count: 0})
     })
 
-    it('agrees with the editor parser about which links exist', () => {
+    it('keeps the set of links, changing only the renamed targets', () => {
         const input = 'x [[B]] `[[B]]` [[B|y]] ![[notes/B]] [[unclosed\n[[B#h]]'
         const out = r(input, [['B', 'Z'], ['notes/B', 'notes/Z']]).text
-        const before = getInternalLinks(input).map((l: {path: string}) => l.path)
-        const after = getInternalLinks(out).map((l: {path: string}) => l.path)
-        expect(after).toEqual(before.map((p: string) => (p === 'B' ? 'Z' : p === 'notes/B' ? 'notes/Z' : p)))
+        const before = getInternalLinks(input).map(l => l.path)
+        const after = getInternalLinks(out).map(l => l.path)
+        expect(after).toEqual(before.map(p => (p === 'B' ? 'Z' : p === 'notes/B' ? 'notes/Z' : p)))
+    })
+})
+
+describe('getInternalLinks', () => {
+    it('reads targets, subpaths and display text, skipping code and broken links', () => {
+        const input = '[[ A ]] [[B#Sec|shown]] ![[img.png]] `[[code]]`\n```\n[[fenced]]\n```\n[[]] [[open [[C]]'
+        expect(getInternalLinks(input)).toEqual([
+            {path: 'A'},
+            {path: 'B', subpath: 'Sec', display: 'shown'},
+            {path: 'img.png'},
+            {path: 'C'},
+        ])
     })
 })
 

@@ -46,6 +46,7 @@ export function useSessionCommands(session?: ActiveSession) {
         'file.save': {run: save, enabled: hasTab},
         ...(isWorkspace ? {
             'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
+            'file.newWorkflow': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'workflow', modalTitle: t('app.editor.ui.filetree.newWorkflow')})},
             'view.closeTab': {
                 run: async () => {
                     const id = tabId()

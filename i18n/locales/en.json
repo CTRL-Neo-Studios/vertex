@@ -13,6 +13,7 @@
 			"quit": "Quit Vertex",
 			"newFile": "New File…",
 			"newFolder": "New Folder…",
+			"newWorkflow": "New Workflow…",
 			"openFile": "Open File…",
 			"openFolder": "Open Folder…",
 			"save": "Save",
@@ -64,7 +65,8 @@
 				"about": "About",
 				"general": "General",
 				"theme": "Theme",
-				"view": "View"
+				"view": "View",
+				"workflows": "Workflows"
 			},
 			"about": {
 				"version": "The app's current version.",
@@ -173,6 +175,27 @@
 				"statusBarOnHover": "Show On Hover",
 				"statusBarAlways": "Always Shown",
 				"statusBarNever": "Always Hidden"
+			},
+			"workflows": {
+				"title": "Workflows",
+				"limits": "Limits",
+				"maxLoopIterations": "Steps per run",
+				"maxLoopIterationsDescription": "Every node a run activates counts; a run that goes over stops.",
+				"maxStackDepth": "Call depth",
+				"maxStackDepthDescription": "How deep functions may call each other.",
+				"wallClockTimeoutMs": "Time limit (ms)",
+				"wallClockTimeoutMsDescription": "A run that takes longer stops. 0 means no limit.",
+				"safety": "Safety",
+				"confirmTrash": "Ask before trashing",
+				"confirmTrashDescription": "Ask once per run before a workflow moves files to the vault trash.",
+				"trusted": "Trusted workflows",
+				"trustedDescription": "Workflows that may run without asking. A workflow you edit has to be trusted again.",
+				"noTrusted": "None yet. The first run of a workflow asks you.",
+				"revoke": "Revoke",
+				"trustedAt": "Trusted {date}",
+				"trustedWorkspaces": "Trusted workspaces",
+				"trustedWorkspacesDescription": "Every workflow in these workspaces runs without asking, edited or not.",
+				"noTrustedWorkspaces": "None. Trust a workspace from a workflow’s first-run prompt."
 			}
 		},
 		"editor": {
@@ -202,7 +225,11 @@
 					"quickActions": "Quick Actions",
 					"newFileDescription": "Creates a new Markdown file in the workspace root.",
 					"newFolderDescription": "Creates a new folder in the workspace root.",
-					"files": "Files ({count})"
+					"newWorkflowDescription": "Creates a new workflow in the workspace root.",
+					"files": "Files ({count})",
+					"workflows": "Run workflow",
+					"runWorkflow": "Run {name}",
+					"runWorkflowOn": "On {note}"
 				},
 				"bases": {
 					"views": "Views",
@@ -239,7 +266,8 @@
 					"newFolder": "New Folder",
 					"newCanvas": "New Canvas",
 					"newBase": "New Base",
-					"newOpenFolderProperties": "New/Open Folder Properties"
+					"newOpenFolderProperties": "New/Open Folder Properties",
+					"newWorkflow": "New Workflow"
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",
@@ -259,7 +287,825 @@
 					"done": "Updated {links} link(s).",
 					"failed": "Could not update links in {file}."
 				},
-				"viewImage": "Click to view image"
+				"viewImage": "Click to view image",
+				"workflow": {
+					"run": "Run",
+					"dryRun": "Dry run",
+					"undo": "Undo run",
+					"runDisabled": "Fix the problems first.",
+					"lastRun": "Last run",
+					"noRun": "Not run yet. A dry run shows what would change without touching any file.",
+					"ok": "Done · {steps} steps",
+					"fault": "Stopped · {code}",
+					"aborted": "Aborted",
+					"wouldChange": "Would change",
+					"changed": "Changed",
+					"noChanges": "No changes",
+					"declined": "Not trusted, so nothing ran.",
+					"failed": "The workflow couldn’t run",
+					"undone": "Undid {count} changes",
+					"undoSkipped": "{count} skipped: {reasons}",
+					"invalid": "This file isn’t a workflow Vertex can open",
+					"invalidDescription": "It stays read-only here. Fix the JSON in another editor or restore it from a backup.",
+					"ops": {
+						"rename": "Rename",
+						"move": "Move",
+						"trash": "Trash",
+						"property": "Set properties",
+						"links": "Update links",
+						"text": "Edit text",
+						"tag": "Change tags",
+						"note": "Create note",
+						"folder": "Create folder",
+						"copy": "Copy"
+					},
+					"cancelled": "Cancelled",
+					"whichNote": "Which note should it run on?",
+					"wouldChangeCount": "Would make {count} changes",
+					"changedCount": "Made {count} changes",
+					"runOnNote": "Run workflow on this note"
+				},
+				"workflowCanvas": {
+					"zoomIn": "Zoom in",
+					"zoomOut": "Zoom out",
+					"fitView": "Fit view",
+					"snapToGrid": "Snap to grid",
+					"minimap": "Minimap",
+					"cantConnect": "Can't connect: {reason}",
+					"searchNodes": "Search nodes",
+					"noMatches": "No matching nodes",
+					"categoryVariables": "Variables",
+					"categoryFunctions": "My Blocks",
+					"getVariable": "Get {name}",
+					"setVariable": "Set {name}",
+					"entry": "Entry",
+					"return": "Return",
+					"auto": "auto",
+					"defaultValue": "{value} (default)",
+					"json": "JSON",
+					"noCapabilities": "No capabilities needed",
+					"noProblems": "No problems",
+					"emptyTitle": "Nothing here yet",
+					"emptyHint": "Press Tab, double-click or right-click to add a node, or drag one in from the library.",
+					"selected": "Selected {count} nodes",
+					"undo": "Undo",
+					"redo": "Redo",
+					"copy": "Copy",
+					"cut": "Cut",
+					"paste": "Paste",
+					"duplicate": "Duplicate",
+					"delete": "Delete",
+					"selectAll": "Select all",
+					"addNode": "Add node…",
+					"insertNode": "Insert node…",
+					"disconnect": "Disconnect",
+					"disconnectAll": "Disconnect all",
+					"resetValue": "Reset value",
+					"goToDefinition": "Go to definition",
+					"findReferences": "Find references",
+					"noReferences": "No references",
+					"referenceIn": "{graph} › {node}",
+					"main": "Main",
+					"makeBlock": "Make block",
+					"group": "Group",
+					"addComment": "Add comment",
+					"commentPlaceholder": "Write a note…",
+					"color": "Color",
+					"rename": "Rename",
+					"newVariable": "New variable",
+					"variableName": "variable {n}",
+					"localVariable": "For this block only",
+					"globalVariable": "For the whole workflow",
+					"variableHint": "Drag to get, ⌥-drag to set",
+					"newBlock": "New block",
+					"blockName": "block {n}",
+					"open": "Open",
+					"name": "Name",
+					"type": "Type",
+					"defaultLabel": "Default",
+					"execBlock": "Runs as a step",
+					"exits": "Exits",
+					"addPort": "Add",
+					"remove": "Remove",
+					"usedBy": "Nodes using it: {count}. Deleting removes them.",
+					"deleteAnyway": "Delete anyway",
+					"returnVia": "Return · {exit}",
+					"block": "Block",
+					"running": "Running…",
+					"pausedBefore": "Paused before {node}",
+					"pause": "Pause",
+					"step": "Step",
+					"resume": "Continue",
+					"cancel": "Cancel",
+					"arrange": "Arrange",
+					"alignLeft": "Align left edges",
+					"alignCenter": "Align centers",
+					"alignRight": "Align right edges",
+					"alignTop": "Align top edges",
+					"alignMiddle": "Align middles",
+					"alignBottom": "Align bottom edges",
+					"distributeHorizontally": "Space evenly across",
+					"distributeVertically": "Space evenly down",
+					"library": "Nodes",
+					"inspector": "Inspector",
+					"workflow": "Workflow",
+					"inputs": "Inputs",
+					"outputs": "Outputs"
+				},
+				"workflowTrust": {
+					"title": "Run “{name}” for the first time?",
+					"description": "Workflows can change your notes. Check what this one would do; it runs only after you trust it, and editing it asks again.",
+					"capabilities": "It can",
+					"nothing": "Nothing outside the program",
+					"plan": "A dry run would change",
+					"dryRunFault": "The dry run stopped early: {message}",
+					"cancel": "Cancel",
+					"trust": "Trust and run",
+					"noPlan": "It asks you questions as it runs, so it isn’t previewed here. Use Dry run to see what it would change.",
+					"trustWorkspace": "Trust this workspace",
+					"trustWorkspaceDescription": "Every workflow in this workspace, including ones you edit or add later, runs without asking. Revoke it in Settings → Workflows."
+				},
+				"workflowTrash": {
+					"title": "Move files to the trash?",
+					"description": "“{name}” is about to move files into this vault’s .vertex/trash folder. Nothing is deleted, and you can undo the run.",
+					"cancel": "Stop the run",
+					"confirm": "Move to trash"
+				},
+				"workflowLanguage": {
+					"categories": {
+						"std": {
+							"control": "Control",
+							"operators": "Operators",
+							"text": "Text",
+							"lists": "Lists",
+							"dictionaries": "Dictionaries"
+						},
+						"vertex": {
+							"events": "Events",
+							"notes": "Notes",
+							"files": "Files & Folders",
+							"properties": "Properties",
+							"tags": "Tags & Links",
+							"ask": "Ask"
+						}
+					},
+					"types": {
+						"vertex": {
+							"Entry": "Entry",
+							"File": "File",
+							"Note": "Note",
+							"Folder": "Folder"
+						}
+					},
+					"capabilities": {
+						"index": {
+							"label": "Read the vault",
+							"description": "Find notes and files, and read their text, properties and links."
+						},
+						"fs": {
+							"label": "Change files",
+							"description": "Create, rename, move, copy, trash and edit notes. Every change can be undone."
+						},
+						"ui": {
+							"label": "Ask you",
+							"description": "Show prompts, pickers and messages, and open notes."
+						}
+					},
+					"nodes": {
+						"std": {
+							"if": {
+								"label": "If",
+								"description": "Runs then or else, then continues on done. Values set in the branch stay visible after it.",
+								"ports": {
+									"condition": "condition",
+									"then": "then",
+									"else": "else",
+									"done": "done"
+								}
+							},
+							"forEach": {
+								"label": "For Each",
+								"description": "Runs body once per item, each in its own scope, then continues on done.",
+								"ports": {
+									"list": "list",
+									"item": "item",
+									"index": "index",
+									"body": "body",
+									"done": "done"
+								}
+							},
+							"sequence": {
+								"label": "Sequence",
+								"description": "Runs then0, then1, … in order."
+							},
+							"try": {
+								"label": "Try",
+								"description": "Runs body; if it faults, runs catch with the error message. Then continues on done. Limits and aborts can't be caught.",
+								"ports": {
+									"error": "error",
+									"body": "body",
+									"catch": "catch",
+									"done": "done"
+								}
+							},
+							"equals": {
+								"label": "{a} = {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"not": {
+								"label": "not {value}",
+								"ports": {
+									"value": "value",
+									"result": "result"
+								}
+							},
+							"and": {
+								"label": "{a} and {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"or": {
+								"label": "{a} or {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"add": {
+								"label": "{a} + {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"subtract": {
+								"label": "{a} − {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"multiply": {
+								"label": "{a} × {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"divide": {
+								"label": "{a} ÷ {b}",
+								"description": "Faults when b is 0.",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"remainder": {
+								"label": "{a} mod {b}",
+								"description": "What's left after dividing a by b, with the sign of b (-1 mod 3 is 2). Faults when b is 0.",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"round": {
+								"label": "Round {value}",
+								"ports": {
+									"value": "value",
+									"result": "result"
+								}
+							},
+							"lessThan": {
+								"label": "{a} < {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"greaterThan": {
+								"label": "{a} > {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "result"
+								}
+							},
+							"now": {
+								"label": "Now",
+								"description": "The date and time (ISO 8601), read once per run: every use in a run sees the same.",
+								"ports": {
+									"date": "date"
+								}
+							},
+							"formatDate": {
+								"label": "Format {date} as {pattern}",
+								"description": "Writes date in local time, replacing YYYY, MM, DD, HH, mm and ss in pattern. Faults on a date it can't read.",
+								"ports": {
+									"date": "date",
+									"pattern": "pattern",
+									"text": "text"
+								}
+							},
+							"concat": {
+								"label": "Join",
+								"ports": {
+									"out": "out"
+								}
+							},
+							"textContains": {
+								"label": "{text} contains {search}",
+								"description": "Ignores case.",
+								"ports": {
+									"text": "text",
+									"search": "search",
+									"result": "result"
+								}
+							},
+							"replace": {
+								"label": "Replace {search} with {replacement} in {text}",
+								"description": "Replaces every occurrence, matching the text exactly.",
+								"ports": {
+									"search": "search",
+									"replacement": "replacement",
+									"text": "text"
+								}
+							},
+							"split": {
+								"label": "Split {text} by {separator}",
+								"ports": {
+									"text": "text",
+									"separator": "separator",
+									"parts": "parts"
+								}
+							},
+							"trim": {
+								"label": "Trim {text}",
+								"description": "Removes whitespace from both ends.",
+								"ports": {
+									"text": "text"
+								}
+							},
+							"upperCase": {
+								"label": "Uppercase {text}",
+								"ports": {
+									"text": "text"
+								}
+							},
+							"lowerCase": {
+								"label": "Lowercase {text}",
+								"ports": {
+									"text": "text"
+								}
+							},
+							"letterOf": {
+								"label": "Letter {index} of {text}",
+								"description": "Counts from 0. Faults when there's no letter at index.",
+								"ports": {
+									"index": "index",
+									"text": "text",
+									"letter": "letter"
+								}
+							},
+							"length": {
+								"label": "Count of {list}",
+								"ports": {
+									"list": "list",
+									"length": "length"
+								}
+							},
+							"append": {
+								"label": "Append",
+								"description": "A new List with item added at the end; the input is unchanged.",
+								"ports": {
+									"list": "list",
+									"item": "item"
+								}
+							},
+							"flatten": {
+								"label": "Flatten",
+								"ports": {
+									"list": "list"
+								}
+							},
+							"first": {
+								"label": "First of {list}",
+								"description": "Faults when the list is empty.",
+								"ports": {
+									"list": "list",
+									"item": "item"
+								}
+							},
+							"last": {
+								"label": "Last of {list}",
+								"description": "Faults when the list is empty.",
+								"ports": {
+									"list": "list",
+									"item": "item"
+								}
+							},
+							"itemAt": {
+								"label": "Item {index} of {list}",
+								"description": "Counts from 0. Faults when there's no item at index.",
+								"ports": {
+									"index": "index",
+									"list": "list",
+									"item": "item"
+								}
+							},
+							"sort": {
+								"label": "Sort {list}",
+								"description": "A new List: numbers first, smallest first, then text alphabetically.",
+								"ports": {
+									"list": "list",
+									"descending": "descending"
+								}
+							},
+							"unique": {
+								"label": "Unique items of {list}",
+								"description": "A new List without repeats, keeping each item's first occurrence.",
+								"ports": {
+									"list": "list"
+								}
+							},
+							"listContains": {
+								"label": "{list} contains {item}",
+								"ports": {
+									"list": "list",
+									"item": "item",
+									"result": "result"
+								}
+							},
+							"filter": {
+								"label": "Keep items of {list} where {keep}",
+								"description": "Works out keep once per item, where it can read item and index, then continues on then with the kept items as list.",
+								"ports": {
+									"list": "list",
+									"keep": "keep",
+									"item": "item",
+									"index": "index"
+								}
+							},
+							"map": {
+								"label": "Map {list} to {value}",
+								"description": "Works out value once per item, where it can read item and index, then continues on then with the results as list.",
+								"ports": {
+									"list": "list",
+									"value": "value",
+									"item": "item",
+									"index": "index"
+								}
+							},
+							"dictGet": {
+								"label": "Get",
+								"ports": {
+									"dict": "dict",
+									"key": "key",
+									"value": "value",
+									"found": "found",
+									"missing": "missing"
+								}
+							},
+							"dictSet": {
+								"label": "Set",
+								"description": "A new Dictionary with key set to value; the input is unchanged.",
+								"ports": {
+									"dict": "dict",
+									"key": "key",
+									"value": "value"
+								}
+							},
+							"dictKeys": {
+								"label": "Keys",
+								"ports": {
+									"dict": "dict",
+									"keys": "keys"
+								}
+							}
+						},
+						"vertex": {
+							"onManual": {
+								"label": "On Run",
+								"description": "Starts when you press Run."
+							},
+							"currentNote": {
+								"label": "Current note",
+								"description": "The note the workflow was run on. Run from elsewhere, it asks which note.",
+								"ports": {
+									"note": "note"
+								}
+							},
+							"createNote": {
+								"label": "Create note {name} in {folder}",
+								"description": "A new markdown note, starting with the template's text when there is one. Faults if the name is taken.",
+								"ports": {
+									"name": "name",
+									"folder": "folder",
+									"template": "template",
+									"note": "note"
+								}
+							},
+							"readText": {
+								"label": "Text of {file}",
+								"description": "The whole file, frontmatter included.",
+								"ports": {
+									"file": "file",
+									"text": "text"
+								}
+							},
+							"writeText": {
+								"label": "Write {text} to {file}",
+								"description": "Replaces the whole file.",
+								"ports": {
+									"text": "text",
+									"file": "file"
+								}
+							},
+							"appendText": {
+								"label": "Append {text} to {file}",
+								"description": "Adds the text at the end, on a new line.",
+								"ports": {
+									"text": "text",
+									"file": "file"
+								}
+							},
+							"asNote": {
+								"label": "{file} as a note",
+								"description": "Continues on ok with the entry as a note when it is a markdown file, else on fail.",
+								"ports": {
+									"file": "file",
+									"note": "note",
+									"ok": "ok",
+									"fail": "fail"
+								}
+							},
+							"open": {
+								"label": "Open {file}",
+								"description": "Opens the file in a tab. Dry runs don't.",
+								"ports": {
+									"file": "file"
+								}
+							},
+							"listFolder": {
+								"label": "Entries in {folder}",
+								"description": "What a folder holds (empty: the vault root), by path. Extensions are comma-separated; pattern is a name or glob like *.md or Daily/**.",
+								"ports": {
+									"folder": "folder",
+									"recursive": "in subfolders",
+									"files": "files",
+									"folders": "folders",
+									"extensions": "extensions",
+									"tag": "tag",
+									"pattern": "pattern",
+									"entries": "entries"
+								}
+							},
+							"find": {
+								"label": "Find {pattern}",
+								"description": "Entries anywhere in the vault by name (with or without extension) or glob: *.pdf matches names, Projects/**/*.md paths.",
+								"ports": {
+									"pattern": "pattern",
+									"entries": "entries"
+								}
+							},
+							"fileName": {
+								"label": "Name of {file}",
+								"description": "The name without its folder or extension.",
+								"ports": {
+									"file": "file",
+									"name": "name"
+								}
+							},
+							"fileInfo": {
+								"label": "Info of {file}",
+								"description": "Name with extension, extension, folder, size in bytes, and when it was created and last modified (ISO dates).",
+								"ports": {
+									"file": "file",
+									"name": "name",
+									"extension": "extension",
+									"folder": "folder",
+									"size": "size",
+									"created": "created",
+									"modified": "modified"
+								}
+							},
+							"rename": {
+								"label": "Rename {file} to {newName}",
+								"description": "Renames in place and updates links to it. Without an extension in the new name, the old one stays.",
+								"ports": {
+									"file": "file",
+									"newName": "new name"
+								}
+							},
+							"move": {
+								"label": "Move {file} to {folder}",
+								"description": "Moves into a folder and updates links to it. An empty folder path is the vault root.",
+								"ports": {
+									"file": "file",
+									"folder": "folder"
+								}
+							},
+							"copy": {
+								"label": "Copy {file} to {folder}",
+								"description": "Copies a file, or a folder with everything in it, keeping its name. Faults if the name is taken there.",
+								"ports": {
+									"file": "file",
+									"folder": "folder",
+									"copy": "copy"
+								}
+							},
+							"createFolder": {
+								"label": "Create folder {name} in {folder}",
+								"description": "Faults if the name is taken.",
+								"ports": {
+									"name": "name",
+									"folder": "folder"
+								}
+							},
+							"trash": {
+								"label": "Trash {file}",
+								"description": "Moves to the vault's .vertex/trash folder, after asking once per run. Nothing is deleted.",
+								"ports": {
+									"file": "file"
+								}
+							},
+							"getProperty": {
+								"label": "Property {key} of {file}",
+								"description": "A frontmatter property, or null when the note has none.",
+								"ports": {
+									"file": "file",
+									"key": "key",
+									"value": "value"
+								}
+							},
+							"setProperty": {
+								"label": "Set {key} of {file} to {value}",
+								"description": "Sets a frontmatter property, creating the frontmatter if needed.",
+								"ports": {
+									"file": "file",
+									"key": "key",
+									"value": "value"
+								}
+							},
+							"queryByTag": {
+								"label": "Notes tagged {tag}",
+								"description": "Every markdown note with this tag, nested tags included. Read once per run.",
+								"ports": {
+									"tag": "tag",
+									"files": "files"
+								}
+							},
+							"addTag": {
+								"label": "Add tag {tag} to {note}",
+								"description": "Adds it to the frontmatter tags, unless the note has it already.",
+								"ports": {
+									"tag": "tag",
+									"note": "note"
+								}
+							},
+							"removeTag": {
+								"label": "Remove tag {tag} from {note}",
+								"description": "Removes exactly this tag from the frontmatter tags; nested tags under it stay.",
+								"ports": {
+									"tag": "tag",
+									"note": "note"
+								}
+							},
+							"linksFrom": {
+								"label": "Links from {file}",
+								"description": "The files its links point to; links to missing files are left out.",
+								"ports": {
+									"file": "file",
+									"files": "files"
+								}
+							},
+							"linksTo": {
+								"label": "Links to {file}",
+								"description": "The files that link to it (its backlinks).",
+								"ports": {
+									"file": "file",
+									"files": "files"
+								}
+							},
+							"askText": {
+								"label": "Ask {question}",
+								"description": "Waits for a text answer. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"question": "question",
+									"initial": "initial",
+									"answer": "answer"
+								}
+							},
+							"askNumber": {
+								"label": "Ask for a number: {question}",
+								"description": "Waits for a number. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"question": "question",
+									"initial": "initial",
+									"answer": "answer"
+								}
+							},
+							"askChoice": {
+								"label": "Ask {question} with choices {choices}",
+								"description": "Waits for one of the choices. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"question": "question",
+									"choices": "choices",
+									"answer": "answer"
+								}
+							},
+							"askYesNo": {
+								"label": "Ask yes or no: {question}",
+								"description": "Continues on yes or no. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"question": "question",
+									"yes": "yes",
+									"no": "no"
+								}
+							},
+							"form": {
+								"label": "Form {title}",
+								"description": "Asks for a text answer per field at once; answers is a Dictionary from field to answer. Dry runs ask too.",
+								"ports": {
+									"title": "title",
+									"answers": "answers"
+								}
+							},
+							"pickFile": {
+								"label": "Pick a file: {prompt}",
+								"description": "Waits for a file from the vault, optionally only these comma-separated extensions. Dry runs ask too.",
+								"ports": {
+									"prompt": "prompt",
+									"extensions": "extensions",
+									"file": "file"
+								}
+							},
+							"pickFiles": {
+								"label": "Pick files: {prompt}",
+								"description": "Waits for one or more files from the vault, optionally only these comma-separated extensions. Dry runs ask too.",
+								"ports": {
+									"prompt": "prompt",
+									"extensions": "extensions",
+									"files": "files"
+								}
+							},
+							"pickFolder": {
+								"label": "Pick a folder: {prompt}",
+								"description": "Waits for a folder from the vault. Dry runs ask too.",
+								"ports": {
+									"prompt": "prompt",
+									"folder": "folder"
+								}
+							},
+							"pickFolders": {
+								"label": "Pick folders: {prompt}",
+								"description": "Waits for one or more folders from the vault. Cancelling faults the node. Dry runs ask too.",
+								"ports": {
+									"prompt": "prompt",
+									"folders": "folders"
+								}
+							},
+							"showMessage": {
+								"label": "Show {message}",
+								"description": "Shows a message and continues at once. Other values than text are shown as JSON.",
+								"ports": {
+									"message": "message"
+								}
+							}
+						}
+					}
+				},
+				"workflowAsk": {
+					"cancel": "Cancel",
+					"ok": "OK",
+					"yes": "Yes",
+					"no": "No"
+				},
+				"vaultPicker": {
+					"search": "Search the vault",
+					"nothing": "Nothing to pick here",
+					"root": "Vault root",
+					"choose": "Choose…",
+					"picked": "{count} picked"
+				},
+				"workflowData": {
+					"addItem": "Type, then Enter",
+					"list": "List ({count})",
+					"dictionary": "Dictionary ({count})"
+				}
 			}
 		},
 		"frontmatter": {

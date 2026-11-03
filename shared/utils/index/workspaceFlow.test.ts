@@ -1,9 +1,8 @@
 import {describe, expect, it} from 'vitest'
 import {parseFrontmatter, parseYaml} from '../../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/frontmatter.js'
-import {getInternalLinks} from '../../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/internalLinks.js'
 import {LinkGraph} from './linkGraph'
 import {parseLinkTargets} from './parse'
-import {renameTargets, rewriteLinks} from './rewriteLinks'
+import {getInternalLinks, renameTargets, rewriteLinks} from './rewriteLinks'
 
 /**
  * End-to-end flow of the workspace index on an in-memory vault, using the same pieces
