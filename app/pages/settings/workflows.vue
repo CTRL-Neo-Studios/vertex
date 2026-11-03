@@ -74,7 +74,7 @@ const limitsDirty = computed(() => limitRows.some(r => config.value?.workflowCon
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.workflows.trusted')" :description="t('app.settings.workflows.trustedDescription')">
-                <p v-if="!trusted.length" class="text-sm text-muted">{{ t('app.settings.workflows.noTrusted') }}</p>
+                <p v-if="!trusted.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.workflows.noTrusted') }}</p>
                 <SettingsRow
                     v-for="record in trusted"
                     :key="record.hash"

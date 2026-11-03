@@ -102,7 +102,7 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
             />
         </template>
         <template #header>
-            <UDashboardNavbar :ui="{ root: 'border-b border-default h-(--ui-header-height) sm:px-1 p-2 w-full', center: 'w-full', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
+            <UDashboardNavbar :ui="{ root: 'border-b border-none h-(--ui-header-height) sm:px-1 p-2 w-full', center: 'w-full', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
                 <template #default>
                     <SpaceOnOs detect-os="macos" :show-on-os="true" data-tauri-drag-region/>
                     <div class="grow" data-tauri-drag-region/>
