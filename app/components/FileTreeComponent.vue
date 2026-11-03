@@ -3,7 +3,7 @@ import {StateKey} from "#shared/constants/app";
 import type {TreeItem, ContextMenuItem} from '@nuxt/ui';
 import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
-import {fileNameFromPath, getFileExtensionFromPath} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
@@ -15,6 +15,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 
 const {t} = useI18n()
 
@@ -27,9 +28,11 @@ const $navi = useAppNavigator()
 const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, activeTabUuid} = useActiveTabs(session)
-const {getFileByUuid, getPropertiesFile} = useActiveWorkspaceIndex(session)
+const {getFileByUuid, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
 const {createFile} = useActiveWorkspaceTools(session)
 const {config} = useAppSettings()
+// Workflows run on a workspace folder; a session without one gets no run items.
+const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 
 const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
@@ -39,6 +42,7 @@ const expandedFolders = useState<string[]>(StateKey.expandedFolders(props.sessio
 const formattedTreeData = computed<TreeItem[]>(() => {
     const build = (nodes: UITreeNode[]): TreeItem[] => nodes.map(node => {
         const icon = isPropertiesFile(node.fileName) ? 'i-lucide-file-cog'
+            : isWorkflowFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-workflow'
             : typeof node.properties.icon === 'string' && node.properties.icon ? node.properties.icon : undefined
         const item: TreeItem = {
             id: node.uuid,
@@ -69,8 +73,8 @@ async function openInTab(uuid: string) {
 
 function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean): ContextMenuItem[][] {
     const file = () => getFileByUuid(item.id)
-    /** Above / this / under level submenu for creating a file or folder relative to `item`. */
-    const newAt = (asFolder: boolean, title: string): ContextMenuItem[] => ([
+    /** Above / this / under level submenu for creating a file (with `ext`) or folder relative to `item`. */
+    const newAt = (asFolder: boolean, title: string, ext = 'md'): ContextMenuItem[] => ([
         ['aboveLevel', 'i-lucide-folder-up', 'above', itemLevel <= 1],
         ['thisLevel', 'i-lucide-folder-dot', 'same', false],
         ['underLevel', 'i-lucide-folder-down', 'below', !isFolder],
@@ -78,15 +82,41 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         label: t(`app.editor.ui.filetree.${key}`),
         icon,
         disabled,
-        onSelect: () => newFileModal.open({atFileIndexId: item.id, modalTitle: title, asFolder, asLevel, fileExt: asFolder ? undefined : 'md'}),
+        onSelect: () => newFileModal.open({atFileIndexId: item.id, modalTitle: title, asFolder, asLevel, fileExt: asFolder ? undefined : ext}),
     }))
 
-    return [
+    const node = item.originalNodeData as UITreeNode
+    const ext = getFileExtensionFromPath(node.fileName)
+    /** `.workflow`: Run / Dry run. A note: run one of the vault's workflows on it. */
+    const runItems = (): ContextMenuItem[] => {
+        if (!runner || isFolder) return []
+        if (isWorkflowFile(ext)) return [
+            {label: t('app.editor.ui.workflow.run'), icon: 'i-lucide-play', onSelect: () => runner.runFile(node.relativePath, false)},
+            {label: t('app.editor.ui.workflow.dryRun'), icon: 'i-lucide-flask-conical', onSelect: () => runner.runFile(node.relativePath, true)},
+        ]
+        if (ext.toLowerCase() !== 'md') return []
+        const workflows = getFilteredFiles(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName)))
+        return [{
+            label: t('app.editor.ui.workflow.runOnNote'),
+            icon: 'i-lucide-workflow',
+            disabled: !workflows.length,
+            children: workflows.map(w => ({
+                label: fileNameFromPath(w.fileName, true),
+                description: w.relativePath,
+                icon: 'i-lucide-workflow',
+                onSelect: () => runner.runFile(w.relativePath, false, {note: node.relativePath}),
+            })),
+        }]
+    }
+
+    const groups: ContextMenuItem[][] = [
+        runItems(),
         [
             {label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', children: newAt(false, t('app.editor.ui.filetree.newMarkdownFile'))},
             {label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-file-plus', children: newAt(true, t('app.editor.ui.filetree.newFolder'))},
             {label: t('app.editor.ui.filetree.newCanvas'), icon: 'i-lucide-file-plus', disabled: true}, // not implemented yet
             {label: t('app.editor.ui.filetree.newBase'), icon: 'i-lucide-file-plus', disabled: true}, // not implemented yet
+            {label: t('app.editor.ui.filetree.newWorkflow'), icon: 'i-lucide-workflow', children: newAt(false, t('app.editor.ui.filetree.newWorkflow'), 'workflow')},
             {
                 label: t('app.editor.ui.filetree.newOpenFolderProperties'),
                 icon: 'i-lucide-file-plus',
@@ -113,6 +143,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: [item.id]})},
         ],
     ]
+    return groups.filter(group => group.length)
 }
 </script>
 

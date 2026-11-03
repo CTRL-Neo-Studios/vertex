@@ -13,6 +13,7 @@
 			"quit": "退出 Vertex",
 			"newFile": "新建文件…",
 			"newFolder": "新建文件夹…",
+			"newWorkflow": "新建工作流…",
 			"openFile": "打开文件…",
 			"openFolder": "打开文件夹…",
 			"save": "保存",
@@ -64,7 +65,8 @@
 				"about": "关于",
 				"general": "通用",
 				"theme": "主题",
-				"view": "视图"
+				"view": "视图",
+				"workflows": "工作流"
 			},
 			"about": {
 				"version": "应用的当前版本。",
@@ -173,6 +175,27 @@
 				"statusBarOnHover": "悬停时显示",
 				"statusBarAlways": "始终显示",
 				"statusBarNever": "始终隐藏"
+			},
+			"workflows": {
+				"title": "工作流",
+				"limits": "限制",
+				"maxLoopIterations": "每次运行的步数",
+				"maxLoopIterationsDescription": "运行激活的每个节点都计数；超过后运行停止。",
+				"maxStackDepth": "调用深度",
+				"maxStackDepthDescription": "函数之间可以嵌套调用的层数。",
+				"wallClockTimeoutMs": "时间限制（毫秒）",
+				"wallClockTimeoutMsDescription": "运行超过此时间会停止。0 表示不限制。",
+				"safety": "安全",
+				"confirmTrash": "移到废纸篓前询问",
+				"confirmTrashDescription": "每次运行在工作流首次把文件移到仓库废纸篓前询问一次。",
+				"trusted": "已信任的工作流",
+				"trustedDescription": "无需询问即可运行的工作流。编辑过的工作流需要重新信任。",
+				"noTrusted": "暂无。工作流首次运行时会询问你。",
+				"revoke": "撤销信任",
+				"trustedAt": "信任于 {date}",
+				"trustedWorkspaces": "受信任的工作区",
+				"trustedWorkspacesDescription": "这些工作区中的所有工作流都会直接运行，无论是否编辑过。",
+				"noTrustedWorkspaces": "暂无。可在工作流首次运行的提示中信任工作区。"
 			}
 		},
 		"editor": {
@@ -202,7 +225,11 @@
 					"quickActions": "快捷操作",
 					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
 					"newFolderDescription": "在工作区根目录新建文件夹。",
-					"files": "文件（{count}）"
+					"newWorkflowDescription": "在工作区根目录新建工作流。",
+					"files": "文件（{count}）",
+					"workflows": "运行工作流",
+					"runWorkflow": "运行 {name}",
+					"runWorkflowOn": "在 {note} 上"
 				},
 				"bases": {
 					"views": "视图",
@@ -239,7 +266,8 @@
 					"newFolder": "新建文件夹",
 					"newCanvas": "新建画布",
 					"newBase": "新建数据库",
-					"newOpenFolderProperties": "新建/打开文件夹属性"
+					"newOpenFolderProperties": "新建/打开文件夹属性",
+					"newWorkflow": "新建工作流"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
@@ -259,7 +287,825 @@
 					"done": "已更新 {links} 个链接。",
 					"failed": "无法更新 {file} 中的链接。"
 				},
-				"viewImage": "点击查看图片"
+				"viewImage": "点击查看图片",
+				"workflow": {
+					"run": "运行",
+					"dryRun": "试运行",
+					"undo": "撤销运行",
+					"runDisabled": "请先解决问题。",
+					"lastRun": "上次运行",
+					"noRun": "尚未运行。试运行会显示将要发生的更改，但不会改动任何文件。",
+					"ok": "完成 · {steps} 步",
+					"fault": "已停止 · {code}",
+					"aborted": "已中止",
+					"wouldChange": "将要更改",
+					"changed": "已更改",
+					"noChanges": "没有更改",
+					"declined": "未信任，因此没有运行。",
+					"failed": "工作流无法运行",
+					"undone": "已撤销 {count} 项更改",
+					"undoSkipped": "跳过 {count} 项：{reasons}",
+					"invalid": "Vertex 无法打开此工作流文件",
+					"invalidDescription": "它在这里保持只读。请在其他编辑器中修复 JSON，或从备份恢复。",
+					"ops": {
+						"rename": "重命名",
+						"move": "移动",
+						"trash": "移到废纸篓",
+						"property": "设置属性",
+						"links": "更新链接",
+						"text": "编辑文本",
+						"tag": "更改标签",
+						"note": "新建笔记",
+						"folder": "新建文件夹",
+						"copy": "复制"
+					},
+					"cancelled": "已取消",
+					"whichNote": "要在哪篇笔记上运行？",
+					"wouldChangeCount": "将做出 {count} 项更改",
+					"changedCount": "已做出 {count} 项更改",
+					"runOnNote": "在此笔记上运行工作流"
+				},
+				"workflowCanvas": {
+					"zoomIn": "放大",
+					"zoomOut": "缩小",
+					"fitView": "适应视图",
+					"snapToGrid": "吸附到网格",
+					"minimap": "小地图",
+					"cantConnect": "无法连接：{reason}",
+					"searchNodes": "搜索节点",
+					"noMatches": "没有匹配的节点",
+					"categoryVariables": "变量",
+					"categoryFunctions": "自制积木",
+					"getVariable": "读取 {name}",
+					"setVariable": "设置 {name}",
+					"entry": "入口",
+					"return": "返回",
+					"auto": "自动",
+					"defaultValue": "{value}（默认）",
+					"json": "JSON",
+					"noCapabilities": "无需任何权限",
+					"noProblems": "没有问题",
+					"emptyTitle": "这里还什么都没有",
+					"emptyHint": "按 Tab、双击或右键添加节点，也可以从节点库拖入。",
+					"selected": "已选择 {count} 个节点",
+					"undo": "撤销",
+					"redo": "重做",
+					"copy": "复制",
+					"cut": "剪切",
+					"paste": "粘贴",
+					"duplicate": "创建副本",
+					"delete": "删除",
+					"selectAll": "全选",
+					"addNode": "添加节点…",
+					"insertNode": "插入节点…",
+					"disconnect": "断开连接",
+					"disconnectAll": "断开所有连接",
+					"resetValue": "重置值",
+					"goToDefinition": "转到定义",
+					"findReferences": "查找引用",
+					"noReferences": "没有引用",
+					"referenceIn": "{graph} › {node}",
+					"main": "主程序",
+					"makeBlock": "制作积木",
+					"group": "分组",
+					"addComment": "添加注释",
+					"commentPlaceholder": "写点备注…",
+					"color": "颜色",
+					"rename": "重命名",
+					"newVariable": "新建变量",
+					"variableName": "变量 {n}",
+					"localVariable": "仅适用于此积木",
+					"globalVariable": "适用于整个工作流",
+					"variableHint": "拖动以读取，按住 ⌥ 拖动以设置",
+					"newBlock": "制作新的积木",
+					"blockName": "积木 {n}",
+					"open": "打开",
+					"name": "名称",
+					"type": "类型",
+					"defaultLabel": "默认值",
+					"execBlock": "作为步骤运行",
+					"exits": "出口",
+					"addPort": "添加",
+					"remove": "移除",
+					"usedBy": "有 {count} 个节点在用。删除会一并移除它们。",
+					"deleteAnyway": "仍然删除",
+					"returnVia": "返回 · {exit}",
+					"block": "积木",
+					"running": "运行中…",
+					"pausedBefore": "已暂停于 {node} 之前",
+					"pause": "暂停",
+					"step": "单步",
+					"resume": "继续",
+					"cancel": "取消",
+					"arrange": "排列",
+					"alignLeft": "左对齐",
+					"alignCenter": "水平居中",
+					"alignRight": "右对齐",
+					"alignTop": "顶部对齐",
+					"alignMiddle": "垂直居中",
+					"alignBottom": "底部对齐",
+					"distributeHorizontally": "水平均匀分布",
+					"distributeVertically": "垂直均匀分布",
+					"library": "节点",
+					"inspector": "检查器",
+					"workflow": "工作流",
+					"inputs": "输入",
+					"outputs": "输出"
+				},
+				"workflowTrust": {
+					"title": "首次运行“{name}”？",
+					"description": "工作流可以修改你的笔记。请检查它将要做什么；只有在你信任后它才会运行，编辑后需要重新信任。",
+					"capabilities": "它可以",
+					"nothing": "不会访问程序以外的内容",
+					"plan": "试运行将会更改",
+					"dryRunFault": "试运行提前停止：{message}",
+					"cancel": "取消",
+					"trust": "信任并运行",
+					"noPlan": "它会在运行时向你提问，所以这里不做预览。可以用“试运行”查看它将要做出的更改。",
+					"trustWorkspace": "信任此工作区",
+					"trustWorkspaceDescription": "此工作区中的所有工作流（包括之后编辑或新增的）都会直接运行，不再询问。可在“设置 → 工作流”中撤销。"
+				},
+				"workflowTrash": {
+					"title": "将文件移到废纸篓？",
+					"description": "“{name}”即将把文件移到此仓库的 .vertex/trash 文件夹。不会删除任何文件，并且可以撤销这次运行。",
+					"cancel": "停止运行",
+					"confirm": "移到废纸篓"
+				},
+				"workflowLanguage": {
+					"categories": {
+						"std": {
+							"control": "控制",
+							"operators": "运算",
+							"text": "文本",
+							"lists": "列表",
+							"dictionaries": "字典"
+						},
+						"vertex": {
+							"events": "事件",
+							"notes": "笔记",
+							"files": "文件和文件夹",
+							"properties": "属性",
+							"tags": "标签和链接",
+							"ask": "询问"
+						}
+					},
+					"types": {
+						"vertex": {
+							"Entry": "条目",
+							"File": "文件",
+							"Note": "笔记",
+							"Folder": "文件夹"
+						}
+					},
+					"capabilities": {
+						"index": {
+							"label": "读取仓库",
+							"description": "查找笔记和文件，并读取它们的文本、属性和链接。"
+						},
+						"fs": {
+							"label": "更改文件",
+							"description": "创建、重命名、移动、复制、移到废纸篓和编辑笔记。每项更改都可以撤销。"
+						},
+						"ui": {
+							"label": "询问你",
+							"description": "显示提示、选择器和消息，并打开笔记。"
+						}
+					},
+					"nodes": {
+						"std": {
+							"if": {
+								"label": "如果",
+								"description": "运行“那么”或“否则”，然后从“完成后”继续。在分支中设置的值之后仍然可见。",
+								"ports": {
+									"condition": "条件",
+									"then": "那么",
+									"else": "否则",
+									"done": "完成后"
+								}
+							},
+							"forEach": {
+								"label": "对每一项",
+								"description": "对每一项运行一次“每一项”，各自有独立的作用域，然后从“完成后”继续。",
+								"ports": {
+									"list": "列表",
+									"item": "项",
+									"index": "序号",
+									"body": "每一项",
+									"done": "完成后"
+								}
+							},
+							"sequence": {
+								"label": "依次执行",
+								"description": "按顺序运行 then0、then1……"
+							},
+							"try": {
+								"label": "尝试",
+								"description": "运行“主体”；如果出错，带着错误信息运行“出错时”，然后从“完成后”继续。限制和中止无法捕获。",
+								"ports": {
+									"error": "错误",
+									"body": "主体",
+									"catch": "出错时",
+									"done": "完成后"
+								}
+							},
+							"equals": {
+								"label": "{a} = {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"not": {
+								"label": "{value} 不成立",
+								"ports": {
+									"value": "值",
+									"result": "结果"
+								}
+							},
+							"and": {
+								"label": "{a} 与 {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"or": {
+								"label": "{a} 或 {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"add": {
+								"label": "{a} + {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"subtract": {
+								"label": "{a} − {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"multiply": {
+								"label": "{a} × {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"divide": {
+								"label": "{a} ÷ {b}",
+								"description": "b 为 0 时出错。",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"remainder": {
+								"label": "{a} 除以 {b} 的余数",
+								"description": "a 除以 b 后剩下的数，符号与 b 相同（-1 除以 3 的余数是 2）。b 为 0 时出错。",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"round": {
+								"label": "四舍五入 {value}",
+								"ports": {
+									"value": "值",
+									"result": "结果"
+								}
+							},
+							"lessThan": {
+								"label": "{a} < {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"greaterThan": {
+								"label": "{a} > {b}",
+								"ports": {
+									"a": "a",
+									"b": "b",
+									"result": "结果"
+								}
+							},
+							"now": {
+								"label": "现在",
+								"description": "当前的日期和时间（ISO 8601），每次运行只读取一次：同一次运行中的每处使用都相同。",
+								"ports": {
+									"date": "日期"
+								}
+							},
+							"formatDate": {
+								"label": "把 {date} 格式化为 {pattern}",
+								"description": "按本地时间写出日期，替换格式中的 YYYY、MM、DD、HH、mm 和 ss。无法识别日期时出错。",
+								"ports": {
+									"date": "日期",
+									"pattern": "格式",
+									"text": "文本"
+								}
+							},
+							"concat": {
+								"label": "连接",
+								"ports": {
+									"out": "结果"
+								}
+							},
+							"textContains": {
+								"label": "{text} 包含 {search}",
+								"description": "不区分大小写。",
+								"ports": {
+									"text": "文本",
+									"search": "查找",
+									"result": "结果"
+								}
+							},
+							"replace": {
+								"label": "把 {text} 中的 {search} 替换为 {replacement}",
+								"description": "替换每一处，按原文精确匹配。",
+								"ports": {
+									"search": "查找",
+									"replacement": "替换为",
+									"text": "文本"
+								}
+							},
+							"split": {
+								"label": "用 {separator} 拆分 {text}",
+								"ports": {
+									"text": "文本",
+									"separator": "分隔符",
+									"parts": "各部分"
+								}
+							},
+							"trim": {
+								"label": "去除 {text} 两端的空白",
+								"description": "删除两端的空白字符。",
+								"ports": {
+									"text": "文本"
+								}
+							},
+							"upperCase": {
+								"label": "{text} 转为大写",
+								"ports": {
+									"text": "文本"
+								}
+							},
+							"lowerCase": {
+								"label": "{text} 转为小写",
+								"ports": {
+									"text": "文本"
+								}
+							},
+							"letterOf": {
+								"label": "{text} 的第 {index} 个字符",
+								"description": "从 0 开始数。该位置没有字符时出错。",
+								"ports": {
+									"index": "序号",
+									"text": "文本",
+									"letter": "字符"
+								}
+							},
+							"length": {
+								"label": "{list} 的项数",
+								"ports": {
+									"list": "列表",
+									"length": "项数"
+								}
+							},
+							"append": {
+								"label": "追加",
+								"description": "返回在末尾加上该项的新列表；原列表不变。",
+								"ports": {
+									"list": "列表",
+									"item": "项"
+								}
+							},
+							"flatten": {
+								"label": "展平",
+								"ports": {
+									"list": "列表"
+								}
+							},
+							"first": {
+								"label": "{list} 的第一项",
+								"description": "列表为空时出错。",
+								"ports": {
+									"list": "列表",
+									"item": "项"
+								}
+							},
+							"last": {
+								"label": "{list} 的最后一项",
+								"description": "列表为空时出错。",
+								"ports": {
+									"list": "列表",
+									"item": "项"
+								}
+							},
+							"itemAt": {
+								"label": "{list} 的第 {index} 项",
+								"description": "从 0 开始数。该位置没有项时出错。",
+								"ports": {
+									"index": "序号",
+									"list": "列表",
+									"item": "项"
+								}
+							},
+							"sort": {
+								"label": "排序 {list}",
+								"description": "返回新列表：先是数字，从小到大，然后是按字母顺序排列的文本。",
+								"ports": {
+									"list": "列表",
+									"descending": "降序"
+								}
+							},
+							"unique": {
+								"label": "{list} 去重",
+								"description": "返回没有重复项的新列表，保留每项第一次出现的位置。",
+								"ports": {
+									"list": "列表"
+								}
+							},
+							"listContains": {
+								"label": "{list} 包含 {item}",
+								"ports": {
+									"list": "列表",
+									"item": "项",
+									"result": "结果"
+								}
+							},
+							"filter": {
+								"label": "保留 {list} 中满足 {keep} 的项",
+								"description": "对每一项算出一次“保留”，算的时候可以读取“项”和“序号”；然后继续，保留下来的项作为输出的“列表”。",
+								"ports": {
+									"list": "列表",
+									"keep": "保留",
+									"item": "项",
+									"index": "序号"
+								}
+							},
+							"map": {
+								"label": "把 {list} 的每一项变为 {value}",
+								"description": "对每一项算出一次“值”，算的时候可以读取“项”和“序号”；然后继续，结果作为输出的“列表”。",
+								"ports": {
+									"list": "列表",
+									"value": "值",
+									"item": "项",
+									"index": "序号"
+								}
+							},
+							"dictGet": {
+								"label": "取值",
+								"ports": {
+									"dict": "字典",
+									"key": "键",
+									"value": "值",
+									"found": "找到",
+									"missing": "未找到"
+								}
+							},
+							"dictSet": {
+								"label": "设置",
+								"description": "返回把键设为该值的新字典；原字典不变。",
+								"ports": {
+									"dict": "字典",
+									"key": "键",
+									"value": "值"
+								}
+							},
+							"dictKeys": {
+								"label": "所有键",
+								"ports": {
+									"dict": "字典",
+									"keys": "键"
+								}
+							}
+						},
+						"vertex": {
+							"onManual": {
+								"label": "当运行时",
+								"description": "按下运行时开始。"
+							},
+							"currentNote": {
+								"label": "当前笔记",
+								"description": "运行工作流时所在的笔记。从别处运行时，会询问是哪篇笔记。",
+								"ports": {
+									"note": "笔记"
+								}
+							},
+							"createNote": {
+								"label": "在 {folder} 中新建笔记 {name}",
+								"description": "新的 Markdown 笔记；有模板时以模板的文本开头。名称已被占用时出错。",
+								"ports": {
+									"name": "名称",
+									"folder": "文件夹",
+									"template": "模板",
+									"note": "笔记"
+								}
+							},
+							"readText": {
+								"label": "{file} 的文本",
+								"description": "整个文件，包括 frontmatter。",
+								"ports": {
+									"file": "文件",
+									"text": "文本"
+								}
+							},
+							"writeText": {
+								"label": "把 {text} 写入 {file}",
+								"description": "替换整个文件。",
+								"ports": {
+									"text": "文本",
+									"file": "文件"
+								}
+							},
+							"appendText": {
+								"label": "把 {text} 追加到 {file}",
+								"description": "在末尾另起一行添加文本。",
+								"ports": {
+									"text": "文本",
+									"file": "文件"
+								}
+							},
+							"asNote": {
+								"label": "把 {file} 当作笔记",
+								"description": "条目是 Markdown 文件时，作为笔记从“是笔记”继续，否则从“不是笔记”继续。",
+								"ports": {
+									"file": "文件",
+									"note": "笔记",
+									"ok": "是笔记",
+									"fail": "不是笔记"
+								}
+							},
+							"open": {
+								"label": "打开 {file}",
+								"description": "在标签页中打开文件。试运行不会打开。",
+								"ports": {
+									"file": "文件"
+								}
+							},
+							"listFolder": {
+								"label": "{folder} 中的条目",
+								"description": "文件夹中的内容（留空即仓库根目录），按路径列出。扩展名用逗号分隔；匹配可以是名称或通配符，如 *.md 或 Daily/**。",
+								"ports": {
+									"folder": "文件夹",
+									"recursive": "包括子文件夹",
+									"files": "包括文件",
+									"folders": "包括文件夹",
+									"extensions": "扩展名",
+									"tag": "标签",
+									"pattern": "匹配",
+									"entries": "条目"
+								}
+							},
+							"find": {
+								"label": "查找 {pattern}",
+								"description": "在整个仓库中按名称（带不带扩展名都可以）或通配符查找：*.pdf 匹配名称，Projects/**/*.md 匹配路径。",
+								"ports": {
+									"pattern": "名称或通配符",
+									"entries": "条目"
+								}
+							},
+							"fileName": {
+								"label": "{file} 的名称",
+								"description": "不含文件夹和扩展名的名称。",
+								"ports": {
+									"file": "文件",
+									"name": "名称"
+								}
+							},
+							"fileInfo": {
+								"label": "{file} 的信息",
+								"description": "含扩展名的名称、扩展名、文件夹、以字节计的大小，以及创建和最后修改的时间（ISO 日期）。",
+								"ports": {
+									"file": "文件",
+									"name": "名称",
+									"extension": "扩展名",
+									"folder": "文件夹",
+									"size": "大小",
+									"created": "创建时间",
+									"modified": "修改时间"
+								}
+							},
+							"rename": {
+								"label": "将 {file} 重命名为 {newName}",
+								"description": "原地重命名并更新指向它的链接。新名称没有扩展名时保留原来的扩展名。",
+								"ports": {
+									"file": "文件",
+									"newName": "新名称"
+								}
+							},
+							"move": {
+								"label": "将 {file} 移到 {folder}",
+								"description": "移入文件夹并更新指向它的链接。文件夹路径为空即仓库根目录。",
+								"ports": {
+									"file": "文件",
+									"folder": "文件夹"
+								}
+							},
+							"copy": {
+								"label": "将 {file} 复制到 {folder}",
+								"description": "复制文件，或连同里面的一切复制文件夹，保留名称。目标处名称已被占用时出错。",
+								"ports": {
+									"file": "文件",
+									"folder": "文件夹",
+									"copy": "副本"
+								}
+							},
+							"createFolder": {
+								"label": "在 {folder} 中新建文件夹 {name}",
+								"description": "名称已被占用时出错。",
+								"ports": {
+									"name": "名称",
+									"folder": "文件夹"
+								}
+							},
+							"trash": {
+								"label": "将 {file} 移到废纸篓",
+								"description": "每次运行先询问一次，然后移到仓库的 .vertex/trash 文件夹。不会删除任何内容。",
+								"ports": {
+									"file": "文件"
+								}
+							},
+							"getProperty": {
+								"label": "{file} 的属性 {key}",
+								"description": "frontmatter 中的属性；笔记没有该属性时为 null。",
+								"ports": {
+									"file": "文件",
+									"key": "键",
+									"value": "值"
+								}
+							},
+							"setProperty": {
+								"label": "将 {file} 的 {key} 设为 {value}",
+								"description": "设置 frontmatter 属性，必要时创建 frontmatter。",
+								"ports": {
+									"file": "文件",
+									"key": "键",
+									"value": "值"
+								}
+							},
+							"queryByTag": {
+								"label": "带有标签 {tag} 的笔记",
+								"description": "所有带此标签的 Markdown 笔记，包括嵌套标签。每次运行只读取一次。",
+								"ports": {
+									"tag": "标签",
+									"files": "笔记"
+								}
+							},
+							"addTag": {
+								"label": "给 {note} 添加标签 {tag}",
+								"description": "添加到 frontmatter 的标签中，笔记已有该标签时不变。",
+								"ports": {
+									"tag": "标签",
+									"note": "笔记"
+								}
+							},
+							"removeTag": {
+								"label": "从 {note} 移除标签 {tag}",
+								"description": "只从 frontmatter 的标签中移除这个标签；其下的嵌套标签保留。",
+								"ports": {
+									"tag": "标签",
+									"note": "笔记"
+								}
+							},
+							"linksFrom": {
+								"label": "{file} 链接到的文件",
+								"description": "它的链接所指向的文件；指向不存在文件的链接不计入。",
+								"ports": {
+									"file": "文件",
+									"files": "文件"
+								}
+							},
+							"linksTo": {
+								"label": "链接到 {file} 的文件",
+								"description": "链接到它的文件（反向链接）。",
+								"ports": {
+									"file": "文件",
+									"files": "文件"
+								}
+							},
+							"askText": {
+								"label": "询问 {question}",
+								"description": "等待文本回答。取消会让节点出错。试运行也会询问。",
+								"ports": {
+									"question": "问题",
+									"initial": "默认答案",
+									"answer": "回答"
+								}
+							},
+							"askNumber": {
+								"label": "询问数字：{question}",
+								"description": "等待一个数字。取消会让节点出错。试运行也会询问。",
+								"ports": {
+									"question": "问题",
+									"initial": "默认答案",
+									"answer": "回答"
+								}
+							},
+							"askChoice": {
+								"label": "询问 {question}，选项为 {choices}",
+								"description": "等待从选项中选一个。取消会让节点出错。试运行也会询问。",
+								"ports": {
+									"question": "问题",
+									"choices": "选项",
+									"answer": "回答"
+								}
+							},
+							"askYesNo": {
+								"label": "询问是或否：{question}",
+								"description": "从“是”或“否”继续。取消会让节点出错。试运行也会询问。",
+								"ports": {
+									"question": "问题",
+									"yes": "是",
+									"no": "否"
+								}
+							},
+							"form": {
+								"label": "表单 {title}",
+								"description": "一次为每个字段询问一个文本回答；“回答”是从字段到回答的字典。试运行也会询问。",
+								"ports": {
+									"title": "标题",
+									"answers": "回答"
+								}
+							},
+							"pickFile": {
+								"label": "选择一个文件：{prompt}",
+								"description": "等待从仓库中选择一个文件，可只限这些用逗号分隔的扩展名。试运行也会询问。",
+								"ports": {
+									"prompt": "提示",
+									"extensions": "扩展名",
+									"file": "文件"
+								}
+							},
+							"pickFiles": {
+								"label": "选择文件：{prompt}",
+								"description": "等待从仓库中选择一个或多个文件，可只限这些用逗号分隔的扩展名。试运行也会询问。",
+								"ports": {
+									"prompt": "提示",
+									"extensions": "扩展名",
+									"files": "文件"
+								}
+							},
+							"pickFolder": {
+								"label": "选择一个文件夹：{prompt}",
+								"description": "等待从仓库中选择一个文件夹。试运行也会询问。",
+								"ports": {
+									"prompt": "提示",
+									"folder": "文件夹"
+								}
+							},
+							"pickFolders": {
+								"label": "选择文件夹：{prompt}",
+								"description": "等待从仓库中选择一个或多个文件夹。取消会使节点出错。试运行也会询问。",
+								"ports": {
+									"prompt": "提示",
+									"folders": "文件夹"
+								}
+							},
+							"showMessage": {
+								"label": "显示 {message}",
+								"description": "显示一条消息并立即继续。文本以外的值以 JSON 显示。",
+								"ports": {
+									"message": "消息"
+								}
+							}
+						}
+					}
+				},
+				"workflowAsk": {
+					"cancel": "取消",
+					"ok": "确定",
+					"yes": "是",
+					"no": "否"
+				},
+				"vaultPicker": {
+					"search": "搜索仓库",
+					"nothing": "这里没有可选的内容",
+					"root": "仓库根目录",
+					"choose": "选择…",
+					"picked": "已选择 {count} 项"
+				},
+				"workflowData": {
+					"addItem": "输入后按回车",
+					"list": "列表（{count}）",
+					"dictionary": "字典（{count}）"
+				}
 			}
 		},
 		"frontmatter": {

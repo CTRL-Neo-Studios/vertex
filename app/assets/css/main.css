@@ -2,6 +2,8 @@
 /*@import url('https://fonts.cdnfonts.com/css/sf-pro-display');*/
 @import 'tailwindcss';
 @import '@nuxt/ui';
+/* The workflow canvas (@type32/workflows/vue) is built from Nuxt UI classes. */
+@source '../../../node_modules/@type32/workflows/dist';
 
 
 @utility no-scrollbar {

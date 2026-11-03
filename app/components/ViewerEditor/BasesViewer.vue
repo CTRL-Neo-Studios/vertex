@@ -5,6 +5,7 @@ import type {
 	InternalLinkNode
 } from "#codemirror-rich-obsidian-editor/editor-types";
 import {type BaseSource, type SortConfig, useBase} from "@type32/obsidian-bases-parser";
+import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {YamlFormData} from "@type32/yaml-editor-form";

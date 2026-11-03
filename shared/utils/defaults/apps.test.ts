@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppSettings } from './apps'
+import { defaultAppSettings, defaultAppWorkflowConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -25,5 +25,27 @@ describe('defaultAppSettings recovery migration', () => {
 
     it('keeps an existing deviceId', () => {
         expect(defaultAppSettings({ deviceId: 'abc' }).deviceId).toBe('abc')
+    })
+})
+
+describe('defaultAppWorkflowConfig', () => {
+    const hash = 'a'.repeat(64)
+
+    it('replaces invalid limits and keeps a zero timeout (no limit)', () => {
+        const c = defaultAppWorkflowConfig({maxLoopIterations: -1, maxStackDepth: 2.5, wallClockTimeoutMs: 0})
+        expect(c).toMatchObject({maxLoopIterations: 100_000, maxStackDepth: 64, wallClockTimeoutMs: 0, confirmTrash: true})
+    })
+
+    it('keeps only well-formed trust records', () => {
+        const c = defaultAppWorkflowConfig({
+            trustedPrograms: {
+                [hash]: {name: 'Archive', trustedAt: '2026-11-01'},
+                'not-a-hash': {name: 'x', trustedAt: 'y'},
+                ['b'.repeat(64)]: {name: 'missing date'},
+            },
+            trustedWorkspaces: {'/Users/me/Vault': {trustedAt: '2026-11-02'}, 'relative/path': {trustedAt: 'x'}, '/no-date': {}},
+        })
+        expect(c.trustedPrograms).toEqual({[hash]: {name: 'Archive', trustedAt: '2026-11-01'}})
+        expect(c.trustedWorkspaces).toEqual({'/Users/me/Vault': {trustedAt: '2026-11-02'}})
     })
 })
