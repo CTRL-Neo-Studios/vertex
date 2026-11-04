@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
-import {useAppSettings} from "~/composables/app/useAppSettings";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * Flexible layout wrapper for different viewer/editor types.
@@ -14,10 +14,9 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
  */
 
 const fileName = defineModel<string>('fileName')
-const {
-    config
-} = useAppSettings()
-const statusBarDisplayMode = computed(() => unref(config)?.viewConfig.editorPanel.showStatusBar)
+// The workspace's own view settings, when it overrides them.
+const {effective} = useSettingsScope()
+const statusBarDisplayMode = computed(() => effective.value?.viewConfig.editorPanel.showStatusBar)
 
     type ScrollMode = 'vertical' | 'both' | 'none'
 type ContentAlignment = 'center' | 'start' | 'stretch'

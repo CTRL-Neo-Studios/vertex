@@ -150,7 +150,13 @@
 					"otherBundled": "其他内置",
 					"monospace": "等宽",
 					"proportional": "比例"
-				}
+				},
+				"customCss": "自定义 CSS",
+				"customCssLabel": "样式表",
+				"customCssDescription": "添加在 Vertex 自身样式之后。离开编辑器时保存。",
+				"customCssPlaceholder": "/* 你的 CSS，例如 .tiptap h1 */",
+				"customCssUntrusted": "在你信任此工作区之前，它的 CSS 不会生效：它可以改变或隐藏任何内容，包括信任提示。",
+				"trustWorkspace": "信任工作区"
 			},
 			"view": {
 				"title": "视图",
@@ -188,14 +194,36 @@
 				"safety": "安全",
 				"confirmTrash": "移到废纸篓前询问",
 				"confirmTrashDescription": "每次运行在工作流首次把文件移到仓库废纸篓前询问一次。",
-				"trusted": "已信任的工作流",
-				"trustedDescription": "无需询问即可运行的工作流。编辑过的工作流需要重新信任。",
-				"noTrusted": "暂无。工作流首次运行时会询问你。",
+				"trusted": "受信任的文件夹和文件",
+				"trustedDescription": "这里的工作流会直接运行，不再询问。其他工作流在首次实际运行时会询问。",
+				"noTrusted": "暂无。工作流首次运行时会询问你，也可以在这里添加文件夹或文件。",
 				"revoke": "撤销信任",
 				"trustedAt": "信任于 {date}",
-				"trustedWorkspaces": "受信任的工作区",
-				"trustedWorkspacesDescription": "这些工作区中的所有工作流都会直接运行，无论是否编辑过。",
-				"noTrustedWorkspaces": "暂无。可在工作流首次运行的提示中信任工作区。"
+				"noMatches": "没有匹配项。",
+				"search": "搜索路径",
+				"folders": "文件夹",
+				"files": "文件",
+				"nested": "子文件夹",
+				"addFolder": "添加文件夹",
+				"addFile": "添加文件",
+				"revokeAll": "全部撤销",
+				"alsoTrustedBy": "也通过文件夹 {folder} 受信任",
+				"trustFailed": "无法更改信任",
+				"fileTrust": "受信任的文件记住",
+				"fileTrustDescription": "路径和内容：在 Vertex 之外做出的编辑（同步、git、其他应用、工作流）会撤销该文件的信任，在 Vertex 中的编辑会保留它。路径：任何地方的编辑都会保留它。文件夹始终按路径。",
+				"fileTrustPath": "路径",
+				"fileTrustContent": "路径和内容"
+			},
+			"scope": {
+				"label": "正在编辑",
+				"help": "工作区自己的设置保存在其 .vertex/settings.json 中，并在该工作区中覆盖你的设置。",
+				"user": "用户（所有工作区）",
+				"changed": "已在此工作区中更改",
+				"globalOnly": "仅全局",
+				"useGlobal": "使用全局",
+				"useGlobalAll": "使用全局主题",
+				"globalOnlyPage": "工作区无法更改这些设置；它们在所有地方生效。",
+				"editUser": "编辑用户设置"
 			}
 		},
 		"editor": {
@@ -414,16 +442,18 @@
 				},
 				"workflowTrust": {
 					"title": "首次运行“{name}”？",
-					"description": "工作流可以修改你的笔记。请检查它将要做什么；只有在你信任后它才会运行，编辑后需要重新信任。",
+					"description": "工作流可以更改你的笔记。请先查看它能做什么；只有在你信任它之后它才会运行。",
 					"capabilities": "它可以",
 					"nothing": "不会访问程序以外的内容",
 					"plan": "试运行将会更改",
 					"dryRunFault": "试运行提前停止：{message}",
 					"cancel": "取消",
-					"trust": "信任并运行",
+					"trust": "信任此文件并运行",
 					"noPlan": "它会在运行时向你提问，所以这里不做预览。可以用“试运行”查看它将要做出的更改。",
-					"trustWorkspace": "信任此工作区",
-					"trustWorkspaceDescription": "此工作区中的所有工作流（包括之后编辑或新增的）都会直接运行，不再询问。可在“设置 → 工作流”中撤销。"
+					"trustWorkspace": "信任整个工作区",
+					"more": "更多信任方式",
+					"trustFolder": "信任文件夹“{name}”",
+					"trustFolderNested": "信任“{name}”及其子文件夹"
 				},
 				"workflowTrash": {
 					"title": "将文件移到废纸篓？",

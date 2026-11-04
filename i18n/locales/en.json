@@ -150,7 +150,13 @@
 					"otherBundled": "Other bundled",
 					"monospace": "Monospaced",
 					"proportional": "Proportional"
-				}
+				},
+				"customCss": "Custom CSS",
+				"customCssLabel": "Style sheet",
+				"customCssDescription": "Added after Vertex's own styles. Saved when you leave the editor.",
+				"customCssPlaceholder": "/* Your CSS, e.g. .tiptap h1 */",
+				"customCssUntrusted": "This workspace's CSS is off until you trust the workspace: it could restyle or hide anything, the trust prompt included.",
+				"trustWorkspace": "Trust workspace"
 			},
 			"view": {
 				"title": "View",
@@ -188,14 +194,36 @@
 				"safety": "Safety",
 				"confirmTrash": "Ask before trashing",
 				"confirmTrashDescription": "Ask once per run before a workflow moves files to the vault trash.",
-				"trusted": "Trusted workflows",
-				"trustedDescription": "Workflows that may run without asking. A workflow you edit has to be trusted again.",
-				"noTrusted": "None yet. The first run of a workflow asks you.",
+				"trusted": "Trusted folders & files",
+				"trustedDescription": "Workflows here run without asking. Everything else asks on its first real run.",
+				"noTrusted": "Nothing yet. A workflow’s first run asks you, or add a folder or file here.",
 				"revoke": "Revoke",
 				"trustedAt": "Trusted {date}",
-				"trustedWorkspaces": "Trusted workspaces",
-				"trustedWorkspacesDescription": "Every workflow in these workspaces runs without asking, edited or not.",
-				"noTrustedWorkspaces": "None. Trust a workspace from a workflow’s first-run prompt."
+				"noMatches": "Nothing matches.",
+				"search": "Search paths",
+				"folders": "Folders",
+				"files": "Files",
+				"nested": "Subfolders",
+				"addFolder": "Add folder",
+				"addFile": "Add file",
+				"revokeAll": "Revoke all",
+				"alsoTrustedBy": "also trusted by folder {folder}",
+				"trustFailed": "Couldn’t change trust",
+				"fileTrust": "Trusted files remember",
+				"fileTrustDescription": "Path and content: an edit made outside Vertex (sync, git, another app, a workflow) revokes the file's trust, and edits in Vertex keep it. Path: edits anywhere keep it. Folders always go by path.",
+				"fileTrustPath": "Their path",
+				"fileTrustContent": "Their path and content"
+			},
+			"scope": {
+				"label": "Editing",
+				"help": "A workspace's own settings live in its .vertex/settings.json and override yours there.",
+				"user": "User (all workspaces)",
+				"changed": "Changed in this workspace",
+				"globalOnly": "Global only",
+				"useGlobal": "Use global",
+				"useGlobalAll": "Use global theme",
+				"globalOnlyPage": "A workspace can't change these settings; they apply everywhere.",
+				"editUser": "Edit User settings"
 			}
 		},
 		"editor": {
@@ -414,16 +442,18 @@
 				},
 				"workflowTrust": {
 					"title": "Run “{name}” for the first time?",
-					"description": "Workflows can change your notes. Check what this one would do; it runs only after you trust it, and editing it asks again.",
+					"description": "Workflows can change your notes. Check what this one can do; it runs only after you trust it.",
 					"capabilities": "It can",
 					"nothing": "Nothing outside the program",
 					"plan": "A dry run would change",
 					"dryRunFault": "The dry run stopped early: {message}",
 					"cancel": "Cancel",
-					"trust": "Trust and run",
+					"trust": "Trust this file and run",
 					"noPlan": "It asks you questions as it runs, so it isn’t previewed here. Use Dry run to see what it would change.",
-					"trustWorkspace": "Trust this workspace",
-					"trustWorkspaceDescription": "Every workflow in this workspace, including ones you edit or add later, runs without asking. Revoke it in Settings → Workflows."
+					"trustWorkspace": "Trust this whole workspace",
+					"more": "More ways to trust",
+					"trustFolder": "Trust folder “{name}”",
+					"trustFolderNested": "Trust “{name}” and its subfolders"
 				},
 				"workflowTrash": {
 					"title": "Move files to the trash?",

@@ -87,7 +87,7 @@ async function setToken(token: string) {
 </script>
 
 <template>
-    <SettingsScrollLayout :title="t('app.settings.general.title')" v-if="config">
+    <SettingsScrollLayout :title="t('app.settings.general.title')" v-if="config" global-only>
         <div class="space-y-4">
             <SettingsSection :title="t('app.settings.general.startup')">
                 <SettingsRow :label="t('app.settings.general.recovery.label')" :description="t('app.settings.general.recovery.description')">

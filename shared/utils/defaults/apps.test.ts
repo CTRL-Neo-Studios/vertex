@@ -29,23 +29,15 @@ describe('defaultAppSettings recovery migration', () => {
 })
 
 describe('defaultAppWorkflowConfig', () => {
-    const hash = 'a'.repeat(64)
-
     it('replaces invalid limits and keeps a zero timeout (no limit)', () => {
         const c = defaultAppWorkflowConfig({maxLoopIterations: -1, maxStackDepth: 2.5, wallClockTimeoutMs: 0})
         expect(c).toMatchObject({maxLoopIterations: 100_000, maxStackDepth: 64, wallClockTimeoutMs: 0, confirmTrash: true})
     })
 
-    it('keeps only well-formed trust records', () => {
-        const c = defaultAppWorkflowConfig({
-            trustedPrograms: {
-                [hash]: {name: 'Archive', trustedAt: '2026-11-01'},
-                'not-a-hash': {name: 'x', trustedAt: 'y'},
-                ['b'.repeat(64)]: {name: 'missing date'},
-            },
-            trustedWorkspaces: {'/Users/me/Vault': {trustedAt: '2026-11-02'}, 'relative/path': {trustedAt: 'x'}, '/no-date': {}},
-        })
-        expect(c.trustedPrograms).toEqual({[hash]: {name: 'Archive', trustedAt: '2026-11-01'}})
-        expect(c.trustedWorkspaces).toEqual({'/Users/me/Vault': {trustedAt: '2026-11-02'}})
+    it('drops the old trust records, which moved to trust.json, and defaults file trust to path and content', () => {
+        const c = defaultAppWorkflowConfig({trustedWorkspaces: {'/v': {trustedAt: 'x'}}, fileTrust: 'bogus'} as never)
+        expect(c).not.toHaveProperty('trustedWorkspaces')
+        expect(c.fileTrust).toBe('content')
+        expect(defaultAppWorkflowConfig({fileTrust: 'path'}).fileTrust).toBe('path')
     })
 })

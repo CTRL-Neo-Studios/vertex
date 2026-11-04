@@ -3,6 +3,7 @@ import type {ActiveSession} from "#shared/types/active/sessions"
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps"
 import {overlayVault} from "#shared/workflows/dryRun"
 import {createVertexEffects, undoOps, type Op, type UndoResult} from "#shared/workflows/effects"
+import {normalizeTrustPath, trustedBy} from "#shared/workflows/trust"
 import {baseNameOf, type Vault, type YamlTools} from "#shared/workflows/vault"
 import {vertexLanguage, type PickOptions, type VertexEffects} from "#shared/workflows/vertex"
 import WorkflowAskModal, {type Ask} from "~/components/Modals/WorkflowAskModal.vue"
@@ -15,7 +16,9 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator"
 import {useAppSettings} from "~/composables/app/useAppSettings"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
 import {useWorkflowManifest} from "~/composables/workflows/useWorkflowManifest"
+import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust"
 import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault"
+import {stateClient} from "~/utils/stateClient"
 
 export const RUN_EVENT = 'vertex.onManual'
 
@@ -58,13 +61,14 @@ export type LiveOptions = Pick<RunOptions<unknown>, 'onTrace' | 'signal' | 'befo
 
 /**
  * Runs workflow documents against a workspace. A dry run executes the same effects over an in-memory overlay;
- * a real run of a program whose hash isn't trusted yet first shows its capabilities and dry-run diff (§11).
+ * a real run of a workflow outside the trusted folders and files first shows what it can do (§11).
  * Prompts (the `ui` capability) are interactive: their time doesn't count toward the timeout, and dry runs ask
  * too (Appendix A #66). The last real run's ops are kept in memory for undo.
  */
 export function useWorkflowRunner(session: ActiveSession) {
     const vault = useWorkspaceVault(session)
-    const {config, save} = useAppSettings()
+    const {config} = useAppSettings()
+    const trusted = useWorkflowTrust()
     const {t} = useI18n()
     const $qt = useQuickToasts()
     const $toast = useToast()
@@ -140,30 +144,45 @@ export function useWorkflowRunner(session: ActiveSession) {
     const dryRun = (doc: DocumentV1, name: string, context: RunContext = {}, live?: LiveOptions) => execute(doc, name, true, context, live)
 
     /**
-     * Asks before a real run, unless the program's hash or the workspace is trusted. The prompt shows the
-     * capabilities, and the dry-run diff when there's one to show: a program that talks to the user (`ui`) isn't
-     * dry-run first, or its questions and messages would come before the prompt and again after it.
+     * Asks before a real run of the workflow at `path` (vault-relative), unless its file or folder is trusted. A file
+     * trusted with another program than it now holds was changed outside Vertex (edits in Vertex carry its trust,
+     * `followEdit`), so in content mode that trust is revoked. The prompt shows the capabilities, and the dry-run
+     * diff when there's one to show: a program that talks to the user (`ui`) isn't dry-run first, or its questions
+     * and messages would come before the prompt and again after it.
      */
-    async function trust(doc: DocumentV1, name: string): Promise<boolean> {
-        const hash = await hashProgram(doc)
+    async function trust(doc: DocumentV1, name: string, path: string): Promise<boolean> {
+        await trusted.load()
         const root = session.rootPath!
-        if (settings().trustedPrograms[hash] || settings().trustedWorkspaces[root]) return true
+        const file = normalizeTrustPath(`${root}/${path}`)
+        const hash = await hashProgram(doc)
+        const mode = settings().fileTrust
+        if (trustedBy(trusted.records.value, file, hash, mode)) return true
+        if (mode === 'content' && trusted.records.value.files[file]) await trusted.revoke('files', file)
         const used = compile(doc, vertexLanguage).capabilities
         const capabilities = manifest.value.capabilities.filter(c => used.has(c.id))
         const plan = used.has('ui') ? undefined : await dryRun(doc, name)
-        const answer = await trustModal.open({name, capabilities, plan}).result
+        const answer = await trustModal.open({name, capabilities, plan, file, root}).result
         if (!answer) return false
-        const current = settings()
-        const trustedAt = new Date().toISOString()
-        await save({workflowConfig: answer === 'workspace'
-            ? {...current, trustedWorkspaces: {...current.trustedWorkspaces, [root]: {trustedAt}}}
-            : {...current, trustedPrograms: {...current.trustedPrograms, [hash]: {name, trustedAt}}}})
+        await (answer.kind === 'file' ? trusted.trustFile(file, hash) : trusted.trustFolder(answer.path, answer.nested))
         return true
     }
 
-    /** `undefined` when the user declined to trust the program. Call `trust` first to ask outside a live run. */
-    async function run(doc: DocumentV1, name: string, context: RunContext = {}, live?: LiveOptions): Promise<RunOutcome | undefined> {
-        if (!await trust(doc, name)) return undefined
+    // In order, so each edit's `before` is the previous edit's `after`.
+    let following = Promise.resolve()
+    /**
+     * An edit made in Vertex's workflow editor: a file trusted with the program it had before keeps its trust with
+     * the new one. Rust swaps the hash only if it matches, so a file changed elsewhere first stays untrusted.
+     */
+    function followEdit(path: string, before: DocumentV1, after: DocumentV1) {
+        following = following.then(async () => {
+            const [from, to] = await Promise.all([hashProgram(before), hashProgram(after)])
+            if (from !== to) await stateClient.followTrustEdit(normalizeTrustPath(`${session.rootPath}/${path}`), from, to)
+        }).catch(error => console.error('[useWorkflowRunner] keeping trust after an edit:', error))
+    }
+
+    /** `undefined` when the user declined to trust the workflow. Call `trust` first to ask outside a live run. */
+    async function run(doc: DocumentV1, name: string, path: string, context: RunContext = {}, live?: LiveOptions): Promise<RunOutcome | undefined> {
+        if (!await trust(doc, name, path)) return undefined
         const outcome = await execute(doc, name, false, context, live)
         undoable.value = outcome.ops
         return outcome
@@ -205,7 +224,7 @@ export function useWorkflowRunner(session: ActiveSession) {
         try {
             const {doc, problems} = parseWorkflow(await vault.read(path))
             if (!doc) return $qt.error(t('app.editor.ui.workflow.invalid'), problems[0]?.message)
-            const outcome = dry ? await dryRun(doc, name, context) : await run(doc, name, context)
+            const outcome = dry ? await dryRun(doc, name, context) : await run(doc, name, path, context)
             if (!outcome) return $qt.info(t('app.editor.ui.workflow.declined'))
             report(name, outcome)
         } catch (error) {
@@ -213,5 +232,5 @@ export function useWorkflowRunner(session: ActiveSession) {
         }
     }
 
-    return {dryRun, trust, run, runFile, undo, canUndo: computed(() => undoable.value.length > 0)}
+    return {dryRun, trust, followEdit, run, runFile, undo, canUndo: computed(() => undoable.value.length > 0)}
 }

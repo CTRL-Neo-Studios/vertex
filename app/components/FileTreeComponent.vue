@@ -10,7 +10,7 @@ import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
 import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
-import {useAppSettings} from "~/composables/app/useAppSettings";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -30,7 +30,8 @@ const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, activeTabUuid} = useActiveTabs(session)
 const {getFileByUuid, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
 const {createFile} = useActiveWorkspaceTools(session)
-const {config} = useAppSettings()
+// The workspace's own view settings, when it overrides them.
+const config = useSettingsScope().effective
 // Workflows run on a workspace folder; a session without one gets no run items.
 const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 

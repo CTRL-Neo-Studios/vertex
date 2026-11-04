@@ -28,19 +28,12 @@ const positiveInt = (value: unknown, fallback: number) =>
     typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
-    const trusted = data?.trustedPrograms
-    const workspaces = data?.trustedWorkspaces
     return {
         maxLoopIterations: positiveInt(data?.maxLoopIterations, 100_000),
         maxStackDepth: positiveInt(data?.maxStackDepth, 64),
         wallClockTimeoutMs: data?.wallClockTimeoutMs === 0 ? 0 : positiveInt(data?.wallClockTimeoutMs, 30_000),
         confirmTrash: data?.confirmTrash ?? true,
-        trustedPrograms: Object.fromEntries(Object.entries(trusted && typeof trusted === 'object' ? trusted : {})
-            .filter(([hash, r]) => /^[0-9a-f]{64}$/.test(hash) && typeof r?.name === 'string' && typeof r?.trustedAt === 'string')
-            .map(([hash, r]) => [hash, {name: r!.name!, trustedAt: r!.trustedAt!}])),
-        trustedWorkspaces: Object.fromEntries(Object.entries(workspaces && typeof workspaces === 'object' ? workspaces : {})
-            .filter(([root, r]) => /^(\/|[a-zA-Z]:[\\/])/.test(root) && typeof r?.trustedAt === 'string')
-            .map(([root, r]) => [root, {trustedAt: r!.trustedAt!}])),
+        fileTrust: data?.fileTrust === 'path' ? 'path' : 'content',
     } satisfies AppWorkflowConfig
 }
 

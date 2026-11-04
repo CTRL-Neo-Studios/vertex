@@ -1,19 +1,22 @@
 //! Single writer for state shared by every window.
 //!
-//! Webviews never write `sessions.json` / `settings.json` themselves: they call these commands,
-//! Rust mutates the in-memory copy under a mutex, persists it, and broadcasts the new value.
-//! That removes the read-modify-write races that existed when each window kept its own copy.
+//! Webviews never write `sessions.json` / `settings.json` / `trust.json` / a workspace's `.vertex/settings.json`
+//! themselves: they call these commands, Rust mutates the in-memory copy under a mutex, persists it, and
+//! broadcasts the new value. That removes the read-modify-write races that existed when each window kept its own copy.
 
 use serde_json::{Map, Value};
-use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::collections::{HashMap, VecDeque};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub const SESSIONS_FILE: &str = "sessions.json";
 pub const SETTINGS_FILE: &str = "settings.json";
+pub const TRUST_FILE: &str = "trust.json";
 pub const EVENT_SESSIONS_CHANGED: &str = "vertex://sessions-changed";
 pub const EVENT_SETTINGS_CHANGED: &str = "vertex://settings-changed";
+pub const EVENT_TRUST_CHANGED: &str = "vertex://trust-changed";
+pub const EVENT_WORKSPACE_SETTINGS_CHANGED: &str = "vertex://workspace-settings-changed";
 pub const EVENT_OPEN_REQUESTED: &str = "vertex://open-requested";
 pub const EVENT_FLUSH_REQUESTED: &str = "vertex://flush-requested";
 pub const EVENT_FLUSH_DONE: &str = "vertex://flush-done";
@@ -28,6 +31,9 @@ const SETTINGS_ROOT: &str = "settings";
 pub struct AppState {
     sessions: Mutex<Option<Vec<Value>>>,
     settings: Mutex<Option<Value>>,
+    trust: Mutex<Option<Value>>,
+    /// Workspace root → its `.vertex/settings.json` as last read or written, to tell real changes from echoes.
+    workspace: Mutex<HashMap<String, Value>>,
     open_queue: Mutex<VecDeque<String>>,
 }
 
@@ -46,12 +52,15 @@ fn read_json<R: Runtime>(app: &AppHandle<R>, file: &str) -> Value {
 }
 
 /// Write via temp file + rename so a crash mid-write never leaves a truncated store.
-fn write_json<R: Runtime>(app: &AppHandle<R>, file: &str, value: &Value) -> Result<(), String> {
-    let path = store_path(app, file)?;
+fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
     let tmp = path.with_extension("json.tmp");
     let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+fn write_json<R: Runtime>(app: &AppHandle<R>, file: &str, value: &Value) -> Result<(), String> {
+    write_atomic(&store_path(app, file)?, value)
 }
 
 fn session_uuid(v: &Value) -> Option<&str> {
@@ -110,6 +119,142 @@ fn merge(target: &mut Value, patch: Value) {
     }
 }
 
+/// Trusted workflow folders and files (§11), `{"folders": {path: record}, "files": {path: record}}`. Kept out of
+/// settings so a stale settings save from another window can't bring back a revoked entry, and so a workspace's
+/// own settings can never touch it. Records are opaque here; the frontend sanitizes them.
+const TRUST_KINDS: [&str; 2] = ["folders", "files"];
+
+/// The first trust store: `settings.workflowConfig.trustedWorkspaces` become folders trusted with their
+/// subfolders. Per-program (hash) records are dropped; they name no path.
+pub fn migrate_trust(settings: &Value) -> Value {
+    let folders: Map<String, Value> = settings
+        .pointer("/workflowConfig/trustedWorkspaces")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(root, r)| {
+            let at = r.get("trustedAt")?.as_str()?;
+            Some((root.clone(), serde_json::json!({"trustedAt": at, "nested": true})))
+        })
+        .collect();
+    serde_json::json!({"folders": folders, "files": {}})
+}
+
+/// Sets one entry (`record` = null removes it), so concurrent changes from different windows never overwrite
+/// each other.
+pub fn set_trust_entry(trust: &mut Value, kind: &str, path: String, record: Value) -> Result<(), String> {
+    if !TRUST_KINDS.contains(&kind) {
+        return Err(format!("unknown trust kind {kind:?}"));
+    }
+    if !std::path::Path::new(&path).is_absolute() {
+        return Err(format!("{path:?} is not an absolute path"));
+    }
+    if !trust.is_object() {
+        *trust = serde_json::json!({});
+    }
+    let list = trust
+        .as_object_mut()
+        .unwrap()
+        .entry(kind)
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !list.is_object() {
+        *list = Value::Object(Map::new());
+    }
+    let list = list.as_object_mut().unwrap();
+    if record.is_null() {
+        list.remove(&path);
+    } else {
+        list.insert(path, record);
+    }
+    Ok(())
+}
+
+/// A rename or move inside an open workspace: every trusted path at or under `from` moves to the same place
+/// under `to`, so trust follows the file (or folder) instead of pointing at nothing.
+pub fn move_trust_paths(trust: &mut Value, from: &str, to: &str) {
+    for kind in TRUST_KINDS {
+        let Some(list) = trust.get_mut(kind).and_then(Value::as_object_mut) else {
+            continue;
+        };
+        let moved: Vec<String> = list
+            .keys()
+            .filter(|k| k.strip_prefix(from).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
+            .cloned()
+            .collect();
+        for key in moved {
+            let record = list.remove(&key).unwrap();
+            list.insert(format!("{to}{}", &key[from.len()..]), record);
+        }
+    }
+}
+
+/// An edit made in Vertex: a file trusted with program `from` now holds `to`. A file trusted with another
+/// program was changed outside Vertex (sync, git, another app, a workflow), so it's left for the next run to catch.
+pub fn follow_trust_edit(trust: &mut Value, path: &str, from: &str, to: &str) {
+    let record = trust.get_mut("files").and_then(|f| f.get_mut(path));
+    if let Some(record) = record.filter(|r| r.get("hash").and_then(Value::as_str) == Some(from)) {
+        record["hash"] = Value::String(to.to_owned());
+    }
+}
+
+const WORKSPACE_SETTINGS: [&str; 2] = [".vertex", "settings.json"];
+
+fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
+    let root = Path::new(root);
+    if !root.is_absolute() || !root.is_dir() {
+        return Err(format!("{root:?} is not a workspace folder"));
+    }
+    Ok(WORKSPACE_SETTINGS.iter().fold(root.to_path_buf(), |p, part| p.join(part)))
+}
+
+/// The file's object; anything else (missing, unreadable, not an object) is no overrides.
+fn read_object(path: &Path) -> Value {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| Value::Object(Map::new()))
+}
+
+/// Sets one dotted path (`themeConfig.primaryColor`), or removes it for `null`, dropping objects that end up
+/// empty, so the file only ever holds what the workspace changes.
+pub fn set_setting_path(target: &mut Value, path: &str, value: Value) -> Result<(), String> {
+    fn go(node: &mut Map<String, Value>, keys: &[&str], value: Value) {
+        let (key, rest) = keys.split_first().unwrap();
+        if rest.is_empty() {
+            if value.is_null() {
+                node.remove(*key);
+            } else {
+                node.insert((*key).to_owned(), value);
+            }
+            return;
+        }
+        if value.is_null() && !node.get(*key).is_some_and(Value::is_object) {
+            return;
+        }
+        let child = node
+            .entry((*key).to_owned())
+            .or_insert_with(|| Value::Object(Map::new()));
+        if !child.is_object() {
+            *child = Value::Object(Map::new());
+        }
+        let obj = child.as_object_mut().unwrap();
+        go(obj, rest, value);
+        if obj.is_empty() {
+            node.remove(*key);
+        }
+    }
+    let keys: Vec<&str> = path.split('.').collect();
+    if keys.iter().any(|k| k.is_empty()) {
+        return Err(format!("{path:?} is not a setting path"));
+    }
+    if !target.is_object() {
+        *target = Value::Object(Map::new());
+    }
+    go(target.as_object_mut().unwrap(), &keys, value);
+    Ok(())
+}
+
 impl AppState {
     fn with_sessions<R: Runtime, T>(
         &self,
@@ -160,6 +305,37 @@ impl AppState {
             root.insert(SETTINGS_ROOT.into(), settings.clone());
             write_json(app, SETTINGS_FILE, &Value::Object(root))?;
             app.emit(EVENT_SETTINGS_CHANGED, settings.clone())
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(out)
+    }
+
+    fn with_trust<R: Runtime, T>(
+        &self,
+        app: &AppHandle<R>,
+        f: impl FnOnce(&mut Value) -> Result<T, String>,
+        persist: bool,
+    ) -> Result<T, String> {
+        let mut guard = self.trust.lock().map_err(|e| e.to_string())?;
+        if guard.is_none() {
+            let stored = read_json(app, TRUST_FILE);
+            let trust = if stored.is_null() {
+                let settings = read_json(app, SETTINGS_FILE);
+                let migrated = migrate_trust(settings.get(SETTINGS_ROOT).unwrap_or(&Value::Null));
+                // Written now: the settings that held the old records drop them on their next save.
+                write_json(app, TRUST_FILE, &migrated)?;
+                migrated
+            } else {
+                stored
+            };
+            *guard = Some(trust);
+        }
+        let trust = guard.as_mut().unwrap();
+        let before = persist.then(|| trust.clone());
+        let out = f(trust)?;
+        if before.is_some_and(|b| b != *trust) {
+            write_json(app, TRUST_FILE, trust)?;
+            app.emit(EVENT_TRUST_CHANGED, trust.clone())
                 .map_err(|e| e.to_string())?;
         }
         Ok(out)
@@ -224,6 +400,132 @@ pub fn settings_set<R: Runtime>(
     state.with_settings(&app, |s| *s = settings, true)
 }
 
+#[tauri::command]
+pub fn trust_get<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+) -> Result<Value, String> {
+    state.with_trust(&app, |t| Ok(t.clone()), false)
+}
+
+/// `record: null` revokes. `kind` is `folders` or `files`; `path` must be absolute.
+#[tauri::command]
+pub fn trust_set<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    kind: String,
+    path: String,
+    record: Value,
+) -> Result<(), String> {
+    state.with_trust(&app, |t| set_trust_entry(t, &kind, path, record), true)
+}
+
+#[tauri::command]
+pub fn trust_clear<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    state.with_trust(
+        &app,
+        |t| {
+            *t = serde_json::json!({"folders": {}, "files": {}});
+            Ok(())
+        },
+        true,
+    )
+}
+
+/// See `move_trust_paths`. Paths are absolute.
+#[tauri::command]
+pub fn trust_move<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    from: String,
+    to: String,
+) -> Result<(), String> {
+    state.with_trust(
+        &app,
+        |t| {
+            move_trust_paths(t, &from, &to);
+            Ok(())
+        },
+        true,
+    )
+}
+
+/// See `follow_trust_edit`. Compare-and-swap in Rust, so edits in quick succession can't race each other.
+#[tauri::command]
+pub fn trust_follow_edit<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    path: String,
+    from: String,
+    to: String,
+) -> Result<(), String> {
+    state.with_trust(
+        &app,
+        |t| {
+            follow_trust_edit(t, &path, &from, &to);
+            Ok(())
+        },
+        true,
+    )
+}
+
+/// A workspace's overrides, `{}` when it has none. Always read from disk: the file travels with the folder.
+#[tauri::command]
+pub fn workspace_settings_get(state: tauri::State<'_, AppState>, root: String) -> Result<Value, String> {
+    let settings = read_object(&workspace_settings_file(&root)?);
+    state
+        .workspace
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(root, settings.clone());
+    Ok(settings)
+}
+
+/// Applies `[path, value]` pairs (`null` removes) to the file as it is on disk, then broadcasts it.
+#[tauri::command]
+pub fn workspace_settings_update<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    root: String,
+    updates: Vec<(String, Value)>,
+) -> Result<(), String> {
+    let file = workspace_settings_file(&root)?;
+    let mut cache = state.workspace.lock().map_err(|e| e.to_string())?;
+    let before = read_object(&file);
+    let mut settings = before.clone();
+    for (path, value) in updates {
+        set_setting_path(&mut settings, &path, value)?;
+    }
+    if settings != before {
+        std::fs::create_dir_all(file.parent().unwrap()).map_err(|e| e.to_string())?;
+        write_atomic(&file, &settings)?;
+    }
+    cache.insert(root.clone(), settings.clone());
+    app.emit(EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
+        .map_err(|e| e.to_string())
+}
+
+/// The workspace's watcher saw the file change (an external edit, git, sync): re-reads it and broadcasts it when
+/// it differs from what Rust last read or wrote.
+#[tauri::command]
+pub fn workspace_settings_reload<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    root: String,
+) -> Result<(), String> {
+    let settings = read_object(&workspace_settings_file(&root)?);
+    let mut cache = state.workspace.lock().map_err(|e| e.to_string())?;
+    if cache.get(&root) == Some(&settings) {
+        return Ok(());
+    }
+    cache.insert(root.clone(), settings.clone());
+    app.emit(EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
+        .map_err(|e| e.to_string())
+}
+
 /// Returns and clears every path the OS asked us to open (file associations, second launches).
 #[tauri::command]
 pub fn take_open_requests(state: tauri::State<'_, AppState>) -> Vec<String> {
@@ -286,5 +588,64 @@ mod tests {
         upsert_session(&mut list, json!({"uuid": "n"})).unwrap();
         assert_eq!(list.len(), 1);
         assert!(upsert_session(&mut list, json!({"x": 1})).is_err());
+    }
+
+    #[test]
+    fn migrate_trust_keeps_workspaces_as_nested_folders_and_drops_programs() {
+        let settings = json!({"workflowConfig": {
+            "trustedPrograms": {"ab": {"name": "x", "trustedAt": "t0"}},
+            "trustedWorkspaces": {"/v": {"trustedAt": "t1"}, "/bad": {}},
+        }});
+        assert_eq!(
+            migrate_trust(&settings),
+            json!({"folders": {"/v": {"trustedAt": "t1", "nested": true}}, "files": {}})
+        );
+        assert_eq!(migrate_trust(&Value::Null), json!({"folders": {}, "files": {}}));
+    }
+
+    #[test]
+    fn set_trust_entry_adds_and_removes_one_entry() {
+        let mut trust = json!({"folders": {"/a": {"trustedAt": "t"}}, "files": {}});
+        set_trust_entry(&mut trust, "files", "/a/x.workflow".into(), json!({"trustedAt": "t"})).unwrap();
+        set_trust_entry(&mut trust, "folders", "/a".into(), Value::Null).unwrap();
+        assert_eq!(trust, json!({"folders": {}, "files": {"/a/x.workflow": {"trustedAt": "t"}}}));
+        assert!(set_trust_entry(&mut trust, "programs", "/a".into(), json!({})).is_err());
+        assert!(set_trust_entry(&mut trust, "files", "a/x".into(), json!({})).is_err());
+    }
+
+    #[test]
+    fn move_trust_paths_moves_the_entry_and_everything_under_it_only() {
+        let mut trust = json!({
+            "folders": {"/v/A": {"n": 1}, "/v/A/B": {"n": 2}, "/v/AB": {"n": 3}},
+            "files": {"/v/A/x.workflow": {"n": 4}},
+        });
+        move_trust_paths(&mut trust, "/v/A", "/v/C");
+        assert_eq!(trust, json!({
+            "folders": {"/v/C": {"n": 1}, "/v/C/B": {"n": 2}, "/v/AB": {"n": 3}},
+            "files": {"/v/C/x.workflow": {"n": 4}},
+        }));
+    }
+
+    #[test]
+    fn follow_trust_edit_swaps_only_from_the_trusted_program() {
+        let mut trust = json!({"files": {"/v/x.workflow": {"trustedAt": "t", "hash": "h1"}}});
+        follow_trust_edit(&mut trust, "/v/x.workflow", "h0", "h9");
+        assert_eq!(trust["files"]["/v/x.workflow"]["hash"], "h1");
+        follow_trust_edit(&mut trust, "/v/x.workflow", "h1", "h2");
+        assert_eq!(trust["files"]["/v/x.workflow"], json!({"trustedAt": "t", "hash": "h2"}));
+        follow_trust_edit(&mut trust, "/v/missing.workflow", "h1", "h2");
+        assert_eq!(trust["files"].as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn set_setting_path_sets_removes_and_prunes_empty_objects() {
+        let mut s = json!({});
+        set_setting_path(&mut s, "themeConfig.primaryColor", json!("red")).unwrap();
+        set_setting_path(&mut s, "viewConfig.fileTree.showFoldArrows", json!(true)).unwrap();
+        assert_eq!(s, json!({"themeConfig": {"primaryColor": "red"}, "viewConfig": {"fileTree": {"showFoldArrows": true}}}));
+        set_setting_path(&mut s, "viewConfig.fileTree.showFoldArrows", Value::Null).unwrap();
+        set_setting_path(&mut s, "missing.key", Value::Null).unwrap();
+        assert_eq!(s, json!({"themeConfig": {"primaryColor": "red"}}));
+        assert!(set_setting_path(&mut s, "a..b", json!(1)).is_err());
     }
 }

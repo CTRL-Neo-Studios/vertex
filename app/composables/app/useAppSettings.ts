@@ -1,10 +1,13 @@
-import {TauriEvent} from "@tauri-apps/api/event";
+import {emitTo, TauriEvent} from "@tauri-apps/api/event";
 import {defaultAppSettings} from "#shared/utils/defaults/apps";
 import type {AppSettings} from "#shared/types/app/settings";
 import type {DeepPartial} from "#shared/types/types";
 import {Routes, StateKey, WindowLabel} from "#shared/constants/app";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {stateClient} from "~/utils/stateClient";
+
+/** Sent to an open Settings window with the scope (workspace root, or `null` for User) to switch to. */
+export const SETTINGS_SCOPE_EVENT = 'vertex://settings-scope'
 
 /**
  * Per-window mirror of app settings. Rust (src-tauri/src/state.rs) is the only writer of settings.json
@@ -62,12 +65,15 @@ export function useAppSettings() {
         }
     }
 
-    async function createOrFocusSettingsWindow() {
+    /** `scope`: a workspace root to open on (`null` = User). An open Settings window switches to it. */
+    async function createOrFocusSettingsWindow(scope: string | null = null) {
         if (await $win.getAppWindowWithLabel(WindowLabel.settings)) {
             await $win.showWindowWithLabel(WindowLabel.settings)
+            await emitTo(WindowLabel.settings, SETTINGS_SCOPE_EVENT, scope)
             return
         }
-        const settingsWindow = $win.createAppWebviewWindow(Routes.settings, WindowLabel.settings, 'Settings')
+        const route = scope ? `${Routes.settings}?scope=${encodeURIComponent(scope)}` : Routes.settings
+        const settingsWindow = $win.createAppWebviewWindow(route, WindowLabel.settings, 'Settings')
         // Settings has nothing to flush; let close proceed immediately.
         const unlisten = await settingsWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
             unlisten()
