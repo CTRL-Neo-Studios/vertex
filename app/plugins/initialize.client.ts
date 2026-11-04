@@ -3,6 +3,7 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {resolveLocale} from "#shared/utils/locale";
 
 /**
@@ -17,16 +18,21 @@ export default defineNuxtPlugin({
         const $win = useAppWebviewWindows()
         const $settings = useAppSettings()
         const $theme = useAppTheme()
+        const $scope = useSettingsScope()
 
         const cfg = await $settings.load()
         $theme.apply()
         // Window lifetime == listener lifetime; Tauri drops webview listeners when the window is destroyed.
         await $settings.listen()
         await $asesh.listen()
-        await $asesh.initializeCurrentAppSession()
+        const session = await $asesh.initializeCurrentAppSession()
+        // A workspace window uses its workspace's overrides; a broken `.vertex/settings.json` leaves the global ones.
+        if (session?.sessionType === 'workspace' && session.rootFileOrFolderAbsolutePath) {
+            await $scope.open(session.rootFileOrFolderAbsolutePath).catch(e => console.error('[initialize] workspace settings:', e))
+        }
 
-        // Re-apply the theme whenever any window (e.g. Settings) saves it.
-        watch(() => $settings.config.value?.themeConfig, () => $theme.apply(), {deep: true})
+        // Re-apply the theme whenever it changes: any window saving it, the workspace's overrides, trusting it.
+        watch([$theme.theme, $theme.customCss], () => $theme.apply(), {deep: true, immediate: true})
 
         // UI language: setting (or OS language when `system`), applied in every window and on every change.
         const i18n = nuxtApp.$i18n

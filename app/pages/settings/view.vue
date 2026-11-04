@@ -2,17 +2,17 @@
 import type {SelectItem} from '@nuxt/ui'
 import type {AppViewConfig} from "#shared/types/app/settings";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {defaultAppViewConfig} from "#shared/utils/defaults/apps";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 definePageMeta({
     layout: 'settings'
 })
 
 const {t} = useI18n()
-const {config, load, save} = useAppSettings()
+const {config, load} = useAppSettings()
+const scope = useSettingsScope()
 onMounted(load)
 
-const defaults = defaultAppViewConfig()
 type FileTreeKey = keyof AppViewConfig['fileTree']
 
 const fileTreeRows: {key: FileTreeKey, label: string}[] = [
@@ -30,46 +30,38 @@ const statusBarItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.statusBarAlways'), value: 'always-shown'},
     {label: t('app.settings.view.statusBarNever'), value: 'always-hidden'},
 ])
-
-// Whole-object saves: settings merge only at the top level.
-function setFileTree(patch: Partial<AppViewConfig['fileTree']>) {
-    const view = config.value!.viewConfig
-    return save({viewConfig: {...view, fileTree: {...view.fileTree, ...patch}}})
-}
-
-function setEditorPanel(patch: Partial<AppViewConfig['editorPanel']>) {
-    const view = config.value!.viewConfig
-    return save({viewConfig: {...view, editorPanel: {...view.editorPanel, ...patch}}})
-}
-
-const fileTreeDirty = computed(() => JSON.stringify(config.value?.viewConfig.fileTree) !== JSON.stringify(defaults.fileTree))
-const editorPanelDirty = computed(() => JSON.stringify(config.value?.viewConfig.editorPanel) !== JSON.stringify(defaults.editorPanel))
+const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as const)
 </script>
 
 <template>
     <SettingsScrollLayout :title="t('app.settings.view.title')" v-if="config">
         <div class="space-y-4">
-            <SettingsSection :title="t('app.settings.view.fileTree')" :dirty="fileTreeDirty" @reset="setFileTree(defaults.fileTree)">
+            <SettingsSection :title="t('app.settings.view.fileTree')" :dirty="scope.isDirty(fileTreePaths)" @reset="scope.reset(fileTreePaths)">
                 <SettingsRow
                     v-for="row in fileTreeRows"
                     :key="row.key"
+                    :setting="`viewConfig.fileTree.${row.key}`"
                     :label="t(`app.settings.view.${row.label}`)"
                     :description="t(`app.settings.view.${row.label}Description`)"
                 >
                     <USwitch
-                        :model-value="config.viewConfig.fileTree[row.key]"
-                        @update:model-value="setFileTree({ [row.key]: $event })"
+                        :model-value="scope.value(`viewConfig.fileTree.${row.key}`)"
+                        @update:model-value="scope.set({[`viewConfig.fileTree.${row.key}`]: $event})"
                     />
                 </SettingsRow>
             </SettingsSection>
 
-            <SettingsSection :title="t('app.settings.view.editorPanel')" :dirty="editorPanelDirty" @reset="setEditorPanel(defaults.editorPanel)">
-                <SettingsRow :label="t('app.settings.view.statusBar')" :description="t('app.settings.view.statusBarDescription')">
+            <SettingsSection
+                :title="t('app.settings.view.editorPanel')"
+                :dirty="scope.isDirty(['viewConfig.editorPanel.showStatusBar'])"
+                @reset="scope.reset(['viewConfig.editorPanel.showStatusBar'])"
+            >
+                <SettingsRow setting="viewConfig.editorPanel.showStatusBar" :label="t('app.settings.view.statusBar')" :description="t('app.settings.view.statusBarDescription')">
                     <USelect
-                        :model-value="config.viewConfig.editorPanel.showStatusBar"
+                        :model-value="scope.value('viewConfig.editorPanel.showStatusBar')"
                         :items="statusBarItems"
                         class="w-52"
-                        @update:model-value="setEditorPanel({ showStatusBar: $event as AppViewConfig['editorPanel']['showStatusBar'] })"
+                        @update:model-value="scope.set({'viewConfig.editorPanel.showStatusBar': $event})"
                     />
                 </SettingsRow>
             </SettingsSection>

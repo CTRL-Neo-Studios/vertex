@@ -1,6 +1,6 @@
 import colors from 'tailwindcss/colors'
 import {invoke} from '@tauri-apps/api/core'
-import {useAppSettings} from "~/composables/app/useAppSettings";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {AppThemeConfig} from "#shared/types/app/settings";
 
@@ -42,16 +42,19 @@ export function loadSystemFonts() {
 }
 
 /**
- * The theme lives in settings (`themeConfig`), written by Rust and broadcast to every window; `apply()`
- * copies it into app.config, which app.vue turns into CSS variables. Edits always save the whole object.
+ * The theme lives in settings (`themeConfig`, which a workspace may override), written by Rust and broadcast to
+ * every window; `apply()` copies this window's effective theme into app.config, which app.vue turns into CSS
+ * variables, and its custom CSS into a style element. Edits go to the Settings window's current scope.
  */
 export function useAppTheme() {
     const appConfig = useAppConfig()
     const colorMode = useColorMode()
-    const $settings = useAppSettings()
+    const scope = useSettingsScope()
     const defaults = defaultAppThemeConfig()
 
-    const theme = computed(() => $settings.config.value?.themeConfig ?? defaults)
+    const theme = computed(() => scope.effective.value?.themeConfig ?? defaults)
+    const customCss = computed(() => scope.effective.value?.advancedThemeConfig.customCss ?? '')
+    const paths = (keys: (keyof AppThemeConfig)[]) => keys.map(key => `themeConfig.${key}` as const)
 
     function apply() {
         const t = theme.value
@@ -64,21 +67,20 @@ export function useAppTheme() {
         appConfig.theme.editorMonoFont = t.editorMonoFont
         appConfig.theme.blackAsPrimary = t.blackAsPrimary
         colorMode.preference = t.colorMode
+        // textContent, not innerHTML: the CSS can't close its element and inject markup.
+        const style = document.getElementById('vertex-custom-css') ?? document.head.appendChild(Object.assign(document.createElement('style'), {id: 'vertex-custom-css'}))
+        style.textContent = customCss.value
     }
 
     /** Saving broadcasts the settings; the init plugin's watcher re-applies them in every window, this one included. */
     async function update(patch: Partial<AppThemeConfig>) {
-        await $settings.save({themeConfig: {...theme.value, ...patch}})
+        await scope.set(Object.fromEntries(Object.entries(patch).map(([key, value]) => [`themeConfig.${key}`, value])))
     }
 
-    /** Whether any of `keys` differs from the stock theme; drives the per-section reset buttons. */
-    function isDirty(keys: (keyof AppThemeConfig)[]) {
-        return keys.some(key => theme.value[key] !== defaults[key])
-    }
+    /** Whether any of `keys` differs (User: from the stock theme; workspace: from the global one). */
+    const isDirty = (keys: (keyof AppThemeConfig)[]) => scope.isDirty(paths(keys))
 
-    function reset(keys: (keyof AppThemeConfig)[] = Object.keys(defaults) as (keyof AppThemeConfig)[]) {
-        return update(Object.fromEntries(keys.map(key => [key, defaults[key]])))
-    }
+    const reset = (keys: (keyof AppThemeConfig)[] = Object.keys(defaults) as (keyof AppThemeConfig)[]) => scope.reset(paths(keys))
 
-    return {theme, defaults, apply, update, isDirty, reset}
+    return {theme, customCss, defaults, apply, update, isDirty, reset}
 }

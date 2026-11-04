@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import type {NavigationMenuItem} from "#ui/components/NavigationMenu.vue";
+import {getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
 import {Routes} from "#shared/constants/app";
+import {fileNameFromPath} from "#shared/utils/fs/filenames";
+import {useAppSessions} from "~/composables/app/useAppSessions";
+import {SETTINGS_SCOPE_EVENT} from "~/composables/app/useAppSettings";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 const {t} = useI18n()
+const $route = useRoute()
+const scope = useSettingsScope()
+const {appSessions} = useAppSessions()
 
 const links = computed(() => [
     {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings},
@@ -11,6 +19,26 @@ const links = computed(() => [
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
     {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
 ] satisfies NavigationMenuItem[])
+
+// User, or a workspace this app has opened. Select items need a non-empty value; a root is an absolute path.
+const USER = 'user'
+const scopes = computed(() => {
+    const roots = new Set(appSessions.value.flatMap(s => (s.sessionType === 'workspace' && s.rootFileOrFolderAbsolutePath ? [s.rootFileOrFolderAbsolutePath] : [])))
+    if (scope.root.value) roots.add(scope.root.value)
+    return [
+        {label: t('app.settings.scope.user'), value: USER, icon: 'i-lucide-user'},
+        ...[...roots].map(root => ({label: fileNameFromPath(root), value: root, icon: 'i-lucide-folder'})),
+    ]
+})
+const choose = (root: string | null) => scope.open(root === USER ? null : root).catch(e => console.error('[settings] could not open scope', e))
+
+let unlisten: (() => void) | undefined
+onBeforeUnmount(() => unlisten?.())
+onMounted(async () => {
+    await choose(typeof $route.query.scope === 'string' ? $route.query.scope : null)
+    // Settings opened again from another window: switch to that window's scope.
+    unlisten = await getCurrentWebviewWindow().listen<string | null>(SETTINGS_SCOPE_EVENT, e => choose(e.payload))
+})
 </script>
 
 <template>
@@ -19,8 +47,18 @@ const links = computed(() => [
             <!-- Sidebar -->
             <div class="col-span-1 bg-submuted border-r border-r-default h-full overflow-hidden flex flex-col" data-tauri-drag-region>
                 <SpaceOnOs detectOs="macos" showOnOs class="h-(--ui-header-height)"/>
-                
-                <UContainer class="w-full flex-1 overflow-y-auto">
+
+                <UContainer class="w-full flex-1 overflow-y-auto space-y-3">
+                    <UFormField :label="t('app.settings.scope.label')" :help="t('app.settings.scope.help')" size="xs">
+                        <USelect
+                            class="w-full"
+                            size="sm"
+                            :items="scopes"
+                            :model-value="scope.root.value ?? USER"
+                            :icon="scope.root.value ? 'i-lucide-folder' : 'i-lucide-user'"
+                            @update:model-value="choose($event as string)"
+                        />
+                    </UFormField>
                     <UNavigationMenu
                         :items="links"
                         orientation="vertical"
@@ -29,7 +67,7 @@ const links = computed(() => [
                     />
                 </UContainer>
             </div>
-            
+
             <!-- Content area (non-scrollable container) -->
             <div class="col-span-3 h-screen">
                 <slot/>
@@ -37,7 +75,3 @@ const links = computed(() => [
         </div>
     </div>
 </template>
-
-<style scoped>
-
-</style>
