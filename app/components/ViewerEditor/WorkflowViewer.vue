@@ -64,15 +64,15 @@ const pathWidget = (type: TypeTerm | undefined) => (type?.kind === 'con' ? PATH_
 const canvasKey = ref(0)
 
 // Text ↔ document. `written` is the last text this viewer produced, so its own saves don't reload it. An edit made
-// here carries the file's trust from the program it had (the text before) to the new one.
+// here carries the file's trust from the program it had (the text before) to the new one; an empty file had none.
 let written = content.value
 const serialize = () => `${JSON.stringify(editor.snapshot(), null, 2)}\n`
 watch(() => editor.document.value, () => {
     if (loadProblems.value.length) return
     const text = serialize()
     if (text === content.value) return
-    const before = parseWorkflow(content.value).doc
-    if (before) runner.followEdit(props.filePath, before, editor.snapshot())
+    const before = content.value.trim() ? parseWorkflow(content.value).doc : undefined
+    if (before || !content.value.trim()) runner.followEdit(props.filePath, before, editor.snapshot())
     written = text
     content.value = text
 }, {deep: true})

@@ -209,10 +209,11 @@
 				"revokeAll": "全部撤销",
 				"alsoTrustedBy": "也通过文件夹 {folder} 受信任",
 				"trustFailed": "无法更改信任",
-				"fileTrust": "受信任的文件记住",
-				"fileTrustDescription": "路径和内容：在 Vertex 之外做出的编辑（同步、git、其他应用、工作流）会撤销该文件的信任，在 Vertex 中的编辑会保留它。路径：任何地方的编辑都会保留它。文件夹始终按路径。",
-				"fileTrustPath": "路径",
-				"fileTrustContent": "路径和内容"
+				"fileTrust": "信任记住",
+				"fileTrustDescription": "路径和内容：受信任的文件，或受信任文件夹中信任时的工作流，只在 Vertex 之外未被更改时运行；在 Vertex 中的编辑会保留信任，在其他地方（同步、git、其他应用、工作流）新增或更改的工作流会先询问。仅路径：受信任路径下的一切都会运行。",
+				"fileTrustPath": "仅路径",
+				"fileTrustContent": "路径和内容",
+				"pinned": "{count} 个工作流按受信任时的内容"
 			},
 			"scope": {
 				"label": "正在编辑",

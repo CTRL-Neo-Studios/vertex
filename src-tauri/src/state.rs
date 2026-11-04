@@ -169,32 +169,80 @@ pub fn set_trust_entry(trust: &mut Value, kind: &str, path: String, record: Valu
     Ok(())
 }
 
+fn under(path: &str, base: &str) -> bool {
+    path.strip_prefix(base).is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+fn rename_keys(list: &mut Map<String, Value>, from: &str, to: &str) {
+    let moved: Vec<String> = list.keys().filter(|k| under(k, from)).cloned().collect();
+    for key in moved {
+        let record = list.remove(&key).unwrap();
+        list.insert(format!("{to}{}", &key[from.len()..]), record);
+    }
+}
+
 /// A rename or move inside an open workspace: every trusted path at or under `from` moves to the same place
-/// under `to`, so trust follows the file (or folder) instead of pointing at nothing.
+/// under `to`, so trust follows the file (or folder) instead of pointing at nothing. A folder's pinned programs
+/// (`files`) move too; one moved out of its folder isn't covered by it any more and is dropped.
 pub fn move_trust_paths(trust: &mut Value, from: &str, to: &str) {
     for kind in TRUST_KINDS {
-        let Some(list) = trust.get_mut(kind).and_then(Value::as_object_mut) else {
-            continue;
-        };
-        let moved: Vec<String> = list
-            .keys()
-            .filter(|k| k.strip_prefix(from).is_some_and(|rest| rest.is_empty() || rest.starts_with('/')))
-            .cloned()
-            .collect();
-        for key in moved {
-            let record = list.remove(&key).unwrap();
-            list.insert(format!("{to}{}", &key[from.len()..]), record);
+        if let Some(list) = trust.get_mut(kind).and_then(Value::as_object_mut) {
+            rename_keys(list, from, to);
+        }
+    }
+    let Some(folders) = trust.get_mut("folders").and_then(Value::as_object_mut) else {
+        return;
+    };
+    for (folder, record) in folders.iter_mut() {
+        if let Some(pins) = record.get_mut("files").and_then(Value::as_object_mut) {
+            rename_keys(pins, from, to);
+            pins.retain(|path, _| under(path, folder) && path != folder);
         }
     }
 }
 
-/// An edit made in Vertex: a file trusted with program `from` now holds `to`. A file trusted with another
-/// program was changed outside Vertex (sync, git, another app, a workflow), so it's left for the next run to catch.
+/// An edit made in Vertex: a file trusted with program `from`, on its own or pinned by a folder, now holds `to`.
+/// One trusted with another program was changed outside Vertex (sync, git, another app, a workflow), so it's left
+/// for the next run to catch.
 pub fn follow_trust_edit(trust: &mut Value, path: &str, from: &str, to: &str) {
+    let to = Value::String(to.to_owned());
     let record = trust.get_mut("files").and_then(|f| f.get_mut(path));
     if let Some(record) = record.filter(|r| r.get("hash").and_then(Value::as_str) == Some(from)) {
-        record["hash"] = Value::String(to.to_owned());
+        record["hash"] = to.clone();
     }
+    let pins = trust
+        .get_mut("folders")
+        .and_then(Value::as_object_mut)
+        .into_iter()
+        .flat_map(|folders| folders.values_mut())
+        .filter_map(|r| r.get_mut("files").and_then(|p| p.get_mut(path)));
+    for pin in pins.filter(|p| p.as_str() == Some(from)) {
+        *pin = to.clone();
+    }
+}
+
+/// Pins (or, for `None`, unpins) `path`'s program in a trusted folder's record; nothing when the folder isn't trusted.
+pub fn pin_trust(trust: &mut Value, folder: &str, path: &str, hash: Option<String>) -> Result<(), String> {
+    if !under(path, folder) || path == folder {
+        return Err(format!("{path:?} is not in {folder:?}"));
+    }
+    let Some(record) = trust.get_mut("folders").and_then(|f| f.get_mut(folder)).filter(|r| r.is_object()) else {
+        return Ok(());
+    };
+    let pins = record
+        .as_object_mut()
+        .unwrap()
+        .entry("files")
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !pins.is_object() {
+        *pins = Value::Object(Map::new());
+    }
+    let pins = pins.as_object_mut().unwrap();
+    match hash {
+        Some(hash) => pins.insert(path.to_owned(), Value::String(hash)),
+        None => pins.remove(path),
+    };
+    Ok(())
 }
 
 const WORKSPACE_SETTINGS: [&str; 2] = [".vertex", "settings.json"];
@@ -341,6 +389,11 @@ impl AppState {
         Ok(out)
     }
 
+    /// Reads (or first creates, migrating old settings) `trust.json`, so it exists from launch.
+    pub fn ensure_trust<R: Runtime>(&self, app: &AppHandle<R>) -> Result<(), String> {
+        self.with_trust(app, |_| Ok(()), false)
+    }
+
     pub fn push_open_request<R: Runtime>(&self, app: &AppHandle<R>, path: String) {
         if let Ok(mut q) = self.open_queue.lock() {
             q.push_back(path);
@@ -470,6 +523,19 @@ pub fn trust_follow_edit<R: Runtime>(
         },
         true,
     )
+}
+
+/// See `pin_trust`: an empty workflow file in a trusted folder gets its first program in Vertex, or a pin that no
+/// longer matches is dropped (`hash: null`).
+#[tauri::command]
+pub fn trust_pin<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    folder: String,
+    path: String,
+    hash: Option<String>,
+) -> Result<(), String> {
+    state.with_trust(&app, |t| pin_trust(t, &folder, &path, hash), true)
 }
 
 /// A workspace's overrides, `{}` when it has none. Always read from disk: the file travels with the folder.
@@ -647,5 +713,23 @@ mod tests {
         set_setting_path(&mut s, "missing.key", Value::Null).unwrap();
         assert_eq!(s, json!({"themeConfig": {"primaryColor": "red"}}));
         assert!(set_setting_path(&mut s, "a..b", json!(1)).is_err());
+    }
+
+    #[test]
+    fn folder_pins_follow_edits_and_moves_and_drop_when_moved_out() {
+        let mut trust = json!({"folders": {"/v/A": {"trustedAt": "t", "nested": true, "files": {"/v/A/x.workflow": "h1"}}}, "files": {}});
+        pin_trust(&mut trust, "/v/A", "/v/A/B/new.workflow", Some("n1".into())).unwrap();
+        pin_trust(&mut trust, "/v/Other", "/v/Other/y.workflow", Some("h".into())).unwrap();
+        assert!(pin_trust(&mut trust, "/v/A", "/v/AB/z.workflow", Some("h".into())).is_err());
+        follow_trust_edit(&mut trust, "/v/A/x.workflow", "h0", "h9");
+        follow_trust_edit(&mut trust, "/v/A/B/new.workflow", "n1", "n2");
+        assert_eq!(trust["folders"]["/v/A"]["files"], json!({"/v/A/x.workflow": "h1", "/v/A/B/new.workflow": "n2"}));
+        move_trust_paths(&mut trust, "/v/A/B", "/v/A/C");
+        move_trust_paths(&mut trust, "/v/A/x.workflow", "/v/elsewhere.workflow");
+        assert_eq!(trust["folders"], json!({"/v/A": {"trustedAt": "t", "nested": true, "files": {"/v/A/C/new.workflow": "n2"}}}));
+        move_trust_paths(&mut trust, "/v/A", "/v/Z");
+        assert_eq!(trust["folders"]["/v/Z"]["files"], json!({"/v/Z/C/new.workflow": "n2"}));
+        pin_trust(&mut trust, "/v/Z", "/v/Z/C/new.workflow", None).unwrap();
+        assert_eq!(trust["folders"]["/v/Z"]["files"], json!({}));
     }
 }

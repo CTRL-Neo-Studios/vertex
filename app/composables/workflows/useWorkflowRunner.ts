@@ -3,7 +3,7 @@ import type {ActiveSession} from "#shared/types/active/sessions"
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps"
 import {overlayVault} from "#shared/workflows/dryRun"
 import {createVertexEffects, undoOps, type Op, type UndoResult} from "#shared/workflows/effects"
-import {normalizeTrustPath, trustedBy} from "#shared/workflows/trust"
+import {coveringFolder, normalizeTrustPath, trustedBy} from "#shared/workflows/trust"
 import {baseNameOf, type Vault, type YamlTools} from "#shared/workflows/vault"
 import {vertexLanguage, type PickOptions, type VertexEffects} from "#shared/workflows/vertex"
 import WorkflowAskModal, {type Ask} from "~/components/Modals/WorkflowAskModal.vue"
@@ -144,11 +144,11 @@ export function useWorkflowRunner(session: ActiveSession) {
     const dryRun = (doc: DocumentV1, name: string, context: RunContext = {}, live?: LiveOptions) => execute(doc, name, true, context, live)
 
     /**
-     * Asks before a real run of the workflow at `path` (vault-relative), unless its file or folder is trusted. A file
-     * trusted with another program than it now holds was changed outside Vertex (edits in Vertex carry its trust,
-     * `followEdit`), so in content mode that trust is revoked. The prompt shows the capabilities, and the dry-run
-     * diff when there's one to show: a program that talks to the user (`ui`) isn't dry-run first, or its questions
-     * and messages would come before the prompt and again after it.
+     * Asks before a real run of the workflow at `path` (vault-relative), unless its file or folder is trusted. In
+     * content mode a file record or folder pin holding another program than the file now has was changed outside
+     * Vertex (edits in Vertex carry trust, `followEdit`), so it's revoked first. The prompt shows the capabilities,
+     * and the dry-run diff when there's one to show: a program that talks to the user (`ui`) isn't dry-run first, or
+     * its questions and messages would come before the prompt and again after it.
      */
     async function trust(doc: DocumentV1, name: string, path: string): Promise<boolean> {
         await trusted.load()
@@ -156,27 +156,47 @@ export function useWorkflowRunner(session: ActiveSession) {
         const file = normalizeTrustPath(`${root}/${path}`)
         const hash = await hashProgram(doc)
         const mode = settings().fileTrust
-        if (trustedBy(trusted.records.value, file, hash, mode)) return true
-        if (mode === 'content' && trusted.records.value.files[file]) await trusted.revoke('files', file)
+        const records = trusted.records.value
+        if (trustedBy(records, file, hash, mode)) return true
+        if (mode === 'content') {
+            if (records.files[file]) await trusted.revoke('files', file)
+            const folder = coveringFolder(records, file)
+            if (folder && records.folders[folder]!.files[file]) await stateClient.pinTrust(folder, file, null)
+        }
         const used = compile(doc, vertexLanguage).capabilities
         const capabilities = manifest.value.capabilities.filter(c => used.has(c.id))
         const plan = used.has('ui') ? undefined : await dryRun(doc, name)
         const answer = await trustModal.open({name, capabilities, plan, file, root}).result
         if (!answer) return false
-        await (answer.kind === 'file' ? trusted.trustFile(file, hash) : trusted.trustFolder(answer.path, answer.nested))
+        if (answer.kind === 'file') await trusted.trustFile(file, hash)
+        else {
+            await trusted.trustFolder(answer.path, answer.nested)
+            // What's running may be ahead of the disk (unsaved edits); pin that, the program the user just trusted.
+            await stateClient.pinTrust(normalizeTrustPath(answer.path), file, hash)
+        }
         return true
     }
 
     // In order, so each edit's `before` is the previous edit's `after`.
     let following = Promise.resolve()
     /**
-     * An edit made in Vertex's workflow editor: a file trusted with the program it had before keeps its trust with
-     * the new one. Rust swaps the hash only if it matches, so a file changed elsewhere first stays untrusted.
+     * An edit made in Vertex's workflow editor: a file trusted (or pinned by a folder) with the program it had before
+     * keeps its trust with the new one; Rust swaps the hash only if it matches, so a file changed elsewhere first
+     * stays untrusted. An empty file (`before` undefined, nothing to trust yet) in a trusted folder gets its first
+     * program pinned: that one comes from the user.
      */
-    function followEdit(path: string, before: DocumentV1, after: DocumentV1) {
+    function followEdit(path: string, before: DocumentV1 | undefined, after: DocumentV1) {
         following = following.then(async () => {
-            const [from, to] = await Promise.all([hashProgram(before), hashProgram(after)])
-            if (from !== to) await stateClient.followTrustEdit(normalizeTrustPath(`${session.rootPath}/${path}`), from, to)
+            const file = normalizeTrustPath(`${session.rootPath}/${path}`)
+            const to = await hashProgram(after)
+            if (!before) {
+                await trusted.load()
+                const folder = coveringFolder(trusted.records.value, file)
+                if (folder) await stateClient.pinTrust(folder, file, to)
+                return
+            }
+            const from = await hashProgram(before)
+            if (from !== to) await stateClient.followTrustEdit(file, from, to)
         }).catch(error => console.error('[useWorkflowRunner] keeping trust after an edit:', error))
     }
 

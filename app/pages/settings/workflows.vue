@@ -5,7 +5,7 @@ import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {AppWorkflowConfig} from "#shared/types/app/settings";
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
-import {trustedBy} from "#shared/workflows/trust";
+import {coveringFolder} from "#shared/workflows/trust";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {parseWorkflow} from "~/composables/workflows/useWorkflowRunner";
@@ -47,8 +47,10 @@ const shown = <R extends {path: string, trustedAt: string}>(records: R[]) => {
 const folders = computed(() => shown(Object.entries(trust.records.value.folders).map(([path, r]) => ({path, ...r}))))
 // A file a folder covers too stays trusted after it's revoked; the row says so.
 const files = computed(() => shown(Object.entries(trust.records.value.files).map(([path, r]) => {
-    const by = trustedBy({folders: trust.records.value.folders, files: {}}, path, '', 'path')
-    return {path, ...r, coveredBy: by?.kind === 'folder' ? by.path : undefined}
+    // In content mode a folder covers a file only with a pin for it.
+    const folder = coveringFolder(trust.records.value, path)
+    const covers = folder && (config.value?.workflowConfig.fileTrust === 'path' || trust.records.value.folders[folder]!.files[path])
+    return {path, ...r, coveredBy: covers ? folder : undefined}
 })))
 const any = computed(() => Object.keys(trust.records.value.folders).length + Object.keys(trust.records.value.files).length > 0)
 const trustedAt = (date: string) => t('app.settings.workflows.trustedAt', {date: new Date(date).toLocaleString()})
@@ -134,7 +136,7 @@ const addFile = () => attempt(async () => {
                     v-for="record in folders"
                     :key="`folder:${record.path}`"
                     :label="fileNameFromPath(record.path)"
-                    :description="`${trustedAt(record.trustedAt)} · ${record.path}`"
+                    :description="`${trustedAt(record.trustedAt)} · ${t('app.settings.workflows.pinned', {count: Object.keys(record.files).length})} · ${record.path}`"
                 >
                     <USwitch
                         :label="t('app.settings.workflows.nested')"

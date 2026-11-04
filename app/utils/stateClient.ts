@@ -20,6 +20,7 @@ export const StateCommand = {
     trustClear: 'trust_clear',
     trustMove: 'trust_move',
     trustFollowEdit: 'trust_follow_edit',
+    trustPin: 'trust_pin',
     workspaceSettingsGet: 'workspace_settings_get',
     workspaceSettingsUpdate: 'workspace_settings_update',
     workspaceSettingsReload: 'workspace_settings_reload',
@@ -62,6 +63,8 @@ export const stateClient = {
     moveTrust: (from: string, to: string) => invoke(StateCommand.trustMove, {from, to}),
     /** An edit in Vertex: the file stays trusted only if it was trusted with program `from`. */
     followTrustEdit: (path: string, from: string, to: string) => invoke(StateCommand.trustFollowEdit, {path, from, to}),
+    /** Pins `path`'s program in trusted `folder` (`null` unpins); nothing if the folder isn't trusted. */
+    pinTrust: (folder: string, path: string, hash: string | null) => invoke(StateCommand.trustPin, {folder, path, hash}),
 
     /** A workspace's `.vertex/settings.json`: only what it overrides; normalise with `effectiveSettings`. */
     getWorkspaceSettings: (root: string) => invoke<DeepPartial<AppSettings>>(StateCommand.workspaceSettingsGet, {root}),

@@ -209,10 +209,11 @@
 				"revokeAll": "Revoke all",
 				"alsoTrustedBy": "also trusted by folder {folder}",
 				"trustFailed": "Couldn’t change trust",
-				"fileTrust": "Trusted files remember",
-				"fileTrustDescription": "Path and content: an edit made outside Vertex (sync, git, another app, a workflow) revokes the file's trust, and edits in Vertex keep it. Path: edits anywhere keep it. Folders always go by path.",
-				"fileTrustPath": "Their path",
-				"fileTrustContent": "Their path and content"
+				"fileTrust": "Trust remembers",
+				"fileTrustDescription": "Paths and content: a trusted file, or a trusted folder's workflows as they were when you trusted it, run only while unchanged outside Vertex; edits in Vertex keep them trusted, and a workflow added or changed elsewhere (sync, git, another app, a workflow) asks first. Paths: anything at a trusted path runs.",
+				"fileTrustPath": "Paths only",
+				"fileTrustContent": "Paths and content",
+				"pinned": "{count} workflows as trusted"
 			},
 			"scope": {
 				"label": "Editing",
