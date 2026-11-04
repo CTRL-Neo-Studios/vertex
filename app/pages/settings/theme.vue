@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {useAppTheme} from "~/composables/app/useAppTheme";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
 import type {AppThemeConfig} from "#shared/types/app/settings";
 
 definePageMeta({
@@ -8,6 +10,8 @@ definePageMeta({
 
 const {t} = useI18n()
 const {theme, defaults, update, isDirty, reset} = useAppTheme()
+const scope = useSettingsScope()
+const trust = useWorkflowTrust()
 
 const COLOR_KEYS: (keyof AppThemeConfig)[] = ['primaryColor', 'neutralColor', 'blackAsPrimary', 'colorMode']
 const SHAPE_KEYS: (keyof AppThemeConfig)[] = ['roundedRadius']
@@ -19,6 +23,13 @@ const fonts = computed(() => FONT_KEYS.map(key => ({
     description: t(`app.settings.theme.${key}Description`),
     monospace: key.endsWith('MonoFont'),
 })))
+
+// Saved when the editor loses focus, not per keystroke; follows the scope (and other windows) otherwise.
+const CSS = 'advancedThemeConfig.customCss' as const
+const css = ref('')
+watch(() => scope.value(CSS), value => css.value = value ?? '', {immediate: true})
+const saveCss = () => css.value !== (scope.value(CSS) ?? '') && scope.set({[CSS]: css.value})
+const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS) && !scope.trusted.value)
 </script>
 
 <template>
@@ -30,7 +41,7 @@ const fonts = computed(() => FONT_KEYS.map(key => ({
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :label="t('app.settings.theme.reset')"
+                :label="t(scope.root.value ? 'app.settings.scope.useGlobalAll' : 'app.settings.theme.reset')"
                 @click="reset()"
             />
         </template>
@@ -41,25 +52,25 @@ const fonts = computed(() => FONT_KEYS.map(key => ({
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.colors')" :dirty="isDirty(COLOR_KEYS)" @reset="reset(COLOR_KEYS)">
-                <SettingsRow :label="t('app.settings.theme.primary')" :description="t('app.settings.theme.primaryDescription')">
+                <SettingsRow setting="themeConfig.primaryColor" :label="t('app.settings.theme.primary')" :description="t('app.settings.theme.primaryDescription')">
                     <SettingsThemeColorMenu alias="primary"/>
                 </SettingsRow>
-                <SettingsRow :label="t('app.settings.theme.neutral')" :description="t('app.settings.theme.neutralDescription')">
+                <SettingsRow setting="themeConfig.neutralColor" :label="t('app.settings.theme.neutral')" :description="t('app.settings.theme.neutralDescription')">
                     <SettingsThemeColorMenu alias="neutral"/>
                 </SettingsRow>
-                <SettingsRow :label="t('app.settings.theme.colorMode')" :description="t('app.settings.theme.colorModeDescription')">
+                <SettingsRow setting="themeConfig.colorMode" :label="t('app.settings.theme.colorMode')" :description="t('app.settings.theme.colorModeDescription')">
                     <SettingsThemeColorModeTabs/>
                 </SettingsRow>
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.shape')" :dirty="isDirty(SHAPE_KEYS)" @reset="reset(SHAPE_KEYS)">
-                <SettingsRow :label="t('app.settings.theme.radius')" :description="t('app.settings.theme.radiusDescription')">
+                <SettingsRow setting="themeConfig.roundedRadius" :label="t('app.settings.theme.radius')" :description="t('app.settings.theme.radiusDescription')">
                     <SettingsThemeRadiusPicker/>
                 </SettingsRow>
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.fonts')" :dirty="isDirty([...FONT_KEYS])" @reset="reset([...FONT_KEYS])">
-                <SettingsRow v-for="font in fonts" :key="font.key" :label="font.label" :description="font.description">
+                <SettingsRow v-for="font in fonts" :key="font.key" :setting="`themeConfig.${font.key}`" :label="font.label" :description="font.description">
                     <SettingsThemeFontPicker
                         :model-value="theme[font.key]"
                         :monospace="font.monospace"
@@ -68,6 +79,30 @@ const fonts = computed(() => FONT_KEYS.map(key => ({
                         @update:model-value="update({ [font.key]: $event })"
                     />
                 </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection :title="t('app.settings.theme.customCss')" :dirty="scope.isDirty([CSS])" @reset="scope.reset([CSS])">
+                <SettingsRow :setting="CSS" :label="t('app.settings.theme.customCssLabel')" :description="t('app.settings.theme.customCssDescription')"/>
+                <div class="px-4 pb-3 space-y-2">
+                    <UAlert
+                        v-if="cssOff"
+                        color="warning"
+                        variant="subtle"
+                        icon="i-lucide-shield-alert"
+                        :title="t('app.settings.theme.customCssUntrusted')"
+                        :actions="[{label: t('app.settings.theme.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
+                    />
+                    <UTextarea
+                        v-model="css"
+                        class="w-full font-mono"
+                        :rows="6"
+                        autoresize
+                        :maxrows="24"
+                        spellcheck="false"
+                        :placeholder="t('app.settings.theme.customCssPlaceholder')"
+                        @blur="saveCss"
+                    />
+                </div>
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

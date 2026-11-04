@@ -1,3 +1,5 @@
+import type {FileTrustMode} from "#shared/workflows/trust"
+
 export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both'
 
 export interface AppSettings {
@@ -14,7 +16,7 @@ export interface AppSettings {
     updateChannel: string
 }
 
-/** Trust records live here, in app data, so a vault can't mark its own workflows trusted (§11). */
+/** Trusted folders and files aren't settings: they live in `trust.json` (`shared/workflows/trust.ts`). */
 export interface AppWorkflowConfig {
     /** Step limit per run (`limits.steps`): every node activation counts, so loops can't run forever. */
     maxLoopIterations: number,
@@ -24,10 +26,8 @@ export interface AppWorkflowConfig {
     wallClockTimeoutMs: number,
     /** Ask before a run's first move to the vault trash. */
     confirmTrash: boolean,
-    /** Program hash → the workflow's name and when it was trusted. Editing a program changes its hash. */
-    trustedPrograms: Record<string, {name: string, trustedAt: string}>,
-    /** Workspace root path → when it was trusted. Every workflow in a trusted workspace runs without asking. */
-    trustedWorkspaces: Record<string, {trustedAt: string}>,
+    /** What a trusted file remembers: its path, or its path and program (an edit asks again). */
+    fileTrust: FileTrustMode,
 }
 
 export interface AppThemeConfig {

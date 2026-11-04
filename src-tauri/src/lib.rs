@@ -229,6 +229,15 @@ pub fn run() {
             state::sessions_remove,
             state::settings_get,
             state::settings_set,
+            state::trust_get,
+            state::trust_set,
+            state::trust_clear,
+            state::trust_move,
+            state::trust_follow_edit,
+            state::trust_pin,
+            state::workspace_settings_get,
+            state::workspace_settings_update,
+            state::workspace_settings_reload,
             state::take_open_requests,
             quit_app,
             updater::update_token_get,
@@ -239,6 +248,11 @@ pub fn run() {
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
             apply_decorum_style(&main_window);
+
+            // trust.json exists from launch (and old settings migrate then), not only once a window reads it.
+            if let Err(e) = app.state::<AppState>().ensure_trust(app.handle()) {
+                eprintln!("[state] could not create trust.json: {e}");
+            }
 
             // Cold start with a file argument (Windows/Linux).
             #[cfg(any(windows, target_os = "linux"))]

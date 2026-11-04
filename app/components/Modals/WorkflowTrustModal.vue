@@ -1,20 +1,43 @@
-<script setup lang="ts">
+<script lang="ts">
 import type {CapabilityDef} from "@type32/workflows/core"
+import type {DropdownMenuItem} from "@nuxt/ui"
+import {fileNameFromPath} from "#shared/utils/fs/filenames"
 import type {RunOutcome} from "~/composables/workflows/useWorkflowRunner"
 
+/** What the user trusted: the workflow's file, or a folder (with its subfolders when `nested`). */
+export type TrustAnswer = { kind: 'file' } | { kind: 'folder', path: string, nested: boolean }
+</script>
+
+<script setup lang="ts">
 /**
- * First real run of a program hash: what it may do and, without prompts in it, what a dry run says it would
- * change (§11). Trusts this program, or every workflow in the workspace.
+ * A real run of a workflow outside the trusted folders and files: what it may do and, without prompts in it,
+ * what a dry run says it would change (§11). Trusts its file, its folder, or the whole workspace.
  */
 const props = defineProps<{
     name: string,
     capabilities: CapabilityDef[],
     /** Absent for a program that asks questions: it isn't dry-run before the prompt. */
     plan?: RunOutcome,
+    /** Absolute paths: the workflow's file and its workspace's root. */
+    file: string,
+    root: string,
 }>()
-const emit = defineEmits<{ close: [answer: 'program' | 'workspace' | false] }>()
+const emit = defineEmits<{ close: [answer: TrustAnswer | false] }>()
 const {t} = useI18n()
 const mutates = computed(() => props.capabilities.some(c => c.mutates))
+
+const folders = computed<DropdownMenuItem[]>(() => {
+    const folder = props.file.slice(0, props.file.lastIndexOf('/'))
+    const name = fileNameFromPath(folder)
+    const trust = (path: string, nested: boolean) => emit('close', {kind: 'folder', path, nested})
+    return [
+        ...(folder === props.root ? [] : [
+            {label: t('app.editor.ui.workflowTrust.trustFolder', {name}), icon: 'i-lucide-folder-check', onSelect: () => trust(folder, false)},
+            {label: t('app.editor.ui.workflowTrust.trustFolderNested', {name}), icon: 'i-lucide-folder-tree', onSelect: () => trust(folder, true)},
+        ]),
+        {label: t('app.editor.ui.workflowTrust.trustWorkspace'), icon: 'i-lucide-folder-lock', onSelect: () => trust(props.root, true)},
+    ]
+})
 </script>
 
 <template>
@@ -60,10 +83,12 @@ const mutates = computed(() => props.capabilities.some(c => c.mutates))
         <template #footer>
             <div class="w-full inline-flex items-center justify-end gap-2">
                 <UButton size="sm" color="neutral" variant="ghost" :label="t('app.editor.ui.workflowTrust.cancel')" @click="emit('close', false)"/>
-                <UTooltip :text="t('app.editor.ui.workflowTrust.trustWorkspaceDescription')">
-                    <UButton size="sm" color="neutral" variant="outline" icon="i-lucide-folder-check" :label="t('app.editor.ui.workflowTrust.trustWorkspace')" @click="emit('close', 'workspace')"/>
-                </UTooltip>
-                <UButton size="sm" :color="mutates ? 'warning' : 'primary'" icon="i-lucide-shield-check" :label="t('app.editor.ui.workflowTrust.trust')" autofocus @click="emit('close', 'program')"/>
+                <UFieldGroup size="sm">
+                    <UButton :color="mutates ? 'warning' : 'primary'" icon="i-lucide-shield-check" :label="t('app.editor.ui.workflowTrust.trust')" autofocus @click="emit('close', {kind: 'file'})"/>
+                    <UDropdownMenu :items="folders" :content="{align: 'end'}">
+                        <UButton :color="mutates ? 'warning' : 'primary'" icon="i-lucide-chevron-down" :aria-label="t('app.editor.ui.workflowTrust.more')"/>
+                    </UDropdownMenu>
+                </UFieldGroup>
             </div>
         </template>
     </UModal>

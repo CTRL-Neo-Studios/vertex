@@ -1,13 +1,18 @@
 <script setup lang="ts">
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * Settings page scroll layout
- * Provides scrollable content area with sticky header
+ * Provides scrollable content area with sticky header. A `globalOnly` page is read-only while the Settings
+ * window edits a workspace: none of its settings can be overridden there.
  */
 
-defineProps<{
+const props = defineProps<{
     title?: string,
+    globalOnly?: boolean,
 }>()
+const scope = useSettingsScope()
+const locked = computed(() => props.globalOnly && scope.root.value !== null)
 </script>
 
 <template>
@@ -29,7 +34,18 @@ defineProps<{
         <!-- Scrollable Content (takes remaining height) -->
         <div class="flex-1 overflow-hidden">
             <UScrollArea class="h-full w-full p-6" orientation="vertical">
-                <slot/>
+                <UAlert
+                    v-if="locked"
+                    class="mb-4"
+                    color="neutral"
+                    variant="subtle"
+                    icon="i-lucide-globe"
+                    :title="$t('app.settings.scope.globalOnlyPage')"
+                    :actions="[{label: $t('app.settings.scope.editUser'), color: 'neutral', variant: 'outline', onClick: () => scope.open(null)}]"
+                />
+                <fieldset :disabled="locked" :class="locked && 'opacity-60'">
+                    <slot/>
+                </fieldset>
             </UScrollArea>
         </div>
     </div>

@@ -11,6 +11,7 @@ import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, p
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
 import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
+import {stateClient} from "~/utils/stateClient";
 
 /**
  * Per-session runtime objects that must not be deep-reactive (watcher handle, listeners, link graph).
@@ -252,6 +253,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             unref(uuidToFilePathIndex).set(node.uuid, to)
         }
         await relocate(oldPath, newPath)
+        // Moves inside the open workspace (Vertex's own, and ones its watcher sees) carry trust along.
+        void stateClient.moveTrust(oldPath, newPath).catch(e => console.error('[index] could not move trust', e))
 
         const oldParent = index[parentPathOf(oldPath)]
         if (oldParent) oldParent.children = oldParent.children.filter(c => c !== oldPath)
@@ -315,6 +318,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const paths = event.paths.filter(p => !p.endsWith('.DS_Store'))
         if (paths.length === 0 || 'access' in type || 'metadata' in type) return
         const rt = runtime()
+        // The workspace's own settings changed on disk (an editor, git, sync): Rust re-reads and broadcasts them.
+        if (rt.wholeFolder && paths.includes(`${rt.root}/.vertex/settings.json`)) {
+            void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
+        }
         const drop = (path: string) => {
             const removedNodes = removeFileFromIndex(path)
             if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})

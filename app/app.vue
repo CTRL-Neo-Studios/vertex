@@ -9,6 +9,7 @@ import {useAppSessionActions} from "~/composables/app/useAppSessionActions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppUpdater} from "~/composables/app/useAppUpdater";
 import {cssFontName} from "~/composables/app/useAppTheme";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {Routes} from "#shared/constants/app";
 import {stateClient} from "~/utils/stateClient";
 
@@ -26,7 +27,8 @@ const notInUtilityPage = () => ![Routes.settings, Routes.loading, Routes.about].
 
 // Commands available in every window. Session layouts register more (save, new folder, tabs…).
 useCommands({
-    'app.settings': {run: () => $settings.createOrFocusSettingsWindow(), enabled: () => !$route.path.startsWith(Routes.settings)},
+    // From a workspace window, Settings opens on that workspace's scope.
+    'app.settings': {run: () => $settings.createOrFocusSettingsWindow(useSettingsScope().root.value), enabled: () => !$route.path.startsWith(Routes.settings)},
     'app.about': {run: () => $settings.createOrFocusAboutWindow()},
     'app.checkUpdates': {run: () => $updater.checkForUpdates()},
     'app.quit': {run: () => stateClient.quit()},
