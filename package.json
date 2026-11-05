@@ -20,7 +20,7 @@
 	},
 	"dependencies": {
 		"@catppuccin/codemirror": "^1.0.3",
-		"@iconify-json/lucide": "^1.2.150",
+		"@iconify-json/lucide": "^1.2.151",
 		"@nuxt/fonts": "1.2.0",
 		"@nuxt/icon": "2.6.2",
 		"@nuxt/ui": "^4.12.0",
@@ -35,7 +35,7 @@
 		"@tauri-apps/plugin-updater": "~2.14.1",
 		"@tiptap/extension-collaboration": "^3.32.2",
 		"@tiptap/extension-node-range": "^3.32.2",
-		"@type32/codemirror-rich-obsidian-editor": "^0.2.3",
+		"@type32/codemirror-rich-obsidian-editor": "^0.3.2",
 		"@type32/dispatcher": "^0.1.2",
 		"@type32/latex2vue": "^3.1.18",
 		"@type32/nuxt-predicates": "^1.1.0",
@@ -46,7 +46,7 @@
 		"@vueuse/nuxt": "15.0.0",
 		"compromise": "^14.19.0",
 		"katex": "^0.19.1",
-		"nuxt": "^4.6.3",
+		"nuxt": "^4.6.4",
 		"pele": "^1.13.0",
 		"reka-ui": "^2.11.0",
 		"vue": "^3.5.44",
@@ -57,10 +57,10 @@
 	"devDependencies": {
 		"@nuxt/eslint": "^1.17.0",
 		"@tauri-apps/cli": "^2.12.4",
-		"@types/node": "^24",
+		"@types/node": "^26.6.6",
 		"eslint": "^10.14.0",
 		"typescript": "6.0.3",
-		"vitest": "^5.0.5",
+		"vitest": "^5.1.0",
 		"vue-tsc": "^3.3.14"
 	},
 	"trustedDependencies": [

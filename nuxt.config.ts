@@ -93,7 +93,7 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/core",
                 "@tauri-apps/api/dpi",
                 "tailwindcss/colors",
-                "vue-mermaid-string",
+                "pele",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod",

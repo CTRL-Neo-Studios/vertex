@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import VueMermaidString from "vue-mermaid-string";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import PreviewMermaidGraphModal from "~/components/Modals/PreviewMermaidGraphModal.vue";
+import MermaidDiagram from "~/components/Utility/MermaidDiagram.vue";
 
 const props = defineProps<{ codeContent?: string }>()
 const {t} = useI18n()
@@ -31,13 +31,6 @@ function openPreview() {
             <UButton size="xs" variant="ghost" color="neutral" icon="i-lucide-eye" class="text-dimmed" @click="openPreview"/>
             <UButton size="xs" variant="ghost" color="neutral" icon="i-lucide-clipboard" class="text-dimmed" @click="copyToClipboard"/>
         </div>
-        <VueMermaidString :value="codeContent || ''"/>
+        <MermaidDiagram :source="codeContent || ''" :options="{ zoom: false }"/>
     </div>
 </template>
-
-<style scoped>
-@reference "~/assets/css/main.css";
-div[data-processed=true] {
-    @apply w-fit
-}
-</style>
