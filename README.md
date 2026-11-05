@@ -1,7 +1,7 @@
 # Vertex
 ![screenshot](alpha-screenshot.png)
 
-A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nuxt UI v4 + Tauri v2.
+An OFM-compliant Markdown Editor built with Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
 > [!WARNING]
 > Since the app is in ***EARLY ACCESS***, I highly suggest you to **NOT USE IT ON IMPORTANT VAULTS**. I've warned you here and I won't be responsible for any loss caused by the software.
@@ -19,6 +19,7 @@ A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nu
 - https://github.com/CTRL-Neo-Studios/dispatcher
 - https://github.com/CTRL-Neo-Studios/nuxt-predicates
 - https://github.com/Type-32/tauri-sqlite-orm
+- https://github.com/CTRL-Neo-Studios/workflows
 
 ## Learning
 

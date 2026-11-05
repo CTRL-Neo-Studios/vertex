@@ -114,7 +114,7 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
             </UDashboardNavbar>
         </template>
         <template #body>
-            <UContextMenu :items="contextMenuItems">
+            <UContextMenu :items="contextMenuItems" size="sm">
                 <UScrollArea orientation="vertical" class="no-scrollbar h-full relative" data-tauri-drag-region>
                     <FileTreeComponent class="py-2.5" :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
                 </UScrollArea>
