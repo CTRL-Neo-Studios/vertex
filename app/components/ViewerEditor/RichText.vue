@@ -4,6 +4,7 @@ import type {
     InternalLinkClickDetail,
     SpecialCodeBlockMapping
 } from "#codemirror-rich-obsidian-editor/editor-types";
+import type {Extension} from "@codemirror/state";
 
 const editorInstance = defineModel('editorInstance')
 const fileName = defineModel<string>('fileName')
@@ -12,7 +13,8 @@ const contentSaved = defineModel<boolean>('contentSaved', {default: false})
 
 const props = withDefaults(defineProps<{
     internalLinkList: InternalLink[],
-    specialCodeBlockMapping: SpecialCodeBlockMapping[]
+    specialCodeBlockMapping: SpecialCodeBlockMapping[],
+    extensions?: Extension[],
     renaming: boolean,
     filePath?: string,
     disabled?: boolean
@@ -46,6 +48,7 @@ onBeforeUnmount(() => {
             <ViewerEditorComponentFrontmatterEditor class="max-w-2xl w-full" v-model:open="frontmatterOpen" v-model:editorInstance="editorInstance"/>
             <Editor
                 :disabled="disabled || frontmatterOpen || renaming"
+                :extensions="props.extensions"
                 ref="editorInstance"
                 v-model="content"
                 class="max-w-2xl w-full"

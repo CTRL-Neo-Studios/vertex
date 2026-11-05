@@ -56,6 +56,19 @@ export default defineNuxtConfig({
         ]
     },
 
+    // Model vendor logos (Settings → Assistive AI, `ModelBadges.vue`): picked at runtime, so bundle them.
+    icon: {
+        clientBundle: {
+            icons: [
+                'simple-icons:openai', 'simple-icons:anthropic', 'simple-icons:googlegemini', 'simple-icons:meta',
+                'simple-icons:mistralai', 'simple-icons:deepseek', 'simple-icons:qwen', 'simple-icons:alibabacloud',
+                'simple-icons:microsoft', 'simple-icons:nvidia', 'simple-icons:perplexity', 'simple-icons:ollama',
+                'simple-icons:huggingface', 'simple-icons:amazon', 'simple-icons:ibm', 'simple-icons:moonshotai',
+                'simple-icons:minimax', 'simple-icons:openrouter',
+            ],
+        },
+    },
+
     // SPA: `nuxt generate` emits static files that Tauri serves; there is no server at runtime.
     ssr: false,
     ignore: ['**/src-tauri/**'],
@@ -94,6 +107,8 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/dpi",
                 "tailwindcss/colors",
                 "pele",
+                "ai",
+                "@ai-sdk/openai-compatible",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod",

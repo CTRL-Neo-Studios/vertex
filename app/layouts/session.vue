@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -59,8 +59,8 @@ onBeforeUnmount(async () => {
     $sesh.removeSession($sessionId)
 })
 
-function toToc(node: TocEntry) {
-    $editorDispatcher.emitToTocEntry({node, verticalMargin: 70, verticalScrollStrategy: 'start'})
+function toToc({from}: Heading) {
+    $editorDispatcher.emitToTocEntry({from, verticalMargin: 70, verticalScrollStrategy: 'start'})
 }
 </script>
 

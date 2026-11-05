@@ -102,6 +102,20 @@ write those files themselves. This removes the cross-window lost-update races th
 
 The frontend wrapper is `app/utils/stateClient.ts`. It has no Vue lifecycle, so it is safe from plugins and callbacks.
 
+### AI requests
+
+Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys never reach the webview:
+
+| Rust command | Purpose |
+|---|---|
+| `ai_key_set` / `ai_key_has` | Provider API keys in the OS keychain (`ai-provider:<id>`). There is no getter. No keychain → error, never a plaintext fallback |
+| `ai_request` / `ai_request_cancel` | One HTTP request for a provider: the URL must share the provider's `baseURL` origin, Rust adds `Authorization`, and the body streams back over a `Channel` |
+| `ai_model_catalog` | The models.dev catalog, cached for a day, for model badges |
+
+- `app/utils/aiFetch.ts` wraps `ai_request` as a `fetch`, which ai-sdk (`@ai-sdk/openai-compatible`) and the editor's `aiAssistant({ endpoint: { fetch } })` use unchanged.
+- Changing a provider's `baseURL` or removing it deletes its key in `settings_set`, so a saved key can't be pointed at another host.
+- `settings.aiConfig`: provider profiles → model profiles (provider + model + system prompt) → features (`shared/constants/ai.ts`), each falling back to the default model profile. Only `aiConfig.features` is workspace-overridable, and only in trusted folders: a shared vault can pick among your own profiles or turn a feature off, never add a provider, model or prompt.
+
 ---
 
 ## Window Model

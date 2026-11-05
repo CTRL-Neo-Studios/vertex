@@ -18,6 +18,16 @@ const links = computed(() => [
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
     {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
+    {
+        label: t('app.settings.nav.ai'),
+        icon: 'i-lucide-sparkles',
+        defaultOpen: $route.path.startsWith(`${Routes.settings}/ai`),
+        children: [
+            {label: t('app.settings.nav.aiProviders'), icon: 'i-lucide-server', to: `${Routes.settings}/ai/providers`},
+            {label: t('app.settings.nav.aiModels'), icon: 'i-lucide-box', to: `${Routes.settings}/ai/models`},
+            {label: t('app.settings.nav.aiFeatures'), icon: 'i-lucide-toggle-right', to: `${Routes.settings}/ai/features`},
+        ],
+    },
 ] satisfies NavigationMenuItem[])
 
 // User, or a workspace this app has opened. Select items need a non-empty value; a root is an absolute path.

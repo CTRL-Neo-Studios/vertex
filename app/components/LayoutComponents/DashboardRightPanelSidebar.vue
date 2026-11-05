@@ -5,7 +5,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import type {TabsItem} from "@nuxt/ui";
-import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import ReferenceBacklinksListComponent from "~/components/ReferenceBacklinksListComponent.vue";
 import {computed} from "vue";
 import {isBasesFile} from "#shared/utils/fs/filenames";
@@ -22,7 +22,7 @@ const {
     rightPanelCollapsed
 } = useActiveLayouts($sesh.getSession($sessionId))
 const emit = defineEmits<{
-    (e: 'to-toc', value: TocEntry): void
+    (e: 'to-toc', value: Heading): void
 }>()
 const isBases = computed(() => isBasesFile(getFileByUuid($tabId)?.fileExt || ''))
 

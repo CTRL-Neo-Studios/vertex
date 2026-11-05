@@ -1,3 +1,4 @@
+mod ai;
 mod fonts;
 mod state;
 mod updater;
@@ -200,6 +201,7 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
+        .manage(ai::AiRequests::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -244,6 +246,11 @@ pub fn run() {
             updater::update_token_set,
             updater::update_channels,
             fonts::system_fonts,
+            ai::ai_key_set,
+            ai::ai_key_has,
+            ai::ai_request,
+            ai::ai_request_cancel,
+            ai::ai_model_catalog,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
