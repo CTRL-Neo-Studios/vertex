@@ -519,21 +519,23 @@ const sorting = ref<SortingState>([])
                         </UDropdownMenu>
                     </div>
                 </div>
-                <UTable
-					v-if="!loadingData"
-                    v-model:sorting="sorting"
-                    :columns="columns"
-                    ref="table"
-                    sticky
-                    :data="currentViewResults"
-                    class="flex-1"
-					v-model:global-filter="searchTerm"
-                    :ui="{
-                        thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
-                        td: 'py-1',
-                        th: 'py-2 pt-0 text-xs',
-                    }"
-                />
+                <!-- Hidden, not unmounted, while loading: onMounted waits on the table's ref. v-show needs an element root, which UTable doesn't have. -->
+                <div v-show="!loadingData" class="flex-1 min-h-0 flex flex-col">
+                    <UTable
+                        v-model:sorting="sorting"
+                        :columns="columns"
+                        ref="table"
+                        sticky
+                        :data="currentViewResults"
+                        class="flex-1 min-h-0"
+                        v-model:global-filter="searchTerm"
+                        :ui="{
+                            thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
+                            td: 'py-1',
+                            th: 'py-2 pt-0 text-xs',
+                        }"
+                    />
+                </div>
             </div>
         </template>
     </ViewerEditorLayoutWrapper>

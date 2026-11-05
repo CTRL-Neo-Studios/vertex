@@ -149,23 +149,27 @@ function scrollToItem(index: number) {
         <UScrollArea
             ref="scrollArea"
             v-if="isWorkspace"
-            class="no-scrollbar w-full h-full relative"
+            class="no-scrollbar w-full h-full relative px-2 flex items-center justify-center"
             v-slot="{ item, index }: {item: DropdownMenuItem, index: number}"
             :items="dropdownItems[1]"
             orientation="horizontal"
-            virtualize
+            :virtualize="{ gap: 8 }"
+			:ui="{
+				item: 'flex items-center justify-center rounded'
+			}"
+			data-tauri-drag-region
         >
             <div v-if="tabs.length == 0" class="w-full items-center text-center">
                 <span class="text-sm text-dimmed">{{ $t('app.editor.ui.selectFileShort') }}</span>
             </div>
             <div
                 v-else
-                :class="['w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 after:border-b-2 after:border-neutral after:w-0 after:bottom-0 after:h-full after:bg-linear-to-t after:from-primary/10 dark:after:from-primary/20 after:via-transparent after:to-transparent', 'h-full', tabId == item.id ? 'after:absolute after:transition after:border-b-2 after:border-primary after:w-full' : '']"
+                :class="['rounded-md w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 ', 'h-fit', tabId == item.id ? 'after:absolute after:transition after:w-full shadow shadow-primary/20' : '']"
             >
                 <UButton
                     :key="index"
                     size="sm"
-                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
+                    :class="['rounded-md cursor-pointer transition-all duration-300 h-fit py-2 align-middle', 'border-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
                     :color="tabId == item.id ? 'primary' : 'neutral'"
                     :variant="tabId == item.id ? 'soft' : 'ghost'"
                     :label="item.label"
@@ -201,7 +205,7 @@ function scrollToItem(index: number) {
 <!--                />-->
 <!--            </ScrollAreaScrollbar>-->
 <!--        </ScrollAreaRoot>-->
-        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
+        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>

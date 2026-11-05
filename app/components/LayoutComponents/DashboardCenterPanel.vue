@@ -26,7 +26,7 @@ const panelsCollapsed = computed(() => {
         resizable
     >
         <template #header>
-            <UDashboardNavbar :ui="{ root: 'border-b h-(--ui-header-height) sm:p-0 p-0 w-full gap-0', center: 'w-full h-full p-0 sm:p-0 m-0 sm:m-0 gap-0', left: 'pl-0 gap-0', right: 'pr-0 gap-0' }" data-tauri-drag-region>
+            <UDashboardNavbar :ui="{ root: 'border-none h-(--ui-header-height) sm:p-0 p-0 w-full gap-0', center: 'w-full h-full p-0 sm:p-0 m-0 sm:m-0 gap-0', left: 'pl-0 gap-0', right: 'pr-0 gap-0' }" data-tauri-drag-region>
                 <template #default>
                     <TabsHeaderComponent/>
                 </template>
