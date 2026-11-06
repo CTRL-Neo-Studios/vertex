@@ -45,7 +45,9 @@ describe('defaultAppWorkflowConfig', () => {
 describe('defaultAppAiConfig', () => {
     it('seeds Local Ollama only when aiConfig is absent, so removing it sticks', () => {
         expect(defaultAppSettings().aiConfig.providers.map(p => p.id)).toEqual(['local-ollama'])
-        expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}})
+        expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app'})
+        expect(defaultAppAiConfig({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
+        expect(defaultAppAiConfig({chatStorage: 'cloud'}).chatStorage).toBe('app')
     })
 
     it('drops malformed entries and falls back to the first profile as default', () => {

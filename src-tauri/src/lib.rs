@@ -1,4 +1,5 @@
 mod ai;
+mod chats;
 mod fonts;
 mod state;
 mod updater;
@@ -202,6 +203,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .manage(ai::AiRequests::default())
+        .manage(chats::ChatVaults::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -251,6 +253,17 @@ pub fn run() {
             ai::ai_request,
             ai::ai_request_cancel,
             ai::ai_model_catalog,
+            chats::chat_vault_state,
+            chats::chat_vault_create,
+            chats::chat_vault_unlock,
+            chats::chat_vault_lock,
+            chats::chat_index,
+            chats::chat_read,
+            chats::chat_write,
+            chats::chat_delete,
+            chats::chat_folders_set,
+            chats::chat_folder_rename,
+            chats::chat_folder_delete,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

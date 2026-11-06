@@ -10,6 +10,24 @@
     @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
 
+/* Top fade on a scroll area once it's scrolled; toggle `is-scrolled` from the scroll position. */
+@property --fade-size {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+.scroll-fade {
+    --fade-size: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+    mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+    transition: --fade-size 200ms ease;
+}
+
+.scroll-fade.is-scrolled {
+    --fade-size: 2rem;
+}
+
 @theme {
     --font-sans: 'Geist', 'Inter', sans-serif;
 

@@ -52,9 +52,14 @@ fn read_json<R: Runtime>(app: &AppHandle<R>, file: &str) -> Value {
 }
 
 /// Write via temp file + rename so a crash mid-write never leaves a truncated store.
-fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
-    let tmp = path.with_extension("json.tmp");
-    let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
+pub(crate) fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
+    write_bytes_atomic(path, &serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?)
+}
+
+/// `write_atomic` for raw bytes: `<path>.tmp` + rename.
+pub(crate) fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
@@ -247,12 +252,17 @@ pub fn pin_trust(trust: &mut Value, folder: &str, path: &str, hash: Option<Strin
 
 const WORKSPACE_SETTINGS: [&str; 2] = [".vertex", "settings.json"];
 
-fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
+/// `root` as a workspace folder: absolute and an existing directory.
+pub(crate) fn workspace_root(root: &str) -> Result<&Path, String> {
     let root = Path::new(root);
     if !root.is_absolute() || !root.is_dir() {
         return Err(format!("{root:?} is not a workspace folder"));
     }
-    Ok(WORKSPACE_SETTINGS.iter().fold(root.to_path_buf(), |p, part| p.join(part)))
+    Ok(root)
+}
+
+fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
+    Ok(WORKSPACE_SETTINGS.iter().fold(workspace_root(root)?.to_path_buf(), |p, part| p.join(part)))
 }
 
 /// The file's object; anything else (missing, unreadable, not an object) is no overrides.

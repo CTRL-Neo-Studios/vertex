@@ -1,7 +1,10 @@
 export interface AppSessionContext {
     openedAbsoluteFilePaths: string[],
     openedAbsoluteFolderPaths: string[],
-    lastFocusedAbsoluteFilePath?: string
+    lastFocusedAbsoluteFilePath?: string,
+    /** Chat tabs, reopened after the file tabs (workspace sessions). */
+    openedChatIds?: string[],
+    leftPanelView?: 'files' | 'chats',
 }
 
 export interface AppSession {

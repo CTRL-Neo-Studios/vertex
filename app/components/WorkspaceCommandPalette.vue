@@ -8,6 +8,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
+import {StateKey} from "#shared/constants/app";
 
 const { t } = useI18n()
 
@@ -27,6 +28,8 @@ const {
 const newFileModal = $ovl.create(NewFileModal)
 const session = $sesh.getSession(sessionId)
 const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
+// Shared so the left sidebar's Search item can open it.
+const open = useState<boolean>(StateKey.fileSearchOpen(sessionId.value), () => false)
 
 async function onClickFile(item: Partial<UITreeNode>) {
     if (!item || !item.uuid) return;
@@ -128,7 +131,7 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
 </script>
 
 <template>
-    <UDashboardSearch shortcut="meta_p" :groups="commandPaletteGroups"/>
+    <UDashboardSearch v-model:open="open" shortcut="meta_p" :groups="commandPaletteGroups"/>
 </template>
 
 <style scoped>

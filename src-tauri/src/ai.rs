@@ -11,7 +11,7 @@ use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{AppHandle, Manager, Runtime, State};
 use tokio::sync::Notify;
 
-const KEYRING_SERVICE: &str = "dev.ctrl-neo.vertex";
+pub(crate) const KEYRING_SERVICE: &str = "dev.ctrl-neo.vertex";
 const CATALOG_URL: &str = "https://models.dev/api.json";
 const CATALOG_FILE: &str = "models-dev.json";
 const CATALOG_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
@@ -56,7 +56,7 @@ pub fn delete_key(provider_id: &str) -> Result<(), String> {
     }
 }
 
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 

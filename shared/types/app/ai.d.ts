@@ -1,3 +1,5 @@
+import type {ChatStorage} from "#shared/types/app/chats";
+
 /** One model a provider serves, with whatever metadata its `/models` list, Ollama or models.dev knew. */
 export interface AiModelInfo {
     id: string,
@@ -41,4 +43,6 @@ export interface AppAiConfig {
      * workspace override of `null` means "remove the override".)
      */
     features: Record<string, string>,
+    /** Where this workspace's chats are kept; switching leaves the existing ones where they are. */
+    chatStorage: ChatStorage,
 }

@@ -9,6 +9,7 @@ import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useChats} from "~/composables/ai/useChats";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -25,6 +26,7 @@ const {
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
+const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
 const {
     leftPanelCollapsed,
     rightPanelCollapsed
@@ -98,11 +100,12 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 
     unref(tabs)?.forEach(i => {
         const node = getFileByUuid(i.fileUuid)
+        const isChat = i.kind === 'chat'
 
-        if (node) {
+        if (node || isChat) {
             items[1]?.push({
-                label: node.fileName,
-                icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : node?.fileName,
+                icon: isChat ? 'i-lucide-message-square' : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)

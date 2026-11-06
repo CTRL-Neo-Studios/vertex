@@ -17,6 +17,7 @@ onMounted(load)
 
 const DEFAULT_PROFILE = 'aiConfig.defaultModelProfile' as const
 const FEATURES = 'aiConfig.features' as const
+const CHAT_STORAGE = 'aiConfig.chatStorage' as const
 const path = (id: string) => `${FEATURES}.${id}` as AppSettingPath
 
 // Profiles are global: the effective settings carry the global ones.
@@ -40,6 +41,10 @@ function featureValue(id: string) {
 // A workspace's "use global" removes its override (`null`); User's "use default" removes the entry.
 const setFeature = (id: string, choice: string) =>
     scope.set({[path(id)]: choice === OFF ? '' : choice === INHERIT ? (scope.root.value ? null : undefined) : choice})
+const storageItems = computed(() => [
+    {label: t('app.settings.ai.features.chatStorageApp'), value: 'app'},
+    {label: t('app.settings.ai.features.chatStorageWorkspace'), value: 'workspace'},
+])
 
 // Mirrors custom CSS: a workspace's feature choices apply only once its folder is trusted.
 const featuresOff = computed(() => scope.root.value !== null && scope.overridden(FEATURES) && !scope.trusted.value)
@@ -62,8 +67,8 @@ const featuresOff = computed(() => scope.root.value !== null && scope.overridden
             <SettingsSection
                 :title="t('app.settings.ai.features.section')"
                 :description="t('app.settings.ai.features.sectionDescription')"
-                :dirty="scope.isDirty([FEATURES])"
-                @reset="scope.reset([FEATURES])"
+                :dirty="scope.isDirty([FEATURES, CHAT_STORAGE])"
+                @reset="scope.reset([FEATURES, CHAT_STORAGE])"
             >
                 <div v-if="featuresOff" class="px-4 py-2.5">
                     <UAlert
@@ -74,20 +79,33 @@ const featuresOff = computed(() => scope.root.value !== null && scope.overridden
                         :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                     />
                 </div>
-                <SettingsRow
-                    v-for="feature in AI_FEATURES"
-                    :key="feature.id"
-                    :setting="path(feature.id)"
-                    :label="t(feature.label)"
-                    :description="t(feature.description)"
-                >
-                    <USelect
-                        class="w-56"
-                        :items="featureItems"
-                        :model-value="featureValue(feature.id)"
-                        @update:model-value="setFeature(feature.id, $event as string)"
-                    />
-                </SettingsRow>
+                <template v-for="feature in AI_FEATURES" :key="feature.id">
+                    <SettingsRow
+                        :setting="path(feature.id)"
+                        :label="t(feature.label)"
+                        :description="t(feature.description)"
+                    >
+                        <USelect
+                            class="w-56"
+                            :items="featureItems"
+                            :model-value="featureValue(feature.id)"
+                            @update:model-value="setFeature(feature.id, $event as string)"
+                        />
+                    </SettingsRow>
+                    <SettingsRow
+                        v-if="feature.id === 'chat'"
+                        :setting="CHAT_STORAGE"
+                        :label="t('app.settings.ai.features.chatStorage')"
+                        :description="t('app.settings.ai.features.chatStorageDescription')"
+                    >
+                        <USelect
+                            class="w-56"
+                            :items="storageItems"
+                            :model-value="scope.value(CHAT_STORAGE)"
+                            @update:model-value="scope.set({[CHAT_STORAGE]: $event})"
+                        />
+                    </SettingsRow>
+                </template>
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

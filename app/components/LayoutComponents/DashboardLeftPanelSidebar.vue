@@ -8,8 +8,9 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import type {UITreeNode} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import type {ContextMenuItem} from "@nuxt/ui";
+import type {ContextMenuItem, NavigationMenuItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
+import ChatsPanel from "~/components/Chat/ChatsPanel.vue";
 import {computed} from "vue";
 import {useScroll} from "@vueuse/core";
 
@@ -27,8 +28,24 @@ const $sessionId = computed<string>(() => $route.params.sessionId as string)
 const {fileTree} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
 const {openTab, activeTabUuid} = useActiveTabs($sesh.getSession($sessionId))
 const {
-    leftPanelCollapsed
+    leftPanelCollapsed,
+    leftPanelView
 } = useActiveLayouts($sesh.getSession($sessionId))
+const chatsPanel = useTemplateRef('chatsPanel')
+const fileSearchOpen = useState<boolean>(StateKey.fileSearchOpen($sessionId.value), () => false)
+const navItems = computed<NavigationMenuItem[]>(() => [
+    {label: t('app.chat.files'), icon: 'i-lucide-files', active: leftPanelView.value === 'files', onSelect: () => { leftPanelView.value = 'files' }},
+    {label: t('app.chat.chats'), icon: 'i-lucide-messages-square', active: leftPanelView.value === 'chats', onSelect: () => { leftPanelView.value = 'chats' }},
+    {
+        label: t('app.chat.search'),
+        icon: 'i-lucide-search',
+        kbds: leftPanelView.value === 'files' ? ['meta', 'p'] : [],
+        onSelect() {
+            if (leftPanelView.value === 'files') fileSearchOpen.value = true
+            else chatsPanel.value?.openSearch()
+        },
+    },
+])
 const activeTreeItem = useState<string>(StateKey.activeTreeItem(unref($sessionId)), () => '')
 const newFileModal = $ovl.create(NewFileModal)
 
@@ -84,42 +101,49 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
 </script>
 
 <template>
-    <UDashboardPanel
+    <!-- UDashboardSidebar, not UDashboardPanel: a panel goes full-width below `lg`. `root: flex` undoes the sidebar's
+    own `hidden lg:flex`; without a toggle its mobile menu never opens. -->
+    <UDashboardSidebar
         v-if="!leftPanelCollapsed"
         side="left"
         data-tauri-drag-region
         :min-size="10"
         :max-size="30"
         :default-size="18"
-        :collapsed-size="0"
+        :toggle="false"
         resizable
         :ui="{
-            root: 'border-r border-default bg-submuted',
-            body: 'px-2 sm:px-2 sm:py-0'
+            root: 'flex bg-submuted',
+            header: 'contents',
+            body: 'px-2 py-0 gap-0'
         }"
     >
         <template #resize-handle="{ onMouseDown, onTouchStart, onDoubleClick }">
             <UDashboardResizeHandle
-                class="after:absolute after:inset-y-0 after:right-0 after:w-px hover:after:cursor-ew-resize after:cursor-ew-resize cursor-ew-resize after:top-0 after:bottom-0 hover:after:bg-primary hover:after:h-full after:justify-self-center after:items-center transition-all duration-300 after:transition-all after:duration-300"
+                class="block after:absolute after:inset-y-0 after:right-0 after:w-px hover:after:cursor-ew-resize after:cursor-ew-resize cursor-ew-resize after:top-0 after:bottom-0 hover:after:bg-primary hover:after:h-full after:justify-self-center after:items-center transition-all duration-300 after:transition-all after:duration-300"
                 @mousedown="onMouseDown"
                 @touchstart="onTouchStart"
                 @dblclick="onDoubleClick"
             />
         </template>
         <template #header>
-            <UDashboardNavbar :ui="{ root: 'border-b border-none h-(--ui-header-height) sm:px-1 p-2 w-full', center: 'w-full', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
+            <UDashboardNavbar :toggle="false" :ui="{ root: 'border-b border-none h-(--ui-header-height) sm:px-1 p-2 w-full', center: 'flex w-full', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
                 <template #default>
                     <SpaceOnOs detect-os="macos" :show-on-os="true" data-tauri-drag-region/>
                     <div class="grow" data-tauri-drag-region/>
                     <SidebarCollapserButton side="left"/>
                 </template>
             </UDashboardNavbar>
-            <UDashboardNavbar :ui="{ root: 'border-none h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full gap-2', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
-                <UDashboardSearchButton :kbds="['meta', 'p']" class="grow" variant="ghost"/>
-            </UDashboardNavbar>
+            <UNavigationMenu :items="navItems" orientation="vertical" class="px-2 pb-2">
+                <template #item-trailing="{ item }">
+                    <div v-if="item.kbds?.length" class="flex items-center gap-px opacity-0 group-hover:opacity-100 transition-opacity">
+                        <UKbd v-for="kbd in item.kbds" :key="kbd" :value="kbd" size="sm" variant="soft" class="bg-accented/50"/>
+                    </div>
+                </template>
+            </UNavigationMenu>
         </template>
-		<template #body>
-			<UContextMenu :items="contextMenuItems" size="sm">
+		<template #default>
+			<UContextMenu v-if="leftPanelView === 'files'" :items="contextMenuItems" size="sm">
 				<UScrollArea
 					ref="scrollAreaRef"
 					orientation="vertical"
@@ -129,25 +153,7 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
 					<FileTreeComponent class="py-2.5" :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
 				</UScrollArea>
 			</UContextMenu>
+			<ChatsPanel v-else ref="chatsPanel"/>
 		</template>
-    </UDashboardPanel>
+    </UDashboardSidebar>
 </template>
-
-<style scoped>
-@property --fade-size {
-	syntax: '<length>';
-	inherits: false;
-	initial-value: 0px;
-}
-
-.scroll-fade {
-	--fade-size: 0px;
-	-webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
-	mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
-	transition: --fade-size 200ms ease;
-}
-
-.scroll-fade.is-scrolled {
-	--fade-size: 2rem;
-}
-</style>

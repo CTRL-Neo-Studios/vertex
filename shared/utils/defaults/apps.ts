@@ -72,6 +72,7 @@ const AI_SEED: AppAiConfig = {
     modelProfiles: [{id: 'default', name: 'Default', providerId: 'local-ollama', modelId: '', systemPrompt: ''}],
     defaultModelProfile: 'default',
     features: {},
+    chatStorage: 'app',
 }
 
 export function defaultAppAiConfig(data?: unknown): AppAiConfig {
@@ -93,7 +94,8 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const preferred = str(ai.defaultModelProfile)
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
-    return {providers, modelProfiles, defaultModelProfile, features}
+    const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
+    return {providers, modelProfiles, defaultModelProfile, features, chatStorage}
 }
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
@@ -121,7 +123,9 @@ export function defaultAppSessionContext(data?: Partial<AppSessionContext>): App
     return {
         openedAbsoluteFilePaths: data?.openedAbsoluteFilePaths || [],
         openedAbsoluteFolderPaths: data?.openedAbsoluteFolderPaths || [],
-        lastFocusedAbsoluteFilePath: data?.lastFocusedAbsoluteFilePath
+        lastFocusedAbsoluteFilePath: data?.lastFocusedAbsoluteFilePath,
+        openedChatIds: data?.openedChatIds || [],
+        leftPanelView: data?.leftPanelView === 'chats' ? 'chats' : 'files',
     } satisfies AppSessionContext
 }
 
