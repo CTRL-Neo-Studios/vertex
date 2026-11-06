@@ -22,7 +22,7 @@
 		"@ai-sdk/openai-compatible": "^3.0.85",
 		"@ai-sdk/vue": "^4.0.163",
 		"@catppuccin/codemirror": "^1.0.3",
-		"@comark/vue": "^0.8.1",
+		"@comark/nuxt": "^0.8.1",
 		"@iconify-json/lucide": "^1.2.151",
 		"@iconify-json/simple-icons": "^1.2.101",
 		"@nuxt/fonts": "1.2.0",
