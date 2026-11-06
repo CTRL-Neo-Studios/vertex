@@ -94,7 +94,7 @@ watch($tabId, () => {
         data-tauri-drag-region
         :min-size="10"
         :max-size="30"
-        :default-size="15"
+        :default-size="18"
         :toggle="false"
         resizable
         :ui="{
