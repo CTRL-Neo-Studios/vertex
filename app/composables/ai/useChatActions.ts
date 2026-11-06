@@ -92,12 +92,26 @@ export function useChatActions(session?: ActiveSession) {
     }
 
     function folderActions(path: string): DropdownMenuItem[][] {
+        const parent = parentOf(path)
+        const moveTo = (dest: string) => run(() => renameFolder(path, join(dest, baseName(path))))
+        // Not into itself or its own subfolders.
+        const targets = [...(index.value?.folders ?? [])].filter(f => f !== path && !f.startsWith(`${path}/`)).sort()
         return [
             [
                 {label: t('app.chat.newChatHere'), icon: 'i-lucide-circle-plus', onSelect: () => newChat(path)},
                 {label: t('app.chat.newFolderInside'), icon: 'i-lucide-folder-plus', onSelect: () => newFolder(path)},
             ],
-            [{label: t('app.chat.rename'), icon: 'i-lucide-pencil', onSelect: () => renameFolderAt(path)}],
+            [
+                {label: t('app.chat.rename'), icon: 'i-lucide-pencil', onSelect: () => renameFolderAt(path)},
+                {
+                    label: t('app.chat.moveTo'),
+                    icon: 'i-lucide-folder-tree',
+                    children: [
+                        {label: t('app.chat.topLevel'), icon: 'i-lucide-folder-root', disabled: parent === '', onSelect: () => moveTo('')},
+                        ...targets.map(f => ({label: f, icon: 'i-lucide-folder', disabled: f === parent, onSelect: () => moveTo(f)})),
+                    ],
+                },
+            ],
             [{label: t('app.generic.delete'), icon: 'i-lucide-trash', color: 'error', onSelect: () => removeFolder(path)}],
         ]
     }

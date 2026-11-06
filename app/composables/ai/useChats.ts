@@ -101,6 +101,30 @@ export function useChats(session?: ActiveSession) {
         await refresh()
     }
 
+    /**
+     * `.vertex/chats/` changed outside Vertex (sync from another device): re-read the index, and reload each loaded
+     * chat whose file is newer than ours, unless it's replying. `paths` are the changed files (`<id>.chat`).
+     */
+    async function syncExternal(paths: string[]) {
+        if (storage.value !== 'workspace') return
+        await refresh()
+        for (const path of paths) {
+            const name = path.slice(path.lastIndexOf('/') + 1)
+            const entry = name.endsWith('.chat') ? live.get(keyOf(name.slice(0, -'.chat'.length))) : undefined
+            if (!entry || entry.storage !== 'workspace' || entry.root !== root.value) continue
+            if (entry.chat.status === 'submitted' || entry.chat.status === 'streaming') continue
+            try {
+                const {messages, ...meta} = await chatClient.read(entry.root, entry.storage, entry.meta.id)
+                // Our own saves come back with the same `updated`.
+                if (meta.updated <= entry.meta.updated) continue
+                Object.assign(entry.meta, meta)
+                entry.chat.messages = messages
+            } catch {
+                // ponytail: deleted or locked elsewhere; the refreshed list shows it, an open tab keeps its copy.
+            }
+        }
+    }
+
     const summary = (id: string) => computed(() => index.value?.chats.find(c => c.id === id))
     const profileId = (id: string) => computed(() => live.get(keyOf(id))?.meta.profileId)
     const saveError = (id: string) => computed(() => saveErrors.get(keyOf(id)))
@@ -304,6 +328,7 @@ export function useChats(session?: ActiveSession) {
         index,
         error,
         refresh,
+        syncExternal,
         createVault,
         unlock,
         lock,

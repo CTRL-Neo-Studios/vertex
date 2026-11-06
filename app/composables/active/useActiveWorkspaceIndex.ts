@@ -321,6 +321,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (rt.wholeFolder && event.paths.includes(`${rt.root}/.vertex/settings.json`)) {
             void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
         }
+        const chatPath = rt.wholeFolder && event.paths.find(p => relativeOf(p).startsWith('.vertex/chats/'))
+        if (chatPath) broadcast({type: 'chats', path: chatPath})
         // Same rule as the initial scan (`scan_directory_recursive`): nothing under a dot-name is indexed, so
         // `.vertex/` (settings temp files, trash), `.git/` and `.DS_Store` never reach the index.
         const paths = event.paths.filter(p => !relativeOf(p).split('/').some(part => part.startsWith('.')))

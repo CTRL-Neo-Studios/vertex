@@ -44,7 +44,7 @@ export function useAppSessionRecovery() {
 
         let lastOpened = openTabs(fileUuids)
         for (const id of chatIds) lastOpened = openTab(id, 'chat')
-        const focused = getActiveTab(getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
+        const focused = getActiveTab(context.lastFocusedChatId ?? getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
         await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
     }
 

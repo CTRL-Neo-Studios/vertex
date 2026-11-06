@@ -54,13 +54,31 @@ function markerHolder(quote: ElementNode): ElementNode | undefined {
     return Array.isArray(first) && first[0] === 'p' && calloutType(first[2]) !== undefined ? first : undefined
 }
 
+/** Splits inline nodes at the first line break: the title line (formatting kept), then the rest of the paragraph. */
+function splitLine(nodes: Node[]): { line: Node[], rest: Node[] } {
+    const i = nodes.findIndex(n => typeof n === 'string' && n.includes('\n'))
+    if (i < 0) return {line: nodes, rest: []}
+    const text = nodes[i] as string
+    const cut = text.indexOf('\n')
+    const after = text.slice(cut + 1)
+    return {line: [...nodes.slice(0, i), text.slice(0, cut)], rest: [...(after ? [after] : []), ...nodes.slice(i + 1)]}
+}
+
+/** Trims the line's outer whitespace and drops the strings left empty. */
+function trimLine(nodes: Node[]): Node[] {
+    const out = nodes.map((n, i) => typeof n !== 'string' ? n : i === 0 && i === nodes.length - 1 ? n.trim() : i === 0 ? n.trimStart() : i === nodes.length - 1 ? n.trimEnd() : n)
+    return out.filter(n => n !== '')
+}
+
+/** A native `<details>` so the title line is the toggle, as in Obsidian; ChatMarkdown maps `icon` to UIcon. */
+const SUMMARY = 'cursor-pointer list-none [&::-webkit-details-marker]:hidden'
+
 /**
  * `> [!type] Title` blockquotes → `callout` (Nuxt UI's ProseCallout) with a bold title line, Obsidian-style: the title
- * defaults to the type, the fold marker (`-`/`+`) is accepted but not collapsible. Named `alert` so it replaces Comark's
- * default GitHub-alert plugin, which knows five types and drops the title line.
+ * keeps its inline formatting and defaults to the type; `-` folds the body (closed), `+` too (open). Named `alert` so it
+ * replaces Comark's default GitHub-alert plugin, which knows five types and drops the title line.
  * The title is a bare `strong` and body paragraphs get `my-1`: ProseCallout lays its slot out inline after the icon
  * (MDC unwraps the paragraph there, Comark doesn't), and a ProseP's `my-5` would space it like a page.
- * ponytail: the title is the plain text up to the line break; inline formatting in a title ends up in the body.
  */
 export const callouts: ComarkPlugin = {
     name: 'alert',
@@ -70,15 +88,24 @@ export const callouts: ComarkPlugin = {
             const holder = markerHolder(quote)!
             const type = calloutType(holder[2])!
             const style = CALLOUTS[ALIASES[type] ?? type] ?? CALLOUTS.note!
-            const after = typeof holder[3] === 'string' ? holder[3].replace(/^[-+]/, '') : ''
-            const lineEnd = after.indexOf('\n')
-            const title = (lineEnd < 0 ? after : after.slice(0, lineEnd)).trim() || type[0]!.toUpperCase() + type.slice(1)
-            const rest = lineEnd < 0 ? '' : after.slice(lineEnd + 1)
-            const body: Node[] = [...(rest ? [rest] : []), ...holder.slice(typeof holder[3] === 'string' ? 4 : 3) as Node[]]
+            const inline = holder.slice(3) as Node[]
+            const fold = typeof inline[0] === 'string' ? /^[-+]/.exec(inline[0])?.[0] : undefined
+            if (fold) inline[0] = (inline[0] as string).slice(1)
+            const {line, rest} = splitLine(inline)
+            const trimmed = trimLine(line)
+            const title = trimmed.length ? trimmed : [type[0]!.toUpperCase() + type.slice(1)]
             const tight = (n: Node): Node => Array.isArray(n) && n[0] === 'p' ? ['p', {...n[1], class: 'my-1'}, ...n.slice(2) as Node[]] : n
-            const paragraph: Node[] = body.length ? [['p', {...(holder === quote ? {} : holder[1]), class: 'my-1'}, ...body]] : []
-            const others = holder === quote ? [] : (quote.slice(3) as Node[]).map(tight)
-            return ['callout', {color: style.color, icon: style.icon}, ['strong', {}, title], ...paragraph, ...others]
+            const paragraph: Node[] = rest.length ? [['p', {...(holder === quote ? {} : holder[1]), class: 'my-1'}, ...rest]] : []
+            const body = [...paragraph, ...(holder === quote ? [] : (quote.slice(3) as Node[]).map(tight))]
+            if (!fold) return ['callout', {color: style.color, icon: style.icon}, ['strong', {}, ...title], ...body]
+            return ['callout', {color: style.color}, ['details', {...(fold === '+' && {open: true}), class: 'group/fold'},
+                ['summary', {class: SUMMARY},
+                    ['icon', {name: style.icon, class: 'size-4 shrink-0 align-sub me-2'}],
+                    ['strong', {}, ...title],
+                    ['icon', {name: 'i-lucide-chevron-right', class: 'size-4 ms-1 align-sub transition-transform group-open/fold:rotate-90'}],
+                ],
+                ...body,
+            ]]
         })
     },
 }

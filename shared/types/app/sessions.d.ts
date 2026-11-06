@@ -4,6 +4,8 @@ export interface AppSessionContext {
     lastFocusedAbsoluteFilePath?: string,
     /** Chat tabs, reopened after the file tabs (workspace sessions). */
     openedChatIds?: string[],
+    /** Set instead of `lastFocusedAbsoluteFilePath` when the focused tab was a chat. */
+    lastFocusedChatId?: string,
     leftPanelView?: 'files' | 'chats',
 }
 

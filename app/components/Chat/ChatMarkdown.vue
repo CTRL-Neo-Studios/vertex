@@ -9,9 +9,10 @@ import ChatCodeBlock from "~/components/Chat/ChatCodeBlock.vue";
 defineProps<{ value: string, streaming?: boolean }>()
 
 // Callouts render as Nuxt UI's ProseCallout and everything else through its prose components (@comark/nuxt turns
-// them on); `a` and `pre` are ours (wikilinks, Pele diagrams). rangi highlights code without Shiki's weight.
+// them on); `a` and `pre` are ours (wikilinks, Pele diagrams), `icon` is a folding callout's. rangi highlights code
+// without Shiki's weight.
 const plugins = [wikiLinks, callouts, math(), rangi()]
-const components = {a: ChatLink, pre: ChatCodeBlock, math: Math}
+const components = {a: ChatLink, pre: ChatCodeBlock, math: Math, icon: resolveComponent('UIcon')}
 </script>
 
 <template>

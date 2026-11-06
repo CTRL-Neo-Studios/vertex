@@ -17,11 +17,32 @@ describe('callouts', () => {
         ])
     })
 
-    it('accepts aliases, unknown types and the fold marker', async () => {
-        const [faq] = await parse('> [!faq]- Folded question\n> Answer')
-        expect(faq).toEqual(['callout', {color: 'warning', icon: 'i-lucide-circle-help'}, ['strong', {}, 'Folded question'], ['p', {class: 'my-1'}, 'Answer']])
+    it('accepts aliases and unknown types', async () => {
+        const [faq] = await parse('> [!faq] Question\n> Answer')
+        expect(faq).toEqual(['callout', {color: 'warning', icon: 'i-lucide-circle-help'}, ['strong', {}, 'Question'], ['p', {class: 'my-1'}, 'Answer']])
         const [custom] = await parse('> [!recipe] Soup')
         expect(custom).toEqual(['callout', {color: 'info', icon: 'i-lucide-pencil'}, ['strong', {}, 'Soup']])
+    })
+
+    it('keeps inline formatting in the title line', async () => {
+        const [node] = await parse('> [!tip] A **bold** `title`\n> Body *x*')
+        expect(node).toEqual(['callout', {color: 'success', icon: 'i-lucide-flame'},
+            ['strong', {}, 'A ', ['strong', {}, 'bold'], ' ', ['code', {}, 'title']],
+            ['p', {class: 'my-1'}, 'Body ', ['em', {}, 'x']]])
+    })
+
+    it('folds the body under the title line: `-` closed, `+` open', async () => {
+        const [closed] = await parse('> [!faq]- Folded question\n> Answer')
+        const summary = ['summary', {class: expect.any(String)},
+            ['icon', {name: 'i-lucide-circle-help', class: expect.any(String)}],
+            ['strong', {}, 'Folded question'],
+            ['icon', {name: 'i-lucide-chevron-right', class: expect.any(String)}]]
+        expect(closed).toEqual(['callout', {color: 'warning'}, ['details', {class: 'group/fold'}, summary, ['p', {class: 'my-1'}, 'Answer']]])
+        const [open] = await parse('> [!note]+\n> Body')
+        const details = open?.[2] as unknown[]
+        expect(details.slice(0, 2)).toEqual(['details', {open: true, class: 'group/fold'}])
+        expect((details[2] as unknown[])[3]).toEqual(['strong', {}, 'Note'])
+        expect(details[3]).toEqual(['p', {class: 'my-1'}, 'Body'])
     })
 
     it('keeps later paragraphs of a multi-paragraph callout', async () => {

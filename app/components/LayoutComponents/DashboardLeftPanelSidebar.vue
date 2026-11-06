@@ -12,7 +12,8 @@ import type {ContextMenuItem, NavigationMenuItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import ChatsPanel from "~/components/Chat/ChatsPanel.vue";
 import {computed} from "vue";
-import {useScroll} from "@vueuse/core";
+import {useDebounceFn, useScroll} from "@vueuse/core";
+import {useChats} from "~/composables/ai/useChats";
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
@@ -25,7 +26,8 @@ const $navi = useAppNavigator()
 const $sesh = useActiveSessions()
 const $ovl = useOverlay()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {fileTree} = useActiveWorkspaceIndex($sesh.getSession($sessionId))
+const $index = useActiveWorkspaceIndex($sesh.getSession($sessionId))
+const {fileTree} = $index
 const {openTab, activeTabUuid} = useActiveTabs($sesh.getSession($sessionId))
 const {
     leftPanelCollapsed,
@@ -58,6 +60,21 @@ async function onClickFile(item: Partial<UITreeNode>) {
     const tab = openTab(item.uuid)
     await $navi.toWorkspaceTab($sesh.getSession($sessionId)?.uuid || '', tab)
 }
+
+// Chats synced in from elsewhere: one refresh per burst of watcher events. Here because this sidebar lives as long as the session.
+const {syncExternal} = useChats($sesh.getSession($sessionId))
+const changedChats = new Set<string>()
+const flushChats = useDebounceFn(() => {
+    const paths = [...changedChats]
+    changedChats.clear()
+    return syncExternal(paths)
+}, 500)
+const offIndex = $index.on((event) => {
+    if (event.type !== 'chats') return
+    changedChats.add(event.path)
+    void flushChats()
+})
+onBeforeUnmount(offIndex)
 
 const contextMenuItems = ref<ContextMenuItem[][]>([
     [

@@ -25,11 +25,14 @@ export function useAppSessionPersistence(session: ActiveSession) {
     function snapshot(): AppSessionContext {
         const paths = (uuids: (string | null | undefined)[]) =>
             uuids.map(u => pathOf(u ?? undefined)?.fullPath).filter((p): p is string => !!p)
+        const chatIds = unref(tabs).filter(t => t.kind === 'chat').map(t => t.fileUuid)
+        const focused = unref(activeTabUuid)
         return {
             openedAbsoluteFilePaths: paths(unref(tabs).filter(t => t.kind !== 'chat').map(t => t.fileUuid)),
             openedAbsoluteFolderPaths: session.workspaceSession ? paths(unref(expandedFolders)) : [],
-            lastFocusedAbsoluteFilePath: paths([unref(activeTabUuid)])[0],
-            openedChatIds: unref(tabs).filter(t => t.kind === 'chat').map(t => t.fileUuid),
+            lastFocusedAbsoluteFilePath: paths([focused])[0],
+            openedChatIds: chatIds,
+            lastFocusedChatId: focused && chatIds.includes(focused) ? focused : undefined,
             leftPanelView: unref(leftPanelView),
         }
     }

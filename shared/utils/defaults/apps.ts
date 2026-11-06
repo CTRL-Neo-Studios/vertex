@@ -125,6 +125,7 @@ export function defaultAppSessionContext(data?: Partial<AppSessionContext>): App
         openedAbsoluteFolderPaths: data?.openedAbsoluteFolderPaths || [],
         lastFocusedAbsoluteFilePath: data?.lastFocusedAbsoluteFilePath,
         openedChatIds: data?.openedChatIds || [],
+        lastFocusedChatId: data?.lastFocusedChatId,
         leftPanelView: data?.leftPanelView === 'chats' ? 'chats' : 'files',
     } satisfies AppSessionContext
 }

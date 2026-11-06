@@ -33,10 +33,16 @@ const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 const parentOf = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
 const folderKey = (path: string) => `folder:${path}`
 
-// ponytail: open folders are recorded from clicks on their icon or label, the accordion doesn't report nested toggles.
-function toggleFolder(path: string) {
+// Nested accordions keep their open state to themselves, so it's read back from the folder's trigger after each click on
+// it (Enter and Space on the trigger button are clicks too).
+async function onNavClick(event: MouseEvent) {
+    const link = (event.target as Element).closest('[data-slot="link"]')
+    const path = link?.querySelector<HTMLElement>('[data-folder]')?.dataset.folder
+    if (path === undefined) return
+    await nextTick()
     const key = folderKey(path)
-    expanded.value = expanded.value.includes(key) ? expanded.value.filter(k => k !== key) : [...expanded.value, key]
+    const open = link!.getAttribute('data-state') === 'open'
+    expanded.value = open ? [...new Set([...expanded.value, key])] : expanded.value.filter(k => k !== key)
 }
 
 /** Today, Yesterday, Last 7 days, Last 30 days, then month and year, from `updated`. */
@@ -178,6 +184,7 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
                         :items
                         orientation="vertical"
                         class="pb-2.5"
+                        @click="onNavClick"
                         :ui="{
                             link: 'overflow-hidden pr-7.5',
                             linkTrailing: 'translate-x-full group-hover:translate-x-0 group-has-data-[state=open]:translate-x-0 transition-transform ms-0 absolute inset-e-px'
@@ -200,13 +207,10 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
                         </template>
                         <template #folder-leading="{ item }: { item: FolderNavItem }">
                             <!-- The link is the accordion trigger, so its data-state tells whether the folder is open. -->
-                            <span class="inline-flex shrink-0" @click="toggleFolder(item.path)">
+                            <span class="inline-flex shrink-0" :data-folder="item.path">
                                 <UIcon name="i-lucide-folder" class="size-5 group-data-[state=open]:hidden"/>
                                 <UIcon name="i-lucide-folder-open" class="size-5 hidden group-data-[state=open]:inline"/>
                             </span>
-                        </template>
-                        <template #folder-label="{ item }: { item: FolderNavItem }">
-                            <span @click="toggleFolder(item.path)">{{ item.label }}</span>
                         </template>
                         <template #folder-trailing="{ item }: { item: FolderNavItem }">
                             <UDropdownMenu :items="folderActions(item.path)" :content="{ align: 'end' }" size="sm">
