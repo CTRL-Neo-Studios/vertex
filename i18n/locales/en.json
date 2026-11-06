@@ -24,7 +24,8 @@
 			"closeWindow": "Close Window",
 			"docs": "Documentation",
 			"reportIssue": "Report an Issue",
-			"repo": "Source Code on GitHub"
+			"repo": "Source Code on GitHub",
+			"newChat": "New Chat"
 		},
 		"about": {
 			"version": "Version",
@@ -1254,7 +1255,9 @@
 				},
 				"undo": "Undo",
 				"redo": "Redo",
-				"hiddenFolders": "Hidden folders"
+				"hiddenFolders": "Hidden folders",
+				"askInChat": "Ask in chat",
+				"editFailed": "Couldn't complete that"
 			},
 			"labels": {
 				"bold": "Bold",
@@ -1387,7 +1390,12 @@
 				"remember": "Remember on this device",
 				"create": "Set password",
 				"unlock": "Unlock",
-				"wrongPassword": "Wrong password."
+				"wrongPassword": "Wrong password.",
+				"changeTitle": "Change chat password",
+				"current": "Current password",
+				"new": "New password",
+				"change": "Change password",
+				"changed": "Chat password changed"
 			},
 			"search": "Search",
 			"today": "Today",
@@ -1400,7 +1408,8 @@
 			"saveFailed": "This chat couldn't be saved",
 			"retrySave": "Retry",
 			"searchTitles": "Chats",
-			"searchMessages": "In messages"
+			"searchMessages": "In messages",
+			"changePassword": "Change password…"
 		}
 	}
 }

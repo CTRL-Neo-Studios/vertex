@@ -257,6 +257,7 @@ pub fn run() {
             chats::chat_vault_create,
             chats::chat_vault_unlock,
             chats::chat_vault_lock,
+            chats::chat_vault_change,
             chats::chat_index,
             chats::chat_read,
             chats::chat_write,

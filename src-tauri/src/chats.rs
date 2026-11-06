@@ -242,19 +242,31 @@ fn vault_create(keys: &mut Keys, root: &Path, password: String, remember: bool) 
     remember_key(keys, id, key, remember)
 }
 
-fn vault_unlock(keys: &mut Keys, root: &Path, password: String, remember: bool) -> Result<(), String> {
+/// `key.age` opened with `password`: the identity's text.
+fn open_key_file(root: &Path, password: String) -> Result<Vec<u8>, String> {
     let sealed = fs::read(key_path(root)).map_err(|e| e.to_string())?;
-    let id = workspace_id(root)?;
-    let plain = age::decrypt(&scrypt::Identity::new(SecretString::from(password)), &sealed).map_err(|e| match e {
+    age::decrypt(&scrypt::Identity::new(SecretString::from(password)), &sealed).map_err(|e| match e {
         age::DecryptError::DecryptionFailed => "wrong-password".to_owned(),
         e => e.to_string(),
-    })?;
+    })
+}
+
+fn vault_unlock(keys: &mut Keys, root: &Path, password: String, remember: bool) -> Result<(), String> {
+    let plain = open_key_file(root, password)?;
+    let id = workspace_id(root)?;
     let key = std::str::from_utf8(&plain)
         .map_err(|e| e.to_string())?
         .trim()
         .parse::<x25519::Identity>()
         .map_err(|e| format!("{KEY_FILE}: {e}"))?;
     remember_key(keys, id, key, remember)
+}
+
+/// Re-encrypts `key.age` with `next`. The identity stays the same, so the chats and a remembered key are untouched.
+fn vault_change(root: &Path, current: String, next: String) -> Result<(), String> {
+    let plain = open_key_file(root, current)?;
+    let sealed = age::encrypt(&scrypt::Recipient::new(SecretString::from(next)), &plain).map_err(|e| e.to_string())?;
+    write_bytes_atomic(&key_path(root), &sealed)
 }
 
 fn vault_lock(keys: &mut Keys, root: &Path) -> Result<(), String> {
@@ -477,6 +489,11 @@ pub async fn chat_vault_lock<R: Runtime>(app: AppHandle<R>, root: String) -> Res
 }
 
 #[tauri::command]
+pub async fn chat_vault_change<R: Runtime>(app: AppHandle<R>, root: String, current: String, next: String) -> Result<(), String> {
+    run(app, root, move |_, _, root| vault_change(root, current, next)).await
+}
+
+#[tauri::command]
 pub async fn chat_index<R: Runtime>(app: AppHandle<R>, root: String, storage: Storage) -> Result<ChatIndex, String> {
     with_store(app, root, storage, |s| s.index()).await
 }
@@ -627,6 +644,14 @@ mod tests {
         assert_eq!(store.index().unwrap().folders, vec!["F"]);
         // The two storages are separate.
         assert!(open(&mut keys, &data, &root, Storage::App).unwrap().index().unwrap().chats.is_empty());
+
+        // A new password: the old one stops working, the chats don't change.
+        assert_eq!(vault_change(&root, "nope".into(), "pw2".into()).err().as_deref(), Some("wrong-password"));
+        vault_change(&root, "pw".into(), "pw2".into()).unwrap();
+        let mut keys = Keys::new();
+        assert_eq!(vault_unlock(&mut keys, &root, "pw".into(), false).err().as_deref(), Some("wrong-password"));
+        vault_unlock(&mut keys, &root, "pw2".into(), false).unwrap();
+        assert_eq!(open(&mut keys, &data, &root, Storage::Workspace).unwrap().read("w1").unwrap(), chat("w1", ""));
     }
 
     #[test]

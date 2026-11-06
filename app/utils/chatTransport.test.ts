@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {chatSystem} from "./chatTransport";
+import {chatSystem, cleanTitle} from "./chatTransport";
 
 const notesIn = (system: string) => [...system.matchAll(/<note path="([^"]+)">\n([\s\S]*?)\n<\/note>/g)].map(m => ({path: m[1]!, content: m[2]!}))
 
@@ -24,5 +24,18 @@ describe('chatSystem', () => {
     it('is empty without a prompt or notes, and just the prompt without notes', () => {
         expect(chatSystem('', [])).toBe('')
         expect(chatSystem('Be brief.', [])).toBe('Be brief.')
+    })
+})
+
+describe('cleanTitle', () => {
+    it('keeps the first line, without quotes, markdown marks, a "Title:" label or closing punctuation', () => {
+        expect(cleanTitle('"Planning the Gilded Kraken heist."\nHere is why…')).toBe('Planning the Gilded Kraken heist')
+        expect(cleanTitle('**Title: Soup recipes**')).toBe('Soup recipes')
+        expect(cleanTitle('<think>hmm</think>\n# 汤的做法。')).toBe('汤的做法')
+    })
+
+    it('is empty when nothing usable is left, and at most 60 characters', () => {
+        expect(cleanTitle('  "" ')).toBe('')
+        expect(cleanTitle('x'.repeat(80))).toHaveLength(60)
     })
 })

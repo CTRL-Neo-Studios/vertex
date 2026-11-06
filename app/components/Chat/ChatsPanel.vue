@@ -17,8 +17,8 @@ const $route = useRoute()
 const sessionId = computed(() => $route.params.sessionId as string)
 const session = useActiveSessions().getSession(sessionId)
 const {activeTabUuid} = useActiveTabs(session)
-const {storage, vault, index, error, refresh, search, showInSidePanel, openInTab} = useChats(session)
-const {run, chatTitle, newChat, panelMenu, chatActions, folderActions} = useChatActions(session)
+const {storage, vault, index, error, refresh, search, moveChat, showInSidePanel, openInTab} = useChats(session)
+const {run, chatTitle, newChat, moveFolderTo, panelMenu, chatActions, folderActions} = useChatActions(session)
 
 watch(storage, () => refresh(), {immediate: true})
 
@@ -73,6 +73,7 @@ const chatItem = (chat: ChatSummary): ChatNavItem => ({
     chat,
     active: chat.id === activeTabUuid.value,
     class: chat.title ? '' : 'text-muted',
+    'data-drag': `chat:${chat.id}`,
     onSelect: (e: Event) => onChatSelect(chat, e),
 })
 
@@ -92,6 +93,8 @@ const items = computed<NavigationMenuItem[]>(() => {
             value: folderKey(path),
             slot: 'folder',
             path,
+            'data-drag': `folder:${path}`,
+            class: dropTarget.value === path ? DROP_TARGET : undefined,
             defaultOpen: expanded.value.includes(folderKey(path)),
             children: [],
         }
@@ -114,6 +117,68 @@ const items = computed<NavigationMenuItem[]>(() => {
     }
     return top
 })
+
+// Drag and drop: a chat or folder onto a folder; onto a chat, that chat's folder; onto empty space, the top level.
+// Rows carry `data-drag` (`chat:<id>` / `folder:<path>`); Nuxt UI passes only data-/aria- attributes on to a row,
+// so the observer makes them draggable (nested rows mount when their folder opens).
+const DROP_TARGET = 'bg-primary/10 ring-1 ring-inset ring-primary/40'
+const dragged = ref<string | null>(null)
+/** Where the dragged row would land: a folder path, '' for the top level, null for nowhere. */
+const dropTarget = ref<string | null>(null)
+const listEl = computed(() => scrollAreaRef.value?.$el)
+const markDraggable = () => listEl.value?.querySelectorAll('[data-drag]:not([draggable])').forEach(el => el.setAttribute('draggable', 'true'))
+useMutationObserver(listEl, markDraggable, {childList: true, subtree: true})
+watch(listEl, markDraggable, {flush: 'post'})
+
+const rowOf = (event: DragEvent) => (event.target as Element).closest?.('[data-drag]')?.getAttribute('data-drag') ?? undefined
+const chatOf = (id: string) => index.value?.chats.find(c => c.id === id)
+
+function destOf(event: DragEvent) {
+    const row = rowOf(event)
+    if (row?.startsWith('folder:')) return row.slice('folder:'.length)
+    if (row?.startsWith('chat:')) return chatOf(row.slice('chat:'.length))?.folder ?? ''
+    return ''
+}
+
+/** Not where it already is; a folder not into itself or below it. */
+function canDrop(source: string, dest: string) {
+    if (source.startsWith('chat:')) return chatOf(source.slice('chat:'.length))?.folder !== dest
+    const path = source.slice('folder:'.length)
+    return dest !== path && !dest.startsWith(`${path}/`) && dest !== parentOf(path)
+}
+
+function onDragStart(event: DragEvent) {
+    const row = rowOf(event)
+    if (!row || !event.dataTransfer) return
+    dragged.value = row
+    event.dataTransfer.effectAllowed = 'move'
+    // WebKit starts a drag only with some data set.
+    event.dataTransfer.setData('text/plain', row)
+}
+
+function onDragOver(event: DragEvent) {
+    if (!dragged.value) return
+    const dest = destOf(event)
+    dropTarget.value = canDrop(dragged.value, dest) ? dest : null
+    if (dropTarget.value === null) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+
+function onDragEnd() {
+    dragged.value = null
+    dropTarget.value = null
+}
+
+function onDrop(event: DragEvent) {
+    const source = dragged.value
+    const dest = dropTarget.value
+    onDragEnd()
+    if (!source || dest === null) return
+    event.preventDefault()
+    if (source.startsWith('chat:')) run(() => moveChat(source.slice('chat:'.length), dest))
+    else moveFolderTo(source.slice('folder:'.length), dest)
+}
 
 const searchOpen = ref(false)
 const searchTerm = ref('')
@@ -167,8 +232,12 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
                 <UScrollArea
                     ref="scrollAreaRef"
                     orientation="vertical"
-                    :class="['no-scrollbar flex-1 min-h-0 relative scroll-fade', isScrolled && 'is-scrolled']"
+                    :class="['no-scrollbar flex-1 min-h-0 relative scroll-fade', isScrolled && 'is-scrolled', dropTarget === '' && `rounded-md ${DROP_TARGET}`]"
                     data-tauri-drag-region
+                    @dragstart="onDragStart"
+                    @dragover="onDragOver"
+                    @drop="onDrop"
+                    @dragend="onDragEnd"
                 >
                     <UAlert v-if="error" class="mt-2" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="$t('app.chat.loadFailed')" :description="error"/>
                     <UEmpty

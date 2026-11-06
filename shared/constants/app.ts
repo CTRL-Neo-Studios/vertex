@@ -54,6 +54,7 @@ export const StateKey = {
     chatIndex: (s: string) => `active.chats.index.${s}`,
     chatError: (s: string) => `active.chats.error.${s}`,
     chatSidePanel: (s: string) => `active.chats.side-panel.${s}`,
+    chatPrompt: (s: string) => `active.chats.prompt.${s}`,
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,

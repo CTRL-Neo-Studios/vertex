@@ -1,4 +1,4 @@
-import {convertToModelMessages, streamText, type ChatTransport} from "ai";
+import {convertToModelMessages, generateText, streamText, type ChatTransport} from "ai";
 import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
 import type {AiProviderProfile} from "#shared/types/app/ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
@@ -31,13 +31,31 @@ export function chatSystem(prompt: string, notes: {path: string, content: string
     return [prompt, context].filter(Boolean).join('\n\n')
 }
 
+const modelFor = (provider: AiProviderProfile, modelId: string) =>
+    createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id)}).chatModel(modelId)
+
+/** A model's title reply as a title: first line, no quotes, markdown marks or closing punctuation, at most 60 characters. */
+export function cleanTitle(text: string): string {
+    const line = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().split('\n')[0] ?? ''
+    return line.replace(/^["'“”‘’*#\s]*(?:title:\s*)?["'“”‘’*#\s]*/i, '').replace(/["'“”‘’*.。!?！？\s]+$/, '').slice(0, 60)
+}
+
+/** A 3–6 word title from a chat's first exchange; '' when the model gives nothing usable. */
+export async function generateChatTitle(provider: AiProviderProfile, modelId: string, question: string, answer: string): Promise<string> {
+    const {text} = await generateText({
+        model: modelFor(provider, modelId),
+        instructions: 'You name conversations. Reply with only a 3 to 6 word title, in the language of the conversation. No quotes, no trailing punctuation.',
+        prompt: `User: ${question.slice(0, 2000)}\n\nAssistant: ${answer.slice(0, 2000)}`,
+    })
+    return cleanTitle(text)
+}
+
 /** A chat transport that runs the model in the webview, through Rust's `ai_request` (no server route). */
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
             const {provider, modelId, system} = await setup(messages)
-            const model = createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id)}).chatModel(modelId)
-            return streamText({model, instructions: system || undefined, messages: await convertToModelMessages(messages), abortSignal})
+            return streamText({model: modelFor(provider, modelId), instructions: system || undefined, messages: await convertToModelMessages(messages), abortSignal})
                 .toUIMessageStream<VertexChatMessage>({
                     sendReasoning: true,
                     messageMetadata: ({part}) => part.type === 'finish' ? {modelId} : undefined,

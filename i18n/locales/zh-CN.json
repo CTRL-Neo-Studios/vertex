@@ -24,7 +24,8 @@
 			"closeWindow": "关闭窗口",
 			"docs": "文档",
 			"reportIssue": "报告问题",
-			"repo": "GitHub 上的源代码"
+			"repo": "GitHub 上的源代码",
+			"newChat": "新建聊天"
 		},
 		"about": {
 			"version": "版本",
@@ -1254,7 +1255,9 @@
 				},
 				"undo": "撤销",
 				"redo": "重做",
-				"hiddenFolders": "隐藏的文件夹"
+				"hiddenFolders": "隐藏的文件夹",
+				"askInChat": "在聊天中提问",
+				"editFailed": "无法完成此操作"
 			},
 			"labels": {
 				"bold": "粗体",
@@ -1387,7 +1390,12 @@
 				"remember": "在此设备上记住",
 				"create": "设置密码",
 				"unlock": "解锁",
-				"wrongPassword": "密码错误。"
+				"wrongPassword": "密码错误。",
+				"changeTitle": "更改聊天密码",
+				"current": "当前密码",
+				"new": "新密码",
+				"change": "更改密码",
+				"changed": "聊天密码已更改"
 			},
 			"search": "搜索",
 			"today": "今天",
@@ -1400,7 +1408,8 @@
 			"saveFailed": "无法保存此聊天",
 			"retrySave": "重试",
 			"searchTitles": "聊天",
-			"searchMessages": "消息中"
+			"searchMessages": "消息中",
+			"changePassword": "更改密码…"
 		}
 	}
 }

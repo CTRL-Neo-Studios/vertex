@@ -10,6 +10,7 @@ export const ChatCommand = {
     vaultCreate: 'chat_vault_create',
     vaultUnlock: 'chat_vault_unlock',
     vaultLock: 'chat_vault_lock',
+    vaultChange: 'chat_vault_change',
     index: 'chat_index',
     read: 'chat_read',
     write: 'chat_write',
@@ -36,6 +37,8 @@ export const chatClient = {
     vaultUnlock: (root: string, password: string, remember: boolean) => invoke(ChatCommand.vaultUnlock, {root, password, remember}),
     /** Forgets the key in memory and in the keychain. */
     vaultLock: (root: string) => invoke(ChatCommand.vaultLock, {root}),
+    /** Re-encrypts the key with a new password; the chats and a remembered key don't change. */
+    vaultChange: (root: string, current: string, next: string) => invoke(ChatCommand.vaultChange, {root, current, next}),
     index: (root: string, storage: ChatStorage) => invoke<ChatIndex>(ChatCommand.index, {root, storage}),
     read: (root: string, storage: ChatStorage, id: string) => invoke<ChatFile>(ChatCommand.read, {root, storage, id}),
     /** Creates or replaces `chat.id` atomically. */

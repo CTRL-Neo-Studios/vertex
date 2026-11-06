@@ -20,7 +20,7 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {vault, refresh, summary, profileId, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab} = useChats(session)
+const {vault, refresh, summary, profileId, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
 const {chatActions} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
 const settings = useSettingsScope().effective
@@ -186,6 +186,18 @@ function onMentionKey(e: KeyboardEvent) {
     e.preventDefault()
     e.stopPropagation()
 }
+
+// "Ask in chat" from the editor: the quote goes after anything already typed, the note joins the attached ones.
+watch(pendingPrompt, async request => {
+    if (request?.chatId !== props.chatId) return
+    pendingPrompt.value = null
+    input.value = input.value.trim() ? `${input.value.trimEnd()}\n\n${request.text}` : request.text
+    notes.value = [...new Set([...notes.value, ...request.notes])]
+    await nextTick()
+    const el = textarea()
+    el?.focus()
+    el?.setSelectionRange(input.value.length, input.value.length)
+}, {immediate: true})
 
 // USelect can't hold an empty value; '@default' stands for "the chat feature's profile".
 const DEFAULT_PROFILE = '@default'

@@ -5,7 +5,7 @@ import type {ChatFile, ChatIndex, ChatStorage, ChatSummary, ChatVaultState, Vert
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
-import {chatSystem, createChatTransport, type ChatSendSetup} from "~/utils/chatTransport";
+import {chatSystem, createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -59,6 +59,8 @@ export function useChats(session?: ActiveSession) {
     const index = useState<ChatIndex | null>(StateKey.chatIndex(scope), () => null)
     const error = useState<string | null>(StateKey.chatError(scope), () => null)
     const sidePanelChatId = useState<string | null>(StateKey.chatSidePanel(scope), () => null)
+    /** Text and notes for a chat's prompt, put there by `askInChat` and taken by that chat's ChatView. */
+    const pendingPrompt = useState<{ chatId: string, text: string, notes: string[] } | null>(StateKey.chatPrompt(scope), () => null)
 
     const keyOf = (id: string) => `${scope}:${id}`
     const ownLive = () => [...live].filter(([key]) => key.startsWith(`${scope}:`))
@@ -205,6 +207,28 @@ export function useChats(session?: ActiveSession) {
         return {provider, modelId: profile.modelId, system: chatSystem(profile.systemPrompt, await notesFor(messages))}
     }
 
+    const firstLineTitle = (text: string) => text.trim().slice(0, 60)
+    const textOf = (m: VertexChatMessage) => m.parts.map(p => p.type === 'text' ? p.text : '').join('')
+
+    /** After the first reply: the chat's model names it, unless the title was changed from the first message's. */
+    async function autoTitle(entry: LiveChat) {
+        const [question, answer, ...later] = entry.chat.messages
+        if (later.length || question?.role !== 'user' || answer?.role !== 'assistant') return
+        const initial = firstLineTitle(textOf(question))
+        if (entry.meta.title !== initial) return
+        try {
+            const {profile, provider} = resolveModel(entry.meta.profileId)
+            const title = await generateChatTitle(provider, profile.modelId, textOf(question), textOf(answer))
+            // Renamed while the model was answering: the user's name wins.
+            if (!title || entry.meta.title !== initial) return
+            entry.meta.title = title
+            await save(entry)
+        } catch (e) {
+            // A failed title keeps the first message's; nothing to show for it.
+            console.warn(`[useChats] no title for chat ${entry.meta.id}`, e)
+        }
+    }
+
     function load(id: string): Promise<LiveChat> {
         const key = keyOf(id)
         const pending = loading.get(key)
@@ -217,7 +241,10 @@ export function useChats(session?: ActiveSession) {
                 id,
                 messages,
                 transport: createChatTransport(m => setupFor(entry, m)),
-                onFinish: () => void saveLogged(entry),
+                onFinish: ({isAbort, isError}) => {
+                    void saveLogged(entry)
+                    if (!isAbort && !isError) void autoTitle(entry)
+                },
             })
             const entry: LiveChat = Object.assign(state, {chat})
             live.set(key, entry)
@@ -258,7 +285,7 @@ export function useChats(session?: ActiveSession) {
     async function send(id: string, text: string, notes: string[]) {
         const entry = await load(id)
         resolveModel(entry.meta.profileId)
-        if (!entry.meta.title) entry.meta.title = text.trim().slice(0, 60)
+        if (!entry.meta.title) entry.meta.title = firstLineTitle(text)
         await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
     }
 
@@ -321,6 +348,15 @@ export function useChats(session?: ActiveSession) {
         await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(id, 'chat'))
     }
 
+    /** Shows the side-panel chat (a new one when none is there) with `quote` quoted in its prompt and `note` attached. */
+    async function askInChat(quote: string, note: string) {
+        if (!index.value) await refresh()
+        const shown = sidePanelChatId.value
+        const id = shown && index.value?.chats.some(c => c.id === shown) ? shown : (await createChat()).id
+        pendingPrompt.value = {chatId: id, text: `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n`, notes: [note]}
+        showInSidePanel(id)
+    }
+
     return {
         root,
         storage,
@@ -351,5 +387,7 @@ export function useChats(session?: ActiveSession) {
         sidePanelChatId,
         showInSidePanel,
         openInTab,
+        askInChat,
+        pendingPrompt,
     }
 }
