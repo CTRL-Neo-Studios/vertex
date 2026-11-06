@@ -190,7 +190,14 @@
 				"blockHandleDescription": "在块旁显示可拖动或移动块的手柄。",
 				"statusBarOnHover": "悬停时显示",
 				"statusBarAlways": "始终显示",
-				"statusBarNever": "始终隐藏"
+				"statusBarNever": "始终隐藏",
+				"headerHistory": "撤销与重做按钮",
+				"headerHistoryDescription": "撤销和重做按钮在标题栏中的位置。",
+				"headerFormatting": "格式按钮",
+				"headerFormattingDescription": "粗体、斜体、删除线和高亮按钮在标题栏中的位置。",
+				"headerToolsLeft": "左侧",
+				"headerToolsRight": "右侧",
+				"headerToolsHidden": "隐藏"
 			},
 			"workflows": {
 				"title": "工作流",
@@ -1238,7 +1245,10 @@
 					"addItem": "输入后按回车",
 					"list": "列表（{count}）",
 					"dictionary": "字典（{count}）"
-				}
+				},
+				"undo": "撤销",
+				"redo": "重做",
+				"hiddenFolders": "隐藏的文件夹"
 			},
 			"labels": {
 				"bold": "粗体",

@@ -31,7 +31,16 @@ const statusBarItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.statusBarNever'), value: 'always-hidden'},
 ])
 const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
-const editorPanelPaths = ['viewConfig.editorPanel.showStatusBar' as const, ...editorToggles.map(k => `viewConfig.editorPanel.${k}` as const)]
+const headerTools = ['headerHistory', 'headerFormatting'] as const
+const headerToolsItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.headerToolsLeft'), value: 'left'},
+    {label: t('app.settings.view.headerToolsRight'), value: 'right'},
+    {label: t('app.settings.view.headerToolsHidden'), value: 'hidden'},
+])
+const editorPanelPaths = [
+    'viewConfig.editorPanel.showStatusBar' as const,
+    ...[...editorToggles, ...headerTools].map(k => `viewConfig.editorPanel.${k}` as const),
+]
 const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as const)
 </script>
 
@@ -75,6 +84,20 @@ const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as co
                 >
                     <USwitch
                         :model-value="scope.value(`viewConfig.editorPanel.${key}`)"
+                        @update:model-value="scope.set({[`viewConfig.editorPanel.${key}`]: $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow
+                    v-for="key in headerTools"
+                    :key="key"
+                    :setting="`viewConfig.editorPanel.${key}`"
+                    :label="t(`app.settings.view.${key}`)"
+                    :description="t(`app.settings.view.${key}Description`)"
+                >
+                    <USelect
+                        :model-value="scope.value(`viewConfig.editorPanel.${key}`)"
+                        :items="headerToolsItems"
+                        class="w-52"
                         @update:model-value="scope.set({[`viewConfig.editorPanel.${key}`]: $event})"
                     />
                 </SettingsRow>

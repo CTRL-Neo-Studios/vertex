@@ -190,7 +190,14 @@
 				"blockHandleDescription": "Show a handle beside blocks to drag or move them.",
 				"statusBarOnHover": "Show On Hover",
 				"statusBarAlways": "Always Shown",
-				"statusBarNever": "Always Hidden"
+				"statusBarNever": "Always Hidden",
+				"headerHistory": "Undo & Redo Buttons",
+				"headerHistoryDescription": "Where the header shows undo and redo.",
+				"headerFormatting": "Formatting Buttons",
+				"headerFormattingDescription": "Where the header shows bold, italic, strikethrough and highlight.",
+				"headerToolsLeft": "Left",
+				"headerToolsRight": "Right",
+				"headerToolsHidden": "Hidden"
 			},
 			"workflows": {
 				"title": "Workflows",
@@ -1238,7 +1245,10 @@
 					"addItem": "Type, then Enter",
 					"list": "List ({count})",
 					"dictionary": "Dictionary ({count})"
-				}
+				},
+				"undo": "Undo",
+				"redo": "Redo",
+				"hiddenFolders": "Hidden folders"
 			},
 			"labels": {
 				"bold": "Bold",

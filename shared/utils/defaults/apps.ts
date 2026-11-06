@@ -1,10 +1,14 @@
-import type {AppSettings, AppViewConfig, AppWorkflowConfig, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {DeepPartial} from "#shared/types/types";
 
 const RECOVERY_MODES: readonly SessionRecoveryMode[] = ['none', 'workspaces', 'singlespaces', 'both']
+const HEADER_TOOLS_POSITIONS: readonly HeaderToolsPosition[] = ['left', 'right', 'hidden']
+
+const headerToolsPosition = (value: unknown, fallback: HeaderToolsPosition) =>
+    HEADER_TOOLS_POSITIONS.includes(value as HeaderToolsPosition) ? value as HeaderToolsPosition : fallback
 
 /** Settings written before `recoverSessions` existed only had `openLastOpenedWindows`, which recovered workspaces. */
 type LegacySettings = DeepPartial<AppSettings> & { openLastOpenedWindows?: boolean }
@@ -137,6 +141,8 @@ export function defaultAppViewConfig(data?: DeepPartial<AppViewConfig>): AppView
             selectionToolbar: data?.editorPanel?.selectionToolbar ?? true,
             slashMenu: data?.editorPanel?.slashMenu ?? true,
             blockHandle: data?.editorPanel?.blockHandle ?? true,
+            headerHistory: headerToolsPosition(data?.editorPanel?.headerHistory, 'left'),
+            headerFormatting: headerToolsPosition(data?.editorPanel?.headerFormatting, 'right'),
         }
     } satisfies AppViewConfig
 }

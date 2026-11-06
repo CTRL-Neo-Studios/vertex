@@ -65,5 +65,10 @@ export interface AppViewConfig {
         selectionToolbar: boolean,
         slashMenu: boolean,
         blockHandle: boolean,
+        /** Where the header shows undo/redo and the formatting buttons; `hidden` turns them off. */
+        headerHistory: HeaderToolsPosition,
+        headerFormatting: HeaderToolsPosition,
     }
 }
+
+export type HeaderToolsPosition = 'left' | 'right' | 'hidden'

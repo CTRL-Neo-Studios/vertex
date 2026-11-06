@@ -4,7 +4,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * Flexible layout wrapper for different viewer/editor types.
- * 
+ *
  * Supports:
  * - Different scroll behaviors (vertical, both, none)
  * - Optional header with breadcrumbs
@@ -18,6 +18,8 @@ const fileName = defineModel<string>('fileName')
 const {effective} = useSettingsScope()
 const statusBarDisplayMode = computed(() => effective.value?.viewConfig.editorPanel.showStatusBar)
 
+// One header row for both root variants: left slot, breadcrumbs always centered, right slot.
+const [DefineHeaderRow, HeaderRow] = createReusableTemplate()
     type ScrollMode = 'vertical' | 'both' | 'none'
 type ContentAlignment = 'center' | 'start' | 'stretch'
 
@@ -27,20 +29,20 @@ const props = withDefaults(defineProps<{
     showBreadcrumbs?: boolean,
     renaming?: boolean,
     filePath?: string,
-    
+
     // Scroll configuration
     scrollMode?: ScrollMode,
     showScrollbar?: boolean,
-    
+
     // Status bar configuration
     showStatusBar?: boolean,
-    
+
     // Content area configuration
     contentAlignment?: ContentAlignment,
     contentMaxWidth?: string,
     contentPadding?: boolean,
     cursorText?: boolean,
-    
+
     // Layout spacing
     topSpacing?: boolean,
     bottomSpacing?: boolean,
@@ -71,7 +73,7 @@ const emit = defineEmits<{
 // Compute classes based on props
 const contentClasses = computed(() => {
     const classes = ['flex flex-col', 'w-full']
-    
+
     // Alignment
     if (props.contentAlignment === 'center') {
         classes.push('items-center')
@@ -80,14 +82,14 @@ const contentClasses = computed(() => {
     } else if (props.contentAlignment === 'stretch') {
         classes.push('items-stretch')
     }
-    
+
     classes.push('justify-start')
-    
+
     // Padding
     if (props.contentPadding) {
         classes.push('md:p-0')
     }
-    
+
     // Spacing
     if (props.bottomSpacing) {
         classes.push('mb-32')
@@ -95,18 +97,18 @@ const contentClasses = computed(() => {
     if (props.topSpacing) {
         classes.push('mt-10')
     }
-    
+
     // Cursor
     if (props.cursorText) {
         classes.push('cursor-text')
     }
-    
+
     return classes.join(' ')
 })
 
 const viewportClasses = computed(() => {
     const classes = ['w-full']
-    
+
     if (props.scrollMode === 'vertical') {
         classes.push('flex-none h-full')
     } else if (props.scrollMode === 'both') {
@@ -114,42 +116,47 @@ const viewportClasses = computed(() => {
     } else if (props.scrollMode === 'none') {
         classes.push('flex-none h-full overflow-hidden')
     }
-    
+
     if (props.cursorText) {
         classes.push('cursor-text')
     }
-    
+
     return classes.join(' ')
 })
 </script>
 
 <template>
+    <DefineHeaderRow>
+        <div class="w-full h-full flex items-center p-2 relative">
+            <slot name="header-left"/>
+            <div class="grow"/>
+            <!-- Faded out until pointed at (or being renamed), so it doesn't compete with the text. -->
+            <div
+                v-if="showBreadcrumbs"
+                class="absolute inset-y-0 left-1/2 -translate-x-1/2 max-w-1/2 flex items-center justify-center opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300"
+            >
+                <EditorHeaderBreadcrumbs
+                    :renaming="renaming"
+                    v-model="fileName"
+                    :relativeFilePath="filePath"
+                    @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)"
+                    class="w-fit"
+                />
+            </div>
+            <slot name="header-right"/>
+        </div>
+    </DefineHeaderRow>
+
     <!-- Root container with conditional scroll -->
-    <div 
+    <div
         v-if="scrollMode === 'none'"
         class="w-full h-full flex flex-col relative"
         :class="ui?.root"
         :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)', maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
     >
         <!-- Header (no scroll) -->
-        <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
-            <div class="w-full flex items-center justify-center p-2 relative">
-                <slot name="header-left"/>
-                <template v-if="showBreadcrumbs" >
-                    <div class="flex items-center justify-center absolute top-2 left-1/2 -translate-x-1/2">
-                        <EditorHeaderBreadcrumbs
-                            :renaming="renaming"
-                            v-model="fileName"
-                            :relativeFilePath="filePath"
-                            @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)"
-                            class="w-fit"
-                        />
-                    </div>
-                    <div class="grow"/>
-                </template>
-                <div v-else class="grow"/>
-                <slot name="header-right"/>
-            </div>
+        <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 opacity-50 trasition-opacity duration-300 hover:opacity-100">
+            <HeaderRow/>
         </div>
 
         <!-- Content (no scroll) -->
@@ -173,20 +180,7 @@ const viewportClasses = computed(() => {
     >
         <!-- Header (with scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
-            <div class="w-full flex items-center justify-center p-2">
-                <slot name="header-left"/>
-                <div v-if="showBreadcrumbs" class="grow flex items-center justify-center">
-                    <EditorHeaderBreadcrumbs 
-                        :renaming="renaming" 
-                        v-model="fileName" 
-                        :relativeFilePath="filePath" 
-                        @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)" 
-                        class="w-fit"
-                    />
-                </div>
-                <div v-else class="grow"/>
-                <slot name="header-right"/>
-            </div>
+            <HeaderRow/>
         </div>
 
         <!-- Scroll Viewport -->
