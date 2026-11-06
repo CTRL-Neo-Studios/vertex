@@ -17,5 +17,6 @@ const source = computed(() => textContent(props.__node))
 
 <template>
     <MermaidDiagram v-if="language === 'mermaid'" :source="source" class="my-3"/>
-    <ProsePre v-else :code="source" :language="language"><slot/></ProsePre>
+    <!-- $attrs carries the highlighter's classes (`shiki`, for the dark colors in main.css) onto ProsePre's <pre>. -->
+    <ProsePre v-else :code="source" :language="language" v-bind="$attrs"><slot/></ProsePre>
 </template>

@@ -45,3 +45,9 @@ export interface ChatIndex {
     /** Every folder path, including empty ones and the parents of nested ones. */
     folders: string[],
 }
+
+/** A chat whose messages contain the searched text, with that text in context (`…` marks a cut). */
+export interface ChatHit {
+    id: string,
+    snippet: string,
+}

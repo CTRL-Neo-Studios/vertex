@@ -1344,7 +1344,7 @@
 			"chats": "聊天",
 			"chat": "聊天",
 			"untitled": "未命名",
-			"searchChats": "搜索聊天…",
+			"searchChats": "搜索聊天标题和消息…",
 			"copy": "复制",
 			"copied": "已复制到剪贴板。",
 			"thinking": "思考中…",
@@ -1398,7 +1398,9 @@
 			"newFolderInside": "在其中新建文件夹",
 			"actions": "聊天操作",
 			"saveFailed": "无法保存此聊天",
-			"retrySave": "重试"
+			"retrySave": "重试",
+			"searchTitles": "聊天",
+			"searchMessages": "消息中"
 		}
 	}
 }

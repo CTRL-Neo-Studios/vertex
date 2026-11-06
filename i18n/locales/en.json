@@ -1344,7 +1344,7 @@
 			"chats": "Chats",
 			"chat": "Chat",
 			"untitled": "Untitled",
-			"searchChats": "Search chats…",
+			"searchChats": "Search chat titles and messages…",
 			"copy": "Copy",
 			"copied": "Copied to the clipboard.",
 			"thinking": "Thinking…",
@@ -1398,7 +1398,9 @@
 			"newFolderInside": "New folder inside",
 			"actions": "Chat actions",
 			"saveFailed": "This chat couldn't be saved",
-			"retrySave": "Retry"
+			"retrySave": "Retry",
+			"searchTitles": "Chats",
+			"searchMessages": "In messages"
 		}
 	}
 }

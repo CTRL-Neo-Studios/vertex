@@ -264,6 +264,7 @@ pub fn run() {
             chats::chat_folders_set,
             chats::chat_folder_rename,
             chats::chat_folder_delete,
+            chats::chat_search,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

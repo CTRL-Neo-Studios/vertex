@@ -24,6 +24,10 @@ const FOLDERS: &str = "folders";
 const EXT: &str = ".chat";
 const AGE_MAGIC: &[u8] = b"age-encryption.org/";
 const MAX_FOLDER_LEN: usize = 512;
+const SEARCH_LIMIT: usize = 50;
+/// Characters of context kept before and after a search match.
+const SNIPPET_BEFORE: usize = 40;
+const SNIPPET_AFTER: usize = 80;
 
 type Keys = HashMap<String, x25519::Identity>;
 
@@ -74,6 +78,35 @@ pub struct ChatFile {
 pub struct ChatIndex {
     chats: Vec<ChatSummary>,
     folders: Vec<String>,
+}
+
+/// A chat whose messages contain the search text, with the text around the first match.
+#[derive(Serialize, PartialEq, Debug)]
+pub struct ChatHit {
+    id: String,
+    snippet: String,
+}
+
+/// The `text` parts of every message (`messages` is the frontend's opaque UIMessage list).
+fn message_texts(messages: &Value) -> impl Iterator<Item = &str> {
+    messages.as_array().into_iter().flatten()
+        .filter_map(|m| m.get("parts")?.as_array())
+        .flatten()
+        .filter(|p| p.get("type").and_then(Value::as_str) == Some("text"))
+        .filter_map(|p| p.get("text")?.as_str())
+}
+
+/// `text` around the first case-insensitive match of `needle` (already lowercased), on one line; `None` without one.
+/// Counts characters, not bytes, so the cut never splits one.
+fn snippet(text: &str, needle: &str) -> Option<String> {
+    let lower = text.to_lowercase();
+    let at = lower[..lower.find(needle)?].chars().count();
+    let chars: Vec<char> = text.chars().collect();
+    let start = at.saturating_sub(SNIPPET_BEFORE);
+    let end = (at + needle.chars().count() + SNIPPET_AFTER).min(chars.len());
+    let body: String = chars[start.min(end)..end].iter().collect();
+    let body = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    Some(format!("{}{body}{}", if start > 0 { "…" } else { "" }, if end < chars.len() { "…" } else { "" }))
 }
 
 fn join(root: &Path, parts: &[&str]) -> PathBuf {
@@ -345,6 +378,24 @@ impl Store<'_> {
         not_found_ok(fs::remove_file(self.file(id)))
     }
 
+    /// Chats whose message text contains `query` (case-insensitive), newest first, at most `SEARCH_LIMIT`.
+    fn search(&self, query: &str) -> Result<Vec<ChatHit>, String> {
+        let needle = query.trim().to_lowercase();
+        if needle.is_empty() {
+            return Ok(vec![]);
+        }
+        let mut hits: Vec<(i64, ChatHit)> = self
+            .all::<ChatFile>()?
+            .into_iter()
+            .filter_map(|(id, chat)| {
+                let snippet = message_texts(&chat.messages).find_map(|t| snippet(t, &needle))?;
+                Some((chat.summary.updated, ChatHit { id, snippet }))
+            })
+            .collect();
+        hits.sort_by(|a, b| b.0.cmp(&a.0));
+        Ok(hits.into_iter().take(SEARCH_LIMIT).map(|(_, hit)| hit).collect())
+    }
+
     fn set_folders(&self, folders: Vec<String>) -> Result<(), String> {
         folders.iter().try_for_each(|f| check_folder(f))?;
         self.write(FOLDERS, &folders.into_iter().collect::<BTreeSet<_>>())
@@ -460,6 +511,11 @@ pub async fn chat_folder_delete<R: Runtime>(app: AppHandle<R>, root: String, sto
     with_store(app, root, storage, move |s| s.delete_folder(&path)).await
 }
 
+#[tauri::command]
+pub async fn chat_search<R: Runtime>(app: AppHandle<R>, root: String, storage: Storage, query: String) -> Result<Vec<ChatHit>, String> {
+    with_store(app, root, storage, move |s| s.search(&query)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511,6 +567,32 @@ mod tests {
         store.delete("a1").unwrap();
         store.delete("a1").unwrap();
         assert!(store.read("a1").is_err());
+    }
+
+    #[test]
+    fn search_matches_message_text_case_insensitively_newest_first() {
+        let (root, data) = dirs();
+        let mut keys = Keys::new();
+        let store = open(&mut keys, &data, &root, Storage::App).unwrap();
+        let with = |id: &str, updated: i64, text: &str| ChatFile {
+            summary: ChatSummary { updated, ..chat(id, "").summary },
+            messages: serde_json::json!([{"id": "m", "role": "assistant", "parts": [{"type": "reasoning", "text": "dragon"}, {"type": "text", "text": text}]}]),
+            ..chat(id, "")
+        };
+        store.write_chat(&with("old", 1, "The Dragon sleeps.")).unwrap();
+        store.write_chat(&with("new", 5, &format!("{}then the dragon woke{}", "x ".repeat(40), " y".repeat(60)))).unwrap();
+        store.write_chat(&with("none", 9, "nothing here")).unwrap();
+
+        let hits = store.search("  DRAGON ").unwrap();
+        assert_eq!(hits.iter().map(|h| h.id.as_str()).collect::<Vec<_>>(), ["new", "old"]);
+        assert_eq!(hits[1].snippet, "The Dragon sleeps.");
+        assert!(hits[0].snippet.starts_with('…') && hits[0].snippet.ends_with('…') && hits[0].snippet.contains("the dragon woke"));
+        // Only text parts count: every chat above has "dragon" in a reasoning part, yet "none" isn't a hit.
+        store.write_chat(&ChatFile { messages: serde_json::json!([{"parts": [{"type": "reasoning", "text": "unicorn"}]}]), ..chat("r", "") }).unwrap();
+        assert!(store.search("unicorn").unwrap().is_empty());
+        assert!(store.search("   ").unwrap().is_empty());
+        // Multi-byte text around the match stays whole.
+        assert_eq!(snippet("café ☕ dragon", "dragon").as_deref(), Some("café ☕ dragon"));
     }
 
     #[test]

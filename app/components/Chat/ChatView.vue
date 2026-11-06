@@ -7,6 +7,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useChats} from "~/composables/ai/useChats";
+import {useChatActions} from "~/composables/ai/useChatActions";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
@@ -19,11 +20,38 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {vault, refresh, summary, profileId, saveError, retrySave, liveChat, send, setProfile, showInSidePanel, openInTab} = useChats(session)
+const {vault, refresh, summary, profileId, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab} = useChats(session)
+const {chatActions} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
 const settings = useSettingsScope().effective
 
 const title = computed(() => summary(props.chatId).value?.title || t('app.chat.untitled'))
+const current = computed(() => summary(props.chatId).value)
+const [DefineBody, Body] = createReusableTemplate()
+
+// The tab header is the file viewers': breadcrumbs from a path (the chat's folders, then a stand-in for the title,
+// which is the editable last crumb) and the title as the renamable name.
+const crumbPath = computed(() => [current.value?.folder, 'chat'].filter(Boolean).join('/'))
+const titleDraft = ref('')
+watch(title, value => { titleDraft.value = value }, {immediate: true})
+const renaming = ref(false)
+
+async function onRename(_old: string, next: string) {
+    const name = next.trim()
+    if (!name || name === current.value?.title) {
+        titleDraft.value = title.value
+        return
+    }
+    renaming.value = true
+    try {
+        await renameChat(props.chatId, name)
+    } catch (e) {
+        $qt.error(t('app.chat.actionFailed'), errorText(e))
+        titleDraft.value = title.value
+    } finally {
+        renaming.value = false
+    }
+}
 const locked = computed(() => vault.value === 'none' || vault.value === 'locked')
 
 const chat = shallowRef<Chat<VertexChatMessage>>()
@@ -172,24 +200,13 @@ const profile = computed({
 </script>
 
 <template>
-    <div class="flex flex-col h-full w-full min-h-0">
-        <div class="flex items-center gap-1.5 px-3 h-10 shrink-0 border-b border-default">
-            <UIcon name="i-lucide-message-square" class="size-4 text-muted shrink-0"/>
-            <span class="truncate text-sm font-medium text-highlighted grow">{{ title }}</span>
-            <UTooltip v-if="inSidePanel" :text="$t('app.chat.openInTab')">
-                <UButton icon="i-lucide-square-arrow-out-up-left" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.openInTab')" @click="openInTab(chatId)"/>
-            </UTooltip>
-            <UTooltip v-else :text="$t('app.chat.moveToSidePanel')">
-                <UButton icon="i-lucide-panel-right" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
-            </UTooltip>
-        </div>
-
+    <DefineBody>
         <div v-if="locked" class="flex-1 min-h-0 overflow-y-auto flex items-center">
             <ChatVaultForm/>
         </div>
 
         <template v-else-if="chat">
-            <div ref="scrollEl" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar scroll-fade', isScrolled && 'is-scrolled']">
+            <div ref="scrollEl" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar', inSidePanel ? ['scroll-fade', isScrolled && 'is-scrolled'] : 'pt-10']">
                 <UChatMessages
                     :messages="chat.messages"
                     :status="chat.status"
@@ -304,5 +321,45 @@ const profile = computed({
             <span v-if="loadError">{{ loadError }}</span>
             <UIcon v-else name="i-lucide-loader-circle" class="size-5 animate-spin"/>
         </div>
+    </DefineBody>
+
+    <!-- In a tab: the file viewers' header (gradient, centred breadcrumbs with the renamable title). -->
+    <ViewerEditorLayoutWrapper
+        v-if="!inSidePanel"
+        v-model:file-name="titleDraft"
+        scroll-mode="none"
+        content-alignment="stretch"
+        :show-status-bar="false"
+        :top-spacing="false"
+        :bottom-spacing="false"
+        :cursor-text="false"
+        :file-path="crumbPath"
+        :renaming
+        @on-rename="onRename"
+    >
+        <template #header-left>
+            <UDropdownMenu v-if="current" :items="chatActions(current, 'tab')" :content="{ align: 'start' }" size="sm">
+                <UButton icon="i-lucide-ellipsis" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.actions')"/>
+            </UDropdownMenu>
+        </template>
+        <template #header-right>
+            <UTooltip :text="$t('app.chat.moveToSidePanel')">
+                <UButton icon="i-lucide-panel-right" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
+            </UTooltip>
+        </template>
+        <div class="absolute inset-0 flex flex-col">
+            <Body/>
+        </div>
+    </ViewerEditorLayoutWrapper>
+
+    <div v-else class="flex flex-col h-full w-full min-h-0">
+        <div class="flex items-center gap-1.5 px-3 h-10 shrink-0 border-b border-default">
+            <UIcon name="i-lucide-message-square" class="size-4 text-muted shrink-0"/>
+            <span class="truncate text-sm font-medium text-highlighted grow">{{ title }}</span>
+            <UTooltip :text="$t('app.chat.openInTab')">
+                <UButton icon="i-lucide-square-arrow-out-up-left" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.openInTab')" @click="openInTab(chatId)"/>
+            </UTooltip>
+        </div>
+        <Body/>
     </div>
 </template>

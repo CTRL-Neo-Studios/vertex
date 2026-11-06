@@ -318,6 +318,8 @@ export function useChats(session?: ActiveSession) {
         createFolder,
         renameFolder,
         deleteFolder,
+        /** Searches the saved chats' message text (in Rust, so decrypted chats never leave it in bulk). */
+        search: (query: string) => chatClient.search(requireRoot(), storage.value, query),
         liveChat,
         send,
         setProfile: (id: string, profileId: string | undefined) => update(id, {profileId}),

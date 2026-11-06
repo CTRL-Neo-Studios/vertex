@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import type {CommandPaletteGroup, ContextMenuItem, DropdownMenuItem, NavigationMenuChildItem, NavigationMenuItem} from "@nuxt/ui";
-import type {ChatSummary} from "#shared/types/app/chats";
+import type {CommandPaletteGroup, NavigationMenuChildItem, NavigationMenuItem} from "@nuxt/ui";
+import type {ChatHit, ChatSummary} from "#shared/types/app/chats";
 import {StateKey} from "#shared/constants/app";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useChats} from "~/composables/ai/useChats";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {useChatActions} from "~/composables/ai/useChatActions";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
-import ChatNameModal from "~/components/Chat/ChatNameModal.vue";
-import ChatDeleteModal from "~/components/Chat/ChatDeleteModal.vue";
 
 /**
  * The left sidebar's Chats view, after the Nuxt UI chat template: a New chat item, then the list (folders first,
@@ -16,20 +14,14 @@ import ChatDeleteModal from "~/components/Chat/ChatDeleteModal.vue";
  */
 const {t, locale} = useI18n()
 const $route = useRoute()
-const $qt = useQuickToasts()
-const $ovl = useOverlay()
 const sessionId = computed(() => $route.params.sessionId as string)
 const session = useActiveSessions().getSession(sessionId)
 const {activeTabUuid} = useActiveTabs(session)
-const {
-    storage, vault, index, error, refresh, lock, createChat, renameChat, moveChat, deleteChat,
-    createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab,
-} = useChats(session)
+const {storage, vault, index, error, refresh, search, showInSidePanel, openInTab} = useChats(session)
+const {run, chatTitle, newChat, panelMenu, chatActions, folderActions} = useChatActions(session)
 
 watch(storage, () => refresh(), {immediate: true})
 
-const nameModal = $ovl.create(ChatNameModal)
-const deleteModal = $ovl.create(ChatDeleteModal)
 const expanded = useState<string[]>(StateKey.chatsExpanded(sessionId.value), () => [])
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
@@ -37,10 +29,8 @@ const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
 const isScrolled = computed(() => scrollY.value > 2)
 
 const locked = computed(() => vault.value === 'none' || vault.value === 'locked')
-const chatTitle = (chat: ChatSummary) => chat.title || t('app.chat.untitled')
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 const parentOf = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
-const join = (parent: string, name: string) => parent ? `${parent}/${name}` : name
 const folderKey = (path: string) => `folder:${path}`
 
 // ponytail: open folders are recorded from clicks on their icon or label, the accordion doesn't report nested toggles.
@@ -119,97 +109,43 @@ const items = computed<NavigationMenuItem[]>(() => {
     return top
 })
 
-async function run(action: () => Promise<unknown>) {
-    try {
-        await action()
-    } catch (e) {
-        $qt.error(t('app.chat.actionFailed'), e instanceof Error ? e.message : String(e))
-    }
-}
-
-const newChat = (folder = '') => run(async () => openInTab((await createChat(folder)).id))
-
-async function newFolder(parent = '') {
-    const name = await nameModal.open({modalTitle: t('app.chat.newFolder'), label: t('app.chat.folderName'), folder: true}).result
-    if (name) await run(() => createFolder(join(parent, name)))
-}
-
-async function rename(chat: ChatSummary) {
-    const title = await nameModal.open({modalTitle: t('app.chat.rename'), label: t('app.chat.title'), value: chat.title}).result
-    if (title && title !== chat.title) await run(() => renameChat(chat.id, title))
-}
-
-async function renameFolderAt(path: string) {
-    const name = await nameModal.open({modalTitle: t('app.chat.rename'), label: t('app.chat.folderName'), value: baseName(path), folder: true}).result
-    if (name && name !== baseName(path)) await run(() => renameFolder(path, join(parentOf(path), name)))
-}
-
-async function remove(chat: ChatSummary) {
-    const ok = await deleteModal.open({modalTitle: t('app.chat.deleteChat'), description: t('app.chat.deleteChatConfirm', {title: chatTitle(chat)})}).result
-    if (ok) await run(() => deleteChat(chat.id))
-}
-
-async function removeFolder(path: string) {
-    const ok = await deleteModal.open({modalTitle: t('app.chat.deleteFolder'), description: t('app.chat.deleteFolderConfirm', {folder: path})}).result
-    if (ok) await run(() => deleteFolder(path))
-}
-
-const createItems = (folder: string): ContextMenuItem[] => [
-    {label: t('app.chat.newChat'), icon: 'i-lucide-circle-plus', onSelect: () => newChat(folder)},
-    {label: t('app.chat.newFolder'), icon: 'i-lucide-folder-plus', onSelect: () => newFolder(folder)},
-]
-
-function chatActions(chat: ChatSummary): DropdownMenuItem[][] {
-    const folders = [...(index.value?.folders ?? [])].sort()
-    return [
-        [
-            {label: t('app.chat.openInTab'), icon: 'i-lucide-square-plus', onSelect: () => run(() => openInTab(chat.id))},
-            {label: t('app.chat.showInSidePanel'), icon: 'i-lucide-panel-right', onSelect: () => showInSidePanel(chat.id)},
-        ],
-        [
-            {label: t('app.chat.rename'), icon: 'i-lucide-pencil', onSelect: () => rename(chat)},
-            {
-                label: t('app.chat.moveTo'),
-                icon: 'i-lucide-folder-tree',
-                children: [
-                    {label: t('app.chat.topLevel'), icon: 'i-lucide-folder-root', disabled: chat.folder === '', onSelect: () => run(() => moveChat(chat.id, ''))},
-                    ...folders.map(f => ({label: f, icon: 'i-lucide-folder', disabled: f === chat.folder, onSelect: () => run(() => moveChat(chat.id, f))})),
-                ],
-            },
-        ],
-        [{label: t('app.generic.delete'), icon: 'i-lucide-trash', color: 'error', onSelect: () => remove(chat)}],
-    ]
-}
-
-function folderActions(path: string): DropdownMenuItem[][] {
-    return [
-        [
-            {label: t('app.chat.newChatHere'), icon: 'i-lucide-circle-plus', onSelect: () => newChat(path)},
-            {label: t('app.chat.newFolderInside'), icon: 'i-lucide-folder-plus', onSelect: () => newFolder(path)},
-        ],
-        [{label: t('app.chat.rename'), icon: 'i-lucide-pencil', onSelect: () => renameFolderAt(path)}],
-        [{label: t('app.generic.delete'), icon: 'i-lucide-trash', color: 'error', onSelect: () => removeFolder(path)}],
-    ]
-}
-
-const panelMenu = computed<ContextMenuItem[][]>(() => vault.value === 'unlocked' ? [createItems('')] : [
-    createItems(''),
-    [{label: t('app.chat.lock'), icon: 'i-lucide-lock', onSelect: () => run(lock)}],
-])
-
 const searchOpen = ref(false)
-const searchGroups = computed<CommandPaletteGroup[]>(() => [{
-    id: 'chats',
-    items: (index.value?.chats ?? []).map(chat => ({
-        label: chatTitle(chat),
-        suffix: chat.folder,
-        icon: 'i-lucide-message-square',
-        onSelect() {
-            searchOpen.value = false
-            run(() => openInTab(chat.id))
+const searchTerm = ref('')
+const hits = shallowRef<ChatHit[]>([])
+let searchRun = 0
+// Titles are filtered by the palette; message text is searched in Rust (it holds the decrypted chats).
+watchDebounced(searchTerm, async term => {
+    const run = ++searchRun
+    const found = term.trim().length < 2 ? [] : await search(term).catch(() => [])
+    if (run === searchRun) hits.value = found
+}, {debounce: 250})
+watch(searchOpen, open => { if (!open) searchTerm.value = '' })
+
+function openFromSearch(id: string) {
+    searchOpen.value = false
+    run(() => openInTab(id))
+}
+
+const searchGroups = computed<CommandPaletteGroup[]>(() => {
+    const chats = index.value?.chats ?? []
+    const byId = new Map(chats.map(c => [c.id, c]))
+    return [
+        {
+            id: 'chats',
+            label: t('app.chat.searchTitles'),
+            items: chats.map(chat => ({label: chatTitle(chat), suffix: chat.folder, icon: 'i-lucide-message-square', onSelect: () => openFromSearch(chat.id)})),
         },
-    })),
-}])
+        {
+            id: 'messages',
+            label: t('app.chat.searchMessages'),
+            ignoreFilter: true,
+            items: hits.value.flatMap(hit => {
+                const chat = byId.get(hit.id)
+                return chat ? [{label: chatTitle(chat), description: hit.snippet, icon: 'i-lucide-text-search', onSelect: () => openFromSearch(hit.id)}] : []
+            }),
+        },
+    ]
+})
 
 defineExpose({openSearch: () => { searchOpen.value = true }})
 </script>
@@ -294,7 +230,7 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
 
         <UModal v-model:open="searchOpen">
             <template #content>
-                <UCommandPalette :groups="searchGroups" :placeholder="$t('app.chat.searchChats')" close @update:open="searchOpen = $event"/>
+                <UCommandPalette v-model:search-term="searchTerm" :groups="searchGroups" :placeholder="$t('app.chat.searchChats')" close @update:open="searchOpen = $event"/>
             </template>
         </UModal>
     </div>

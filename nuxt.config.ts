@@ -117,6 +117,10 @@ export default defineNuxtConfig({
                 // @comark/nuxt's auto-registered <Markdown> comes from @comark/vue.
                 "@comark/vue",
                 "@comark/nuxt/utils",
+                "@comark/nuxt/plugins/math",
+                "@comark/nuxt/plugins/rangi",
+                // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
+                "katex",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod",

@@ -1,5 +1,5 @@
 import {invoke} from "@tauri-apps/api/core";
-import type {ChatFile, ChatIndex, ChatStorage, ChatVaultState} from "#shared/types/app/chats";
+import type {ChatFile, ChatHit, ChatIndex, ChatStorage, ChatVaultState} from "#shared/types/app/chats";
 
 /**
  * Thin client for the Rust chat store (src-tauri/src/chats.rs). Rust owns the files, the encryption and the
@@ -17,6 +17,7 @@ export const ChatCommand = {
     foldersSet: 'chat_folders_set',
     folderRename: 'chat_folder_rename',
     folderDelete: 'chat_folder_delete',
+    search: 'chat_search',
 } as const
 
 /** Error strings Rust returns for expected failures; anything else is an I/O or format error message. */
@@ -46,4 +47,6 @@ export const chatClient = {
     folderRename: (root: string, storage: ChatStorage, from: string, to: string) => invoke(ChatCommand.folderRename, {root, storage, from, to}),
     /** Deletes a folder, its subfolders and every chat inside them. */
     folderDelete: (root: string, storage: ChatStorage, path: string) => invoke(ChatCommand.folderDelete, {root, storage, path}),
+    /** Chats whose saved message text contains `query` (case-insensitive), newest first, at most 50. */
+    search: (root: string, storage: ChatStorage, query: string) => invoke<ChatHit[]>(ChatCommand.search, {root, storage, query}),
 }
