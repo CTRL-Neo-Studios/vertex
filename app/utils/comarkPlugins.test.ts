@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
-import {parseMarkdown} from "@comark/nuxt/parse";
-import {callouts, wikiLinks} from "./comarkPlugins";
+import {createMarkdownParser, parseMarkdown} from "@comark/nuxt/parse";
+import {callouts, frontmatterAsCode, wikiLinks} from "./comarkPlugins";
 
 const parse = async (md: string) => (await parseMarkdown(md, {plugins: [wikiLinks, callouts]})).nodes
 
@@ -62,5 +62,24 @@ describe('wikiLinks', () => {
         expect(await parse('See [[Note 1|the note]] and `[[not a link]]`')).toEqual([
             ['p', {}, 'See ', ['a', {note: 'Note 1'}, 'the note'], ' and ', ['code', {}, '[[not a link]]']],
         ])
+    })
+})
+
+describe('frontmatterAsCode', () => {
+    const plugins = [wikiLinks, callouts, frontmatterAsCode]
+    const streamed = async (md: string) => (await createMarkdownParser({plugins})(md, {streaming: true})).nodes
+    const yamlBlock = (code: string) => ['pre', expect.objectContaining({language: 'yaml'}), ['code', {class: 'language-yaml'}, code]]
+
+    it('shows a quoted note\'s frontmatter as a yaml block, also while a key is half-streamed', async () => {
+        expect(await streamed('---\ncover: Kthalatir/Kthalatir.png\ntags')).toEqual([yamlBlock('cover: Kthalatir/Kthalatir.png\ntags')])
+        const whole = await streamed('---\ncover: a.png\ntags:\n  - k\n---\n# Title')
+        expect(whole[0]).toEqual(yamlBlock('cover: a.png\ntags:\n  - k'))
+        expect(whole[1]?.[0]).toBe('h1')
+    })
+
+    it('leaves a leading horizontal rule, and a `---` block later on, alone', async () => {
+        const parsed = async (md: string) => (await parseMarkdown(md, {plugins})).nodes
+        expect((await parsed('---\n\nText')).map(n => n[0])).toEqual(['hr', 'p'])
+        expect((await parsed('Intro\n\n---\nkey: value\n---')).some(n => n[0] === 'pre')).toBe(false)
     })
 })

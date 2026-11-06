@@ -98,7 +98,7 @@ fn message_texts(messages: &Value) -> impl Iterator<Item = &str> {
 
 /// `text` around the first case-insensitive match of `needle` (already lowercased), on one line; `None` without one.
 /// Counts characters, not bytes, so the cut never splits one.
-fn snippet(text: &str, needle: &str) -> Option<String> {
+pub(crate) fn snippet(text: &str, needle: &str) -> Option<String> {
     let lower = text.to_lowercase();
     let at = lower[..lower.find(needle)?].chars().count();
     let chars: Vec<char> = text.chars().collect();

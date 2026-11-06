@@ -307,7 +307,9 @@
 					"modelMissing": "{model} is no longer enabled on this provider.",
 					"systemPrompt": "System prompt",
 					"systemPromptDescription": "Sent with every request that uses this profile.",
-					"systemPromptPlaceholder": "You are a helpful writing assistant."
+					"systemPromptPlaceholder": "You are a helpful writing assistant.",
+					"tools": "Tools",
+					"toolsDescription": "Lets chats search and read your notes, and propose edits to the open one. Turn off for models without tool calling."
 				},
 				"features": {
 					"title": "AI Features",
@@ -1409,7 +1411,28 @@
 			"retrySave": "Retry",
 			"searchTitles": "Chats",
 			"searchMessages": "In messages",
-			"changePassword": "Change password…"
+			"changePassword": "Change password…",
+			"toolsUnsupported": {
+				"title": "This model can't use tools",
+				"description": "{model} doesn't support tool calling, so the request was stopped. Turn tools off for this model profile and try again? You can turn them back on in the profile's settings.",
+				"turnOff": "Turn off tools and retry"
+			},
+			"tools": {
+				"failed": "failed",
+				"accepted": "accepted",
+				"rejected": "rejected",
+				"waiting": "waiting for you in the note",
+				"names": {
+					"findTools": "Find tools",
+					"searchNotes": "Search notes",
+					"readNote": "Read note",
+					"listNotes": "List notes",
+					"readDocument": "Read the open note",
+					"readSelection": "Read the selection",
+					"proposeEdit": "Propose an edit",
+					"proposeInsert": "Propose an insertion"
+				}
+			}
 		}
 	}
 }

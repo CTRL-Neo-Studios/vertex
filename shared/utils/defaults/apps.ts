@@ -90,6 +90,7 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
         providerId: str(p.providerId) ?? '',
         modelId: str(p.modelId) ?? '',
         systemPrompt: str(p.systemPrompt) ?? '',
+        ...(p.tools === false && {tools: false as const}),
     }))
     const preferred = str(ai.defaultModelProfile)
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'

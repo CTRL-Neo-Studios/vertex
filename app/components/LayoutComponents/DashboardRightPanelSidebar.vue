@@ -122,9 +122,9 @@ watch($tabId, () => {
         </template>
         <template #default>
             <template v-if="rightPanelView == '4' && chatsRoot">
-                <!-- Absolute, so the messages scroll inside the panel and the prompt stays at the bottom. -->
+                <!-- `min-h-0` with the chat's `h-full`, so the messages scroll inside the panel and the prompt stays at the bottom. -->
                 <div v-if="sidePanelChatId" class="relative flex-1 min-h-0">
-                    <ChatView :key="sidePanelChatId" class="absolute inset-0" :chat-id="sidePanelChatId" in-side-panel/>
+                    <ChatView :key="sidePanelChatId" :chat-id="sidePanelChatId" in-side-panel/>
                 </div>
                 <UEmpty
                     v-else

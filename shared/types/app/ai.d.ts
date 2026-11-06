@@ -32,6 +32,8 @@ export interface AiModelProfile {
     providerId: string,
     modelId: string,
     systemPrompt: string,
+    /** Chat tools (notes search/read, edits to the open note); unset = on. Off for models without tool calling. */
+    tools?: false,
 }
 
 export interface AppAiConfig {

@@ -1,11 +1,14 @@
 import {Chat} from "@ai-sdk/vue";
+import {lastAssistantMessageIsCompleteWithToolCalls} from "ai";
+import {isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {invoke} from "@tauri-apps/api/core";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ChatFile, ChatIndex, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
-import {isPlainTextFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {chatSystem, createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
+import {chatTools, TOOLS_PROMPT, usedToolNames} from "~/utils/chatTools";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -13,6 +16,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
+import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
 
 /** Thrown by `send` when the chat feature is off or has no model. The message is an i18n key. */
 export const CHAT_NO_MODEL = 'app.chat.noModel'
@@ -200,11 +204,45 @@ export function useChats(session?: ActiveSession) {
         return notes
     }
 
+    const slashed = (path: string) => path.replace(/\\/g, '/')
+    const noteFiles = () => $index.getFilteredFiles(f => !f.isFolder && isPlainTextFile(f.fileExt))
+
+    /** The shown note's markdown editor: the active tab's, when that's a note (so not while a chat tab is shown). */
+    function openEditor() {
+        const tab = $tabs.getActiveTab($tabs.activeTabUuid.value)
+        return tab && tab.kind !== 'chat' ? editorViewOf(session, tab.fileUuid) : undefined
+    }
+
+    /**
+     * A note's text for `readNote`: its mounted editor's buffer, else the file. `path` is workspace-relative, or, as
+     * models often pass, a note's name (like a wikilink: case-insensitive, `.md` optional).
+     */
+    async function readNote(path: string) {
+        const files = noteFiles()
+        const name = path.toLowerCase().replace(/\.(md|txt)$/, '')
+        const file = files.find(f => slashed(f.relativePath) === path)
+            ?? files.find(f => slashed(f.relativePath).toLowerCase().replace(/\.(md|txt)$/, '') === name)
+            ?? files.find(f => fileNameFromPath(f.fileName, true).toLowerCase() === name)
+        if (!file) return null
+        const view = editorViewOf(session, file.uuid)
+        if (view) return view.state.doc.toString()
+        const [read] = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [file.fullPath]})
+        return read?.content ?? null
+    }
+
     async function setupFor(entry: LiveChat, messages: VertexChatMessage[]): Promise<ChatSendSetup> {
         const {profile, provider} = resolveModel(entry.meta.profileId)
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
-        return {provider, modelId: profile.modelId, system: chatSystem(profile.systemPrompt, await notesFor(messages))}
+        const toolsOn = profile.tools !== false
+        const tools = toolsOn ? chatTools({
+            search: query => invoke('notes_search', {root: requireRoot(), query}),
+            read: readNote,
+            list: folder => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort(),
+            editing: !!openEditor(),
+        }, usedToolNames(messages)) : undefined
+        const prompt = [profile.systemPrompt, toolsOn ? TOOLS_PROMPT : ''].filter(Boolean).join('\n\n')
+        return {provider, modelId: profile.modelId, system: chatSystem(prompt, await notesFor(messages)), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
@@ -213,7 +251,7 @@ export function useChats(session?: ActiveSession) {
     /** After the first reply: the chat's model names it, unless the title was changed from the first message's. */
     async function autoTitle(entry: LiveChat) {
         const [question, answer, ...later] = entry.chat.messages
-        if (later.length || question?.role !== 'user' || answer?.role !== 'assistant') return
+        if (later.length || question?.role !== 'user' || answer?.role !== 'assistant' || !textOf(answer).trim()) return
         const initial = firstLineTitle(textOf(question))
         if (entry.meta.title !== initial) return
         try {
@@ -245,6 +283,17 @@ export function useChats(session?: ActiveSession) {
                     void saveLogged(entry)
                     if (!isAbort && !isError) void autoTitle(entry)
                 },
+                // The editor tools have no `execute`: they run here, against the shown note, and a proposal answers
+                // once the user accepts or rejects it in the editor. Then the reply continues on its own.
+                onToolCall: ({toolCall}) => {
+                    if (!isEditorTool(toolCall)) return
+                    const answer = (output: unknown) => entry.chat.addToolOutput({tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output})
+                    const view = openEditor()
+                    if (!view) return void answer({error: 'The note is no longer open in the editor.'})
+                    // Not awaited: onToolCall must return before the proposal is decided.
+                    void runEditorTool(view, toolCall).then(answer)
+                },
+                sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
             })
             const entry: LiveChat = Object.assign(state, {chat})
             live.set(key, entry)
@@ -370,6 +419,14 @@ export function useChats(session?: ActiveSession) {
         lock,
         summary,
         profileId,
+        /** The profile a loaded chat sends with (its pinned one while usable, else the chat feature's); none when there's no model. */
+        chatProfile: (id: string) => {
+            try {
+                return resolveModel(live.get(keyOf(id))?.meta.profileId).profile
+            } catch {
+                return undefined
+            }
+        },
         saveError,
         retrySave,
         createChat,

@@ -19,6 +19,23 @@ export const wikiLinks: ComarkPlugin = {
     },
 }
 
+/**
+ * A reply has no frontmatter of its own: a leading `---` block is a note's, quoted. Comark's default `frontmatter`
+ * plugin would parse it as YAML, hiding it and throwing on a half-streamed key; this one, by the same name, shows it
+ * as a ```yaml block instead. Swapping the delimiters line for line keeps streaming's line offsets right, and keeping the
+ * name keeps Comark's streaming auto-close, which ends a still-open block with `---` before this runs.
+ */
+export const frontmatterAsCode: ComarkPlugin = {
+    name: 'frontmatter',
+    pre(state) {
+        // A later streamed chunk (`parsedLines` > 0) doesn't start the reply. The first line must be a key, so a
+        // leading horizontal rule stays one.
+        if (state.parsedLines) return
+        const block = /^---[ \t]*(\r?\n[\w-]+:[\s\S]*?\r?\n)---[ \t]*(?=\r?\n|$)/.exec(state.markdown)
+        if (block) state.markdown = `\`\`\`yaml${block[1]}\`\`\`${state.markdown.slice(block[0].length)}`
+    },
+}
+
 /** Obsidian's callout types (and aliases) → a Nuxt UI color and an icon like Obsidian's. Unknown types look like `note`. */
 const CALLOUTS: Record<string, { color: string, icon: string }> = {
     note: {color: 'info', icon: 'i-lucide-pencil'},

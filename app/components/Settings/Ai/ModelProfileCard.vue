@@ -103,6 +103,9 @@ async function test() {
                 </template>
             </USelectMenu>
         </SettingsRow>
+        <SettingsRow :label="t('app.settings.ai.models.tools')" :description="t('app.settings.ai.models.toolsDescription')">
+            <USwitch :model-value="profile.tools !== false" @update:model-value="save({tools: $event ? undefined : false})"/>
+        </SettingsRow>
         <div class="px-4 py-2.5 space-y-1.5">
             <div class="text-sm">{{ t('app.settings.ai.models.systemPrompt') }}</div>
             <div class="text-xs text-muted">{{ t('app.settings.ai.models.systemPromptDescription') }}</div>

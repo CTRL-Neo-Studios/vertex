@@ -195,19 +195,6 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-<!--        <ScrollAreaRoot v-if="isWorkspace" class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px" data-tauri-drag-region>-->
-<!--            <ScrollAreaViewport class="grid grid-cols-1 h-full">-->
-
-<!--            </ScrollAreaViewport>-->
-<!--            <ScrollAreaScrollbar-->
-<!--                class="select-none touch-none z-20 h-0 m-2"-->
-<!--                orientation="horizontal"-->
-<!--            >-->
-<!--                <ScrollAreaThumb-->
-<!--                    class="flex-1 bg-accented rounded-lg"-->
-<!--                />-->
-<!--            </ScrollAreaScrollbar>-->
-<!--        </ScrollAreaRoot>-->
         <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>

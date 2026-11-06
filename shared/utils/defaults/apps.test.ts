@@ -53,12 +53,16 @@ describe('defaultAppAiConfig', () => {
     it('drops malformed entries and falls back to the first profile as default', () => {
         const c = defaultAppAiConfig({
             providers: [{id: 'p', name: 'P', baseURL: 'http://x/v1', models: [{id: 'm', contextLength: 'big'}, {name: 'no id'}]}, {name: 'no id'}, 'x', {id: 'p'}],
-            modelProfiles: [{id: 'a', providerId: 'p', modelId: 'm'}, null],
+            modelProfiles: [{id: 'a', providerId: 'p', modelId: 'm'}, null, {id: 'b', providerId: 'p', modelId: 'm', tools: false}, {id: 'c', providerId: 'p', modelId: 'm', tools: 'off'}],
             defaultModelProfile: 'gone',
             features: {editorAssistant: '', other: 3},
         })
         expect(c.providers).toEqual([{id: 'p', name: 'P', baseURL: 'http://x/v1', models: [{id: 'm'}]}])
-        expect(c.modelProfiles).toEqual([{id: 'a', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''}])
+        expect(c.modelProfiles).toEqual([
+            {id: 'a', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''},
+            {id: 'b', name: '', providerId: 'p', modelId: 'm', systemPrompt: '', tools: false},
+            {id: 'c', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''},
+        ])
         expect(c.defaultModelProfile).toBe('a')
         expect(c.features).toEqual({editorAssistant: ''})
     })

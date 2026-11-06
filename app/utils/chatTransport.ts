@@ -1,4 +1,4 @@
-import {convertToModelMessages, generateText, streamText, type ChatTransport} from "ai";
+import {convertToModelMessages, generateText, isStepCount, streamText, type ChatTransport, type ToolSet} from "ai";
 import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
 import type {AiProviderProfile} from "#shared/types/app/ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
@@ -9,7 +9,12 @@ export interface ChatSendSetup {
     provider: AiProviderProfile,
     modelId: string,
     system: string,
+    /** The chat's tools (`chatTools`); omitted when the model profile has them off. */
+    tools?: ToolSet,
 }
+
+/** Model calls in one reply, tool rounds included. */
+const MAX_STEPS = 8
 
 // ponytail: fixed character cap over all notes, first come first served; budget by the model's context length if it matters.
 const NOTE_CONTEXT_CHARS = 60_000
@@ -54,8 +59,14 @@ export async function generateChatTitle(provider: AiProviderProfile, modelId: st
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, modelId, system} = await setup(messages)
-            return streamText({model: modelFor(provider, modelId), instructions: system || undefined, messages: await convertToModelMessages(messages), abortSignal})
+            const {provider, modelId, system, tools} = await setup(messages)
+            return streamText({
+                model: modelFor(provider, modelId),
+                instructions: system || undefined,
+                messages: await convertToModelMessages(messages, {tools}),
+                ...(tools && {tools, stopWhen: isStepCount(MAX_STEPS)}),
+                abortSignal,
+            })
                 .toUIMessageStream<VertexChatMessage>({
                     sendReasoning: true,
                     messageMetadata: ({part}) => part.type === 'finish' ? {modelId} : undefined,

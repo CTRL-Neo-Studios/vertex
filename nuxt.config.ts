@@ -109,6 +109,8 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/event",
                 "@tauri-apps/api/core",
                 "@tauri-apps/api/dpi",
+                // Imported by pages/settings/index.vue; found at runtime otherwise, which reloads the page mid-load ("head.hooks").
+                "@tauri-apps/api/app",
                 "tailwindcss/colors",
                 "pele",
                 "ai",

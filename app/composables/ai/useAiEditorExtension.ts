@@ -7,14 +7,18 @@ import {createAiFetch} from "~/utils/aiFetch";
 /**
  * The editor's AI assistant for this window's effective settings (feature `editorAssistant`), or `[]` when
  * it's off or has no model. The same extension comes back while the endpoint is unchanged: a new one remounts.
+ * With only Chat on, it's still installed (on Chat's model) with its own entry points off: the chat's edit proposals
+ * show in its preview.
  */
 export function useAiEditorExtension(): ComputedRef<Extension> {
     const {effective} = useSettingsScope()
     let key = ''
     let extension: Extension = []
     return computed(() => {
-        const resolved = effective.value ? resolveAiFeature(effective.value.aiConfig, 'editorAssistant') : null
-        const next = resolved ? JSON.stringify([resolved.provider.id, resolved.provider.baseURL, resolved.profile.modelId, resolved.profile.systemPrompt]) : ''
+        const ai = effective.value?.aiConfig
+        const own = ai ? resolveAiFeature(ai, 'editorAssistant') : null
+        const resolved = own ?? (ai ? resolveAiFeature(ai, 'chat') : null)
+        const next = resolved ? JSON.stringify([!!own, resolved.provider.id, resolved.provider.baseURL, resolved.profile.modelId, resolved.profile.systemPrompt]) : ''
         if (next === key) return extension
         key = next
         // `fetch` and `system` are AiEndpoint fields from editor 0.3.3; the cast covers 0.3.2's types.
@@ -25,6 +29,7 @@ export function useAiEditorExtension(): ComputedRef<Extension> {
                 system: resolved.profile.systemPrompt || undefined,
                 fetch: createAiFetch(resolved.provider.id),
             } as AiEndpoint,
+            ...(own ? {} : {toolbar: false, slash: false, shortcut: false}),
         }) : []
         return extension
     })

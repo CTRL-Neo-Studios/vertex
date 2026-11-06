@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import type {Chat} from "@ai-sdk/vue";
+import {getToolName, isToolUIPart, type DynamicToolUIPart, type ToolUIPart} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
+import {ask} from "@tauri-apps/plugin-dialog";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
+import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {toolsUnsupported} from "~/utils/chatTools";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
@@ -20,7 +24,8 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {vault, refresh, summary, profileId, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
+const {vault, refresh, summary, profileId, chatProfile, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
+const {updateModelProfile} = useAiConfig()
 const {chatActions} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
 const settings = useSettingsScope().effective
@@ -103,6 +108,49 @@ async function retry() {
     // A failure keeps `unsaved` set, so the alert stays.
     await retrySave(props.chatId).catch(() => {})
     retrying.value = false
+}
+
+// A model without tool calling refuses any request that offers tools: say so, and offer to turn them off for its
+// profile and retry.
+watch(() => chat.value?.error, async error => {
+    const live = chat.value
+    if (!error || !live || !toolsUnsupported(error.message)) return
+    live.clearError()
+    const profile = chatProfile(props.chatId)
+    const turnOff = await ask(t('app.chat.toolsUnsupported.description', {model: profile?.modelId ?? ''}), {
+        title: t('app.chat.toolsUnsupported.title'),
+        kind: 'warning',
+        okLabel: t('app.chat.toolsUnsupported.turnOff'),
+        cancelLabel: t('app.generic.cancel'),
+    })
+    if (!turnOff || !profile) return
+    await updateModelProfile(profile.id, {tools: false})
+    await live.regenerate()
+})
+
+// Tool calls in a reply, as UChatTool rows: what ran (and on what), how it ended, and its raw result when opened.
+type ToolPart = ToolUIPart | DynamicToolUIPart
+const TOOL_ICONS: Record<string, string> = {
+    findTools: 'i-lucide-search', searchNotes: 'i-lucide-file-search', readNote: 'i-lucide-file-text', listNotes: 'i-lucide-list-tree',
+    readDocument: 'i-lucide-file-text', readSelection: 'i-lucide-text-select', proposeEdit: 'i-lucide-file-pen-line', proposeInsert: 'i-lucide-file-plus',
+}
+const TOOL_DETAIL_CHARS = 4000
+
+function toolView(part: ToolPart) {
+    const name = getToolName(part)
+    const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string }
+    const output = part.state === 'output-available' ? part.output as { status?: string, error?: string } | undefined : undefined
+    const pending = part.state === 'input-streaming' || part.state === 'input-available'
+    const suffix = part.state === 'output-error' || output?.error ? t('app.chat.tools.failed')
+        : output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
+        : pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('app.chat.tools.waiting')
+        : input.query ?? input.path ?? input.folder
+    return {text: te(`app.chat.tools.names.${name}`) ? t(`app.chat.tools.names.${name}`) : name, suffix, icon: TOOL_ICONS[name] ?? 'i-lucide-wrench', streaming: pending}
+}
+
+function toolDetail(part: ToolPart) {
+    const text = part.state === 'output-error' ? part.errorText : part.state === 'output-available' ? JSON.stringify(part.output, null, 2) : ''
+    return text.length > TOOL_DETAIL_CHARS ? `${text.slice(0, TOOL_DETAIL_CHARS)}…` : text
 }
 
 async function onSubmit() {
@@ -238,6 +286,9 @@ const profile = computed({
                         <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
                             <UChatReasoning v-if="part.type === 'reasoning'" :text="part.text" :streaming="part.state === 'streaming'"/>
                             <ChatMarkdown v-else-if="part.type === 'text'" :value="part.text" :streaming="isStreaming(message)"/>
+                            <UChatTool v-else-if="isToolUIPart(part)" v-bind="toolView(part)" :disabled="!toolDetail(part)" class="my-1">
+                                <pre class="text-xs text-muted whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{{ toolDetail(part) }}</pre>
+                            </UChatTool>
                         </template>
                     </template>
                 </UChatMessages>

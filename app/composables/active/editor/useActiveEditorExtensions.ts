@@ -1,5 +1,5 @@
 import type {EditorState, Extension} from "@codemirror/state";
-import {ViewPlugin} from "@codemirror/view";
+import {ViewPlugin, type EditorView} from "@codemirror/view";
 import {editorLabels, headingAt, headingsField, type Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {blockDragHandle, selectionToolbar, slashMenu} from "@type32/codemirror-rich-obsidian-editor/ext";
 import type {ActiveSession} from "#shared/types/active/sessions";
@@ -27,6 +27,14 @@ const LABEL_KEYS = [
 function outlineKeys(session: ActiveSession | undefined, tabId: string) {
     const scope = sessionScope(session, 'useActiveEditorExtensions')
     return {outline: StateKey.tabOutline(scope, tabId), activeHeading: StateKey.tabActiveHeading(scope, tabId)}
+}
+
+/** Mounted markdown editors by `${scope}:${tabId}`; a view isn't serializable, so it lives here and not in `useState`. */
+const views = new Map<string, EditorView>()
+
+/** The tab's markdown editor while it's mounted (its tab is the one shown), else `undefined`. */
+export function editorViewOf(session: ActiveSession | undefined, tabId: string | null | undefined) {
+    return tabId ? views.get(`${sessionScope(session, 'editorViewOf')}:${tabId}`) : undefined
 }
 
 /** Read-only outline of a tab's markdown editor and the `from` of the heading containing the cursor; follows `tabId`. */
@@ -62,9 +70,14 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
         if (from !== activeHeading.value) activeHeading.value = from
     }
     // A view plugin rather than an update listener so the outline is also written when the view is created.
+    const viewKey = `${sessionScope(session, 'useActiveEditorExtensions')}:${toValue(tabId)}`
     const tracker = ViewPlugin.define(view => {
+        views.set(viewKey, view)
         sync(view.state)
-        return {update: u => sync(u.state)}
+        return {
+            update: u => sync(u.state),
+            destroy: () => { if (views.get(viewKey) === view) views.delete(viewKey) },
+        }
     })
     return computed<Extension[]>(() => {
         const panel = effective.value?.viewConfig.editorPanel

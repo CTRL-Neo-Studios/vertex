@@ -307,7 +307,9 @@
 					"modelMissing": "{model} 已不再在该服务商中启用。",
 					"systemPrompt": "系统提示词",
 					"systemPromptDescription": "随使用此配置的每个请求一起发送。",
-					"systemPromptPlaceholder": "你是一位乐于助人的写作助手。"
+					"systemPromptPlaceholder": "你是一位乐于助人的写作助手。",
+					"tools": "工具",
+					"toolsDescription": "允许聊天搜索和读取你的笔记，并对打开的笔记提议修改。不支持工具调用的模型请关闭。"
 				},
 				"features": {
 					"title": "AI 功能",
@@ -1409,7 +1411,28 @@
 			"retrySave": "重试",
 			"searchTitles": "聊天",
 			"searchMessages": "消息中",
-			"changePassword": "更改密码…"
+			"changePassword": "更改密码…",
+			"toolsUnsupported": {
+				"title": "此模型无法使用工具",
+				"description": "{model} 不支持工具调用，因此请求已停止。要为此模型配置关闭工具并重试吗？之后可以在该配置的设置中重新打开。",
+				"turnOff": "关闭工具并重试"
+			},
+			"tools": {
+				"failed": "失败",
+				"accepted": "已接受",
+				"rejected": "已拒绝",
+				"waiting": "等待你在笔记中确认",
+				"names": {
+					"findTools": "查找工具",
+					"searchNotes": "搜索笔记",
+					"readNote": "读取笔记",
+					"listNotes": "列出笔记",
+					"readDocument": "读取打开的笔记",
+					"readSelection": "读取所选内容",
+					"proposeEdit": "提议修改",
+					"proposeInsert": "提议插入"
+				}
+			}
 		}
 	}
 }
