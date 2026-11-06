@@ -35,10 +35,10 @@ export function switchBranch<M extends Message>(forks: Record<string, (M[] | nul
 }
 
 /**
- * Drops the forks `messages` can no longer reach (mutating `forks`), e.g. after a rewind cut the messages they hang
- * off. A fork hangs off a message with something after it: its key is never a list's last message.
+ * The forks `messages` can still reach, e.g. after a rewind cut the messages some hung off. A fork hangs off a message
+ * with something after it: its key is never a list's last message.
  */
-export function pruneForks(forks: Forks, messages: Message[]) {
+export function pruneForks<F extends Forks>(forks: F, messages: Message[]): F {
     // The start's fork needs a first message to hang at; any other hangs off a message with something after it.
     const points = new Set<string>(messages.length ? [''] : [])
     const reach = (list: Message[]) => {
@@ -55,5 +55,5 @@ export function pruneForks(forks: Forks, messages: Message[]) {
             for (const tail of forks[key]!) if (tail) reach(tail)
         }
     }
-    for (const key of Object.keys(forks)) if (!kept.has(key)) delete forks[key]
+    return Object.fromEntries(Object.entries(forks).filter(([key]) => kept.has(key))) as F
 }

@@ -36,11 +36,9 @@ describe('chat branches', () => {
         // A retry of a2 inside the first branch, then an edit of u2 hides that whole branch.
         let list = [...fork(forks, msgs('u1', 'a1', 'u2', 'a2'), 3), ...msgs('a2b')]
         list = [...fork(forks, list, 2), ...msgs('u2c')]
-        pruneForks(forks, list)
-        expect(Object.keys(forks).sort()).toEqual(['a1', 'u2'])
+        expect(Object.keys(pruneForks(forks, list)).sort()).toEqual(['a1', 'u2'])
 
         // Rewind to a1: the fork after it (u2's edit) and the one inside it (a2's retry) both go.
-        pruneForks(forks, list.slice(0, 2))
-        expect(forks).toEqual({})
+        expect(pruneForks(forks, list.slice(0, 2))).toEqual({})
     })
 })

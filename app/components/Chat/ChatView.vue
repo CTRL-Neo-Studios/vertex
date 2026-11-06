@@ -353,7 +353,7 @@ const profile = computed({
                     </template>
                     <template #actions="{ message }">
                         <div v-if="!busy && editing?.id !== message.id" class="flex items-center">
-                            <template v-for="branch in branches[message.id]" :key="message.id">
+                            <template v-for="branch in branches[message.id]" :key="branch.index">
                                 <UButton icon="i-lucide-chevron-left" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.branch.previous')" :disabled="branch.index === 0" @click="act(() => showBranch(chatId, message.id, branch.index - 1))"/>
                                 <span class="text-xs text-muted tabular-nums">{{ branch.index + 1 }}/{{ branch.count }}</span>
                                 <UButton icon="i-lucide-chevron-right" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.branch.next')" :disabled="branch.index === branch.count - 1" @click="act(() => showBranch(chatId, message.id, branch.index + 1))"/>

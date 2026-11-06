@@ -412,7 +412,7 @@ export function useChats(session?: ActiveSession) {
         if (!found) return
         const {entry, at} = found
         entry.chat.messages = entry.chat.messages.slice(0, at + 1)
-        if (entry.meta.forks) pruneForks(entry.meta.forks, entry.chat.messages)
+        if (entry.meta.forks) entry.meta.forks = pruneForks(entry.meta.forks, entry.chat.messages)
         await save(entry)
     }
 
