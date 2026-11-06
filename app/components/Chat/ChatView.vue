@@ -24,7 +24,7 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {vault, refresh, summary, profileId, chatProfile, saveError, retrySave, liveChat, send, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
+const {vault, refresh, summary, profileId, chatProfile, saveError, retrySave, liveChat, send, editMessage, retryMessage, rewindTo, showBranch, branchOf, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
 const {updateModelProfile} = useAiConfig()
 const {chatActions} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
@@ -85,16 +85,59 @@ const isScrolled = computed(() => scrollY.value > 2)
 
 const lastId = computed(() => chat.value?.messages.at(-1)?.id)
 const isStreaming = (message: VertexChatMessage) => chat.value?.status === 'streaming' && message.id === lastId.value
-const assistant = computed(() => ({
-    actions: [{
-        label: t('app.chat.copy'),
-        icon: 'i-lucide-copy',
-        async onClick(_e: MouseEvent, message: VertexChatMessage) {
-            await writeText(message.parts.flatMap(p => p.type === 'text' ? [p.text] : []).join('\n\n'))
-            $qt.success(t('app.chat.copied'))
-        },
-    }],
-}))
+const busy = computed(() => chat.value?.status === 'submitted' || chat.value?.status === 'streaming')
+
+// Message actions (none while a reply is being written): Copy; Edit on the user's, Retry (or with another model) and
+// Rewind on replies; a branch switcher where an edit or a retry forked the conversation.
+const textOf = (message: VertexChatMessage) => message.parts.flatMap(p => p.type === 'text' ? [p.text] : []).join('\n\n')
+/** The branch shown at each message that starts a fork, as a list of one (for `v-for` to name it), else none. */
+const branches = computed(() => Object.fromEntries((chat.value?.messages ?? []).map(m => {
+    const branch = branchOf(props.chatId, m.id)
+    return [m.id, branch ? [branch] : []]
+})))
+const editing = ref<{ id: string, text: string } | null>(null)
+
+async function act(run: () => Promise<unknown>) {
+    try {
+        await run()
+    } catch (e) {
+        $qt.error(t('app.chat.actionFailed'), errorText(e))
+    }
+}
+
+async function copyMessage(message: VertexChatMessage) {
+    await writeText(textOf(message))
+    $qt.success(t('app.chat.copied'))
+}
+
+function sendEdit() {
+    const draft = editing.value
+    const text = draft?.text.trim()
+    if (!draft || !text) return
+    editing.value = null
+    void act(() => editMessage(props.chatId, draft.id, text))
+}
+
+const retryItems = (message: VertexChatMessage) => [
+    {type: 'label' as const, label: t('app.chat.retryWith')},
+    ...(settings.value?.aiConfig.modelProfiles ?? []).map(p => ({
+        label: p.name,
+        icon: 'i-lucide-bot',
+        onSelect: () => act(() => retryMessage(props.chatId, message.id, p.id)),
+    })),
+]
+
+async function rewind(message: VertexChatMessage) {
+    const messages = chat.value?.messages ?? []
+    const count = messages.length - 1 - messages.findIndex(m => m.id === message.id)
+    const confirmed = await ask(t('app.chat.rewind.description', {count}), {
+        title: t('app.chat.rewind.title'),
+        kind: 'warning',
+        okLabel: t('app.chat.rewind.confirm'),
+        cancelLabel: t('app.generic.cancel'),
+    })
+    if (confirmed) await act(() => rewindTo(props.chatId, message.id))
+}
 
 const input = ref('')
 const notes = ref<string[]>([])
@@ -270,7 +313,6 @@ const profile = computed({
                 <UChatMessages
                     :messages="chat.messages"
                     :status="chat.status"
-                    :assistant
                     should-auto-scroll
                     :class="['mx-auto w-full py-4', inSidePanel ? 'px-2' : 'px-4 max-w-3xl']"
                 >
@@ -278,18 +320,62 @@ const profile = computed({
                         <UChatShimmer :text="$t('app.chat.thinking')" class="text-sm"/>
                     </template>
                     <template #content="{ message }">
-                        <div v-if="message.role === 'user' && message.metadata?.notes?.length" class="flex flex-wrap gap-1 mb-1.5">
-                            <ChatLink v-for="note in message.metadata.notes" :key="note" :note>
-                                <UBadge icon="i-lucide-file-text" size="sm" color="neutral" variant="outline" :label="fileNameFromPath(note, true)"/>
-                            </ChatLink>
+                        <div v-if="editing?.id === message.id" class="flex flex-col gap-2 min-w-64">
+                            <UTextarea
+                                v-model="editing.text"
+                                autoresize
+                                autofocus
+                                :rows="1"
+                                variant="none"
+                                :ui="{ base: 'p-0' }"
+                                @keydown.enter.exact.prevent="sendEdit"
+                                @keydown.esc.prevent="editing = null"
+                            />
+                            <div class="flex justify-end gap-1">
+                                <UButton size="xs" color="neutral" variant="ghost" :label="$t('app.generic.cancel')" @click="editing = null"/>
+                                <UButton size="xs" :label="$t('app.chat.send')" :disabled="!editing.text.trim()" @click="sendEdit"/>
+                            </div>
                         </div>
-                        <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
-                            <UChatReasoning v-if="part.type === 'reasoning'" :text="part.text" :streaming="part.state === 'streaming'"/>
-                            <ChatMarkdown v-else-if="part.type === 'text'" :value="part.text" :streaming="isStreaming(message)"/>
-                            <UChatTool v-else-if="isToolUIPart(part)" v-bind="toolView(part)" :disabled="!toolDetail(part)" class="my-1">
-                                <pre class="text-xs text-muted whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{{ toolDetail(part) }}</pre>
-                            </UChatTool>
+                        <template v-else>
+                            <div v-if="message.role === 'user' && message.metadata?.notes?.length" class="flex flex-wrap gap-1 mb-1.5">
+                                <ChatLink v-for="note in message.metadata.notes" :key="note" :note>
+                                    <UBadge icon="i-lucide-file-text" size="sm" color="neutral" variant="outline" :label="fileNameFromPath(note, true)"/>
+                                </ChatLink>
+                            </div>
+                            <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
+                                <UChatReasoning v-if="part.type === 'reasoning'" :text="part.text" :streaming="part.state === 'streaming'"/>
+                                <ChatMarkdown v-else-if="part.type === 'text'" :value="part.text" :streaming="isStreaming(message)"/>
+                                <UChatTool v-else-if="isToolUIPart(part)" v-bind="toolView(part)" :disabled="!toolDetail(part)" class="my-1">
+                                    <pre class="text-xs text-muted whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{{ toolDetail(part) }}</pre>
+                                </UChatTool>
+                            </template>
                         </template>
+                    </template>
+                    <template #actions="{ message }">
+                        <div v-if="!busy && editing?.id !== message.id" class="flex items-center">
+                            <template v-for="branch in branches[message.id]" :key="message.id">
+                                <UButton icon="i-lucide-chevron-left" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.branch.previous')" :disabled="branch.index === 0" @click="act(() => showBranch(chatId, message.id, branch.index - 1))"/>
+                                <span class="text-xs text-muted tabular-nums">{{ branch.index + 1 }}/{{ branch.count }}</span>
+                                <UButton icon="i-lucide-chevron-right" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.branch.next')" :disabled="branch.index === branch.count - 1" @click="act(() => showBranch(chatId, message.id, branch.index + 1))"/>
+                            </template>
+                            <UTooltip :text="$t('app.chat.copy')">
+                                <UButton icon="i-lucide-copy" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.copy')" @click="copyMessage(message)"/>
+                            </UTooltip>
+                            <UTooltip v-if="message.role === 'user'" :text="$t('app.chat.edit')">
+                                <UButton icon="i-lucide-pencil" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.edit')" @click="editing = { id: message.id, text: textOf(message) }"/>
+                            </UTooltip>
+                            <template v-else>
+                                <UTooltip :text="$t('app.chat.retry')">
+                                    <UButton icon="i-lucide-refresh-cw" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.retry')" @click="act(() => retryMessage(chatId, message.id))"/>
+                                </UTooltip>
+                                <UDropdownMenu :items="retryItems(message)" size="sm" :content="{ align: 'start' }">
+                                    <UButton icon="i-lucide-chevron-down" size="xs" color="neutral" variant="ghost" class="-ms-1" :aria-label="$t('app.chat.retryWith')"/>
+                                </UDropdownMenu>
+                                <UTooltip v-if="message.id !== lastId" :text="$t('app.chat.rewind.action')">
+                                    <UButton icon="i-lucide-history" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.rewind.action')" @click="rewind(message)"/>
+                                </UTooltip>
+                            </template>
+                        </div>
                     </template>
                 </UChatMessages>
             </div>

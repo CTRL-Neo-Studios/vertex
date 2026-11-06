@@ -9,6 +9,7 @@ import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {chatSystem, createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {chatTools, TOOLS_PROMPT, usedToolNames} from "~/utils/chatTools";
+import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -31,6 +32,8 @@ interface LiveChat {
     storage: ChatStorage
     /** Saves run one after another, so an older write never lands last. */
     saving: Promise<void>
+    /** The profile the next new reply uses instead of the chat's, once (a retry's pick). */
+    retryProfileId?: string
 }
 
 /**
@@ -252,7 +255,11 @@ export function useChats(session?: ActiveSession) {
     }
 
     async function setupFor(entry: LiveChat, messages: VertexChatMessage[]): Promise<ChatSendSetup> {
-        const {profile, provider} = resolveModel(entry.meta.profileId)
+        // A tool round goes on with the model that began the reply; a new reply takes a retry's pick, else the chat's.
+        const last = messages.at(-1)
+        const pinned = last?.role === 'assistant' ? last.metadata?.profileId ?? entry.meta.profileId : entry.retryProfileId ?? entry.meta.profileId
+        entry.retryProfileId = undefined
+        const {profile, provider} = resolveModel(pinned)
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
@@ -269,7 +276,7 @@ export function useChats(session?: ActiveSession) {
             toolsOn ? TOOLS_PROMPT : '',
             editing ? `The open document, which the editor tools read and edit, is "${slashed(editing.relativePath)}".` : '',
         ].filter(Boolean).join('\n\n')
-        return {provider, modelId: profile.modelId, system: chatSystem(prompt, await notesFor(messages)), tools}
+        return {provider, profileId: profile.id, modelId: profile.modelId, system: chatSystem(prompt, await notesFor(messages)), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
@@ -365,6 +372,57 @@ export function useChats(session?: ActiveSession) {
         resolveModel(entry.meta.profileId)
         if (!entry.meta.title) entry.meta.title = firstLineTitle(text)
         await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
+    }
+
+    /** A loaded chat that isn't replying, and where `messageId` is in it. */
+    function idleAt(id: string, messageId: string) {
+        const entry = live.get(keyOf(id))
+        const at = entry?.chat.messages.findIndex(m => m.id === messageId) ?? -1
+        if (!entry || at === -1 || entry.chat.status === 'submitted' || entry.chat.status === 'streaming') return undefined
+        return {entry, at}
+    }
+
+    /** Sends `text` in place of a user message (same notes); the old one and what followed it stay as a branch. */
+    async function editMessage(id: string, messageId: string, text: string) {
+        const found = idleAt(id, messageId)
+        if (!found) return
+        const {entry, at} = found
+        resolveModel(entry.meta.profileId)
+        const notes = entry.chat.messages[at]!.metadata?.notes ?? []
+        entry.meta.forks ??= {}
+        entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
+        await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
+    }
+
+    /** Writes a reply again, with `profileId` instead of the chat's model if given; the old one stays as a branch. */
+    async function retryMessage(id: string, messageId: string, profileId?: string) {
+        const found = idleAt(id, messageId)
+        if (!found) return
+        const {entry, at} = found
+        resolveModel(profileId ?? entry.meta.profileId)
+        entry.meta.forks ??= {}
+        entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
+        entry.retryProfileId = profileId
+        await entry.chat.regenerate()
+    }
+
+    /** Drops everything after `messageId`, with the branches that hung off it. */
+    async function rewindTo(id: string, messageId: string) {
+        const found = idleAt(id, messageId)
+        if (!found) return
+        const {entry, at} = found
+        entry.chat.messages = entry.chat.messages.slice(0, at + 1)
+        if (entry.meta.forks) pruneForks(entry.meta.forks, entry.chat.messages)
+        await save(entry)
+    }
+
+    /** Shows branch `to` (0-based) where `messageId` starts a fork. */
+    async function showBranch(id: string, messageId: string, to: number) {
+        const found = idleAt(id, messageId)
+        if (!found?.entry.meta.forks) return
+        const {entry, at} = found
+        entry.chat.messages = switchBranch(entry.meta.forks!, entry.chat.messages, at, to)
+        await save(entry)
     }
 
     /**
@@ -476,6 +534,16 @@ export function useChats(session?: ActiveSession) {
         search: (query: string) => chatClient.search(requireRoot(), storage.value, query),
         liveChat,
         send,
+        editMessage,
+        retryMessage,
+        rewindTo,
+        showBranch,
+        /** Which branch shows at `messageId`, of how many; undefined where nothing forks. */
+        branchOf: (id: string, messageId: string) => {
+            const entry = live.get(keyOf(id))
+            const messages = entry?.chat.messages ?? []
+            return branchAt(entry?.meta.forks, messages, messages.findIndex(m => m.id === messageId))
+        },
         setProfile: (id: string, profileId: string | undefined) => update(id, {profileId}),
         sidePanelChatId,
         showInSidePanel,

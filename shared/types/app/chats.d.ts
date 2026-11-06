@@ -16,11 +16,18 @@ export interface ChatMessageMetadata {
     /** Workspace-relative paths of the notes attached to this (user) message. */
     notes?: string[],
     createdAt?: number,
-    /** The model that wrote this (assistant) message. */
+    /** The model (and profile) that wrote this (assistant) message. */
     modelId?: string,
+    profileId?: string,
 }
 
 export type VertexChatMessage = UIMessage<ChatMessageMetadata>
+
+/**
+ * Branches: where an edit or a retry replaced the rest of a conversation, the alternative rests, keyed by the id of the
+ * message before that point (`''` = the start). `null` marks the one shown now, which lives in `messages`.
+ */
+export type ChatForks = Record<string, (VertexChatMessage[] | null)[]>
 
 export interface ChatSummary {
     /** `[A-Za-z0-9-]{1,64}`; also the file name and the chat tab's id. */
@@ -38,6 +45,7 @@ export interface ChatFile extends ChatSummary {
     /** The model profile it was started with; missing = the chat feature's profile. */
     profileId?: string,
     messages: VertexChatMessage[],
+    forks?: ChatForks,
 }
 
 export interface ChatIndex {

@@ -72,6 +72,9 @@ pub struct ChatFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     profile_id: Option<String>,
     messages: Value,
+    /// Fields only the frontend reads (branches, edit mode…), kept as they are.
+    #[serde(flatten)]
+    rest: Map<String, Value>,
 }
 
 #[derive(Serialize, PartialEq, Debug)]
@@ -552,6 +555,7 @@ mod tests {
             summary: ChatSummary { id: id.into(), title: format!("t-{id}"), folder: folder.into(), created: 1, updated: 2 },
             profile_id: None,
             messages: serde_json::json!([{"id": "m1", "role": "user", "parts": [{"type": "text", "text": "hi"}]}]),
+            rest: Map::new(),
         }
     }
 
@@ -567,7 +571,8 @@ mod tests {
         let mut keys = Keys::new();
         assert_eq!(vault_state(&mut keys, &root, Storage::App).unwrap(), VaultState::Open);
         let store = open(&mut keys, &data, &root, Storage::App).unwrap();
-        let c = ChatFile { profile_id: Some("p".into()), ..chat("a1", "A/B") };
+        let rest = serde_json::json!({"forks": {"m1": [null]}}).as_object().unwrap().clone();
+        let c = ChatFile { profile_id: Some("p".into()), rest, ..chat("a1", "A/B") };
         store.write_chat(&c).unwrap();
         assert_eq!(store.read("a1").unwrap(), c);
 
@@ -575,6 +580,7 @@ mod tests {
         let raw: Value = serde_json::from_slice(&fs::read(data.join("chats").join(&id).join("a1.chat")).unwrap()).unwrap();
         assert_eq!(raw["profileId"], "p");
         assert_eq!(raw["folder"], "A/B");
+        assert_eq!(raw["forks"]["m1"][0], Value::Null);
 
         store.set_folders(vec!["Z".into()]).unwrap();
         let index = store.index().unwrap();

@@ -7,6 +7,7 @@ import {createAiFetch} from "~/utils/aiFetch";
 /** What one send uses. Resolved per send, so settings and the note context are current. */
 export interface ChatSendSetup {
     provider: AiProviderProfile,
+    profileId: string,
     modelId: string,
     system: string,
     /** The chat's tools (`chatTools`); omitted when the model profile has them off. */
@@ -59,7 +60,7 @@ export async function generateChatTitle(provider: AiProviderProfile, modelId: st
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, modelId, system, tools} = await setup(messages)
+            const {provider, profileId, modelId, system, tools} = await setup(messages)
             return streamText({
                 model: modelFor(provider, modelId),
                 instructions: system || undefined,
@@ -69,7 +70,7 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
             })
                 .toUIMessageStream<VertexChatMessage>({
                     sendReasoning: true,
-                    messageMetadata: ({part}) => part.type === 'finish' ? {modelId} : undefined,
+                    messageMetadata: ({part}) => part.type === 'finish' ? {modelId, profileId} : undefined,
                     // The default hides every error as "An error occurred."
                     onError: error => error instanceof Error ? error.message : String(error),
                 })

@@ -1432,6 +1432,20 @@
 					"proposeEdit": "Propose an edit",
 					"proposeInsert": "Propose an insertion"
 				}
+			},
+			"edit": "Edit",
+			"send": "Send",
+			"retry": "Retry",
+			"retryWith": "Retry with",
+			"rewind": {
+				"action": "Rewind to here",
+				"title": "Rewind to this reply?",
+				"description": "The {count} message(s) after it will be removed, with their branches.",
+				"confirm": "Rewind"
+			},
+			"branch": {
+				"previous": "Previous branch",
+				"next": "Next branch"
 			}
 		}
 	}
