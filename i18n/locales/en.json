@@ -1348,7 +1348,7 @@
 			"copy": "Copy",
 			"copied": "Copied to the clipboard.",
 			"thinking": "Thinking…",
-			"placeholder": "Ask anything about your notes…",
+			"placeholder": "Ask anything about your notes… Type {'@'} to attach one",
 			"sendFailed": "Couldn't send the message",
 			"attachNote": "Attach notes",
 			"searchNotes": "Search notes",

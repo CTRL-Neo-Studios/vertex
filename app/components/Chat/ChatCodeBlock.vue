@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {PropType} from "vue";
-import type {ElementNode} from "@comark/vue";
-import {textContent} from "@comark/vue/utils";
+import type {ElementNode} from "comark";
+import {textContent} from "@comark/nuxt/utils";
 import MermaidDiagram from "~/components/Utility/MermaidDiagram.vue";
 
 defineOptions({inheritAttrs: false})
@@ -17,5 +17,5 @@ const source = computed(() => textContent(props.__node))
 
 <template>
     <MermaidDiagram v-if="language === 'mermaid'" :source="source" class="my-3"/>
-    <pre v-else :data-language="language"><slot/></pre>
+    <ProsePre v-else :code="source" :language="language"><slot/></ProsePre>
 </template>

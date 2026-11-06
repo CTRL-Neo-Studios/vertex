@@ -192,9 +192,9 @@ function folderActions(path: string): DropdownMenuItem[][] {
     ]
 }
 
-const panelMenu = computed<ContextMenuItem[][]>(() => [
+const panelMenu = computed<ContextMenuItem[][]>(() => vault.value === 'unlocked' ? [createItems('')] : [
     createItems(''),
-    vault.value === 'unlocked' ? [{label: t('app.chat.lock'), icon: 'i-lucide-lock', onSelect: () => run(lock)}] : [],
+    [{label: t('app.chat.lock'), icon: 'i-lucide-lock', onSelect: () => run(lock)}],
 ])
 
 const searchOpen = ref(false)
@@ -248,7 +248,7 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
                         }"
                     >
                         <template #chat-trailing="{ item }: { item: ChatNavItem }">
-                            <UDropdownMenu :items="chatActions(item.chat)" :content="{ align: 'end' }">
+                            <UDropdownMenu :items="chatActions(item.chat)" :content="{ align: 'end' }" size="sm">
                                 <UButton
                                     as="div"
                                     icon="i-lucide-ellipsis"
@@ -273,7 +273,7 @@ defineExpose({openSearch: () => { searchOpen.value = true }})
                             <span @click="toggleFolder(item.path)">{{ item.label }}</span>
                         </template>
                         <template #folder-trailing="{ item }: { item: FolderNavItem }">
-                            <UDropdownMenu :items="folderActions(item.path)" :content="{ align: 'end' }">
+                            <UDropdownMenu :items="folderActions(item.path)" :content="{ align: 'end' }" size="sm">
                                 <UButton
                                     as="div"
                                     icon="i-lucide-ellipsis"

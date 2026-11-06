@@ -3,6 +3,7 @@ export default defineNuxtConfig({
     $production: {devtools: {enabled: false}},
 
     modules: [
+      "@comark/nuxt",
       "@nuxt/ui",
       "@vueuse/nuxt",
       "@nuxt/icon",
@@ -113,8 +114,9 @@ export default defineNuxtConfig({
                 "ai",
                 "@ai-sdk/openai-compatible",
                 "@ai-sdk/vue",
+                // @comark/nuxt's auto-registered <Markdown> comes from @comark/vue.
                 "@comark/vue",
-                "@comark/vue/utils",
+                "@comark/nuxt/utils",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod",

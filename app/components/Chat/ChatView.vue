@@ -105,6 +105,60 @@ const noteItems = computed(() => getFilteredFiles(f => !f.isFolder && f.fileExt 
     .map(f => ({label: fileNameFromPath(f.fileName, true), description: f.relativePath, value: f.relativePath}))
     .sort((a, b) => a.description.localeCompare(b.description)))
 
+// `@` mentions: typing `@` (at the start or after whitespace) lists notes matching what follows, spaces included (note
+// names have them), while anything matches; picking one attaches it like the Attach picker and drops the `@query` text.
+// Focus stays in the textarea, which drives the list's keys.
+const promptRef = useTemplateRef<{ $el: HTMLElement }>('promptRef')
+const textarea = () => promptRef.value?.$el.querySelector('textarea') ?? null
+const mention = ref<{ start: number, end: number, query: string } | null>(null)
+const mentionIndex = ref(0)
+const MENTION_LIMIT = 8
+/** Where the `@` was that Esc dismissed: that mention stays closed until it's gone. */
+let dismissedAt = -1
+const mentionItems = computed(() => {
+    const query = mention.value?.query.toLowerCase()
+    if (query === undefined) return []
+    return noteItems.value
+        .filter(n => !notes.value.includes(n.value) && (n.label.toLowerCase().includes(query) || n.description.toLowerCase().includes(query)))
+        .slice(0, MENTION_LIMIT)
+})
+
+function updateMention() {
+    const el = textarea()
+    const caret = el?.selectionStart ?? 0
+    const match = el && el.selectionStart === el.selectionEnd ? /(?:^|\s)@([^@\n]{0,40})$/.exec(input.value.slice(0, caret)) : null
+    const next = match ? {start: caret - match[1]!.length - 1, end: caret, query: match[1]!} : null
+    if (next?.start !== dismissedAt) dismissedAt = -1
+    if (next?.query !== mention.value?.query) mentionIndex.value = 0
+    mention.value = next && next.start !== dismissedAt ? next : null
+}
+
+async function pickMention(path: string) {
+    const at = mention.value
+    if (!at) return
+    input.value = input.value.slice(0, at.start) + input.value.slice(at.end)
+    if (!notes.value.includes(path)) notes.value = [...notes.value, path]
+    mention.value = null
+    await nextTick()
+    textarea()?.setSelectionRange(at.start, at.start)
+}
+
+/** Capture phase, so Enter/Tab/arrows/Esc never reach UChatPrompt (submit, blur) while the list is open. */
+function onMentionKey(e: KeyboardEvent) {
+    if (!mention.value || !mentionItems.value.length || e.isComposing) return
+    const count = mentionItems.value.length
+    if (e.key === 'ArrowDown') mentionIndex.value = (mentionIndex.value + 1) % count
+    else if (e.key === 'ArrowUp') mentionIndex.value = (mentionIndex.value - 1 + count) % count
+    else if (e.key === 'Enter' || e.key === 'Tab') pickMention(mentionItems.value[mentionIndex.value]!.value)
+    else if (e.key === 'Escape') {
+        dismissedAt = mention.value.start
+        mention.value = null
+    }
+    else return
+    e.preventDefault()
+    e.stopPropagation()
+}
+
 // USelect can't hold an empty value; '@default' stands for "the chat feature's profile".
 const DEFAULT_PROFILE = '@default'
 const profileItems = computed(() => [
@@ -179,7 +233,8 @@ const profile = computed({
                     :description="banner"
                     :close="{ onClick: dismissError }"
                 />
-                <UChatPrompt v-model="input" :error="chat.error" :placeholder="$t('app.chat.placeholder')" variant="subtle" @submit="onSubmit">
+                <div class="contents" @keydown.capture="onMentionKey" @input="updateMention" @keyup="updateMention" @click="updateMention">
+                <UChatPrompt ref="promptRef" v-model="input" :error="chat.error" :placeholder="$t('app.chat.placeholder')" variant="subtle" @submit="onSubmit" @blur="mention = null">
                     <template #header v-if="notes.length">
                         <div class="flex flex-wrap gap-1">
                             <UBadge v-for="note in notes" :key="note" icon="i-lucide-file-text" size="sm" color="neutral" variant="soft" :label="fileNameFromPath(note, true)">
@@ -212,6 +267,36 @@ const profile = computed({
                         <UChatPromptSubmit :status="chat.status" size="sm" @stop="chat.stop()" @reload="chat.regenerate()"/>
                     </template>
                 </UChatPrompt>
+                </div>
+                <UPopover
+                    :open="!!mention && mentionItems.length > 0"
+                    :reference="promptRef?.$el"
+                    :content="{ side: 'top', align: 'start', sideOffset: 6, onOpenAutoFocus: (e: Event) => e.preventDefault(), onCloseAutoFocus: (e: Event) => e.preventDefault() }"
+                    :ui="{ content: 'p-1 w-72 max-w-[calc(100vw-2rem)]' }"
+                    @update:open="open => { if (!open) mention = null }"
+                >
+                    <template #content>
+                        <div role="listbox" :aria-label="$t('app.chat.attachNote')" class="flex flex-col">
+                            <UButton
+                                v-for="(item, i) in mentionItems"
+                                :key="item.value"
+                                role="option"
+                                :aria-selected="i === mentionIndex"
+                                color="neutral"
+                                variant="ghost"
+                                size="sm"
+                                icon="i-lucide-file-text"
+                                :class="['w-full justify-start', i === mentionIndex && 'bg-elevated']"
+                                @mousedown.prevent
+                                @mouseenter="mentionIndex = i"
+                                @click="pickMention(item.value)"
+                            >
+                                <span class="truncate">{{ item.label }}</span>
+                                <span class="ms-auto truncate text-xs text-dimmed">{{ item.description }}</span>
+                            </UButton>
+                        </div>
+                    </template>
+                </UPopover>
             </div>
         </template>
 
