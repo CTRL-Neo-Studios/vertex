@@ -191,11 +191,31 @@ const viewportClasses = computed(() => {
         </ScrollAreaViewport>
 
         <!-- Status bar (with scroll) -->
-        <div v-if="showStatusBar" :class="[`bg-default absolute z-10 left-0 right-0 bottom-0 h-fit group`, statusBarDisplayMode == 'show-on-hover' ? 'group-hover:opacity-100 hover:opacity-100 opacity-0' : statusBarDisplayMode == 'always-hidden' ? 'hidden' : '']">
-            <div class="bg-submuted inline-flex justify-start items-center w-full border-t border-default p-1 px-3 pb-1.5">
-                <slot name="status-bar"/>
-            </div>
-        </div>
+		<div
+			v-if="showStatusBar"
+			:class="[
+				'group/sb absolute z-10 left-0 right-0 bottom-2 flex justify-center items-end',
+				statusBarDisplayMode == 'always-hidden' ? 'hidden' : ''
+			]"
+		>
+			<!-- iOS-style home indicator pill (only in show-on-hover mode) -->
+			<div
+				v-if="statusBarDisplayMode == 'show-on-hover'"
+				class="pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1.5 w-16 rounded-full bg-muted transition duration-300 group-hover/sb:opacity-0 group-hover/sb:scale-x-200"
+			/>
+
+			<!-- Actual status bar -->
+			<div
+				:class="[
+					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300',
+					statusBarDisplayMode == 'show-on-hover'
+					? 'opacity-0 translate-y-1 group-hover/sb:h-fit scale-0 group-hover/sb:opacity-100 group-hover/sb:translate-y-0 group-hover/sb:scale-100'
+					: ''
+				]"
+			>
+				<slot name="status-bar" />
+			</div>
+		</div>
 
         <!-- Scrollbar (vertical) -->
         <ScrollAreaScrollbar
