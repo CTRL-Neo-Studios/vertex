@@ -339,12 +339,12 @@ const profile = computed({
     >
         <template #header-left>
             <UDropdownMenu v-if="current" :items="chatActions(current, 'tab')" :content="{ align: 'start' }" size="sm">
-                <UButton icon="i-lucide-ellipsis" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.actions')"/>
+                <UButton class="text-muted" icon="i-lucide-ellipsis" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.actions')"/>
             </UDropdownMenu>
         </template>
         <template #header-right>
             <UTooltip :text="$t('app.chat.moveToSidePanel')">
-                <UButton icon="i-lucide-panel-right" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
+                <UButton class="text-muted" icon="i-lucide-square-arrow-out-up-right" size="xs" color="neutral" variant="ghost" :aria-label="$t('app.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
             </UTooltip>
         </template>
         <div class="absolute inset-0 flex flex-col">

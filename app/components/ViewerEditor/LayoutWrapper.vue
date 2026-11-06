@@ -127,13 +127,13 @@ const viewportClasses = computed(() => {
 
 <template>
     <DefineHeaderRow>
-        <div class="w-full h-full flex items-center p-2 relative">
+        <div class="group/header w-full h-full flex items-center p-2 relative">
             <slot name="header-left"/>
             <div class="grow"/>
-            <!-- Faded out until pointed at (or being renamed), so it doesn't compete with the text. -->
+            <!-- Only the breadcrumbs fade: hidden until the header is pointed at (or they're being renamed). -->
             <div
                 v-if="showBreadcrumbs"
-                class="absolute inset-y-0 left-1/2 -translate-x-1/2 max-w-1/2 flex items-center justify-center opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300"
+                class="absolute inset-y-0 left-1/2 -translate-x-1/2 max-w-1/2 flex items-center justify-center opacity-0 group-hover/header:opacity-100 focus-within:opacity-100 transition-opacity duration-300"
             >
                 <EditorHeaderBreadcrumbs
                     :renaming="renaming"
@@ -155,7 +155,7 @@ const viewportClasses = computed(() => {
         :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)', maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
     >
         <!-- Header (no scroll) -->
-        <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10 opacity-50 trasition-opacity duration-300 hover:opacity-100">
+        <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
             <HeaderRow/>
         </div>
 

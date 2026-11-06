@@ -145,7 +145,7 @@ function scrollToItem(index: number) {
 
 <template>
     <div class="w-full flex items-center" data-tauri-drag-region>
-        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`" data-tauri-drag-region>
+        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2`" data-tauri-drag-region>
             <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
             <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
         </div>
