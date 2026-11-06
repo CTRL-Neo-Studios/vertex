@@ -29,12 +29,22 @@ function outlineKeys(session: ActiveSession | undefined, tabId: string) {
     return {outline: StateKey.tabOutline(scope, tabId), activeHeading: StateKey.tabActiveHeading(scope, tabId)}
 }
 
-/** Mounted markdown editors by `${scope}:${tabId}`; a view isn't serializable, so it lives here and not in `useState`. */
-const views = new Map<string, EditorView>()
+/**
+ * Mounted markdown editors by `${scope}:${tabId}`; a view isn't serializable, so it lives here and not in `useState`.
+ * Shallow-reactive, so code can wait for a note's editor to mount.
+ */
+const views = shallowReactive(new Map<string, EditorView>())
+/** Per session scope, the tab whose markdown editor was mounted last: the note shown last (it can be closed since). */
+const lastShown = new Map<string, string>()
 
 /** The tab's markdown editor while it's mounted (its tab is the one shown), else `undefined`. */
 export function editorViewOf(session: ActiveSession | undefined, tabId: string | null | undefined) {
     return tabId ? views.get(`${sessionScope(session, 'editorViewOf')}:${tabId}`) : undefined
+}
+
+/** The tab of the session's last shown markdown note, if one was shown. */
+export function lastShownNoteOf(session: ActiveSession | undefined) {
+    return lastShown.get(sessionScope(session, 'lastShownNoteOf'))
 }
 
 /** Read-only outline of a tab's markdown editor and the `from` of the heading containing the cursor; follows `tabId`. */
@@ -70,9 +80,11 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
         if (from !== activeHeading.value) activeHeading.value = from
     }
     // A view plugin rather than an update listener so the outline is also written when the view is created.
-    const viewKey = `${sessionScope(session, 'useActiveEditorExtensions')}:${toValue(tabId)}`
+    const scope = sessionScope(session, 'useActiveEditorExtensions')
+    const viewKey = `${scope}:${toValue(tabId)}`
     const tracker = ViewPlugin.define(view => {
         views.set(viewKey, view)
+        lastShown.set(scope, toValue(tabId))
         sync(view.state)
         return {
             update: u => sync(u.state),

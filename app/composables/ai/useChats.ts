@@ -16,7 +16,8 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
-import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
+import {editorViewOf, lastShownNoteOf} from "~/composables/active/editor/useActiveEditorExtensions";
+import {until} from "@vueuse/core";
 
 /** Thrown by `send` when the chat feature is off or has no model. The message is an i18n key. */
 export const CHAT_NO_MODEL = 'app.chat.noModel'
@@ -207,10 +208,30 @@ export function useChats(session?: ActiveSession) {
     const slashed = (path: string) => path.replace(/\\/g, '/')
     const noteFiles = () => $index.getFilteredFiles(f => !f.isFolder && isPlainTextFile(f.fileExt))
 
-    /** The shown note's markdown editor: the active tab's, when that's a note (so not while a chat tab is shown). */
-    function openEditor() {
+    /**
+     * The note the editor tools work on: the shown note; from a chat tab, the note shown last, while its tab is open.
+     */
+    function editTarget() {
         const tab = $tabs.getActiveTab($tabs.activeTabUuid.value)
-        return tab && tab.kind !== 'chat' ? editorViewOf(session, tab.fileUuid) : undefined
+        if (tab && tab.kind !== 'chat') return editorViewOf(session, tab.fileUuid) ? tab.fileUuid : undefined
+        const last = lastShownNoteOf(session)
+        return last && $tabs.isTabOpened(last) ? last : undefined
+    }
+
+    /**
+     * The note's editor, shown with the chat beside it: a chat in a tab moves to the side panel and the note's tab
+     * opens, so its proposals can be seen and decided. Waits for the editor to mount; `undefined` if it doesn't.
+     */
+    async function editorFor(chatId: string, noteId: string) {
+        const shown = editorViewOf(session, noteId)
+        if (shown && $tabs.activeTabUuid.value === noteId) return shown
+        sidePanelChatId.value = chatId
+        rightPanelCollapsed.value = false
+        rightPanelView.value = '4'
+        // The note's route first, then the chat's tab goes (see closeChatTab).
+        await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(noteId))
+        if ($tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+        return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
 
     /**
@@ -235,13 +256,19 @@ export function useChats(session?: ActiveSession) {
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
+        const target = toolsOn ? editTarget() : undefined
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
             read: readNote,
             list: folder => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort(),
-            editing: !!openEditor(),
+            editing: !!target,
         }, usedToolNames(messages)) : undefined
-        const prompt = [profile.systemPrompt, toolsOn ? TOOLS_PROMPT : ''].filter(Boolean).join('\n\n')
+        const editing = target && $index.getFileByUuid(target)
+        const prompt = [
+            profile.systemPrompt,
+            toolsOn ? TOOLS_PROMPT : '',
+            editing ? `The open document, which the editor tools read and edit, is "${slashed(editing.relativePath)}".` : '',
+        ].filter(Boolean).join('\n\n')
         return {provider, modelId: profile.modelId, system: chatSystem(prompt, await notesFor(messages)), tools}
     }
 
@@ -283,15 +310,17 @@ export function useChats(session?: ActiveSession) {
                     void saveLogged(entry)
                     if (!isAbort && !isError) void autoTitle(entry)
                 },
-                // The editor tools have no `execute`: they run here, against the shown note, and a proposal answers
-                // once the user accepts or rejects it in the editor. Then the reply continues on its own.
+                // The editor tools have no `execute`: they run here, against the edited note (shown first, with the
+                // chat beside it), and a proposal answers once the user accepts or rejects it. Then the reply goes on.
                 onToolCall: ({toolCall}) => {
                     if (!isEditorTool(toolCall)) return
                     const answer = (output: unknown) => entry.chat.addToolOutput({tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output})
-                    const view = openEditor()
-                    if (!view) return void answer({error: 'The note is no longer open in the editor.'})
+                    const target = editTarget()
+                    if (!target) return void answer({error: 'The note is no longer open in the editor.'})
                     // Not awaited: onToolCall must return before the proposal is decided.
-                    void runEditorTool(view, toolCall).then(answer)
+                    void editorFor(id, target)
+                        .then(view => view ? runEditorTool(view, toolCall) : {error: 'The note could not be shown in the editor.'})
+                        .then(answer)
                 },
                 sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
             })
@@ -338,12 +367,19 @@ export function useChats(session?: ActiveSession) {
         await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
     }
 
-    /** Closes the chat's tab; if it was the shown one, shows the next. */
+    /**
+     * Closes the chat's tab; if it was the shown one, shows the next (`closeTab`'s pick). The route moves first: a route
+     * left on a closed tab falls back to SessionTab, which sends the window to the empty page.
+     */
     async function closeChatTab(id: string) {
         if (!$tabs.isTabOpened(id)) return
-        const wasActive = $tabs.activeTabUuid.value === id
+        if ($tabs.activeTabUuid.value === id) {
+            const list = $tabs.tabs.value
+            const at = list.findIndex(t => t.fileUuid === id)
+            const next = list[at + 1] ?? list[at - 1]
+            await $navi.toWorkspaceTab(session?.uuid, next && $tabs.openTab(next.fileUuid))
+        }
         $tabs.closeTab(id)
-        if (wasActive) await $navi.toWorkspaceTab(session?.uuid, $tabs.getActiveTab($tabs.activeTabUuid.value))
     }
 
     function drop(ids: string[]) {
