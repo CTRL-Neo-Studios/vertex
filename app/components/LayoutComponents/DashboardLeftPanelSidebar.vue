@@ -11,6 +11,11 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import type {ContextMenuItem} from "@nuxt/ui";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {computed} from "vue";
+import {useScroll} from "@vueuse/core";
+
+const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
+const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
+const isScrolled = computed(() => scrollY.value > 2)
 
 const { t } = useI18n()
 
@@ -85,7 +90,7 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
         data-tauri-drag-region
         :min-size="10"
         :max-size="30"
-        :default-size="15"
+        :default-size="18"
         :collapsed-size="0"
         resizable
         :ui="{
@@ -109,20 +114,40 @@ const contextMenuItems = ref<ContextMenuItem[][]>([
                     <SidebarCollapserButton side="left"/>
                 </template>
             </UDashboardNavbar>
-            <UDashboardNavbar :ui="{ root: 'border-b border-default h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full gap-2', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
-                <UDashboardSearchButton :kbds="['meta', 'p']" class="grow"/>
+            <UDashboardNavbar :ui="{ root: 'border-none h-(--ui-header-height) sm:px-0 p-2 w-full', center: 'w-full gap-2', left: 'pl-2.5', right: 'pr-2.5' }" data-tauri-drag-region>
+                <UDashboardSearchButton :kbds="['meta', 'p']" class="grow" variant="ghost"/>
             </UDashboardNavbar>
         </template>
-        <template #body>
-            <UContextMenu :items="contextMenuItems" size="sm">
-                <UScrollArea orientation="vertical" class="no-scrollbar h-full relative" data-tauri-drag-region>
-                    <FileTreeComponent class="py-2.5" :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
-                </UScrollArea>
-            </UContextMenu>
-        </template>
+		<template #body>
+			<UContextMenu :items="contextMenuItems" size="sm">
+				<UScrollArea
+					ref="scrollAreaRef"
+					orientation="vertical"
+					:class="['no-scrollbar h-full relative scroll-fade', isScrolled && 'is-scrolled']"
+					data-tauri-drag-region
+				>
+					<FileTreeComponent class="py-2.5" :sessionId="$sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>
+				</UScrollArea>
+			</UContextMenu>
+		</template>
     </UDashboardPanel>
 </template>
 
 <style scoped>
+@property --fade-size {
+	syntax: '<length>';
+	inherits: false;
+	initial-value: 0px;
+}
 
+.scroll-fade {
+	--fade-size: 0px;
+	-webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+	mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+	transition: --fade-size 200ms ease;
+}
+
+.scroll-fade.is-scrolled {
+	--fade-size: 2rem;
+}
 </style>

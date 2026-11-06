@@ -26,7 +26,7 @@ function toggleSidebar() {
 </script>
 
 <template>
-    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" size="sm" @click="toggleSidebar"/>
+    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" color="neutral" class="text-muted" size="sm" @click="toggleSidebar"/>
 </template>
 
 <style scoped>

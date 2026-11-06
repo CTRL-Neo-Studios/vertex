@@ -207,7 +207,7 @@ function scrollToItem(index: number) {
 <!--        </ScrollAreaRoot>-->
         <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
-                <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
+                <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
             <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
         </div>
