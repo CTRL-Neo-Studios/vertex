@@ -12,10 +12,11 @@ import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {toolsUnsupported} from "~/utils/chatTools";
+import {ASK_USER, toolsUnsupported, type AskUserOutput} from "~/utils/chatTools";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
 import ChatChanges from "~/components/Chat/ChatChanges.vue";
+import ChatQuestions from "~/components/Chat/ChatQuestions.vue";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
 
 /** One conversation: header, messages, prompt. In a tab it offers "move to side panel"; in the side panel, "open in tab". */
@@ -223,6 +224,8 @@ const TOOL_ICONS: Record<string, string> = {
 	findTools: 'i-lucide-search',
 	searchNotes: 'i-lucide-file-search',
 	readNote: 'i-lucide-file-text',
+	findFiles: 'i-lucide-folder-search',
+	// Chats from before findFiles.
 	listNotes: 'i-lucide-list-tree',
 	readDocument: 'i-lucide-file-text',
 	readSelection: 'i-lucide-text-select',
@@ -231,6 +234,7 @@ const TOOL_ICONS: Record<string, string> = {
 	createNote: 'i-lucide-file-plus-2',
 	writeNote: 'i-lucide-file-pen',
 	editNote: 'i-lucide-file-pen-line',
+	runWorkflow: 'i-lucide-workflow',
 }
 const TOOL_DETAIL_CHARS = 4000
 
@@ -239,13 +243,16 @@ function toolView(part: ToolPart) {
 	const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string }
 	const output = part.state === 'output-available' ? part.output as {
 		status?: string,
-		error?: string
+		error?: string,
+		declined?: boolean
 	} | undefined : undefined
 	const pending = part.state === 'input-streaming' || part.state === 'input-available'
 	const suffix = part.state === 'output-error' || output?.error ? t('app.chat.tools.failed')
-		: output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
-			: pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('app.chat.tools.waiting')
-				: input.query ?? input.path ?? input.folder
+		: part.state === 'output-denied' || output?.declined ? t('app.chat.tools.declined')
+			: output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
+				: part.state === 'approval-requested' ? t('app.chat.tools.asksToRun')
+					: pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('app.chat.tools.waiting')
+						: input.query ?? input.path ?? input.folder
 	return {
 		text: te(`app.chat.tools.names.${name}`) ? t(`app.chat.tools.names.${name}`) : name,
 		suffix,
@@ -258,6 +265,17 @@ function toolDetail(part: ToolPart) {
 	const text = part.state === 'output-error' ? part.errorText : part.state === 'output-available' ? JSON.stringify(part.output, null, 2) : ''
 	return text.length > TOOL_DETAIL_CHARS ? `${text.slice(0, TOOL_DETAIL_CHARS)}…` : text
 }
+
+/** An `askUser` call the card shows: asked (the model's input is complete) or answered. */
+const isQuestion = (part: ToolPart) => getToolName(part) === ASK_USER && (part.state === 'input-available' || part.state === 'output-available')
+const answerQuestion = (part: ToolPart, output: AskUserOutput) => chat.value?.addToolOutput({tool: ASK_USER, toolCallId: part.toolCallId, output})
+const approveRun = (id: string, approved: boolean) => chat.value?.addToolApprovalResponse({id, approved})
+/** What the last reply waits on in the chat (a question, or a run to approve), which typing in the prompt answers. */
+const waitingOn = computed(() => {
+	const last = chat.value?.messages.at(-1)
+	const parts = last?.role === 'assistant' ? last.parts.filter(isToolUIPart) : []
+	return parts.some(p => p.state === 'approval-requested') ? 'approval' : parts.some(p => getToolName(p) === ASK_USER && p.state === 'input-available') ? 'question' : undefined
+})
 
 async function onSubmit() {
 	const text = input.value.trim()
@@ -380,7 +398,7 @@ const profile = computed({
 // What the chat may do to notes (Ask: read only; Suggest: propose edits; Write: stage changes to review), and which
 // notes it may change.
 const modeItems = computed(() => [
-	{label: t('app.chat.mode.ask'), value: 'ask' as const, icon: 'i-lucide-message-circle-question'},
+	{label: t('app.chat.mode.read'), value: 'read' as const, icon: 'i-lucide-book-open'},
 	{label: t('app.chat.mode.suggest'), value: 'suggest' as const, icon: 'i-lucide-pencil-line'},
 	{label: t('app.chat.mode.write'), value: 'write' as const, icon: 'i-lucide-feather'},
 ])
@@ -468,13 +486,24 @@ const compact = computed(() => props.inSidePanel ? {
 								                :streaming="part.state === 'streaming'"/>
 								<ChatMarkdown v-else-if="part.type === 'text'" :value="part.text"
 								              :streaming="isStreaming(message)"/>
-								<UChatTool v-else-if="isToolUIPart(part)" v-bind="toolView(part)"
-								           :disabled="!toolDetail(part)" class="my-1">
-									<pre
-										class="text-xs text-muted whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{{
-											toolDetail(part)
-										}}</pre>
-								</UChatTool>
+								<template v-else-if="isToolUIPart(part)">
+									<ChatQuestions v-if="isQuestion(part)" :part :disabled="busy"
+									               @answer="output => answerQuestion(part, output)"/>
+									<template v-else>
+										<UChatTool v-bind="toolView(part)" :disabled="!toolDetail(part)" class="my-1">
+											<pre
+												class="text-xs text-muted whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{{
+													toolDetail(part)
+												}}</pre>
+										</UChatTool>
+										<div v-if="part.state === 'approval-requested'" class="flex gap-1 mb-2">
+											<UButton size="xs" icon="i-lucide-play" :label="$t('app.chat.tools.run')"
+											         @click="approveRun(part.approval.id, true)"/>
+											<UButton size="xs" color="neutral" variant="ghost" :label="$t('app.chat.tools.dontRun')"
+											         @click="approveRun(part.approval.id, false)"/>
+										</div>
+									</template>
+								</template>
 							</template>
 							<ChatChanges v-if="message.metadata?.changes?.length" :chat-id="chatId" :message :busy/>
 						</template>
@@ -555,7 +584,7 @@ const compact = computed(() => props.inSidePanel ? {
 				     @click="updateMention"
 				>
 					<UChatPrompt :ui="{ root: 'bg-transparent backdrop-blur-lg' }" ref="promptRef" v-model="input"
-					             :error="chat.error" :placeholder="$t('app.chat.placeholder')" variant="subtle"
+					             :error="chat.error" :placeholder="waitingOn ? $t(`app.chat.waitingPlaceholder.${waitingOn}`) : $t('app.chat.placeholder')" variant="subtle"
 					             @submit="onSubmit" @blur="mention = null">
 						<template #header v-if="notes.length">
 							<div class="flex flex-wrap gap-1">
@@ -602,7 +631,7 @@ const compact = computed(() => props.inSidePanel ? {
 							</UTooltip>
 							<UTooltip :text="$t('app.chat.scope.label')">
 								<USelectMenu
-									v-if="mode !== 'ask'"
+									v-if="mode !== 'read'"
 									v-model="scope"
 									:items="scopeItems"
 									value-key="value"

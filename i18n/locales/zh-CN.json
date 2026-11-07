@@ -331,7 +331,7 @@
 					"chatStorageApp": "应用数据",
 					"chatStorageWorkspace": "工作区（加密）",
 					"chatMode": "聊天模式",
-					"chatModeDescription": "新聊天的初始模式。询问只读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。"
+					"chatModeDescription": "新聊天的初始模式。只读仅读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。"
 				}
 			},
 			"scope": {
@@ -1424,6 +1424,10 @@
 				"accepted": "已接受",
 				"rejected": "已拒绝",
 				"waiting": "等待你在笔记中确认",
+				"declined": "已拒绝运行",
+				"asksToRun": "请求运行",
+				"run": "运行",
+				"dontRun": "不运行",
 				"names": {
 					"findTools": "查找工具",
 					"searchNotes": "搜索笔记",
@@ -1435,7 +1439,10 @@
 					"proposeInsert": "提议插入",
 					"createNote": "新建笔记",
 					"writeNote": "重写笔记",
-					"editNote": "编辑笔记"
+					"editNote": "编辑笔记",
+					"findFiles": "查找文件",
+					"runWorkflow": "运行工作流",
+					"askUser": "向你提问"
 				}
 			},
 			"edit": "编辑",
@@ -1488,7 +1495,7 @@
 			},
 			"mode": {
 				"label": "模式",
-				"ask": "询问",
+				"read": "只读",
 				"suggest": "建议",
 				"write": "写作"
 			},
@@ -1511,6 +1518,20 @@
 					"conflict": "未应用：笔记在暂存后已被改动",
 					"undone": "已被回退撤销"
 				}
+			},
+			"questions": {
+				"title": "问题（{count}）",
+				"other": "或填写你自己的回答…",
+				"answer": "你的回答…",
+				"skip": "跳过",
+				"submit": "回答",
+				"skipped": "已跳过",
+				"noAnswer": "未回答",
+				"replied": "已在输入框中回答：{reply}"
+			},
+			"waitingPlaceholder": {
+				"question": "回答上方的问题，或在此输入你的回答…",
+				"approval": "在此输入即不运行，并说明原因…"
 			}
 		}
 	}

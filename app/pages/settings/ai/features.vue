@@ -47,7 +47,7 @@ const storageItems = computed(() => [
     {label: t('app.settings.ai.features.chatStorageWorkspace'), value: 'workspace'},
 ])
 const modeItems = computed(() => [
-    {label: t('app.chat.mode.ask'), value: 'ask'},
+    {label: t('app.chat.mode.read'), value: 'read'},
     {label: t('app.chat.mode.suggest'), value: 'suggest'},
     {label: t('app.chat.mode.write'), value: 'write'},
 ])

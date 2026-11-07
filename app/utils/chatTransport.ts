@@ -3,6 +3,7 @@ import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
 import type {AiProviderProfile} from "#shared/types/app/ai";
 import type {ChatRequestInfo, VertexChatMessage} from "#shared/types/app/chats";
 import {createAiFetch} from "~/utils/aiFetch";
+import {markModeSwitches} from "~/utils/chatTools";
 
 /** What one send uses. Resolved per send, so settings and the note context are current. */
 export interface ChatSendSetup {
@@ -92,7 +93,9 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
             return streamText({
                 model: modelFor(provider, modelId),
                 instructions: system || undefined,
-                messages: await convertToModelMessages(messages, {tools}),
+                // Plain copies: the chat's messages are Vue proxies, which an approved tool call's input can't be
+                // `structuredClone`d from when the AI SDK checks it again before running it.
+                messages: await convertToModelMessages(markModeSwitches(JSON.parse(JSON.stringify(messages))), {tools}),
                 ...(tools && {tools, stopWhen: isStepCount(MAX_STEPS)}),
                 abortSignal,
             })

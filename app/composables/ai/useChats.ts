@@ -1,18 +1,22 @@
 import {Chat} from "@ai-sdk/vue";
-import {lastAssistantMessageIsCompleteWithToolCalls} from "ai";
+import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls} from "ai";
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
+import {CompileError} from "@type32/workflows/core";
 import {invoke} from "@tauri-apps/api/core";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
-import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
-import {chatTools, inScope, scopeText, toolsPrompt, usedToolNames, type NamedNotes} from "~/utils/chatTools";
+import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, newNotePath, textChange} from "~/utils/chatChanges";
 import {TRASH_DIR} from "#shared/workflows/vault";
+import type {Op} from "#shared/workflows/effects";
 import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
+import {parseWorkflow, useWorkflowRunner, type WorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -49,9 +53,14 @@ const loading = new Map<string, Promise<LiveChat>>()
 const live = shallowReactive(new Map<string, LiveChat>())
 /** The last failed save per loaded chat (same keys), cleared by the next successful one. Shown in ChatView. */
 const saveErrors = shallowReactive(new Map<string, string>())
+/** A session's workflow runner, for `runWorkflow` (its modals and toasts are app-wide), made on first use. */
+const runners = new Map<string, WorkflowRunner>()
 
 const parentsOf = (path: string) => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
 const inFolder = (folder: string, path: string) => folder === path || folder.startsWith(`${path}/`)
+
+/** A workflow run's change, in a few words for the model. */
+const opText = (op: Op) => op.kind === 'move' ? `${op.why}: "${op.from}" → "${op.to}"` : `${op.kind === 'create' ? `new ${op.why}` : op.why}: "${op.path}"`
 
 /**
  * A workspace's chats (Rust stores them; see chatClient). Unavailable (`root` null) in singlespace sessions.
@@ -261,7 +270,48 @@ export function useChats(session?: ActiveSession) {
         return read?.content ?? null
     }
 
-    const defaultMode = (): ChatMode => effective.value?.aiConfig.chatMode ?? 'suggest'
+    const defaultMode = (): ChatMode => toChatMode(effective.value?.aiConfig.chatMode)
+    const modeOf = (entry: LiveChat) => entry.meta.mode ?? defaultMode()
+
+    /** Every file and folder in the workspace but dot-named ones (and what's in them), for `findFiles`. */
+    const workspaceFiles = () => $index.getFilteredFiles(f => !slashed(f.relativePath).split('/').some(part => part.startsWith('.')))
+        .map(f => ({path: slashed(f.relativePath), kind: f.isFolder ? 'folder' : f.fileExt.toLowerCase()}))
+        .sort((a, b) => a.path.localeCompare(b.path))
+
+    /**
+     * `runWorkflow`: the workflow at `path` (or by name) on `note` (else the open note), through the session's runner:
+     * a real run asks for trust when it isn't trusted, and ends in its toast with Undo. Worded for the model.
+     */
+    async function runWorkflow(path: string, note: string | undefined, dry: boolean): Promise<object> {
+        const name = path.toLowerCase().replace(/\.workflow$/, '')
+        const file = $index.getFilteredFiles(f => !f.isFolder && isWorkflowFile(f.fileExt)).find(f => slashed(f.relativePath) === path
+            || slashed(f.relativePath).toLowerCase().replace(/\.workflow$/, '') === name || fileNameFromPath(f.fileName, true).toLowerCase() === name)
+        if (!file) return {error: `There's no workflow at "${path}". List them with findFiles, extension "workflow".`}
+        const at = slashed(file.relativePath)
+        const open = editTarget()
+        const on = note ? findNote(note)?.relativePath ?? note : open && $index.getFileByUuid(open)?.relativePath
+        const label = fileNameFromPath(file.fileName, true)
+        let runner = runners.get(session!.uuid)
+        if (!runner) runners.set(session!.uuid, runner = await nuxtApp.runWithContext(() => useWorkflowRunner(session!)))
+        try {
+            const {doc, problems} = parseWorkflow(await (await vaultOf()).read(at))
+            if (!doc) return {error: `"${at}" isn't a valid workflow: ${problems[0]?.message ?? 'unreadable'}`}
+            const context = {note: on && slashed(on)}
+            const outcome = dry ? await runner.dryRun(doc, label, context) : await runner.run(doc, label, at, context)
+            if (!outcome) return {declined: true, reason: 'The user didn\'t trust the workflow.'}
+            if (!dry) runner.report(label, outcome)
+            const {status, steps, fault} = outcome.result
+            return {
+                status,
+                steps,
+                ...(fault && {fault: fault.message}),
+                [dry ? 'wouldChange' : 'changed']: outcome.ops.slice(0, 50).map(opText),
+                ...(outcome.ops.length > 50 && {more: outcome.ops.length - 50}),
+            }
+        } catch (e) {
+            return {error: e instanceof CompileError ? e.diagnostics[0]?.message ?? e.message : e instanceof Error ? e.message : String(e)}
+        }
+    }
 
     /**
      * The notes the named scope covers: the open one, every note and folder attached in the conversation, and the notes
@@ -284,7 +334,7 @@ export function useChats(session?: ActiveSession) {
     function editTargetFor(entry: LiveChat, path: string | undefined, proposing: boolean): {id: string, open: boolean} | {error: string} {
         const open = editTarget()
         const file = path ? findNote(path) : open && $index.getFileByUuid(open)
-        if (!file) return {error: path ? `There's no note at "${path}". Use searchNotes or listNotes for its path.` : 'No note is open in the editor. Pass the `path` of the note to change.'}
+        if (!file) return {error: path ? `There's no note at "${path}". Use searchNotes or findFiles for its path.` : 'No note is open in the editor. Pass the `path` of the note to change.'}
         const at = slashed(file.relativePath)
         const named = namedNotes(entry.chat.messages)
         if (proposing && !inScope(at, entry.meta.scope, named)) {
@@ -353,7 +403,7 @@ export function useChats(session?: ActiveSession) {
             before = null
         } else {
             const file = findNote(path)
-            if (!file) return {error: `There's no note at "${path}". Use searchNotes or listNotes for its path, or createNote for a new note.`}
+            if (!file) return {error: `There's no note at "${path}". Use searchNotes or findFiles for its path, or createNote for a new note.`}
             at = slashed(file.relativePath)
             before = await readNote(at)
             if (before === null) return {error: `"${at}" couldn't be read.`}
@@ -450,17 +500,19 @@ export function useChats(session?: ActiveSession) {
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
-        const mode = entry.meta.mode ?? defaultMode()
+        const mode = modeOf(entry)
         const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
             read: mode === 'write' ? path => readStaged(entry, path) : readNote,
             list,
+            files: workspaceFiles,
             mode,
             stage: (path, markdown, create) => stage(entry, path, markdown, create),
+            runWorkflow,
         }, usedToolNames(messages)) : undefined
         const named = namedNotes(messages, entry.staging)
-        const open = mode === 'ask' ? undefined : editTarget()
+        const open = toolsOn ? editTarget() : undefined
         const openFile = open && $index.getFileByUuid(open)
         // ponytail: every referenced folder's note paths, cut at 200 each; summarize if folders get huge.
         const folders = named.folders.map(folder => {
@@ -469,8 +521,8 @@ export function useChats(session?: ActiveSession) {
         })
         const prompt = [
             profile.systemPrompt,
-            toolsOn ? toolsPrompt(mode, scopeText(entry.meta.scope, named)) : '',
-            toolsOn && openFile ? `The open ${mode === 'suggest' ? 'document, which the editor tools read and edit unless given a path,' : 'note'} is "${slashed(openFile.relativePath)}".` : '',
+            toolsPrompt(mode, scopeText(entry.meta.scope, named), toolsOn),
+            openFile ? `The open note is "${slashed(openFile.relativePath)}": readDocument and readSelection read it${mode === 'suggest' ? ', and the proposals edit it unless given a path' : ''}.` : '',
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
@@ -506,6 +558,7 @@ export function useChats(session?: ActiveSession) {
         const r = requireRoot()
         const s = storage.value
         const next = chatClient.read(r, s, id).then(({messages, ...meta}) => {
+            if (meta.mode) meta.mode = toChatMode(meta.mode)
             const state = {meta: reactive(meta), root: r, storage: s, saving: Promise.resolve()}
             const chat = new Chat<VertexChatMessage>({
                 id,
@@ -518,9 +571,12 @@ export function useChats(session?: ActiveSession) {
                 },
                 // The editor tools have no `execute`: they run here, against the edited note (shown first, with the
                 // chat beside it), and a proposal answers once the user accepts or rejects it. Then the reply goes on.
+                // `askUser` has none either: its card in ChatView answers it.
                 onToolCall: ({toolCall}) => {
                     if (!isEditorTool(toolCall)) return
                     const answer = (output: unknown) => entry.chat.addToolOutput({tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output})
+                    const refused = modeError(toolCall.toolName, modeOf(entry))
+                    if (refused) return void answer(refused)
                     const input = (toolCall.input ?? {}) as { path?: string, after?: string }
                     const target = editTargetFor(entry, input.path, toolCall.toolName.startsWith('propose'))
                     if ('error' in target) return void answer(target)
@@ -534,7 +590,8 @@ export function useChats(session?: ActiveSession) {
                         })
                         .then(answer)
                 },
-                sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+                // A tool round goes on once every call has its output, or once a run asking for approval got its answer.
+                sendAutomaticallyWhen: options => lastAssistantMessageIsCompleteWithToolCalls(options) || lastAssistantMessageIsCompleteWithApprovalResponses(options),
             })
             const entry: LiveChat = Object.assign(state, {chat})
             live.set(key, entry)
@@ -572,11 +629,28 @@ export function useChats(session?: ActiveSession) {
         await save(entry)
     }
 
+    /** The last reply's call still waiting on the user in the chat: an `askUser` question, or a run to approve. */
+    function waitingCall(entry: LiveChat) {
+        const last = entry.chat.messages.at(-1)
+        if (last?.role !== 'assistant') return undefined
+        return last.parts.filter(isToolUIPart).find(p => p.state === 'approval-requested' || p.state === 'input-available' && getToolName(p) === ASK_USER)
+    }
+
+    /**
+     * Sends a message. While the last reply waits on a question or an approval, the text answers that instead (an
+     * approval as declined, with the text as the reason), so the reply goes on and no new one starts.
+     */
     async function send(id: string, text: string, notes: string[], folders: string[]) {
         const entry = await load(id)
         resolveModel(entry.meta.profileId)
+        const waiting = waitingCall(entry)
+        if (waiting?.state === 'approval-requested') return entry.chat.addToolApprovalResponse({id: waiting.approval.id, approved: false, reason: text})
+        if (waiting) {
+            const output: AskUserOutput = {reply: text, ...(notes.length && {notes}), ...(folders.length && {folders})}
+            return entry.chat.addToolOutput({tool: ASK_USER, toolCallId: waiting.toolCallId, output})
+        }
         if (!entry.meta.title) entry.meta.title = firstLineTitle(text)
-        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now()}})
+        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now(), mode: modeOf(entry)}})
     }
 
     /** A loaded chat that isn't replying, and where `messageId` is in it. */
@@ -597,7 +671,7 @@ export function useChats(session?: ActiveSession) {
         const {notes = [], folders = []} = entry.chat.messages[at]!.metadata ?? {}
         entry.meta.forks ??= {}
         entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
-        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now()}})
+        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now(), mode: modeOf(entry)}})
     }
 
     /** Writes a reply again, with `profileId` instead of the chat's model if given; the old one stays as a branch. */
@@ -728,7 +802,10 @@ export function useChats(session?: ActiveSession) {
         summary,
         profileId,
         /** A loaded chat's mode (chats from before modes: the settings' default) and scope. */
-        chatMode: (id: string) => computed(() => live.get(keyOf(id))?.meta.mode ?? defaultMode()),
+        chatMode: (id: string) => computed(() => {
+            const entry = live.get(keyOf(id))
+            return entry ? modeOf(entry) : defaultMode()
+        }),
         chatScope: (id: string) => computed(() => live.get(keyOf(id))?.meta.scope),
         /** The profile a loaded chat sends with (its pinned one while usable, else the chat feature's); none when there's no model. */
         chatProfile: (id: string) => {

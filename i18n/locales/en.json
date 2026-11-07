@@ -331,7 +331,7 @@
 					"chatStorageApp": "App data",
 					"chatStorageWorkspace": "Workspace (encrypted)",
 					"chatMode": "Chat mode",
-					"chatModeDescription": "The mode new chats start in. Ask only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply."
+					"chatModeDescription": "The mode new chats start in. Read only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply."
 				}
 			},
 			"scope": {
@@ -1424,6 +1424,10 @@
 				"accepted": "accepted",
 				"rejected": "rejected",
 				"waiting": "waiting for you in the note",
+				"declined": "declined",
+				"asksToRun": "asks to run",
+				"run": "Run",
+				"dontRun": "Don't run",
 				"names": {
 					"findTools": "Find tools",
 					"searchNotes": "Search notes",
@@ -1435,7 +1439,10 @@
 					"proposeInsert": "Propose an insertion",
 					"createNote": "Create a note",
 					"writeNote": "Rewrite a note",
-					"editNote": "Edit a note"
+					"editNote": "Edit a note",
+					"findFiles": "Find files",
+					"runWorkflow": "Run a workflow",
+					"askUser": "Ask you"
 				}
 			},
 			"edit": "Edit",
@@ -1488,7 +1495,7 @@
 			},
 			"mode": {
 				"label": "Mode",
-				"ask": "Ask",
+				"read": "Read",
 				"suggest": "Suggest",
 				"write": "Write"
 			},
@@ -1511,6 +1518,20 @@
 					"conflict": "Not applied: the note changed after it was staged",
 					"undone": "Undone by a rewind"
 				}
+			},
+			"questions": {
+				"title": "Question(s) ({count})",
+				"other": "Or your own answer…",
+				"answer": "Your answer…",
+				"skip": "Skip",
+				"submit": "Answer",
+				"skipped": "Skipped",
+				"noAnswer": "No answer",
+				"replied": "Answered in the prompt: {reply}"
+			},
+			"waitingPlaceholder": {
+				"question": "Answer the question above, or type your answer here…",
+				"approval": "Type here to not run it, and say why…"
 			}
 		}
 	}

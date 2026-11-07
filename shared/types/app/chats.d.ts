@@ -17,6 +17,8 @@ export interface ChatMessageMetadata {
     notes?: string[],
     folders?: string[],
     createdAt?: number,
+    /** The chat's mode when this (user) message was sent; the model is told where it changed. */
+    mode?: ChatMode,
     /** The model (and profile) that wrote this (assistant) message. */
     modelId?: string,
     profileId?: string,
@@ -67,10 +69,10 @@ export type VertexChatMessage = UIMessage<ChatMessageMetadata>
 export type ChatForks = Record<string, (VertexChatMessage[] | null)[]>
 
 /**
- * What a chat may do to notes: `ask` only reads; `suggest` proposes edits the user accepts or rejects in the editor;
- * `write` stages changes (and new notes) that the user reviews and applies after the reply.
+ * What a chat may do to notes: `read` only reads; `suggest` proposes edits the user accepts or rejects in the editor;
+ * `write` stages changes (and new notes) that the user reviews and applies after the reply. Stored `ask` is `read`.
  */
-export type ChatMode = 'ask' | 'suggest' | 'write'
+export type ChatMode = 'read' | 'suggest' | 'write'
 
 /** The notes a chat may change: the ones named in it (open, attached or `@`-mentioned, their folders'), a folder's, any. */
 export type ChatScope = {kind: 'named'} | {kind: 'workspace'} | {kind: 'folder', path: string}

@@ -1,5 +1,6 @@
 import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
+import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {DeepPartial} from "#shared/types/types";
@@ -76,6 +77,9 @@ const AI_SEED: AppAiConfig = {
     chatMode: 'suggest',
 }
 
+/** A stored chat mode (settings or a chat file) as a mode: `ask` is Read's old name; anything unknown is Suggest. */
+export const toChatMode = (value: unknown): ChatMode => value === 'read' || value === 'ask' ? 'read' : value === 'write' ? 'write' : 'suggest'
+
 export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     if (data === undefined) return structuredClone(AI_SEED)
     const ai: Loose = isLoose(data) ? data : {}
@@ -97,8 +101,7 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
-    const chatMode = ai.chatMode === 'ask' || ai.chatMode === 'write' ? ai.chatMode : 'suggest'
-    return {providers, modelProfiles, defaultModelProfile, features, chatStorage, chatMode}
+    return {providers, modelProfiles, defaultModelProfile, features, chatStorage, chatMode: toChatMode(ai.chatMode)}
 }
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
