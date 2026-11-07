@@ -7,7 +7,7 @@ import type {ChatFile, ChatIndex, ChatStorage, ChatSummary, ChatVaultState, Vert
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
-import {chatSystem, createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
+import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {chatTools, TOOLS_PROMPT, usedToolNames} from "~/utils/chatTools";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
@@ -276,7 +276,7 @@ export function useChats(session?: ActiveSession) {
             toolsOn ? TOOLS_PROMPT : '',
             editing ? `The open document, which the editor tools read and edit, is "${slashed(editing.relativePath)}".` : '',
         ].filter(Boolean).join('\n\n')
-        return {provider, profileId: profile.id, modelId: profile.modelId, system: chatSystem(prompt, await notesFor(messages)), tools}
+        return {provider, profileId: profile.id, modelId: profile.modelId, prompt, notes: await notesFor(messages), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)

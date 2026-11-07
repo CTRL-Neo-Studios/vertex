@@ -1446,6 +1446,37 @@
 			"branch": {
 				"previous": "Previous branch",
 				"next": "Next branch"
+			},
+			"context": {
+				"open": "Context…",
+				"info": "Info",
+				"title": "Context: {title}",
+				"totals": "{messages} messages · {calls} model calls · {input} tokens in · {output} out · {seconds} s",
+				"user": "You",
+				"assistant": "Assistant",
+				"sent": "Sent",
+				"attached": "Attached notes",
+				"parts": "Parts",
+				"notRecorded": "Not recorded: this reply is from before Vertex kept its context.",
+				"call": "Model call {n}",
+				"model": "Model",
+				"started": "Started",
+				"duration": "Duration",
+				"seconds": "{n} s",
+				"unfinished": "Stopped or failed",
+				"finishReason": "Finish reason",
+				"tokens": "Tokens",
+				"tokensLine": "{input} in · {output} out",
+				"reasoning": "{n} reasoning",
+				"cached": "{n} cached",
+				"notesSent": "Notes sent",
+				"chars": "{n} characters",
+				"toolsSent": "Tools sent",
+				"toolsDeferred": "Tools available through search",
+				"instructions": "Instructions (without the notes)",
+				"toolCalls": "Tool calls",
+				"step": "step {n}",
+				"raw": "Raw JSON"
 			}
 		}
 	}

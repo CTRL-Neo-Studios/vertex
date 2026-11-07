@@ -26,7 +26,7 @@ const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {vault, refresh, summary, profileId, chatProfile, saveError, retrySave, liveChat, send, editMessage, retryMessage, rewindTo, showBranch, branchOf, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
 const {updateModelProfile} = useAiConfig()
-const {chatActions} = useChatActions(session)
+const {chatActions, showContext} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
 const settings = useSettingsScope().effective
 
@@ -375,6 +375,9 @@ const profile = computed({
                                     <UButton icon="i-lucide-history" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.rewind.action')" @click="rewind(message)"/>
                                 </UTooltip>
                             </template>
+                            <UTooltip :text="$t('app.chat.context.info')">
+                                <UButton icon="i-lucide-info" size="sm" color="neutral" variant="ghost" :aria-label="$t('app.chat.context.info')" @click="current && showContext(current, message.id)"/>
+                            </UTooltip>
                         </div>
                     </template>
                 </UChatMessages>

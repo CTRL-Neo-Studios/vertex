@@ -19,6 +19,26 @@ export interface ChatMessageMetadata {
     /** The model (and profile) that wrote this (assistant) message. */
     modelId?: string,
     profileId?: string,
+    /** Every model call that wrote this (assistant) message: one, plus one per tool round answered in the webview. */
+    requests?: ChatRequestInfo[],
+}
+
+/** One model call of a reply, as the context view shows it. */
+export interface ChatRequestInfo {
+    profileId: string,
+    modelId: string,
+    startedAt: number,
+    /** Missing when the call was stopped or failed. */
+    finishedAt?: number,
+    finishReason?: string,
+    /** Tokens, as far as the provider reported them. */
+    usage?: {input?: number, output?: number, reasoning?: number, cachedInput?: number},
+    /** The instructions without the notes' text. */
+    prompt: string,
+    /** The notes sent, and how many of their characters (after the cap). */
+    notes: {path: string, chars: number}[],
+    /** Tool names: sent loaded, or deferred until a tool search finds them. */
+    tools: {loaded: string[], deferred: string[]},
 }
 
 export type VertexChatMessage = UIMessage<ChatMessageMetadata>

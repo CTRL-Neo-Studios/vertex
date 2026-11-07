@@ -1,7 +1,7 @@
-import {convertToModelMessages, generateText, isStepCount, streamText, type ChatTransport, type ToolSet} from "ai";
+import {convertToModelMessages, generateText, isStepCount, streamText, type ChatTransport, type LanguageModelUsage, type ToolSet} from "ai";
 import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
 import type {AiProviderProfile} from "#shared/types/app/ai";
-import type {VertexChatMessage} from "#shared/types/app/chats";
+import type {ChatRequestInfo, VertexChatMessage} from "#shared/types/app/chats";
 import {createAiFetch} from "~/utils/aiFetch";
 
 /** What one send uses. Resolved per send, so settings and the note context are current. */
@@ -9,7 +9,9 @@ export interface ChatSendSetup {
     provider: AiProviderProfile,
     profileId: string,
     modelId: string,
-    system: string,
+    /** The instructions before the notes. */
+    prompt: string,
+    notes: {path: string, content: string}[],
     /** The chat's tools (`chatTools`); omitted when the model profile has them off. */
     tools?: ToolSet,
 }
@@ -20,10 +22,14 @@ const MAX_STEPS = 8
 // ponytail: fixed character cap over all notes, first come first served; budget by the model's context length if it matters.
 const NOTE_CONTEXT_CHARS = 60_000
 
-/** The system prompt: the profile's prompt, then the notes (deduped by path, capped at {@link NOTE_CONTEXT_CHARS} in total). */
-export function chatSystem(prompt: string, notes: {path: string, content: string}[]): string {
+/**
+ * The system prompt: the profile's prompt, then the notes (deduped by path, capped at {@link NOTE_CONTEXT_CHARS} in
+ * total), with what was sent of each.
+ */
+export function chatSystem(prompt: string, notes: {path: string, content: string}[]) {
     const seen = new Set<string>()
     const blocks: string[] = []
+    const sent: {path: string, chars: number}[] = []
     let budget = NOTE_CONTEXT_CHARS
     for (const {path, content} of notes) {
         if (budget <= 0) break
@@ -32,13 +38,22 @@ export function chatSystem(prompt: string, notes: {path: string, content: string
         const text = content.slice(0, budget)
         budget -= text.length
         blocks.push(`<note path="${path}">\n${text}\n</note>`)
+        sent.push({path, chars: text.length})
     }
     const context = blocks.length ? `The user's notes (link to one as [[its path]]):\n\n${blocks.join('\n\n')}` : ''
-    return [prompt, context].filter(Boolean).join('\n\n')
+    return {system: [prompt, context].filter(Boolean).join('\n\n'), sent}
 }
 
+const usageOf = (u: LanguageModelUsage): ChatRequestInfo['usage'] => ({
+    input: u.inputTokens,
+    output: u.outputTokens,
+    reasoning: u.outputTokenDetails?.reasoningTokens,
+    cachedInput: u.inputTokenDetails?.cacheReadTokens,
+})
+
+// `includeUsage`: streamed replies only report tokens when asked (`stream_options.include_usage`).
 const modelFor = (provider: AiProviderProfile, modelId: string) =>
-    createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id)}).chatModel(modelId)
+    createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id), includeUsage: true}).chatModel(modelId)
 
 /** A model's title reply as a title: first line, no quotes, markdown marks or closing punctuation, at most 60 characters. */
 export function cleanTitle(text: string): string {
@@ -60,7 +75,20 @@ export async function generateChatTitle(provider: AiProviderProfile, modelId: st
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, profileId, modelId, system, tools} = await setup(messages)
+            const {provider, profileId, modelId, prompt, notes, tools} = await setup(messages)
+            const {system, sent} = chatSystem(prompt, notes)
+            const names = Object.entries(tools ?? {})
+            const request: ChatRequestInfo = {
+                profileId,
+                modelId,
+                startedAt: Date.now(),
+                prompt,
+                notes: sent,
+                tools: {loaded: names.filter(([, t]) => !t.deferLoading).map(([n]) => n), deferred: names.filter(([, t]) => t.deferLoading).map(([n]) => n)},
+            }
+            // A tool round continues the last reply: its earlier calls stay listed (metadata arrays replace, not merge).
+            const last = messages.at(-1)
+            const earlier = last?.role === 'assistant' ? last.metadata?.requests ?? [] : []
             return streamText({
                 model: modelFor(provider, modelId),
                 instructions: system || undefined,
@@ -70,7 +98,12 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
             })
                 .toUIMessageStream<VertexChatMessage>({
                     sendReasoning: true,
-                    messageMetadata: ({part}) => part.type === 'finish' ? {modelId, profileId} : undefined,
+                    messageMetadata: ({part}) => {
+                        if (part.type === 'start') return {requests: [...earlier, request]}
+                        if (part.type !== 'finish') return undefined
+                        Object.assign(request, {finishedAt: Date.now(), finishReason: part.finishReason, usage: usageOf(part.totalUsage)})
+                        return {modelId, profileId, requests: [...earlier, request]}
+                    },
                     // The default hides every error as "An error occurred."
                     onError: error => error instanceof Error ? error.message : String(error),
                 })

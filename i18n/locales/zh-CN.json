@@ -1446,6 +1446,37 @@
 			"branch": {
 				"previous": "上一个分支",
 				"next": "下一个分支"
+			},
+			"context": {
+				"open": "上下文…",
+				"info": "信息",
+				"title": "上下文：{title}",
+				"totals": "{messages} 条消息 · {calls} 次模型调用 · 输入 {input} 词元 · 输出 {output} · {seconds} 秒",
+				"user": "你",
+				"assistant": "助手",
+				"sent": "发送时间",
+				"attached": "附加的笔记",
+				"parts": "部分",
+				"notRecorded": "未记录：这条回复早于 Vertex 开始记录上下文。",
+				"call": "模型调用 {n}",
+				"model": "模型",
+				"started": "开始时间",
+				"duration": "耗时",
+				"seconds": "{n} 秒",
+				"unfinished": "已停止或失败",
+				"finishReason": "结束原因",
+				"tokens": "词元",
+				"tokensLine": "输入 {input} · 输出 {output}",
+				"reasoning": "推理 {n}",
+				"cached": "缓存 {n}",
+				"notesSent": "发送的笔记",
+				"chars": "{n} 个字符",
+				"toolsSent": "发送的工具",
+				"toolsDeferred": "可通过搜索加载的工具",
+				"instructions": "指令（不含笔记）",
+				"toolCalls": "工具调用",
+				"step": "第 {n} 步",
+				"raw": "原始 JSON"
 			}
 		}
 	}

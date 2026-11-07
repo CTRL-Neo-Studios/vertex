@@ -6,6 +6,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import ChatNameModal from "~/components/Chat/ChatNameModal.vue";
 import ChatDeleteModal from "~/components/Chat/ChatDeleteModal.vue";
 import ChatPasswordModal from "~/components/Chat/ChatPasswordModal.vue";
+import ChatContextModal from "~/components/Chat/ChatContextModal.vue";
 import {chatClient} from "~/utils/chatClient";
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -17,10 +18,11 @@ export function useChatActions(session?: ActiveSession) {
     const {t} = useI18n()
     const $qt = useQuickToasts()
     const $ovl = useOverlay()
-    const {root, index, vault, lock, createChat, renameChat, moveChat, deleteChat, createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab} = useChats(session)
+    const {root, index, vault, lock, createChat, renameChat, moveChat, deleteChat, createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab, liveChat} = useChats(session)
     const nameModal = $ovl.create(ChatNameModal)
     const deleteModal = $ovl.create(ChatDeleteModal)
     const passwordModal = $ovl.create(ChatPasswordModal)
+    const contextModal = $ovl.create(ChatContextModal)
 
     const chatTitle = (chat: ChatSummary) => chat.title || t('app.chat.untitled')
 
@@ -34,6 +36,11 @@ export function useChatActions(session?: ActiveSession) {
     }
 
     const newChat = (folder = '') => run(async () => openInTab((await createChat(folder)).id))
+
+    /** The chat's context view, opened at `focus` (a message id) if given. */
+    const showContext = (chat: ChatSummary, focus?: string) => run(async () => {
+        void contextModal.open({messages: (await liveChat(chat.id)).messages, title: chatTitle(chat), focus})
+    })
 
     async function newFolder(parent = '') {
         const name = await nameModal.open({modalTitle: t('app.chat.newFolder'), label: t('app.chat.folderName'), folder: true}).result
@@ -103,6 +110,7 @@ export function useChatActions(session?: ActiveSession) {
                     ],
                 },
             ],
+            [{label: t('app.chat.context.open'), icon: 'i-lucide-info', onSelect: () => showContext(chat)}],
             [{label: t('app.generic.delete'), icon: 'i-lucide-trash', color: 'error', onSelect: () => remove(chat)}],
         ]
     }
@@ -132,5 +140,5 @@ export function useChatActions(session?: ActiveSession) {
         ]
     }
 
-    return {run, chatTitle, newChat, newFolder, moveFolderTo, panelMenu, chatActions, folderActions}
+    return {run, chatTitle, newChat, newFolder, moveFolderTo, panelMenu, chatActions, folderActions, showContext}
 }
