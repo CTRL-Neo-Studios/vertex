@@ -1,4 +1,5 @@
 import type {FileTrustMode} from "#shared/workflows/trust"
+import type {AppAiConfig} from "#shared/types/app/ai"
 
 export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both'
 
@@ -11,6 +12,8 @@ export interface AppSettings {
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
     workflowConfig: AppWorkflowConfig,
+    /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
+    aiConfig: AppAiConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
@@ -59,5 +62,13 @@ export interface AppViewConfig {
     },
     editorPanel: {
         showStatusBar: 'show-on-hover' | 'always-shown' | 'always-hidden',
+        selectionToolbar: boolean,
+        slashMenu: boolean,
+        blockHandle: boolean,
+        /** Where the header shows undo/redo and the formatting buttons; `hidden` turns them off. */
+        headerHistory: HeaderToolsPosition,
+        headerFormatting: HeaderToolsPosition,
     }
 }
+
+export type HeaderToolsPosition = 'left' | 'right' | 'hidden'

@@ -1,8 +1,8 @@
 import type {DispatcherEvent} from "@type32/dispatcher";
-import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
 
 export interface ToTocEntryProps {
-    node: TocEntry,
+    /** Document position of the heading to jump to. */
+    from: number,
     verticalScrollStrategy?: "nearest" | "start" | "end" | "center",
     verticalMargin?: number,
 }

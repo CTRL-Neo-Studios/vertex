@@ -6,6 +6,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 
 /**
  * Brings a freshly created session window back to its persisted state:
@@ -27,20 +28,23 @@ export function useAppSessionRecovery() {
         return result
     }
 
-    /** Restore tabs, focused tab and expanded folders after the workspace index is built. */
+    /** Restore tabs (files, then chats), focused tab, expanded folders and the left sidebar's view after the workspace index is built. */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
         const {getFilesByPaths, getFileByPath} = useActiveWorkspaceIndex(activeSession)
-        const {openTabs, getActiveTab} = useActiveTabs(activeSession)
+        const {openTab, openTabs, getActiveTab} = useActiveTabs(activeSession)
         const expandedFolders = useState<string[]>(StateKey.expandedFolders(activeSession.uuid), () => [])
         const context = appSession.context
 
         expandedFolders.value = getFilesByPaths(context?.openedAbsoluteFolderPaths ?? []).map(f => f.uuid)
+        useActiveLayouts(activeSession).leftPanelView.value = context?.leftPanelView === 'chats' ? 'chats' : 'files'
 
         const fileUuids = getFilesByPaths(context?.openedAbsoluteFilePaths ?? []).map(f => f.uuid)
-        if (fileUuids.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
+        const chatIds = context?.openedChatIds ?? []
+        if (fileUuids.length === 0 && chatIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
 
-        const lastOpened = openTabs(fileUuids)
-        const focused = getActiveTab(getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
+        let lastOpened = openTabs(fileUuids)
+        for (const id of chatIds) lastOpened = openTab(id, 'chat')
+        const focused = getActiveTab(context.lastFocusedChatId ?? getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
         await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
     }
 

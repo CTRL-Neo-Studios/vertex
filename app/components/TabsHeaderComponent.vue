@@ -9,6 +9,7 @@ import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useChats} from "~/composables/ai/useChats";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -25,6 +26,7 @@ const {
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
+const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
 const {
     leftPanelCollapsed,
     rightPanelCollapsed
@@ -98,11 +100,12 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 
     unref(tabs)?.forEach(i => {
         const node = getFileByUuid(i.fileUuid)
+        const isChat = i.kind === 'chat'
 
-        if (node) {
+        if (node || isChat) {
             items[1]?.push({
-                label: node.fileName,
-                icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : node?.fileName,
+                icon: isChat ? 'i-lucide-message-square' : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)
@@ -142,30 +145,34 @@ function scrollToItem(index: number) {
 
 <template>
     <div class="w-full flex items-center" data-tauri-drag-region>
-        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`" data-tauri-drag-region>
+        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2`" data-tauri-drag-region>
             <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
             <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
         </div>
         <UScrollArea
             ref="scrollArea"
             v-if="isWorkspace"
-            class="no-scrollbar w-full h-full relative"
+            class="no-scrollbar w-full h-full relative px-2 flex items-center justify-center"
             v-slot="{ item, index }: {item: DropdownMenuItem, index: number}"
             :items="dropdownItems[1]"
             orientation="horizontal"
-            virtualize
+            :virtualize="{ gap: 8 }"
+			:ui="{
+				item: 'flex items-center justify-center rounded'
+			}"
+			data-tauri-drag-region
         >
             <div v-if="tabs.length == 0" class="w-full items-center text-center">
                 <span class="text-sm text-dimmed">{{ $t('app.editor.ui.selectFileShort') }}</span>
             </div>
             <div
                 v-else
-                :class="['w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 after:border-b-2 after:border-neutral after:w-0 after:bottom-0 after:h-full after:bg-linear-to-t after:from-primary/10 dark:after:from-primary/20 after:via-transparent after:to-transparent', 'h-full', tabId == item.id ? 'after:absolute after:transition after:border-b-2 after:border-primary after:w-full' : '']"
+                :class="['rounded-md w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 ', 'h-fit', tabId == item.id ? 'after:absolute after:transition after:w-full shadow shadow-primary/20' : '']"
             >
                 <UButton
                     :key="index"
                     size="sm"
-                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
+                    :class="['rounded-md cursor-pointer transition-all duration-300 h-fit py-2 align-middle', 'border-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
                     :color="tabId == item.id ? 'primary' : 'neutral'"
                     :variant="tabId == item.id ? 'soft' : 'ghost'"
                     :label="item.label"
@@ -188,22 +195,9 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-<!--        <ScrollAreaRoot v-if="isWorkspace" class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px" data-tauri-drag-region>-->
-<!--            <ScrollAreaViewport class="grid grid-cols-1 h-full">-->
-
-<!--            </ScrollAreaViewport>-->
-<!--            <ScrollAreaScrollbar-->
-<!--                class="select-none touch-none z-20 h-0 m-2"-->
-<!--                orientation="horizontal"-->
-<!--            >-->
-<!--                <ScrollAreaThumb-->
-<!--                    class="flex-1 bg-accented rounded-lg"-->
-<!--                />-->
-<!--            </ScrollAreaScrollbar>-->
-<!--        </ScrollAreaRoot>-->
-        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
+        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
-                <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
+                <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
             <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
         </div>

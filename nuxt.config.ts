@@ -3,6 +3,7 @@ export default defineNuxtConfig({
     $production: {devtools: {enabled: false}},
 
     modules: [
+      "@comark/nuxt",
       "@nuxt/ui",
       "@vueuse/nuxt",
       "@nuxt/icon",
@@ -56,6 +57,19 @@ export default defineNuxtConfig({
         ]
     },
 
+    // Model vendor logos (Settings → Assistive AI, `ModelBadges.vue`): picked at runtime, so bundle them.
+    icon: {
+        clientBundle: {
+            icons: [
+                'simple-icons:openai', 'simple-icons:anthropic', 'simple-icons:googlegemini', 'simple-icons:meta',
+                'simple-icons:mistralai', 'simple-icons:deepseek', 'simple-icons:qwen', 'simple-icons:alibabacloud',
+                'simple-icons:microsoft', 'simple-icons:nvidia', 'simple-icons:perplexity', 'simple-icons:ollama',
+                'simple-icons:huggingface', 'simple-icons:amazon', 'simple-icons:ibm', 'simple-icons:moonshotai',
+                'simple-icons:minimax', 'simple-icons:openrouter',
+            ],
+        },
+    },
+
     // SPA: `nuxt generate` emits static files that Tauri serves; there is no server at runtime.
     ssr: false,
     ignore: ['**/src-tauri/**'],
@@ -89,11 +103,26 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/webview",
                 "@tauri-apps/api/window",
                 "@tauri-apps/plugin-process",
+                "@tauri-apps/plugin-updater",
+                // Nuxt DevTools' client; discovered late otherwise, which reloads the page.
+                "@vue/devtools-core",
                 "@tauri-apps/api/event",
                 "@tauri-apps/api/core",
                 "@tauri-apps/api/dpi",
+                // Imported by pages/settings/index.vue; found at runtime otherwise, which reloads the page mid-load ("head.hooks").
+                "@tauri-apps/api/app",
                 "tailwindcss/colors",
                 "pele",
+                "ai",
+                "@ai-sdk/openai-compatible",
+                "@ai-sdk/vue",
+                // @comark/nuxt's auto-registered <Markdown> comes from @comark/vue.
+                "@comark/vue",
+                "@comark/nuxt/utils",
+                "@comark/nuxt/plugins/math",
+                "@comark/nuxt/plugins/rangi",
+                // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
+                "katex",
                 "@type32/obsidian-bases-parser",
                 "@type32/latex2vue",
                 "zod",

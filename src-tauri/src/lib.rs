@@ -1,4 +1,7 @@
+mod ai;
+mod chats;
 mod fonts;
+mod notes;
 mod state;
 mod updater;
 
@@ -200,6 +203,8 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
+        .manage(ai::AiRequests::default())
+        .manage(chats::ChatVaults::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -244,6 +249,25 @@ pub fn run() {
             updater::update_token_set,
             updater::update_channels,
             fonts::system_fonts,
+            ai::ai_key_set,
+            ai::ai_key_has,
+            ai::ai_request,
+            ai::ai_request_cancel,
+            ai::ai_model_catalog,
+            chats::chat_vault_state,
+            chats::chat_vault_create,
+            chats::chat_vault_unlock,
+            chats::chat_vault_lock,
+            chats::chat_vault_change,
+            notes::notes_search,
+            chats::chat_index,
+            chats::chat_read,
+            chats::chat_write,
+            chats::chat_delete,
+            chats::chat_folders_set,
+            chats::chat_folder_rename,
+            chats::chat_folder_delete,
+            chats::chat_search,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

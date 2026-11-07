@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppSettings, defaultAppWorkflowConfig } from './apps'
+import { defaultAppAiConfig, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -39,5 +39,35 @@ describe('defaultAppWorkflowConfig', () => {
         expect(c).not.toHaveProperty('trustedWorkspaces')
         expect(c.fileTrust).toBe('content')
         expect(defaultAppWorkflowConfig({fileTrust: 'path'}).fileTrust).toBe('path')
+    })
+})
+
+describe('defaultAppAiConfig', () => {
+    it('seeds Local Ollama only when aiConfig is absent, so removing it sticks', () => {
+        expect(defaultAppSettings().aiConfig.providers.map(p => p.id)).toEqual(['local-ollama'])
+        expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest'})
+        expect(defaultAppAiConfig({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
+        expect(defaultAppAiConfig({chatStorage: 'cloud'}).chatStorage).toBe('app')
+        expect(defaultAppAiConfig({chatMode: 'read'}).chatMode).toBe('read')
+        expect(defaultAppAiConfig({chatMode: 'ask'}).chatMode).toBe('read')
+        expect(defaultAppAiConfig({chatMode: 'write'}).chatMode).toBe('write')
+        expect(defaultAppAiConfig({chatMode: 'yolo'}).chatMode).toBe('suggest')
+    })
+
+    it('drops malformed entries and falls back to the first profile as default', () => {
+        const c = defaultAppAiConfig({
+            providers: [{id: 'p', name: 'P', baseURL: 'http://x/v1', models: [{id: 'm', contextLength: 'big'}, {name: 'no id'}]}, {name: 'no id'}, 'x', {id: 'p'}],
+            modelProfiles: [{id: 'a', providerId: 'p', modelId: 'm'}, null, {id: 'b', providerId: 'p', modelId: 'm', tools: false}, {id: 'c', providerId: 'p', modelId: 'm', tools: 'off'}],
+            defaultModelProfile: 'gone',
+            features: {editorAssistant: '', other: 3},
+        })
+        expect(c.providers).toEqual([{id: 'p', name: 'P', baseURL: 'http://x/v1', models: [{id: 'm'}]}])
+        expect(c.modelProfiles).toEqual([
+            {id: 'a', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''},
+            {id: 'b', name: '', providerId: 'p', modelId: 'm', systemPrompt: '', tools: false},
+            {id: 'c', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''},
+        ])
+        expect(c.defaultModelProfile).toBe('a')
+        expect(c.features).toEqual({editorAssistant: ''})
     })
 })

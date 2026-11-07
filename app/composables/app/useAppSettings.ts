@@ -23,8 +23,9 @@ export function useAppSettings() {
         try {
             const stored = await stateClient.getSettings()
             config.value = defaultAppSettings(stored ?? undefined)
-            // First launch, or a legacy file that still needs migrating to the current shape.
-            if (!stored || !('recoverSessions' in stored)) await stateClient.setSettings(config.value)
+            // First launch, or a file that still needs migrating to the current shape. Rust reads `aiConfig`
+            // (AI requests are checked against its providers), so the seeded one must reach the file too.
+            if (!stored || !('recoverSessions' in stored) || !('aiConfig' in stored)) await stateClient.setSettings(config.value)
         } catch (error) {
             console.error("[useAppSettings] failed to load settings:", error)
             config.value = defaultAppSettings()

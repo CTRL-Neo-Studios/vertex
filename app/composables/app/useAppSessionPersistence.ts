@@ -4,6 +4,7 @@ import {StateKey} from "#shared/constants/app";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {stateClient} from "~/utils/stateClient";
 
@@ -19,14 +20,20 @@ export function useAppSessionPersistence(session: ActiveSession) {
     const {tabs, activeTabUuid} = useActiveTabs(session)
     const expandedFolders = useState<string[]>(StateKey.expandedFolders(session.uuid), () => [])
     const pathOf = useActiveWorkspaceIndex(session).getFileByUuid
+    const {leftPanelView} = useActiveLayouts(session)
 
     function snapshot(): AppSessionContext {
         const paths = (uuids: (string | null | undefined)[]) =>
             uuids.map(u => pathOf(u ?? undefined)?.fullPath).filter((p): p is string => !!p)
+        const chatIds = unref(tabs).filter(t => t.kind === 'chat').map(t => t.fileUuid)
+        const focused = unref(activeTabUuid)
         return {
-            openedAbsoluteFilePaths: paths(unref(tabs).map(t => t.fileUuid)),
+            openedAbsoluteFilePaths: paths(unref(tabs).filter(t => t.kind !== 'chat').map(t => t.fileUuid)),
             openedAbsoluteFolderPaths: session.workspaceSession ? paths(unref(expandedFolders)) : [],
-            lastFocusedAbsoluteFilePath: paths([unref(activeTabUuid)])[0],
+            lastFocusedAbsoluteFilePath: paths([focused])[0],
+            openedChatIds: chatIds,
+            lastFocusedChatId: focused && chatIds.includes(focused) ? focused : undefined,
+            leftPanelView: unref(leftPanelView),
         }
     }
 
@@ -52,7 +59,7 @@ export function useAppSessionPersistence(session: ActiveSession) {
 
     /** Begin tracking. Call after tabs have been restored so the restored state is not overwritten by an empty one. */
     function start() {
-        watch([tabs, activeTabUuid, expandedFolders], () => persistSoon(), {deep: true})
+        watch([tabs, activeTabUuid, expandedFolders, leftPanelView], () => persistSoon(), {deep: true})
     }
     /**
      * Single close path for session windows: flush the latest state, then let Tauri destroy the window.

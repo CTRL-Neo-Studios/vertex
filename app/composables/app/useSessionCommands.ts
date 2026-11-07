@@ -6,6 +6,7 @@ import {useCommands} from "~/composables/app/useAppWindowMenu";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {useChatActions} from "~/composables/ai/useChatActions";
 
 /**
  * Commands that act on the open session (tabs, save, new folder). Registered by the session layout,
@@ -19,6 +20,7 @@ export function useSessionCommands(session?: ActiveSession) {
     const $qt = useQuickToasts()
     const {tabs, activeTabUuid, closeTab, clearTabs, getActiveTab, setTabSavedState} = useActiveTabs(session)
     const newFileModal = useOverlay().create(NewFileModal)
+    const {newChat} = useChatActions(session)
     const isWorkspace = !!session?.workspaceSession
     const tabId = () => route.params.tabId as string | undefined
     const hasTab = () => !!tabId() && !!getActiveTab(tabId())
@@ -47,6 +49,8 @@ export function useSessionCommands(session?: ActiveSession) {
         ...(isWorkspace ? {
             'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
             'file.newWorkflow': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'workflow', modalTitle: t('app.editor.ui.filetree.newWorkflow')})},
+            // Opens it in a tab; a locked vault or a failure shows as a toast (useChatActions.run).
+            'file.newChat': {run: () => newChat()},
             'view.closeTab': {
                 run: async () => {
                     const id = tabId()
