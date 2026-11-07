@@ -331,7 +331,7 @@
 					"chatStorageApp": "App data",
 					"chatStorageWorkspace": "Workspace (encrypted)",
 					"chatMode": "Chat mode",
-					"chatModeDescription": "The mode new chats start in. Ask only reads your notes; Suggest also proposes edits you accept or reject."
+					"chatModeDescription": "The mode new chats start in. Ask only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply."
 				}
 			},
 			"scope": {
@@ -1432,7 +1432,10 @@
 					"readDocument": "Read the open note",
 					"readSelection": "Read the selection",
 					"proposeEdit": "Propose an edit",
-					"proposeInsert": "Propose an insertion"
+					"proposeInsert": "Propose an insertion",
+					"createNote": "Create a note",
+					"writeNote": "Rewrite a note",
+					"editNote": "Edit a note"
 				}
 			},
 			"edit": "Edit",
@@ -1443,7 +1446,10 @@
 				"action": "Rewind to here",
 				"title": "Rewind to this reply?",
 				"description": "The {count} message(s) after it will be removed, with their branches.",
-				"confirm": "Rewind"
+				"confirm": "Rewind",
+				"undo": "It also undoes the changes applied from those replies: {paths}",
+				"undone": "Undid {count} change(s)",
+				"skipped": "Left {count} note(s) as they are: they changed since"
 			},
 			"branch": {
 				"previous": "Previous branch",
@@ -1483,13 +1489,28 @@
 			"mode": {
 				"label": "Mode",
 				"ask": "Ask",
-				"suggest": "Suggest"
+				"suggest": "Suggest",
+				"write": "Write"
 			},
 			"scope": {
 				"label": "Notes it may change",
 				"named": "Named notes",
 				"workspace": "Whole workspace",
 				"search": "Search folders"
+			},
+			"changes": {
+				"title": "Changes ({count})",
+				"apply": "Apply ({count})",
+				"discard": "Discard",
+				"new": "New",
+				"conflicts": "{count} change(s) not applied: the note changed after it was staged",
+				"states": {
+					"pending": "Pending",
+					"applied": "Applied",
+					"discarded": "Discarded",
+					"conflict": "Not applied: the note changed after it was staged",
+					"undone": "Undone by a rewind"
+				}
 			}
 		}
 	}

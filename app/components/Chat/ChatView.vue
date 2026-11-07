@@ -15,6 +15,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {toolsUnsupported} from "~/utils/chatTools";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
+import ChatChanges from "~/components/Chat/ChatChanges.vue";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
 
 /** One conversation: header, messages, prompt. In a tab it offers "move to side panel"; in the side panel, "open in tab". */
@@ -41,6 +42,7 @@ const {
 	editMessage,
 	retryMessage,
 	rewindTo,
+	appliedAfter,
 	showBranch,
 	branchOf,
 	setProfile,
@@ -162,13 +164,21 @@ const retryItems = (message: VertexChatMessage) => [
 async function rewind(message: VertexChatMessage) {
 	const messages = chat.value?.messages ?? []
 	const count = messages.length - 1 - messages.findIndex(m => m.id === message.id)
-	const confirmed = await ask(t('app.chat.rewind.description', {count}), {
+	// Rewinding also undoes what the dropped replies changed in notes: say which before asking.
+	const applied = appliedAfter(props.chatId, message.id).map(c => c.path)
+	const description = t('app.chat.rewind.description', {count}) + (applied.length ? `\n\n${t('app.chat.rewind.undo', {paths: applied.join(', ')})}` : '')
+	const confirmed = await ask(description, {
 		title: t('app.chat.rewind.title'),
 		kind: 'warning',
 		okLabel: t('app.chat.rewind.confirm'),
 		cancelLabel: t('app.generic.cancel'),
 	})
-	if (confirmed) await act(() => rewindTo(props.chatId, message.id))
+	if (!confirmed) return
+	await act(async () => {
+		const {undone, skipped} = await rewindTo(props.chatId, message.id)
+		if (undone.length) $qt.success(t('app.chat.rewind.undone', {count: undone.length}))
+		if (skipped.length) $qt.warning(t('app.chat.rewind.skipped', {count: skipped.length}), skipped.join(', '))
+	})
 }
 
 const input = ref('')
@@ -218,6 +228,9 @@ const TOOL_ICONS: Record<string, string> = {
 	readSelection: 'i-lucide-text-select',
 	proposeEdit: 'i-lucide-file-pen-line',
 	proposeInsert: 'i-lucide-file-plus',
+	createNote: 'i-lucide-file-plus-2',
+	writeNote: 'i-lucide-file-pen',
+	editNote: 'i-lucide-file-pen-line',
 }
 const TOOL_DETAIL_CHARS = 4000
 
@@ -364,10 +377,12 @@ const profile = computed({
 	set: value => setProfile(props.chatId, value === DEFAULT_PROFILE ? undefined : value),
 })
 
-// What the chat may do to notes (Ask: read only; Suggest: propose edits), and which notes it may change.
+// What the chat may do to notes (Ask: read only; Suggest: propose edits; Write: stage changes to review), and which
+// notes it may change.
 const modeItems = computed(() => [
 	{label: t('app.chat.mode.ask'), value: 'ask' as const, icon: 'i-lucide-message-circle-question'},
 	{label: t('app.chat.mode.suggest'), value: 'suggest' as const, icon: 'i-lucide-pencil-line'},
+	{label: t('app.chat.mode.write'), value: 'write' as const, icon: 'i-lucide-feather'},
 ])
 const mode = computed({
 	get: () => chatMode(props.chatId).value,
@@ -461,6 +476,7 @@ const compact = computed(() => props.inSidePanel ? {
 										}}</pre>
 								</UChatTool>
 							</template>
+							<ChatChanges v-if="message.metadata?.changes?.length" :chat-id="chatId" :message :busy/>
 						</template>
 					</template>
 					<template #actions="{ message }">
@@ -586,7 +602,7 @@ const compact = computed(() => props.inSidePanel ? {
 							</UTooltip>
 							<UTooltip :text="$t('app.chat.scope.label')">
 								<USelectMenu
-									v-if="mode === 'suggest'"
+									v-if="mode !== 'ask'"
 									v-model="scope"
 									:items="scopeItems"
 									value-key="value"

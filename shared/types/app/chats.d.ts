@@ -22,6 +22,22 @@ export interface ChatMessageMetadata {
     profileId?: string,
     /** Every model call that wrote this (assistant) message: one, plus one per tool round answered in the webview. */
     requests?: ChatRequestInfo[],
+    /** Write mode: the note changes this (assistant) message staged, one per note, for the user to review. */
+    changes?: ChatChange[],
+}
+
+/** A note change a Write-mode reply staged, and what became of it. */
+export interface ChatChange {
+    /** Workspace-relative. */
+    path: string,
+    /** The note's text when first staged; `null` = it didn't exist (the reply creates it). */
+    before: string | null,
+    after: string,
+    /**
+     * `conflict`: the note changed after it was staged, so it wasn't applied. `undone`: applied, then reverted by a
+     * rewind past its reply.
+     */
+    state: 'pending' | 'applied' | 'discarded' | 'conflict' | 'undone',
 }
 
 /** One model call of a reply, as the context view shows it. */
@@ -50,8 +66,11 @@ export type VertexChatMessage = UIMessage<ChatMessageMetadata>
  */
 export type ChatForks = Record<string, (VertexChatMessage[] | null)[]>
 
-/** What a chat may do to notes: `ask` only reads; `suggest` proposes edits the user accepts or rejects in the editor. */
-export type ChatMode = 'ask' | 'suggest'
+/**
+ * What a chat may do to notes: `ask` only reads; `suggest` proposes edits the user accepts or rejects in the editor;
+ * `write` stages changes (and new notes) that the user reviews and applies after the reply.
+ */
+export type ChatMode = 'ask' | 'suggest' | 'write'
 
 /** The notes a chat may change: the ones named in it (open, attached or `@`-mentioned, their folders'), a folder's, any. */
 export type ChatScope = {kind: 'named'} | {kind: 'workspace'} | {kind: 'folder', path: string}

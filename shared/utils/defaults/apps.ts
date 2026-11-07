@@ -97,7 +97,7 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
-    const chatMode = ai.chatMode === 'ask' ? 'ask' : 'suggest'
+    const chatMode = ai.chatMode === 'ask' || ai.chatMode === 'write' ? ai.chatMode : 'suggest'
     return {providers, modelProfiles, defaultModelProfile, features, chatStorage, chatMode}
 }
 

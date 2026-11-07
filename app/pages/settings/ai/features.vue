@@ -49,6 +49,7 @@ const storageItems = computed(() => [
 const modeItems = computed(() => [
     {label: t('app.chat.mode.ask'), value: 'ask'},
     {label: t('app.chat.mode.suggest'), value: 'suggest'},
+    {label: t('app.chat.mode.write'), value: 'write'},
 ])
 
 // Mirrors custom CSS: a workspace's feature choices apply only once its folder is trusted.

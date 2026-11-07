@@ -47,6 +47,12 @@ export function lastShownNoteOf(session: ActiveSession | undefined) {
     return lastShown.get(sessionScope(session, 'lastShownNoteOf'))
 }
 
+/** Every mounted markdown editor of the session. */
+export function editorViewsOf(session: ActiveSession | undefined) {
+    const prefix = `${sessionScope(session, 'editorViewsOf')}:`
+    return [...views].flatMap(([key, view]) => key.startsWith(prefix) ? [view] : [])
+}
+
 /** Read-only outline of a tab's markdown editor and the `from` of the heading containing the cursor; follows `tabId`. */
 export function useTabOutline(session: ActiveSession | undefined, tabId: MaybeRefOrGetter<string>) {
     const nuxtApp = useNuxtApp()

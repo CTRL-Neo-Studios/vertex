@@ -10,8 +10,13 @@ export interface NoteToolDeps {
     read: (path: string) => Promise<string | null>
     /** Workspace-relative paths of the notes under `folder` (`''` = all). */
     list: (folder: string) => string[]
-    /** Suggest mode: the editor tools (read the open note, propose edits to notes in scope) come too. */
-    suggest: boolean
+    /** Suggest: the editor tools come too (read the open note, propose edits). Write: the staging tools (`stage`). */
+    mode: ChatMode
+    /**
+     * Write mode: stages `markdown` as the note's new text (`create`: a new note at `path`). Checks the path and the
+     * scope; returns what the model gets back.
+     */
+    stage?: (path: string, markdown: string, create: boolean) => Promise<object>
 }
 
 const NOTE_READ_CHARS = 20_000
@@ -24,7 +29,12 @@ export function toolsPrompt(mode: ChatMode, scope: string): string {
     const find = 'You can use tools on the user\'s notes. Your tools load on demand: call `findTools` with what you want to do (for example "search notes", "read note", "list notes"'
     if (mode === 'ask') {
         return `${find}), then call the tools it returns. This chat is in Ask mode: you can read notes but not change them. `
-            + 'If the user wants a change, tell them to switch the chat to Suggest mode.'
+            + 'If the user wants a change, tell them to switch the chat to Suggest or Write mode.'
+    }
+    if (mode === 'write') {
+        return `${find}, "create a note", "write a note" or "edit a note"), then call the tools it returns. Your changes `
+            + 'are staged, not applied: after your reply the user reviews them and applies the ones they want, so say what '
+            + `you changed. You may change ${scope}; notes you create count as named in this chat.`
     }
     return `${find}, "read the open document" or "edit a note"), then call the tools it returns. Edits are only proposed: `
         + `the user accepts or rejects each one, and the result tells you which. You may propose edits to ${scope}. `
@@ -114,6 +124,51 @@ const suggestTools: ToolSet = {
     }),
 }
 
+const markdownInput = (path: string) => jsonSchema<{ path: string, markdown: string }>({
+    type: 'object',
+    properties: {path: {type: 'string', description: path}, markdown: {type: 'string', description: 'The note\'s whole Markdown.'}},
+    required: ['path', 'markdown'],
+    additionalProperties: false,
+})
+
+/** Write mode's tools: each stages a change (see {@link NoteToolDeps.stage}), which the user applies after the reply. */
+const writeTools = (deps: NoteToolDeps): ToolSet => {
+    const stage = deps.stage ?? (async () => ({error: 'This chat can\'t change notes.'}))
+    return {
+        createNote: tool({
+            description: 'Create a new note. Staged: the user reviews it after your reply and applies it if they want.',
+            inputSchema: markdownInput('Workspace-relative path of the new note, e.g. "Folder/Note.md"; missing folders are created.'),
+            execute: ({path, markdown}) => stage(path, markdown, true),
+        }),
+        writeNote: tool({
+            description: 'Replace a note\'s whole Markdown, e.g. to rewrite or restructure it. Staged like every change.',
+            inputSchema: markdownInput('Workspace-relative path or name of the note.'),
+            execute: ({path, markdown}) => stage(path, markdown, false),
+        }),
+        editNote: tool({
+            description: 'Replace one passage of a note (after your earlier staged changes to it). Staged like every change.',
+            inputSchema: jsonSchema<{ path: string, find: string, replace: string }>({
+                type: 'object',
+                properties: {
+                    path: {type: 'string', description: 'Workspace-relative path or name of the note.'},
+                    find: {type: 'string', description: 'The passage to replace, copied verbatim from the note. Must occur exactly once.'},
+                    replace: {type: 'string', description: 'The new Markdown text.'},
+                },
+                required: ['path', 'find', 'replace'],
+                additionalProperties: false,
+            }),
+            execute: async ({path, find, replace}) => {
+                const text = await deps.read(path)
+                if (text === null) return {error: `There's no note at "${path}". Use searchNotes or listNotes for its path.`}
+                const at = find ? text.indexOf(find) : -1
+                if (at < 0) return {error: 'Passage not found. Copy it exactly as it appears in the note (see readNote).'}
+                if (text.indexOf(find, at + 1) >= 0) return {error: 'Passage occurs more than once. Include more surrounding words so it matches exactly once.'}
+                return stage(path, text.slice(0, at) + replace + text.slice(at + find.length), false)
+            },
+        }),
+    }
+}
+
 /**
  * The chat's tools. Every tool but `findTools` (the AI SDK's tool search) is deferred, so the model loads only what it
  * looks for, except the ones this conversation already used or found (`used`): discovery lasts one generation, and
@@ -155,7 +210,7 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
                 return {paths: paths.slice(0, LIST_LIMIT), more: Math.max(0, paths.length - LIST_LIMIT)}
             },
         }),
-        ...(deps.suggest ? suggestTools : {}),
+        ...(deps.mode === 'suggest' ? suggestTools : deps.mode === 'write' ? writeTools(deps) : {}),
     }
     const deferred = Object.entries(tools).map(([name, t]) => [name, used.has(name) ? t : {...t, deferLoading: true}])
     return {[FIND_TOOLS]: toolSearch({search: rankTools, maxResults: Object.keys(tools).length}), ...Object.fromEntries(deferred)}

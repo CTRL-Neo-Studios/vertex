@@ -331,7 +331,7 @@
 					"chatStorageApp": "应用数据",
 					"chatStorageWorkspace": "工作区（加密）",
 					"chatMode": "聊天模式",
-					"chatModeDescription": "新聊天的初始模式。询问只读取笔记；建议还会提出修改，由你接受或拒绝。"
+					"chatModeDescription": "新聊天的初始模式。询问只读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。"
 				}
 			},
 			"scope": {
@@ -1432,7 +1432,10 @@
 					"readDocument": "读取打开的笔记",
 					"readSelection": "读取所选内容",
 					"proposeEdit": "提议修改",
-					"proposeInsert": "提议插入"
+					"proposeInsert": "提议插入",
+					"createNote": "新建笔记",
+					"writeNote": "重写笔记",
+					"editNote": "编辑笔记"
 				}
 			},
 			"edit": "编辑",
@@ -1443,7 +1446,10 @@
 				"action": "回退到此处",
 				"title": "回退到这条回复？",
 				"description": "将移除其后的 {count} 条消息及其分支。",
-				"confirm": "回退"
+				"confirm": "回退",
+				"undo": "同时会撤销这些回复已应用的修改：{paths}",
+				"undone": "已撤销 {count} 处修改",
+				"skipped": "有 {count} 篇笔记保持原样：它们之后被改动过"
 			},
 			"branch": {
 				"previous": "上一个分支",
@@ -1483,13 +1489,28 @@
 			"mode": {
 				"label": "模式",
 				"ask": "询问",
-				"suggest": "建议"
+				"suggest": "建议",
+				"write": "写作"
 			},
 			"scope": {
 				"label": "可修改的笔记",
 				"named": "指定的笔记",
 				"workspace": "整个工作区",
 				"search": "搜索文件夹"
+			},
+			"changes": {
+				"title": "修改（{count}）",
+				"apply": "应用（{count}）",
+				"discard": "丢弃",
+				"new": "新建",
+				"conflicts": "{count} 处修改未应用：笔记在暂存后已被改动",
+				"states": {
+					"pending": "待处理",
+					"applied": "已应用",
+					"discarded": "已丢弃",
+					"conflict": "未应用：笔记在暂存后已被改动",
+					"undone": "已被回退撤销"
+				}
 			}
 		}
 	}

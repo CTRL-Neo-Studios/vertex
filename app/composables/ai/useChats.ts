@@ -1,15 +1,18 @@
 import {Chat} from "@ai-sdk/vue";
 import {lastAssistantMessageIsCompleteWithToolCalls} from "ai";
-import {isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
+import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {invoke} from "@tauri-apps/api/core";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
+import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {chatTools, inScope, scopeText, toolsPrompt, usedToolNames, type NamedNotes} from "~/utils/chatTools";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
+import {changesSummary, newNotePath, textChange} from "~/utils/chatChanges";
+import {TRASH_DIR} from "#shared/workflows/vault";
+import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -17,7 +20,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
-import {editorViewOf, lastShownNoteOf} from "~/composables/active/editor/useActiveEditorExtensions";
+import {editorViewOf, editorViewsOf, lastShownNoteOf} from "~/composables/active/editor/useActiveEditorExtensions";
 import {until} from "@vueuse/core";
 
 /** Thrown by `send` when the chat feature is off or has no model. The message is an i18n key. */
@@ -34,6 +37,8 @@ interface LiveChat {
     saving: Promise<void>
     /** The profile the next new reply uses instead of the chat's, once (a retry's pick). */
     retryProfileId?: string
+    /** Write mode: what the reply being written has staged so far, by path; kept on the reply when it ends. */
+    staging?: Map<string, ChatChange>
 }
 
 /**
@@ -258,12 +263,16 @@ export function useChats(session?: ActiveSession) {
 
     const defaultMode = (): ChatMode => effective.value?.aiConfig.chatMode ?? 'suggest'
 
-    /** The notes the named scope covers: the open one, and every note and folder attached in the conversation. */
-    function namedNotes(messages: VertexChatMessage[]): NamedNotes {
+    /**
+     * The notes the named scope covers: the open one, every note and folder attached in the conversation, and the notes
+     * it created (staged in Write mode, including the reply being written).
+     */
+    function namedNotes(messages: VertexChatMessage[], staging?: Map<string, ChatChange>): NamedNotes {
         const open = editTarget()
         const openPath = open && $index.getFileByUuid(open)?.relativePath
+        const created = [...messages.flatMap(m => m.metadata?.changes ?? []), ...(staging?.values() ?? [])].filter(c => c.before === null).map(c => c.path)
         return {
-            notes: [...new Set([...(openPath ? [openPath] : []), ...messages.flatMap(m => m.metadata?.notes ?? [])].map(slashed))],
+            notes: [...new Set([...(openPath ? [openPath] : []), ...messages.flatMap(m => m.metadata?.notes ?? []), ...created].map(slashed))],
             folders: [...new Set(messages.flatMap(m => m.metadata?.folders ?? []).map(slashed))],
         }
     }
@@ -284,11 +293,159 @@ export function useChats(session?: ActiveSession) {
         return {id: file.uuid, open: file.uuid === open}
     }
 
+    // Write mode: a reply's tools stage changes (`stage`); the user applies them after it (`applyChanges`).
+
+    const vaultOf = async () => nuxtApp.runWithContext(() => useWorkspaceVault(session!))
+    /** The note at exactly `path` (workspace-relative), if the index has it. */
+    const noteAt = (path: string) => noteFiles().find(f => slashed(f.relativePath) === path)
+    /** The note's text now (its mounted editor's buffer first); `null` when there's no note at `path`. */
+    const textAt = async (path: string) => noteAt(path) ? readNote(path) : null
+
+    /** Writes a note's text: into its mounted editor (so unsaved typing isn't lost and ⌘Z undoes it), else the file. */
+    async function writeAt(path: string, text: string) {
+        const file = noteAt(path)
+        const view = file && editorViewOf(session, file.uuid)
+        if (view) view.dispatch({changes: textChange(view.state.doc.toString(), text), userEvent: 'input.ai'})
+        else await (await vaultOf()).write(path, text)
+    }
+
+    /** Creates a note, and the folders it needs, top down (the index places a node under an indexed parent only). */
+    async function createAt(path: string, text: string) {
+        const vault = await vaultOf()
+        const folders = path.split('/').slice(0, -1)
+        for (let i = 1; i <= folders.length; i++) {
+            const dir = folders.slice(0, i).join('/')
+            if (!vault.entry(dir)) await vault.createFolder(dir)
+        }
+        await vault.create(path, text)
+    }
+
+    /** The staged change a path (or a note's name) refers to in the reply being written. */
+    function stagedKey(entry: LiveChat, path: string) {
+        const staged = entry.staging
+        if (!staged?.size) return undefined
+        const file = findNote(path)
+        return [path, `${path}.md`, file && slashed(file.relativePath)].find(key => key && staged.has(key)) || undefined
+    }
+
+    /** `readNote` in Write mode: what the reply has staged for the note, else the note. */
+    async function readStaged(entry: LiveChat, path: string) {
+        const key = stagedKey(entry, path)
+        return key ? entry.staging!.get(key)!.after : readNote(path)
+    }
+
+    /** Stages `markdown` as a note's new text (`create`: a new note). Results and errors are worded for the model. */
+    async function stage(entry: LiveChat, path: string, markdown: string, create: boolean): Promise<object> {
+        const staged = entry.staging ??= new Map()
+        const known = stagedKey(entry, path)
+        let at: string
+        let before: string | null
+        if (known) {
+            at = known
+            before = staged.get(known)!.before
+        } else if (create) {
+            try {
+                at = newNotePath(path)
+            } catch (e) {
+                return {error: e instanceof Error ? e.message : String(e)}
+            }
+            if (noteAt(at)) return {error: `"${at}" already exists. Use writeNote or editNote to change it.`}
+            before = null
+        } else {
+            const file = findNote(path)
+            if (!file) return {error: `There's no note at "${path}". Use searchNotes or listNotes for its path, or createNote for a new note.`}
+            at = slashed(file.relativePath)
+            before = await readNote(at)
+            if (before === null) return {error: `"${at}" couldn't be read.`}
+        }
+        const named = namedNotes(entry.chat.messages, staged)
+        // A new note is the chat's own (named); a folder scope still keeps it inside the folder.
+        const allowed = before === null && entry.meta.scope?.kind !== 'folder' || inScope(at, entry.meta.scope, named)
+        if (!allowed) return {error: `"${at}" is outside this chat's scope, which allows ${scopeText(entry.meta.scope, named)}. Ask the user to widen the scope or attach the note.`}
+        staged.set(at, {path: at, before, after: markdown, state: 'pending'})
+        return {status: 'staged', path: at}
+    }
+
+    const updateMessage = (entry: LiveChat, messageId: string | undefined, change: (m: VertexChatMessage) => VertexChatMessage) => {
+        entry.chat.messages = entry.chat.messages.map(m => m.id === messageId ? change(m) : m)
+    }
+
+    /** At the end of a reply (also a stopped or failed one): its staged changes go on it, for review. */
+    function keepStaged(entry: LiveChat) {
+        const changes = [...entry.staging?.values() ?? []]
+        entry.staging = undefined
+        const reply = entry.chat.messages.at(-1)
+        if (!changes.length || reply?.role !== 'assistant') return
+        updateMessage(entry, reply.id, m => ({...m, metadata: {...m.metadata, changes: [...m.metadata?.changes ?? [], ...changes]}}))
+    }
+
+    /** Sets the state of a reply's pending changes at `paths`, through `decide` (which may write the note), then saves. */
+    async function settleChanges(id: string, messageId: string, paths: string[], decide: (c: ChatChange) => Promise<ChatChange['state']>) {
+        const entry = live.get(keyOf(id))
+        const changes = entry?.chat.messages.find(m => m.id === messageId)?.metadata?.changes
+        if (!entry || !changes) return
+        const next = [...changes]
+        try {
+            for (const [i, c] of next.entries()) if (c.state === 'pending' && paths.includes(c.path)) next[i] = {...c, state: await decide(c)}
+        } finally {
+            // What was decided before a failure stays decided.
+            updateMessage(entry, messageId, m => ({...m, metadata: {...m.metadata, changes: next}}))
+            await save(entry)
+        }
+    }
+
+    /** Applies a reply's changes at `paths`; a note that changed since it was staged is left alone (`conflict`). */
+    const applyChanges = (id: string, messageId: string, paths: string[]) => settleChanges(id, messageId, paths, async c => {
+        if (await textAt(c.path) !== c.before) return 'conflict'
+        if (c.before === null) await createAt(c.path, c.after)
+        else await writeAt(c.path, c.after)
+        return 'applied'
+    })
+
+    const discardChanges = (id: string, messageId: string, paths: string[]) => settleChanges(id, messageId, paths, async () => 'discarded')
+
+    /** The applied changes in the replies after `messageId`, newest first: what rewinding to it undoes. */
+    function appliedAfter(id: string, messageId: string) {
+        const messages = live.get(keyOf(id))?.chat.messages ?? []
+        const at = messages.findIndex(m => m.id === messageId)
+        return at < 0 ? [] : messages.slice(at + 1).flatMap(m => m.metadata?.changes ?? []).filter(c => c.state === 'applied').reverse()
+    }
+
+    /**
+     * Reverts applied changes, newest first, each only while its note is still as the change left it; a created note
+     * goes to `.vertex/trash`. Returns the paths undone and the ones left alone.
+     */
+    async function undoChanges(chatId: string, changes: ChatChange[]) {
+        const undone: string[] = [], skipped: string[] = []
+        for (const c of changes) {
+            if (await textAt(c.path) !== c.after) {
+                skipped.push(c.path)
+                continue
+            }
+            if (c.before === null) await (await vaultOf()).move(c.path, `${TRASH_DIR}/chat-${chatId}/${Date.now()}/${c.path}`)
+            else await writeAt(c.path, c.before)
+            undone.push(c.path)
+        }
+        return {undone, skipped}
+    }
+
+    /**
+     * Rejects the chat suggestions still waiting in the session's editors, before an edit, retry or rewind replaces the
+     * messages that asked for them. ponytail: every chat's in the session; track which chat proposed what if they collide.
+     */
+    function withdrawSuggestions() {
+        for (const view of editorViewsOf(session)) {
+            for (const p of view.state.field(aiField, false) ?? []) if (p.source === 'tool') discardProposal(view, p.id)
+        }
+    }
+
     async function setupFor(entry: LiveChat, messages: VertexChatMessage[]): Promise<ChatSendSetup> {
         // A tool round goes on with the model that began the reply; a new reply takes a retry's pick, else the chat's.
         const last = messages.at(-1)
         const pinned = last?.role === 'assistant' ? last.metadata?.profileId ?? entry.meta.profileId : entry.retryProfileId ?? entry.meta.profileId
         entry.retryProfileId = undefined
+        // A new reply stages from scratch; a tool round goes on with what its reply staged.
+        if (last?.role !== 'assistant') entry.staging = undefined
         const {profile, provider} = resolveModel(pinned)
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
@@ -297,12 +454,13 @@ export function useChats(session?: ActiveSession) {
         const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
-            read: readNote,
+            read: mode === 'write' ? path => readStaged(entry, path) : readNote,
             list,
-            suggest: mode === 'suggest',
+            mode,
+            stage: (path, markdown, create) => stage(entry, path, markdown, create),
         }, usedToolNames(messages)) : undefined
-        const named = namedNotes(messages)
-        const open = mode === 'suggest' ? editTarget() : undefined
+        const named = namedNotes(messages, entry.staging)
+        const open = mode === 'ask' ? undefined : editTarget()
         const openFile = open && $index.getFileByUuid(open)
         // ponytail: every referenced folder's note paths, cut at 200 each; summarize if folders get huge.
         const folders = named.folders.map(folder => {
@@ -312,8 +470,9 @@ export function useChats(session?: ActiveSession) {
         const prompt = [
             profile.systemPrompt,
             toolsOn ? toolsPrompt(mode, scopeText(entry.meta.scope, named)) : '',
-            toolsOn && openFile ? `The open document, which the editor tools read and edit unless given a path, is "${slashed(openFile.relativePath)}".` : '',
+            toolsOn && openFile ? `The open ${mode === 'suggest' ? 'document, which the editor tools read and edit unless given a path,' : 'note'} is "${slashed(openFile.relativePath)}".` : '',
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
+            changesSummary(messages),
         ].filter(Boolean).join('\n\n')
         return {provider, profileId: profile.id, modelId: profile.modelId, prompt, notes: await notesFor(messages), tools}
     }
@@ -353,6 +512,7 @@ export function useChats(session?: ActiveSession) {
                 messages,
                 transport: createChatTransport(m => setupFor(entry, m)),
                 onFinish: ({isAbort, isError}) => {
+                    keepStaged(entry)
                     void saveLogged(entry)
                     if (!isAbort && !isError) void autoTitle(entry)
                 },
@@ -433,6 +593,7 @@ export function useChats(session?: ActiveSession) {
         if (!found) return
         const {entry, at} = found
         resolveModel(entry.meta.profileId)
+        withdrawSuggestions()
         const {notes = [], folders = []} = entry.chat.messages[at]!.metadata ?? {}
         entry.meta.forks ??= {}
         entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
@@ -445,20 +606,27 @@ export function useChats(session?: ActiveSession) {
         if (!found) return
         const {entry, at} = found
         resolveModel(profileId ?? entry.meta.profileId)
+        withdrawSuggestions()
         entry.meta.forks ??= {}
         entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
         entry.retryProfileId = profileId
         await entry.chat.regenerate()
     }
 
-    /** Drops everything after `messageId`, with the branches that hung off it. */
+    /**
+     * Drops everything after `messageId`, with the branches that hung off it, and undoes the changes applied from the
+     * dropped replies (see `undoChanges`).
+     */
     async function rewindTo(id: string, messageId: string) {
         const found = idleAt(id, messageId)
-        if (!found) return
+        if (!found) return {undone: [], skipped: []}
         const {entry, at} = found
+        withdrawSuggestions()
+        const result = await undoChanges(id, appliedAfter(id, messageId))
         entry.chat.messages = entry.chat.messages.slice(0, at + 1)
         if (entry.meta.forks) entry.meta.forks = pruneForks(entry.meta.forks, entry.chat.messages)
         await save(entry)
+        return result
     }
 
     /** Shows branch `to` (0-based) where `messageId` starts a fork. */
@@ -466,6 +634,7 @@ export function useChats(session?: ActiveSession) {
         const found = idleAt(id, messageId)
         if (!found?.entry.meta.forks) return
         const {entry, at} = found
+        withdrawSuggestions()
         entry.chat.messages = switchBranch(entry.meta.forks!, entry.chat.messages, at, to)
         await save(entry)
     }
@@ -586,6 +755,9 @@ export function useChats(session?: ActiveSession) {
         retryMessage,
         rewindTo,
         showBranch,
+        applyChanges,
+        discardChanges,
+        appliedAfter,
         /** Which branch shows at `messageId`, of how many; undefined where nothing forks. */
         branchOf: (id: string, messageId: string) => {
             const entry = live.get(keyOf(id))

@@ -49,6 +49,7 @@ describe('defaultAppAiConfig', () => {
         expect(defaultAppAiConfig({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
         expect(defaultAppAiConfig({chatStorage: 'cloud'}).chatStorage).toBe('app')
         expect(defaultAppAiConfig({chatMode: 'ask'}).chatMode).toBe('ask')
+        expect(defaultAppAiConfig({chatMode: 'write'}).chatMode).toBe('write')
         expect(defaultAppAiConfig({chatMode: 'yolo'}).chatMode).toBe('suggest')
     })
 

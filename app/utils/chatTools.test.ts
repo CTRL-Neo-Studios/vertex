@@ -7,7 +7,7 @@ const deps = (over: Partial<NoteToolDeps> = {}): NoteToolDeps => ({
     search: async () => [],
     read: async () => null,
     list: () => [],
-    suggest: false,
+    mode: 'ask',
     ...over,
 })
 const run = (t: Tool | undefined, input: unknown) => t!.execute!(input as never, {toolCallId: 't', messages: []} as never)
@@ -18,7 +18,7 @@ describe('chatTools', () => {
         const plain = chatTools(deps(), new Set())
         expect(Object.keys(plain)).toEqual(['findTools', 'searchNotes', 'readNote', 'listNotes'])
         expect(deferred(plain)).toEqual(['listNotes', 'readNote', 'searchNotes'])
-        const editing = chatTools(deps({suggest: true}), new Set(['proposeEdit', 'readNote']))
+        const editing = chatTools(deps({mode: 'suggest'}), new Set(['proposeEdit', 'readNote']))
         expect(deferred(editing)).toEqual(['listNotes', 'proposeInsert', 'readDocument', 'readSelection', 'searchNotes'])
         expect(editing.proposeEdit!.deferLoading).toBeFalsy()
     })
@@ -43,6 +43,23 @@ describe('chatTools', () => {
         const tools = chatTools(deps({list: folder => { asked = folder; return paths }}), new Set())
         const out = await run(tools.listNotes, {folder: '/A/'}) as { paths: string[], more: number }
         expect([asked, out.paths.length, out.more]).toEqual(['A', 200, 5])
+    })
+
+    it('Write mode: editNote stages the note with its one matching passage replaced, and refuses missing or repeated ones', async () => {
+        const staged: [string, string, boolean][] = []
+        const tools = chatTools(deps({
+            mode: 'write',
+            read: async path => path === 'A.md' ? 'one two one three' : null,
+            stage: async (path, markdown, create) => { staged.push([path, markdown, create]); return {status: 'staged'} },
+        }), new Set())
+        expect(Object.keys(tools)).toEqual(expect.arrayContaining(['createNote', 'writeNote', 'editNote']))
+        expect(tools.proposeEdit).toBeUndefined()
+        expect(await run(tools.editNote, {path: 'A.md', find: 'two', replace: '2'})).toEqual({status: 'staged'})
+        expect(staged).toEqual([['A.md', 'one 2 one three', false]])
+        expect(await run(tools.editNote, {path: 'A.md', find: 'one', replace: '1'})).toEqual({error: expect.stringContaining('more than once')})
+        expect(await run(tools.editNote, {path: 'A.md', find: 'four', replace: '4'})).toEqual({error: expect.stringContaining('not found')})
+        expect(await run(tools.editNote, {path: 'B.md', find: 'x', replace: 'y'})).toEqual({error: expect.stringContaining('"B.md"')})
+        expect(staged).toHaveLength(1)
     })
 })
 
