@@ -18,6 +18,7 @@ onMounted(load)
 const DEFAULT_PROFILE = 'aiConfig.defaultModelProfile' as const
 const FEATURES = 'aiConfig.features' as const
 const CHAT_STORAGE = 'aiConfig.chatStorage' as const
+const CHAT_MODE = 'aiConfig.chatMode' as const
 const path = (id: string) => `${FEATURES}.${id}` as AppSettingPath
 
 // Profiles are global: the effective settings carry the global ones.
@@ -44,6 +45,10 @@ const setFeature = (id: string, choice: string) =>
 const storageItems = computed(() => [
     {label: t('app.settings.ai.features.chatStorageApp'), value: 'app'},
     {label: t('app.settings.ai.features.chatStorageWorkspace'), value: 'workspace'},
+])
+const modeItems = computed(() => [
+    {label: t('app.chat.mode.ask'), value: 'ask'},
+    {label: t('app.chat.mode.suggest'), value: 'suggest'},
 ])
 
 // Mirrors custom CSS: a workspace's feature choices apply only once its folder is trusted.
@@ -103,6 +108,19 @@ const featuresOff = computed(() => scope.root.value !== null && scope.overridden
                             :items="storageItems"
                             :model-value="scope.value(CHAT_STORAGE)"
                             @update:model-value="scope.set({[CHAT_STORAGE]: $event})"
+                        />
+                    </SettingsRow>
+                    <SettingsRow
+                        v-if="feature.id === 'chat'"
+                        :setting="CHAT_MODE"
+                        :label="t('app.settings.ai.features.chatMode')"
+                        :description="t('app.settings.ai.features.chatModeDescription')"
+                    >
+                        <USelect
+                            class="w-56"
+                            :items="modeItems"
+                            :model-value="scope.value(CHAT_MODE)"
+                            @update:model-value="scope.set({[CHAT_MODE]: $event})"
                         />
                     </SettingsRow>
                 </template>

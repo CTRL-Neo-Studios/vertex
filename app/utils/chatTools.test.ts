@@ -1,24 +1,24 @@
 import {describe, expect, it} from "vitest";
 import type {Tool} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
-import {chatTools, rankTools, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./chatTools";
+import {chatTools, inScope, rankTools, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./chatTools";
 
 const deps = (over: Partial<NoteToolDeps> = {}): NoteToolDeps => ({
     search: async () => [],
     read: async () => null,
     list: () => [],
-    editing: false,
+    suggest: false,
     ...over,
 })
 const run = (t: Tool | undefined, input: unknown) => t!.execute!(input as never, {toolCallId: 't', messages: []} as never)
 const deferred = (tools: Record<string, Tool>) => Object.entries(tools).filter(([, t]) => t.deferLoading).map(([n]) => n).sort()
 
 describe('chatTools', () => {
-    it('defers every tool but findTools and the ones already used; editor tools only with an open note', () => {
+    it('defers every tool but findTools and the ones already used; editor tools only in Suggest mode', () => {
         const plain = chatTools(deps(), new Set())
         expect(Object.keys(plain)).toEqual(['findTools', 'searchNotes', 'readNote', 'listNotes'])
         expect(deferred(plain)).toEqual(['listNotes', 'readNote', 'searchNotes'])
-        const editing = chatTools(deps({editing: true}), new Set(['proposeEdit', 'readNote']))
+        const editing = chatTools(deps({suggest: true}), new Set(['proposeEdit', 'readNote']))
         expect(deferred(editing)).toEqual(['listNotes', 'proposeInsert', 'readDocument', 'readSelection', 'searchNotes'])
         expect(editing.proposeEdit!.deferLoading).toBeFalsy()
     })
@@ -65,6 +65,23 @@ describe('rankTools', () => {
     it('puts tools sharing the query\'s words first, and lists them all when none do', () => {
         expect(rankTools({query: 'edit the open note', tools})).toEqual(['proposeEdit', 'searchNotes'])
         expect(rankTools({query: 'Gilded Kraken', tools})).toEqual(['searchNotes', 'proposeEdit'])
+    })
+})
+
+describe('inScope', () => {
+    const named = {notes: ['Open.md', 'Lore/Kthalatir.md'], folders: ['Lore/Places']}
+    it('named: the named notes and everything under a named folder, nothing else', () => {
+        expect(inScope('Lore/Kthalatir.md', undefined, named)).toBe(true)
+        expect(inScope('Lore/Places/Deep/Inn.md', {kind: 'named'}, named)).toBe(true)
+        expect(inScope('Lore/Other.md', undefined, named)).toBe(false)
+        // A folder is a path prefix only at a slash: "Lore/Places Old" isn't inside "Lore/Places".
+        expect(inScope('Lore/Places Old/Inn.md', undefined, named)).toBe(false)
+    })
+    it('folder: its notes at any depth; workspace: any note', () => {
+        expect(inScope('Lore/Places/Inn.md', {kind: 'folder', path: 'Lore'}, named)).toBe(true)
+        expect(inScope('Lorem/Inn.md', {kind: 'folder', path: 'Lore'}, named)).toBe(false)
+        expect(inScope('Open.md', {kind: 'folder', path: 'Lore'}, named)).toBe(false)
+        expect(inScope('Anything.md', {kind: 'workspace'}, {notes: [], folders: []})).toBe(true)
     })
 })
 

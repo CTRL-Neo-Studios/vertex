@@ -329,7 +329,9 @@
 					"chatStorage": "聊天存储位置",
 					"chatStorageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
 					"chatStorageApp": "应用数据",
-					"chatStorageWorkspace": "工作区（加密）"
+					"chatStorageWorkspace": "工作区（加密）",
+					"chatMode": "聊天模式",
+					"chatModeDescription": "新聊天的初始模式。询问只读取笔记；建议还会提出修改，由你接受或拒绝。"
 				}
 			},
 			"scope": {
@@ -1355,8 +1357,8 @@
 			"thinking": "思考中…",
 			"placeholder": "询问关于笔记的任何问题…输入 {'@'} 附加笔记",
 			"sendFailed": "无法发送消息",
-			"attachNote": "附加笔记",
-			"searchNotes": "搜索笔记",
+			"attachNote": "附加笔记或文件夹",
+			"searchNotes": "搜索笔记和文件夹",
 			"removeNote": "移除笔记",
 			"defaultProfile": "默认模型",
 			"openInTab": "在标签页中打开",
@@ -1477,6 +1479,17 @@
 				"toolCalls": "工具调用",
 				"step": "第 {n} 步",
 				"raw": "原始 JSON"
+			},
+			"mode": {
+				"label": "模式",
+				"ask": "询问",
+				"suggest": "建议"
+			},
+			"scope": {
+				"label": "可修改的笔记",
+				"named": "指定的笔记",
+				"workspace": "整个工作区",
+				"search": "搜索文件夹"
 			}
 		}
 	}

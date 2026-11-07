@@ -24,7 +24,7 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {vault, refresh, summary, profileId, chatProfile, saveError, retrySave, liveChat, send, editMessage, retryMessage, rewindTo, showBranch, branchOf, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
+const {vault, refresh, summary, profileId, chatMode, chatScope, setMode, setScope, chatProfile, saveError, retrySave, liveChat, send, editMessage, retryMessage, rewindTo, showBranch, branchOf, setProfile, renameChat, showInSidePanel, openInTab, pendingPrompt} = useChats(session)
 const {updateModelProfile} = useAiConfig()
 const {chatActions, showContext} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
@@ -140,7 +140,10 @@ async function rewind(message: VertexChatMessage) {
 }
 
 const input = ref('')
+/** Attached notes and folders (workspace-relative; a folder's ends in '/', which keeps the two apart in one list). */
 const notes = ref<string[]>([])
+const isFolderRef = (ref: string) => ref.endsWith('/')
+const refName = (ref: string) => isFolderRef(ref) ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
 const sendError = ref('')
 const banner = computed(() => sendError.value || chat.value?.error?.message)
 const unsaved = computed(() => saveError(props.chatId).value)
@@ -204,7 +207,7 @@ async function onSubmit() {
     notes.value = []
     sendError.value = ''
     try {
-        await send(props.chatId, text, attached)
+        await send(props.chatId, text, attached.filter(r => !isFolderRef(r)), attached.filter(isFolderRef).map(r => r.slice(0, -1)))
     } catch (e) {
         sendError.value = errorText(e)
         // Give the unsent prompt back unless the user already typed a new one.
@@ -220,12 +223,16 @@ function dismissError() {
     chat.value?.clearError()
 }
 
-const noteItems = computed(() => getFilteredFiles(f => !f.isFolder && f.fileExt === 'md')
-    .map(f => ({label: fileNameFromPath(f.fileName, true), description: f.relativePath, value: f.relativePath}))
-    .sort((a, b) => a.description.localeCompare(b.description)))
+const noteItems = computed(() => [
+    ...getFilteredFiles(f => !f.isFolder && f.fileExt === 'md')
+        .map(f => ({label: fileNameFromPath(f.fileName, true), description: f.relativePath, value: f.relativePath, icon: 'i-lucide-file-text'})),
+    ...getFilteredFiles(f => f.isFolder)
+        .map(f => ({label: refName(`${f.relativePath}/`), description: `${f.relativePath}/`, value: `${f.relativePath}/`, icon: 'i-lucide-folder'})),
+].sort((a, b) => a.description.localeCompare(b.description)))
 
-// `@` mentions: typing `@` (at the start or after whitespace) lists notes matching what follows, spaces included (note
-// names have them), while anything matches; picking one attaches it like the Attach picker and drops the `@query` text.
+// `@` mentions: typing `@` (at the start or after whitespace) lists notes and folders matching what follows, spaces
+// included (names have them), while anything matches; picking one attaches it like the Attach picker and drops the
+// `@query` text.
 // Focus stays in the textarea, which drives the list's keys.
 const promptRef = useTemplateRef<{ $el: HTMLElement }>('promptRef')
 const textarea = () => promptRef.value?.$el.querySelector('textarea') ?? null
@@ -300,6 +307,35 @@ const profile = computed({
     get: () => profileId(props.chatId).value ?? DEFAULT_PROFILE,
     set: value => setProfile(props.chatId, value === DEFAULT_PROFILE ? undefined : value),
 })
+
+// What the chat may do to notes (Ask: read only; Suggest: propose edits), and which notes it may change.
+const modeItems = computed(() => [
+    {label: t('app.chat.mode.ask'), value: 'ask' as const, icon: 'i-lucide-message-circle-question'},
+    {label: t('app.chat.mode.suggest'), value: 'suggest' as const, icon: 'i-lucide-pencil-line'},
+])
+const mode = computed({
+    get: () => chatMode(props.chatId).value,
+    set: value => act(() => setMode(props.chatId, value)),
+})
+// Scopes as select values: 'named', 'workspace', or 'folder:' and the folder's path.
+const scopeItems = computed(() => [
+    {label: t('app.chat.scope.named'), value: 'named', icon: 'i-lucide-at-sign'},
+    {label: t('app.chat.scope.workspace'), value: 'workspace', icon: 'i-lucide-library'},
+    ...getFilteredFiles(f => f.isFolder)
+        .map(f => ({label: f.relativePath, value: `folder:${f.relativePath}`, icon: 'i-lucide-folder'}))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+])
+const scope = computed({
+    get: () => {
+        const s = chatScope(props.chatId).value
+        return s?.kind === 'folder' ? `folder:${s.path}` : s?.kind ?? 'named'
+    },
+    set: (value: string) => act(() => setScope(props.chatId, value.startsWith('folder:')
+        ? {kind: 'folder', path: value.slice('folder:'.length)}
+        : {kind: value === 'workspace' ? 'workspace' : 'named'})),
+})
+/** The side panel is narrow: the prompt's selects show just their icon there (no value, no chevron). */
+const compact = computed(() => props.inSidePanel ? {value: 'sr-only', trailing: 'hidden', base: 'pe-1.5'} : {value: 'truncate'})
 </script>
 
 <template>
@@ -337,10 +373,11 @@ const profile = computed({
                             </div>
                         </div>
                         <template v-else>
-                            <div v-if="message.role === 'user' && message.metadata?.notes?.length" class="flex flex-wrap gap-1 mb-1.5">
-                                <ChatLink v-for="note in message.metadata.notes" :key="note" :note>
+                            <div v-if="message.role === 'user' && (message.metadata?.notes?.length || message.metadata?.folders?.length)" class="flex flex-wrap gap-1 mb-1.5">
+                                <ChatLink v-for="note in message.metadata?.notes ?? []" :key="note" :note>
                                     <UBadge icon="i-lucide-file-text" size="sm" color="neutral" variant="outline" :label="fileNameFromPath(note, true)"/>
                                 </ChatLink>
+                                <UBadge v-for="folder in message.metadata?.folders ?? []" :key="`${folder}/`" icon="i-lucide-folder" size="sm" color="neutral" variant="outline" :label="refName(`${folder}/`)" :title="folder"/>
                             </div>
                             <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
                                 <UChatReasoning v-if="part.type === 'reasoning'" :text="part.text" :streaming="part.state === 'streaming'"/>
@@ -406,7 +443,7 @@ const profile = computed({
                 <UChatPrompt ref="promptRef" v-model="input" :error="chat.error" :placeholder="$t('app.chat.placeholder')" variant="subtle" @submit="onSubmit" @blur="mention = null">
                     <template #header v-if="notes.length">
                         <div class="flex flex-wrap gap-1">
-                            <UBadge v-for="note in notes" :key="note" icon="i-lucide-file-text" size="sm" color="neutral" variant="soft" :label="fileNameFromPath(note, true)">
+                            <UBadge v-for="note in notes" :key="note" :icon="isFolderRef(note) ? 'i-lucide-folder' : 'i-lucide-file-text'" size="sm" color="neutral" variant="soft" :label="refName(note)" :title="note">
                                 <template #trailing>
                                     <UButton icon="i-lucide-x" size="xs" color="neutral" variant="link" class="p-0" :aria-label="$t('app.chat.removeNote')" @click="notes = notes.filter(n => n !== note)"/>
                                 </template>
@@ -424,14 +461,38 @@ const profile = computed({
                             variant="ghost"
                             :search-input="{ placeholder: $t('app.chat.searchNotes') }"
                             :content="{ align: 'start' }"
-                            :ui="{ content: 'min-w-72' }"
+                            :ui="{ ...compact, content: 'min-w-72' }"
                             :aria-label="$t('app.chat.attachNote')"
                             class="min-w-0"
                         >
-                            <!-- The side panel is narrow: icon only there. -->
+                            <!-- The side panel is narrow: icons only there (see `compact`). -->
                             <span v-if="!inSidePanel" class="text-muted truncate">{{ $t('app.chat.attachNote') }}</span>
                         </USelectMenu>
-                        <USelect v-model="profile" :items="profileItems" icon="i-lucide-bot" size="sm" variant="ghost" class="min-w-0 max-w-48" :ui="{ value: 'truncate' }"/>
+                        <USelect
+                            v-model="mode"
+                            :items="modeItems"
+                            :icon="modeItems.find(i => i.value === mode)?.icon"
+                            size="sm"
+                            variant="ghost"
+                            class="min-w-0"
+                            :ui="compact"
+                            :aria-label="$t('app.chat.mode.label')"
+                        />
+                        <USelectMenu
+                            v-if="mode === 'suggest'"
+                            v-model="scope"
+                            :items="scopeItems"
+                            value-key="value"
+                            :icon="scopeItems.find(i => i.value === scope)?.icon ?? 'i-lucide-folder'"
+                            size="sm"
+                            variant="ghost"
+                            class="min-w-0 max-w-48"
+                            :search-input="{ placeholder: $t('app.chat.scope.search') }"
+                            :content="{ align: 'start' }"
+                            :ui="{ ...compact, content: 'min-w-60' }"
+                            :aria-label="$t('app.chat.scope.label')"
+                        />
+                        <USelect v-model="profile" :items="profileItems" icon="i-lucide-bot" size="sm" variant="ghost" class="min-w-0 max-w-48" :ui="compact" :aria-label="$t('app.chat.context.model')"/>
                         <div class="grow"/>
                         <UChatPromptSubmit :status="chat.status" size="sm" @stop="chat.stop()" @reload="chat.regenerate()"/>
                     </template>
@@ -454,7 +515,7 @@ const profile = computed({
                                 color="neutral"
                                 variant="ghost"
                                 size="sm"
-                                icon="i-lucide-file-text"
+                                :icon="item.icon"
                                 :class="['w-full justify-start', i === mentionIndex && 'bg-elevated']"
                                 @mousedown.prevent
                                 @mouseenter="mentionIndex = i"

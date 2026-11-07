@@ -1,6 +1,6 @@
 import {getToolName, isToolUIPart, jsonSchema, tool, toolSearch, type ToolSet} from "ai";
 import {editorTools} from "@type32/codemirror-rich-obsidian-editor/ext/ai/tools";
-import type {VertexChatMessage} from "#shared/types/app/chats";
+import type {ChatMode, ChatScope, VertexChatMessage} from "#shared/types/app/chats";
 
 /** What the note tools reach in the workspace; `useChats` binds them to a session. */
 export interface NoteToolDeps {
@@ -10,8 +10,8 @@ export interface NoteToolDeps {
     read: (path: string) => Promise<string | null>
     /** Workspace-relative paths of the notes under `folder` (`''` = all). */
     list: (folder: string) => string[]
-    /** Whether a note is open in an editor: the editor tools (read it, propose edits) only come with one. */
-    editing: boolean
+    /** Suggest mode: the editor tools (read the open note, propose edits to notes in scope) come too. */
+    suggest: boolean
 }
 
 const NOTE_READ_CHARS = 20_000
@@ -19,11 +19,41 @@ const LIST_LIMIT = 200
 /** Named for what it does: a model told to "search" passes it the user's topic instead of a tool's. */
 const FIND_TOOLS = 'findTools'
 
-/** Added to the system prompt when tools are sent. */
-export const TOOLS_PROMPT = 'You can use tools on the user\'s notes. Your tools load on demand: call `findTools` with what you '
-    + 'want to do (for example "search notes", "read note", "list notes", "read the open document" or "edit the open '
-    + 'document"), then call the tools it returns. Edits are only proposed: the user accepts or rejects each one, and the '
-    + 'result tells you which.'
+/** Added to the system prompt when tools are sent; `scope` is {@link scopeText}'s. */
+export function toolsPrompt(mode: ChatMode, scope: string): string {
+    const find = 'You can use tools on the user\'s notes. Your tools load on demand: call `findTools` with what you want to do (for example "search notes", "read note", "list notes"'
+    if (mode === 'ask') {
+        return `${find}), then call the tools it returns. This chat is in Ask mode: you can read notes but not change them. `
+            + 'If the user wants a change, tell them to switch the chat to Suggest mode.'
+    }
+    return `${find}, "read the open document" or "edit a note"), then call the tools it returns. Edits are only proposed: `
+        + `the user accepts or rejects each one, and the result tells you which. You may propose edits to ${scope}. `
+        + 'To edit a note that isn\'t open, pass its path.'
+}
+
+/** The named scope: notes by path, and folders whose notes all count. */
+export interface NamedNotes {
+    notes: string[]
+    folders: string[]
+}
+
+/** Whether a chat with `scope` may change the note at `path` (workspace-relative). */
+export function inScope(path: string, scope: ChatScope | undefined, named: NamedNotes): boolean {
+    const within = (folder: string) => path.startsWith(`${folder}/`)
+    if (scope?.kind === 'workspace') return true
+    if (scope?.kind === 'folder') return within(scope.path)
+    return named.notes.includes(path) || named.folders.some(within)
+}
+
+/** The scope in words, for the system prompt and out-of-scope errors. */
+export function scopeText(scope: ChatScope | undefined, named: NamedNotes): string {
+    if (scope?.kind === 'workspace') return 'any note in the workspace'
+    if (scope?.kind === 'folder') return `the notes in the folder "${scope.path}" and its subfolders`
+    const names = [...named.notes.map(p => `"${p}"`), ...named.folders.map(f => `the notes in "${f}/"`)]
+    return names.length
+        ? `only the notes named in this chat: ${names.join(', ')}`
+        : 'no notes yet (the user names one by opening or attaching it)'
+}
 
 /**
  * Tools whose name or description share a word with `query`, best first; every tool when none do. There are only a
@@ -45,6 +75,44 @@ export function rankTools({query, tools}: { query: string, tools: { name: string
 const pathInput = (description: string) => jsonSchema<{ path: string }>({
     type: 'object', properties: {path: {type: 'string', description}}, required: ['path'], additionalProperties: false,
 })
+
+const NOTE_PATH = {type: 'string', description: 'The note to change: its workspace-relative path or name. Omit for the open document.'} as const
+
+/**
+ * The editor package's tools, the proposals also taking the note to change (`path`; it opens beside the chat, where
+ * the user decides). They have no `execute`: `useChats` runs them in the editor. `readDocument` and `readSelection`
+ * stay on the open document.
+ */
+const suggestTools: ToolSet = {
+    readDocument: editorTools.readDocument,
+    readSelection: editorTools.readSelection,
+    proposeEdit: tool({
+        description: 'Propose replacing one passage of a note (the open document unless `path` names another). The user reviews the change and accepts or rejects it; the note only changes if they accept. The result tells you which.',
+        inputSchema: jsonSchema<{ path?: string, find: string, replace: string }>({
+            type: 'object',
+            properties: {
+                path: NOTE_PATH,
+                find: {type: 'string', description: 'The passage to replace, copied verbatim from the note. Must occur exactly once.'},
+                replace: {type: 'string', description: 'The new Markdown text.'},
+            },
+            required: ['find', 'replace'],
+            additionalProperties: false,
+        }),
+    }),
+    proposeInsert: tool({
+        description: 'Propose inserting new text into a note (the open document unless `path` names another). The user reviews it and accepts or rejects it. Start `text` with a blank line ("\\n\\n") to add it as a new paragraph.',
+        inputSchema: jsonSchema<{ path?: string, text: string, after?: string }>({
+            type: 'object',
+            properties: {
+                path: NOTE_PATH,
+                text: {type: 'string', description: 'The Markdown text to insert.'},
+                after: {type: 'string', description: 'Insert right after this passage, copied verbatim; it must occur exactly once. Omit to insert at the user\'s cursor in the open document, or at the end of another note.'},
+            },
+            required: ['text'],
+            additionalProperties: false,
+        }),
+    }),
+}
 
 /**
  * The chat's tools. Every tool but `findTools` (the AI SDK's tool search) is deferred, so the model loads only what it
@@ -87,7 +155,7 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
                 return {paths: paths.slice(0, LIST_LIMIT), more: Math.max(0, paths.length - LIST_LIMIT)}
             },
         }),
-        ...(deps.editing ? editorTools : {}),
+        ...(deps.suggest ? suggestTools : {}),
     }
     const deferred = Object.entries(tools).map(([name, t]) => [name, used.has(name) ? t : {...t, deferLoading: true}])
     return {[FIND_TOOLS]: toolSearch({search: rankTools, maxResults: Object.keys(tools).length}), ...Object.fromEntries(deferred)}

@@ -13,8 +13,9 @@ export type ChatStorage = 'app' | 'workspace'
 export type ChatVaultState = 'none' | 'locked' | 'unlocked' | 'open'
 
 export interface ChatMessageMetadata {
-    /** Workspace-relative paths of the notes attached to this (user) message. */
+    /** Workspace-relative paths of the notes and folders attached to this (user) message. */
     notes?: string[],
+    folders?: string[],
     createdAt?: number,
     /** The model (and profile) that wrote this (assistant) message. */
     modelId?: string,
@@ -49,6 +50,12 @@ export type VertexChatMessage = UIMessage<ChatMessageMetadata>
  */
 export type ChatForks = Record<string, (VertexChatMessage[] | null)[]>
 
+/** What a chat may do to notes: `ask` only reads; `suggest` proposes edits the user accepts or rejects in the editor. */
+export type ChatMode = 'ask' | 'suggest'
+
+/** The notes a chat may change: the ones named in it (open, attached or `@`-mentioned, their folders'), a folder's, any. */
+export type ChatScope = {kind: 'named'} | {kind: 'workspace'} | {kind: 'folder', path: string}
+
 export interface ChatSummary {
     /** `[A-Za-z0-9-]{1,64}`; also the file name and the chat tab's id. */
     id: string,
@@ -66,6 +73,10 @@ export interface ChatFile extends ChatSummary {
     profileId?: string,
     messages: VertexChatMessage[],
     forks?: ChatForks,
+    /** Missing = the settings' `chatMode` (chats from before modes). */
+    mode?: ChatMode,
+    /** Missing = named. */
+    scope?: ChatScope,
 }
 
 export interface ChatIndex {

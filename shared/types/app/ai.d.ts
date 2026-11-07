@@ -1,4 +1,4 @@
-import type {ChatStorage} from "#shared/types/app/chats";
+import type {ChatMode, ChatStorage} from "#shared/types/app/chats";
 
 /** One model a provider serves, with whatever metadata its `/models` list, Ollama or models.dev knew. */
 export interface AiModelInfo {
@@ -32,7 +32,7 @@ export interface AiModelProfile {
     providerId: string,
     modelId: string,
     systemPrompt: string,
-    /** Chat tools (notes search/read, edits to the open note); unset = on. Off for models without tool calling. */
+    /** Chat tools (notes search/read, edit suggestions); unset = on. Off for models without tool calling. */
     tools?: false,
 }
 
@@ -47,4 +47,6 @@ export interface AppAiConfig {
     features: Record<string, string>,
     /** Where this workspace's chats are kept; switching leaves the existing ones where they are. */
     chatStorage: ChatStorage,
+    /** The mode new chats start in. */
+    chatMode: ChatMode,
 }

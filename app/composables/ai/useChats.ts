@@ -3,12 +3,12 @@ import {lastAssistantMessageIsCompleteWithToolCalls} from "ai";
 import {isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {invoke} from "@tauri-apps/api/core";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {ChatFile, ChatIndex, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
+import type {ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {fileNameFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
-import {chatTools, TOOLS_PROMPT, usedToolNames} from "~/utils/chatTools";
+import {chatTools, inScope, scopeText, toolsPrompt, usedToolNames, type NamedNotes} from "~/utils/chatTools";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -237,21 +237,51 @@ export function useChats(session?: ActiveSession) {
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
 
-    /**
-     * A note's text for `readNote`: its mounted editor's buffer, else the file. `path` is workspace-relative, or, as
-     * models often pass, a note's name (like a wikilink: case-insensitive, `.md` optional).
-     */
-    async function readNote(path: string) {
+    /** A note by workspace-relative path or, as models often pass, by name (like a wikilink: any case, `.md` optional). */
+    function findNote(path: string) {
         const files = noteFiles()
         const name = path.toLowerCase().replace(/\.(md|txt)$/, '')
-        const file = files.find(f => slashed(f.relativePath) === path)
+        return files.find(f => slashed(f.relativePath) === path)
             ?? files.find(f => slashed(f.relativePath).toLowerCase().replace(/\.(md|txt)$/, '') === name)
             ?? files.find(f => fileNameFromPath(f.fileName, true).toLowerCase() === name)
+    }
+
+    /** A note's text for `readNote` (see `findNote`): its mounted editor's buffer, else the file. */
+    async function readNote(path: string) {
+        const file = findNote(path)
         if (!file) return null
         const view = editorViewOf(session, file.uuid)
         if (view) return view.state.doc.toString()
         const [read] = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [file.fullPath]})
         return read?.content ?? null
+    }
+
+    const defaultMode = (): ChatMode => effective.value?.aiConfig.chatMode ?? 'suggest'
+
+    /** The notes the named scope covers: the open one, and every note and folder attached in the conversation. */
+    function namedNotes(messages: VertexChatMessage[]): NamedNotes {
+        const open = editTarget()
+        const openPath = open && $index.getFileByUuid(open)?.relativePath
+        return {
+            notes: [...new Set([...(openPath ? [openPath] : []), ...messages.flatMap(m => m.metadata?.notes ?? [])].map(slashed))],
+            folders: [...new Set(messages.flatMap(m => m.metadata?.folders ?? []).map(slashed))],
+        }
+    }
+
+    /**
+     * The note an editor tool call works on: `path`'s, else the open one. A change (`proposing`) must be in the chat's
+     * scope; reading needn't. Errors are worded for the model.
+     */
+    function editTargetFor(entry: LiveChat, path: string | undefined, proposing: boolean): {id: string, open: boolean} | {error: string} {
+        const open = editTarget()
+        const file = path ? findNote(path) : open && $index.getFileByUuid(open)
+        if (!file) return {error: path ? `There's no note at "${path}". Use searchNotes or listNotes for its path.` : 'No note is open in the editor. Pass the `path` of the note to change.'}
+        const at = slashed(file.relativePath)
+        const named = namedNotes(entry.chat.messages)
+        if (proposing && !inScope(at, entry.meta.scope, named)) {
+            return {error: `"${at}" is outside this chat's scope, which allows ${scopeText(entry.meta.scope, named)}. Ask the user to widen the scope or attach the note.`}
+        }
+        return {id: file.uuid, open: file.uuid === open}
     }
 
     async function setupFor(entry: LiveChat, messages: VertexChatMessage[]): Promise<ChatSendSetup> {
@@ -263,18 +293,27 @@ export function useChats(session?: ActiveSession) {
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
-        const target = toolsOn ? editTarget() : undefined
+        const mode = entry.meta.mode ?? defaultMode()
+        const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
             read: readNote,
-            list: folder => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort(),
-            editing: !!target,
+            list,
+            suggest: mode === 'suggest',
         }, usedToolNames(messages)) : undefined
-        const editing = target && $index.getFileByUuid(target)
+        const named = namedNotes(messages)
+        const open = mode === 'suggest' ? editTarget() : undefined
+        const openFile = open && $index.getFileByUuid(open)
+        // ponytail: every referenced folder's note paths, cut at 200 each; summarize if folders get huge.
+        const folders = named.folders.map(folder => {
+            const paths = list(folder)
+            return `- "${folder}/": ${paths.slice(0, 200).map(p => `"${p}"`).join(', ') || '(no notes)'}${paths.length > 200 ? `, and ${paths.length - 200} more` : ''}`
+        })
         const prompt = [
             profile.systemPrompt,
-            toolsOn ? TOOLS_PROMPT : '',
-            editing ? `The open document, which the editor tools read and edit, is "${slashed(editing.relativePath)}".` : '',
+            toolsOn ? toolsPrompt(mode, scopeText(entry.meta.scope, named)) : '',
+            toolsOn && openFile ? `The open document, which the editor tools read and edit unless given a path, is "${slashed(openFile.relativePath)}".` : '',
+            folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
         ].filter(Boolean).join('\n\n')
         return {provider, profileId: profile.id, modelId: profile.modelId, prompt, notes: await notesFor(messages), tools}
     }
@@ -322,11 +361,17 @@ export function useChats(session?: ActiveSession) {
                 onToolCall: ({toolCall}) => {
                     if (!isEditorTool(toolCall)) return
                     const answer = (output: unknown) => entry.chat.addToolOutput({tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output})
-                    const target = editTarget()
-                    if (!target) return void answer({error: 'The note is no longer open in the editor.'})
+                    const input = (toolCall.input ?? {}) as { path?: string, after?: string }
+                    const target = editTargetFor(entry, input.path, toolCall.toolName.startsWith('propose'))
+                    if ('error' in target) return void answer(target)
                     // Not awaited: onToolCall must return before the proposal is decided.
-                    void editorFor(id, target)
-                        .then(view => view ? runEditorTool(view, toolCall) : {error: 'The note could not be shown in the editor.'})
+                    void editorFor(id, target.id)
+                        .then(view => {
+                            if (!view) return {error: 'The note could not be shown in the editor.'}
+                            // Into a note that wasn't open: at its end, not wherever its cursor was left.
+                            if (toolCall.toolName === 'proposeInsert' && input.after === undefined && !target.open) view.dispatch({selection: {anchor: view.state.doc.length}})
+                            return runEditorTool(view, toolCall)
+                        })
                         .then(answer)
                 },
                 sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
@@ -353,7 +398,7 @@ export function useChats(session?: ActiveSession) {
 
     async function createChat(folder = ''): Promise<ChatSummary> {
         const now = Date.now()
-        const file: ChatFile = {version: 1, id: crypto.randomUUID(), title: '', folder, created: now, updated: now, messages: []}
+        const file: ChatFile = {version: 1, id: crypto.randomUUID(), title: '', folder, created: now, updated: now, messages: [], mode: defaultMode()}
         await chatClient.write(requireRoot(), storage.value, file)
         const {id, title, created, updated} = file
         const next: ChatSummary = {id, title, folder, created, updated}
@@ -361,17 +406,17 @@ export function useChats(session?: ActiveSession) {
         return next
     }
 
-    async function update(id: string, patch: Partial<Pick<ChatFile, 'title' | 'folder' | 'profileId'>>) {
+    async function update(id: string, patch: Partial<Pick<ChatFile, 'title' | 'folder' | 'profileId' | 'mode' | 'scope'>>) {
         const entry = await load(id)
         Object.assign(entry.meta, patch)
         await save(entry)
     }
 
-    async function send(id: string, text: string, notes: string[]) {
+    async function send(id: string, text: string, notes: string[], folders: string[]) {
         const entry = await load(id)
         resolveModel(entry.meta.profileId)
         if (!entry.meta.title) entry.meta.title = firstLineTitle(text)
-        await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
+        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now()}})
     }
 
     /** A loaded chat that isn't replying, and where `messageId` is in it. */
@@ -388,10 +433,10 @@ export function useChats(session?: ActiveSession) {
         if (!found) return
         const {entry, at} = found
         resolveModel(entry.meta.profileId)
-        const notes = entry.chat.messages[at]!.metadata?.notes ?? []
+        const {notes = [], folders = []} = entry.chat.messages[at]!.metadata ?? {}
         entry.meta.forks ??= {}
         entry.chat.messages = fork(entry.meta.forks, entry.chat.messages, at)
-        await entry.chat.sendMessage({text, metadata: {notes, createdAt: Date.now()}})
+        await entry.chat.sendMessage({text, metadata: {notes, folders, createdAt: Date.now()}})
     }
 
     /** Writes a reply again, with `profileId` instead of the chat's model if given; the old one stays as a branch. */
@@ -513,6 +558,9 @@ export function useChats(session?: ActiveSession) {
         lock,
         summary,
         profileId,
+        /** A loaded chat's mode (chats from before modes: the settings' default) and scope. */
+        chatMode: (id: string) => computed(() => live.get(keyOf(id))?.meta.mode ?? defaultMode()),
+        chatScope: (id: string) => computed(() => live.get(keyOf(id))?.meta.scope),
         /** The profile a loaded chat sends with (its pinned one while usable, else the chat feature's); none when there's no model. */
         chatProfile: (id: string) => {
             try {
@@ -545,6 +593,8 @@ export function useChats(session?: ActiveSession) {
             return branchAt(entry?.meta.forks, messages, messages.findIndex(m => m.id === messageId))
         },
         setProfile: (id: string, profileId: string | undefined) => update(id, {profileId}),
+        setMode: (id: string, mode: ChatMode) => update(id, {mode}),
+        setScope: (id: string, scope: ChatScope) => update(id, {scope}),
         sidePanelChatId,
         showInSidePanel,
         openInTab,

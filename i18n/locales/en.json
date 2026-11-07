@@ -329,7 +329,9 @@
 					"chatStorage": "Chat storage",
 					"chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
 					"chatStorageApp": "App data",
-					"chatStorageWorkspace": "Workspace (encrypted)"
+					"chatStorageWorkspace": "Workspace (encrypted)",
+					"chatMode": "Chat mode",
+					"chatModeDescription": "The mode new chats start in. Ask only reads your notes; Suggest also proposes edits you accept or reject."
 				}
 			},
 			"scope": {
@@ -1355,8 +1357,8 @@
 			"thinking": "Thinking…",
 			"placeholder": "Ask anything about your notes… Type {'@'} to attach one",
 			"sendFailed": "Couldn't send the message",
-			"attachNote": "Attach notes",
-			"searchNotes": "Search notes",
+			"attachNote": "Attach notes or folders",
+			"searchNotes": "Search notes and folders",
 			"removeNote": "Remove note",
 			"defaultProfile": "Default model",
 			"openInTab": "Open in tab",
@@ -1477,6 +1479,17 @@
 				"toolCalls": "Tool calls",
 				"step": "step {n}",
 				"raw": "Raw JSON"
+			},
+			"mode": {
+				"label": "Mode",
+				"ask": "Ask",
+				"suggest": "Suggest"
+			},
+			"scope": {
+				"label": "Notes it may change",
+				"named": "Named notes",
+				"workspace": "Whole workspace",
+				"search": "Search folders"
 			}
 		}
 	}

@@ -73,6 +73,7 @@ const AI_SEED: AppAiConfig = {
     defaultModelProfile: 'default',
     features: {},
     chatStorage: 'app',
+    chatMode: 'suggest',
 }
 
 export function defaultAppAiConfig(data?: unknown): AppAiConfig {
@@ -96,7 +97,8 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
-    return {providers, modelProfiles, defaultModelProfile, features, chatStorage}
+    const chatMode = ai.chatMode === 'ask' ? 'ask' : 'suggest'
+    return {providers, modelProfiles, defaultModelProfile, features, chatStorage, chatMode}
 }
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {

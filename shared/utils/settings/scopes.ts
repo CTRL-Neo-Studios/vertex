@@ -31,6 +31,7 @@ export const WORKSPACE_OVERRIDABLE = {
     // A workspace picking which model its notes go to could send them to a provider the user didn't choose for it.
     'aiConfig.features': 'trustedWorkspace',
     'aiConfig.chatStorage': 'workspace',
+    'aiConfig.chatMode': 'workspace',
 } as const satisfies Partial<Record<AppSettingPath, 'workspace' | 'trustedWorkspace'>>
 
 type Overridable = keyof typeof WORKSPACE_OVERRIDABLE
