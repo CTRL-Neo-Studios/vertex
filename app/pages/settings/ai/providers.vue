@@ -20,6 +20,7 @@ const add = () => addProvider({name: t('app.settings.ai.providers.newProvider'),
             <UButton size="sm" color="neutral" variant="outline" icon="i-lucide-plus" :label="t('app.settings.ai.providers.add')" @click="add"/>
         </template>
         <div class="space-y-4">
+            <SettingsAiOffBanner/>
             <p class="text-sm text-muted">{{ t('app.settings.ai.providers.description') }}</p>
             <SettingsAiProviderCard v-for="provider in ai.providers" :key="provider.id" :provider="provider"/>
             <p v-if="!ai.providers.length" class="text-sm text-muted">{{ t('app.settings.ai.providers.empty') }}</p>

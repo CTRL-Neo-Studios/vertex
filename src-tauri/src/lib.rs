@@ -294,7 +294,7 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             app.listen_any("tauri://webview-created", move |event| {
-                let label = event.payload().replace('"', "");
+                let Some(label) = created_label(event.payload()) else { return };
                 if let Some(uuid) = label.strip_prefix(SESSION_WINDOW_PREFIX) {
                     if let Some(win) = app_handle.get_webview_window(&label) {
                         apply_decorum_style(&win);
@@ -364,4 +364,18 @@ fn parse_file_path_from_args(args: &[String]) -> Option<String> {
         return Some(arg.clone());
     }
     None
+}
+
+/// The label in a `tauri://webview-created` payload (`{"label": "…"}`).
+fn created_label(payload: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(payload).ok()?.get("label")?.as_str().map(str::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn created_label_reads_the_event_payload() {
+        assert_eq!(super::created_label(r#"{"label":"session-a"}"#).as_deref(), Some("session-a"));
+        assert_eq!(super::created_label(r#""session-a""#), None);
+    }
 }

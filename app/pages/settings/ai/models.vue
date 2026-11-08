@@ -25,6 +25,7 @@ const add = () => addModelProfile({
             <UButton size="sm" color="neutral" variant="outline" icon="i-lucide-plus" :label="t('app.settings.ai.models.add')" @click="add"/>
         </template>
         <div class="space-y-4">
+            <SettingsAiOffBanner/>
             <p class="text-sm text-muted">{{ t('app.settings.ai.models.description') }}</p>
             <SettingsAiModelProfileCard v-for="profile in ai.modelProfiles" :key="profile.id" :profile="profile"/>
             <p v-if="!ai.modelProfiles.length" class="text-sm text-muted">{{ t('app.settings.ai.models.empty') }}</p>

@@ -60,7 +60,10 @@ describe('defaultAppWorkflowConfig', () => {
 describe('defaultAppAiConfig', () => {
     it('seeds Local Ollama only when aiConfig is absent, so removing it sticks', () => {
         expect(defaultAppSettings().aiConfig.providers.map(p => p.id)).toEqual(['local-ollama'])
-        expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest'})
+        expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({
+            enabled: true, providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest',
+            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true},
+        })
         expect(defaultAppAiConfig({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
         expect(defaultAppAiConfig({chatStorage: 'cloud'}).chatStorage).toBe('app')
         expect(defaultAppAiConfig({chatMode: 'read'}).chatMode).toBe('read')
@@ -84,5 +87,12 @@ describe('defaultAppAiConfig', () => {
         ])
         expect(c.defaultModelProfile).toBe('a')
         expect(c.features).toEqual({editorAssistant: ''})
+    })
+
+    it('keeps the switches on unless they are explicitly off', () => {
+        const off = defaultAppAiConfig({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}})
+        expect([off.enabled, off.chatTitles, off.editorAssistant]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}])
+        const junk = defaultAppAiConfig({enabled: 0, chatTitles: null, editorAssistant: 'none'})
+        expect([junk.enabled, junk.chatTitles, junk.editorAssistant]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}])
     })
 })

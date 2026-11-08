@@ -336,22 +336,36 @@
 					"defaultProfile": "Default model profile",
 					"defaultProfileDescription": "Used by every feature that doesn't choose its own.",
 					"section": "Features",
-					"sectionDescription": "Which model profile each feature uses. A workspace's choices apply only when its folder is trusted.",
+					"sectionDescription": "Which features are on, and the model profile each uses. A workspace's choices apply only when its folder is trusted.",
 					"useDefault": "Use default ({name})",
-					"off": "Off",
 					"untrusted": "This workspace's AI feature choices don't apply until you trust it.",
 					"trustWorkspace": "Trust workspace",
 					"editorAssistant": "Editor assistant",
-					"editorAssistantDescription": "Ask AI in the editor: rewrite, fix, continue and more, from the selection toolbar, the slash menu or Mod-J.",
+					"editorAssistantDescription": "Ask AI in the editor: rewrite, fix, continue and more.",
 					"chat": "Chat",
-					"chatDescription": "The model chats use. A chat can pin its own profile.",
+					"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat.",
 					"chatStorage": "Chat storage",
 					"chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
 					"chatStorageApp": "App data",
 					"chatStorageWorkspace": "Workspace (encrypted)",
 					"chatMode": "Chat mode",
-					"chatModeDescription": "The mode new chats start in. Read only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply."
-				}
+					"chatModeDescription": "The mode new chats start in. Read only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply.",
+					"masterSection": "Assistive AI",
+					"enabled": "All AI features",
+					"enabledDescription": "Off turns off every AI feature: the editor assistant, chat and chat titles. Your chats stay where they are.",
+					"chatTitles": "Chat titles",
+					"chatTitlesDescription": "After the first reply, the chat's model names it. Off keeps the first message as the title.",
+					"entry": {
+						"toolbar": "Ask AI in the selection toolbar",
+						"toolbarDescription": "A button beside the formatting buttons when text is selected.",
+						"slash": "AI items in the / menu",
+						"slashDescription": "Ask AI, Continue writing and the other presets among the blocks.",
+						"shortcut": "Shortcut",
+						"shortcutDescription": "⌘J opens the assistant at the cursor or on the selection."
+					}
+				},
+				"off": "Assistive AI is off, so nothing here is used.",
+				"turnOn": "Go to its switch"
 			},
 			"scope": {
 				"label": "Editing",

@@ -4,12 +4,13 @@ import {sessionScope, StateKey} from "#shared/constants/app";
 import {isBasesFile} from "#shared/utils/fs/filenames";
 import {DEFAULT_PANEL_LAYOUT, movePanelSlot, panelSideOf, tidySlots, type PanelSlotRef} from "#shared/utils/panelLayout";
 import {withAt, type AppSettingPath} from "#shared/utils/settings/scopes";
-import {NOTE_VIEWS, PANEL_VIEW_INFO, WORKSPACE_VIEWS, panelSlotMenu} from "~/utils/panelViews";
+import {CHAT_VIEWS, NOTE_VIEWS, PANEL_VIEW_INFO, WORKSPACE_VIEWS, panelSlotMenu} from "~/utils/panelViews";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 
 /** A side as shown: its slots that can show here (with their index in the layout's list), its views, the one shown. */
 export interface PanelSideState {
@@ -25,8 +26,9 @@ const LAYOUT_PATHS = ['viewConfig.panels.left', 'viewConfig.panels.right', 'view
 
 /**
  * The side panels of a session window: the settings' arrangement (`viewConfig.panels`) narrowed to what this window
- * can show (no files or chats in a singlespace, no note views on a Bases file), each side's view and collapsed
- * state, and rearranging, saved where the arrangement comes from: the workspace when it overrides it, else globally.
+ * can show (no files or chats in a singlespace, no note views on a Bases file, no chat views with Chat off), each
+ * side's view and collapsed state, and rearranging, saved where the arrangement comes from: the workspace when it
+ * overrides it, else globally.
  */
 export function usePanels(session?: ActiveSession) {
     const scope = sessionScope(session, 'usePanels')
@@ -45,7 +47,9 @@ export function usePanels(session?: ActiveSession) {
 
     const isWorkspace = !!session?.workspaceSession
     const isBases = computed(() => isBasesFile(getFileByUuid(activeTabUuid.value ?? undefined)?.fileExt ?? ''))
+    const chatOn = computed(() => aiFeatureOn(settings.effective.value?.aiConfig, 'chat'))
     const available = (id: PanelViewId) => (isWorkspace || !WORKSPACE_VIEWS.has(id)) && !(isBases.value && NOTE_VIEWS.has(id))
+        && (chatOn.value || !CHAT_VIEWS.has(id))
 
     const viewOf = {left: layouts.leftPanelView, right: layouts.rightPanelView}
     const collapsedOf = {left: layouts.leftPanelCollapsed, right: layouts.rightPanelCollapsed}

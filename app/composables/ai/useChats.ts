@@ -532,8 +532,12 @@ export function useChats(session?: ActiveSession) {
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
     const textOf = (m: VertexChatMessage) => m.parts.map(p => p.type === 'text' ? p.text : '').join('')
 
-    /** After the first reply: the chat's model names it, unless the title was changed from the first message's. */
+    /**
+     * After the first reply: the chat's model names it, unless the title was changed from the first message's or chat
+     * titles are off (`aiConfig.chatTitles`).
+     */
     async function autoTitle(entry: LiveChat) {
+        if (!effective.value?.aiConfig.chatTitles) return
         const [question, answer, ...later] = entry.chat.messages
         if (later.length || question?.role !== 'user' || answer?.role !== 'assistant' || !textOf(answer).trim()) return
         const initial = firstLineTitle(textOf(question))

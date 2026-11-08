@@ -56,3 +56,26 @@ bun i
 bun pm trust --all
 bun run tauri:build
 ```
+
+## Use of AI Disclaimer
+
+Areas where AI are used:
+- AI-related coworking features
+- Test Scripts & Bugfixing
+
+Areas where no AI are used:
+- Application Architecture
+- UI Design
+- UX Provisioning
+- Application features
+- Features Architecture
+
+Used AI Models during Development (via OpenRouter):
+- DeepSeek V4 Pro 0813
+- DeepSeek V4.1 Flash 1017
+- Claude Opus 5.5
+- Claude Sonnet 5.5
+- GPT-5.6 Sol
+
+Used AI Harnesses:
+- OpenCode

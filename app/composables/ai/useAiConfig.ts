@@ -1,13 +1,16 @@
 import type {AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 
+/** Whether a feature is switched on: AI is, and the feature isn't set to off (`''`). Says nothing about its model. */
+export const aiFeatureOn = (ai: AppAiConfig | undefined, featureId: string) => !!ai?.enabled && ai.features[featureId] !== ''
+
 /**
  * The model profile and provider a feature uses: its own profile, else the default one; `null` when the
- * feature is off (`''`), or the profile has no model or provider.
+ * feature (or AI) is off, or the profile has no model or provider.
  */
 export function resolveAiFeature(ai: AppAiConfig, featureId: string): {profile: AiModelProfile, provider: AiProviderProfile} | null {
+    if (!aiFeatureOn(ai, featureId)) return null
     const chosen = ai.features[featureId]
-    if (chosen === '') return null
     const profile = ai.modelProfiles.find(p => p.id === chosen) ?? ai.modelProfiles.find(p => p.id === ai.defaultModelProfile)
     const provider = profile && ai.providers.find(p => p.id === profile.providerId)
     return profile?.modelId && provider ? {profile, provider} : null

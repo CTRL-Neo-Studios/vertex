@@ -70,12 +70,15 @@ export function sanitizeAiModel(m: Loose & {id: string}): AiModelInfo {
 
 /** Seeded only when settings have no `aiConfig` at all, so removing Local Ollama sticks. */
 const AI_SEED: AppAiConfig = {
+    enabled: true,
     providers: [{id: 'local-ollama', name: 'Local Ollama', baseURL: 'http://localhost:11434/v1', models: []}],
     modelProfiles: [{id: 'default', name: 'Default', providerId: 'local-ollama', modelId: '', systemPrompt: ''}],
     defaultModelProfile: 'default',
     features: {},
     chatStorage: 'app',
     chatMode: 'suggest',
+    chatTitles: true,
+    editorAssistant: {toolbar: true, slash: true, shortcut: true},
 }
 
 /** A stored chat mode (settings or a chat file) as a mode: `ask` is Read's old name; anything unknown is Suggest. */
@@ -102,7 +105,14 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
-    return {providers, modelProfiles, defaultModelProfile, features, chatStorage, chatMode: toChatMode(ai.chatMode)}
+    const entries: Loose = isLoose(ai.editorAssistant) ? ai.editorAssistant : {}
+    return {
+        enabled: ai.enabled !== false,
+        providers, modelProfiles, defaultModelProfile, features, chatStorage,
+        chatMode: toChatMode(ai.chatMode),
+        chatTitles: ai.chatTitles !== false,
+        editorAssistant: {toolbar: entries.toolbar !== false, slash: entries.slash !== false, shortcut: entries.shortcut !== false},
+    }
 }
 
 export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {

@@ -36,8 +36,20 @@ export interface AiModelProfile {
     tools?: false,
 }
 
+/** Where the editor assistant can be opened from. */
+export interface AiEditorAssistantEntries {
+    /** "Ask AI" in the selection toolbar. */
+    toolbar: boolean,
+    /** The AI items in the `/` menu. */
+    slash: boolean,
+    /** ⌘J. */
+    shortcut: boolean,
+}
+
 export interface AppAiConfig {
     providers: AiProviderProfile[],
+    /** Every AI feature; off is as if each one were off. */
+    enabled: boolean,
     modelProfiles: AiModelProfile[],
     defaultModelProfile: string,
     /**
@@ -49,4 +61,7 @@ export interface AppAiConfig {
     chatStorage: ChatStorage,
     /** The mode new chats start in. */
     chatMode: ChatMode,
+    /** Chats are named by their model after the first reply. */
+    chatTitles: boolean,
+    editorAssistant: AiEditorAssistantEntries,
 }

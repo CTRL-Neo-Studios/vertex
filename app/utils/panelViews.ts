@@ -18,6 +18,8 @@ export const PANEL_VIEW_INFO: Record<PanelViewId, { label: string, icon: string,
 export const WORKSPACE_VIEWS: ReadonlySet<PanelViewId> = new Set(['files', 'chats', 'search', 'chat'])
 /** Views about the open note, which a Bases file doesn't have. */
 export const NOTE_VIEWS: ReadonlySet<PanelViewId> = new Set(['forelinks', 'backlinks', 'writersTools', 'toc'])
+/** Views that need Chat on. */
+export const CHAT_VIEWS: ReadonlySet<PanelViewId> = new Set(['chats', 'chat'])
 
 /**
  * The right-click menu of a slot (`index` in `list`), or of a list's empty space: move it (up, down, to the other side),

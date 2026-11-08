@@ -336,22 +336,36 @@
 					"defaultProfile": "默认模型配置",
 					"defaultProfileDescription": "未单独选择配置的功能都会使用它。",
 					"section": "功能",
-					"sectionDescription": "每个功能使用哪个模型配置。工作区的选择仅在其文件夹受信任时生效。",
+					"sectionDescription": "开启哪些功能，以及每个功能使用的模型配置。工作区的选择仅在其文件夹受信任时生效。",
 					"useDefault": "使用默认（{name}）",
-					"off": "关闭",
 					"untrusted": "在你信任此工作区之前，它的 AI 功能选择不会生效。",
 					"trustWorkspace": "信任工作区",
 					"editorAssistant": "编辑器助手",
-					"editorAssistantDescription": "在编辑器中使用 AI：改写、修正、续写等，可从选区工具栏、斜杠菜单或 Mod-J 打开。",
+					"editorAssistantDescription": "在编辑器中使用 AI：改写、修正、续写等。",
 					"chat": "聊天",
-					"chatDescription": "聊天使用的模型。每个聊天可以固定自己的模型配置。",
+					"chatDescription": "围绕笔记的聊天。单个聊天可以固定自己的配置。关闭后会隐藏聊天相关视图、“在聊天中提问”和“新建聊天”。",
 					"chatStorage": "聊天存储位置",
 					"chatStorageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
 					"chatStorageApp": "应用数据",
 					"chatStorageWorkspace": "工作区（加密）",
 					"chatMode": "聊天模式",
-					"chatModeDescription": "新聊天的初始模式。只读仅读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。"
-				}
+					"chatModeDescription": "新聊天的初始模式。只读仅读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。",
+					"masterSection": "辅助 AI",
+					"enabled": "全部 AI 功能",
+					"enabledDescription": "关闭后所有 AI 功能都会停用：编辑器助手、聊天和聊天标题。已有聊天仍保留在原处。",
+					"chatTitles": "聊天标题",
+					"chatTitlesDescription": "第一次回复后，由聊天的模型为其命名。关闭则保留第一条消息作为标题。",
+					"entry": {
+						"toolbar": "选区工具栏中的“询问 AI”",
+						"toolbarDescription": "选中文本时，在格式按钮旁显示的按钮。",
+						"slash": "/ 菜单中的 AI 项",
+						"slashDescription": "在块列表中显示“询问 AI”“继续写作”等预设。",
+						"shortcut": "快捷键",
+						"shortcutDescription": "⌘J 在光标处或选区上打开助手。"
+					}
+				},
+				"off": "辅助 AI 已关闭，这里的设置不会被使用。",
+				"turnOn": "前往开关"
 			},
 			"scope": {
 				"label": "正在编辑",

@@ -13,6 +13,7 @@ import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
+import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 const editorInstance = defineModel('editorInstance')
@@ -56,7 +57,7 @@ function toolsAt(side: HeaderToolsPosition) {
 }
 
 // The editor's right-click menu (replaces the webview's, so spelling suggestions and Look Up are gone). Tables keep
-// their own: their menu takes the event first. Ask in chat needs a workspace (chats belong to one).
+// their own: their menu takes the event first. Ask in chat needs a workspace (chats belong to one) and Chat on.
 const {t} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
@@ -115,7 +116,7 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
             {label: t(`${canvas}.paste`), icon: 'i-lucide-clipboard-paste', kbds: ['meta', 'v'], disabled: readOnly.value, onSelect: act(paste)},
             {label: t(`${canvas}.selectAll`), icon: 'i-lucide-text-select', kbds: ['meta', 'a'], onSelect: act(view => selectAll(view))},
         ],
-        ...(chatsRoot.value ? [[
+        ...(chatsRoot.value && aiFeatureOn(effective.value?.aiConfig, 'chat') ? [[
             {label: t('app.editor.ui.askInChat'), icon: 'i-lucide-message-square-quote', disabled: none, onSelect: () => { askAfterClose = selected.value }},
         ]] : []),
     ]
