@@ -19,7 +19,7 @@ export function useAiEditorExtension(): ComputedRef<Extension> {
         const own = ai ? resolveAiFeature(ai, 'editorAssistant') : null
         const resolved = own ?? (ai ? resolveAiFeature(ai, 'chat') : null)
         const entries = own ? ai!.editorAssistant : {toolbar: false, slash: false, shortcut: false}
-        const next = resolved ? JSON.stringify([entries, resolved.provider.id, resolved.provider.baseURL, resolved.profile.modelId, resolved.profile.systemPrompt]) : ''
+        const next = resolved ? JSON.stringify([entries, resolved.provider.id, resolved.provider.baseURL, resolved.profile.modelId, resolved.profile.systemPrompt, resolved.profile.params]) : ''
         if (next === key) return extension
         key = next
         // `fetch` and `system` are AiEndpoint fields from editor 0.3.3; the cast covers 0.3.2's types.
@@ -28,7 +28,7 @@ export function useAiEditorExtension(): ComputedRef<Extension> {
                 baseURL: resolved.provider.baseURL,
                 model: resolved.profile.modelId,
                 system: resolved.profile.systemPrompt || undefined,
-                fetch: createAiFetch(resolved.provider.id),
+                fetch: createAiFetch(resolved.provider.id, resolved.profile.params),
             } as AiEndpoint,
             toolbar: entries.toolbar,
             slash: entries.slash,

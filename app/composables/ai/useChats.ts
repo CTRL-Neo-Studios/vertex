@@ -542,7 +542,7 @@ export function useChats(session?: ActiveSession) {
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
-        return {provider, profileId: profile.id, modelId: profile.modelId, prompt, notes: await notesFor(messages), tools}
+        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)

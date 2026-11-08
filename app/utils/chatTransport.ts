@@ -1,6 +1,6 @@
 import {convertToModelMessages, generateText, isStepCount, streamText, type ChatTransport, type LanguageModelUsage, type ToolSet} from "ai";
 import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
-import type {AiProviderProfile} from "#shared/types/app/ai";
+import type {AiModelParams, AiProviderProfile} from "#shared/types/app/ai";
 import type {ChatRequestInfo, VertexChatMessage} from "#shared/types/app/chats";
 import {createAiFetch} from "~/utils/aiFetch";
 import {markModeSwitches} from "~/utils/chatTools";
@@ -10,6 +10,8 @@ export interface ChatSendSetup {
     provider: AiProviderProfile,
     profileId: string,
     modelId: string,
+    /** The profile's request parameters (not the title's). */
+    params?: AiModelParams,
     /** The instructions before the notes. */
     prompt: string,
     notes: {path: string, content: string}[],
@@ -53,8 +55,8 @@ const usageOf = (u: LanguageModelUsage): ChatRequestInfo['usage'] => ({
 })
 
 // `includeUsage`: streamed replies only report tokens when asked (`stream_options.include_usage`).
-const modelFor = (provider: AiProviderProfile, modelId: string) =>
-    createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id), includeUsage: true}).chatModel(modelId)
+const modelFor = (provider: AiProviderProfile, modelId: string, params?: AiModelParams) =>
+    createOpenAICompatible({name: 'vertex', baseURL: provider.baseURL, fetch: createAiFetch(provider.id, params), includeUsage: true}).chatModel(modelId)
 
 /** A model's title reply as a title: first line, no quotes, markdown marks or closing punctuation, at most 60 characters. */
 export function cleanTitle(text: string): string {
@@ -76,7 +78,7 @@ export async function generateChatTitle(provider: AiProviderProfile, modelId: st
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, profileId, modelId, prompt, notes, tools} = await setup(messages)
+            const {provider, profileId, modelId, params, prompt, notes, tools} = await setup(messages)
             const {system, sent} = chatSystem(prompt, notes)
             const names = Object.entries(tools ?? {})
             const request: ChatRequestInfo = {
@@ -91,7 +93,7 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
             const last = messages.at(-1)
             const earlier = last?.role === 'assistant' ? last.metadata?.requests ?? [] : []
             return streamText({
-                model: modelFor(provider, modelId),
+                model: modelFor(provider, modelId, params),
                 instructions: system || undefined,
                 // Plain copies: the chat's messages are Vue proxies, which an approved tool call's input can't be
                 // `structuredClone`d from when the AI SDK checks it again before running it.

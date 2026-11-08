@@ -34,6 +34,28 @@ export interface AiModelProfile {
     systemPrompt: string,
     /** Chat tools (notes search/read, edit suggestions); unset = on. Off for models without tool calling. */
     tools?: false,
+    /** What the profile's requests set beyond the model; missing (or each unset field) = the provider's default. */
+    params?: AiModelParams,
+}
+
+/**
+ * A model profile's request parameters (ranges in `AI_NUMBER_PARAMS`). Sent as OpenAI-style snake_case fields, only
+ * where the request doesn't set them itself; a provider ignores the ones it doesn't know.
+ */
+export interface AiModelParams {
+    temperature?: number,
+    topP?: number,
+    topK?: number,
+    minP?: number,
+    frequencyPenalty?: number,
+    presencePenalty?: number,
+    repetitionPenalty?: number,
+    maxOutputTokens?: number,
+    seed?: number,
+    /** Sequences that end the reply. */
+    stop?: string[],
+    /** Provider-specific fields, sent as they are (e.g. `reasoning_effort`). */
+    extra?: Record<string, unknown>,
 }
 
 /** Where the editor assistant can be opened from. */

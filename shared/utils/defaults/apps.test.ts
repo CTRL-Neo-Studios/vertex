@@ -86,6 +86,8 @@ describe('defaultAppAiConfig', () => {
             {id: 'c', name: '', providerId: 'p', modelId: 'm', systemPrompt: ''},
         ])
         expect(c.defaultModelProfile).toBe('a')
+        expect(defaultAppAiConfig({modelProfiles: [{id: 'p', params: {temperature: 9, bogus: 1}}, {id: 'q', params: 'x'}]}).modelProfiles.map(p => p.params))
+            .toEqual([{temperature: 2}, undefined])
         expect(c.features).toEqual({editorAssistant: ''})
     })
 

@@ -4,6 +4,7 @@ import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import {normalizePanelLayout, PANEL_VIEWS} from "#shared/utils/panelLayout";
+import {sanitizeModelParams} from "#shared/utils/aiParams";
 import type {DeepPartial} from "#shared/types/types";
 
 const RECOVERY_MODES: readonly SessionRecoveryMode[] = ['none', 'workspaces', 'singlespaces', 'both']
@@ -93,14 +94,18 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
         baseURL: str(p.baseURL) ?? '',
         models: byId(p.models, sanitizeAiModel),
     }))
-    const modelProfiles = byId(ai.modelProfiles, (p): AiModelProfile => ({
-        id: p.id,
-        name: str(p.name) ?? '',
-        providerId: str(p.providerId) ?? '',
-        modelId: str(p.modelId) ?? '',
-        systemPrompt: str(p.systemPrompt) ?? '',
-        ...(p.tools === false && {tools: false as const}),
-    }))
+    const modelProfiles = byId(ai.modelProfiles, (p): AiModelProfile => {
+        const params = sanitizeModelParams(p.params)
+        return {
+            id: p.id,
+            name: str(p.name) ?? '',
+            providerId: str(p.providerId) ?? '',
+            modelId: str(p.modelId) ?? '',
+            systemPrompt: str(p.systemPrompt) ?? '',
+            ...(p.tools === false && {tools: false as const}),
+            ...(params && {params}),
+        }
+    })
     const preferred = str(ai.defaultModelProfile)
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))

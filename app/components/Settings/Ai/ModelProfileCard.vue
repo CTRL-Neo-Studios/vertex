@@ -24,13 +24,14 @@ const providerItems = computed(() => (ai.value?.providers ?? []).map(p => ({labe
 const modelItems = computed(() => (provider.value?.models ?? []).map(model => ({label: model.name ?? model.id, value: model.id, model})))
 // A model the provider no longer enables is still shown as chosen.
 const modelMissing = computed(() => !!props.profile.modelId && !modelItems.value.some(i => i.value === props.profile.modelId))
+const modelInfo = computed(() => provider.value?.models.find(m => m.id === props.profile.modelId))
 
 const testing = ref(false)
 async function test() {
     if (!provider.value || !props.profile.modelId) return
     testing.value = true
     try {
-        const model = createOpenAICompatible({name: 'vertex', baseURL: provider.value.baseURL, fetch: createAiFetch(provider.value.id)})
+        const model = createOpenAICompatible({name: 'vertex', baseURL: provider.value.baseURL, fetch: createAiFetch(provider.value.id, props.profile.params)})
             .chatModel(props.profile.modelId)
         const {text} = await generateText({
             model,
@@ -119,5 +120,6 @@ async function test() {
                 @blur="systemPrompt !== profile.systemPrompt && save({systemPrompt})"
             />
         </div>
+        <SettingsAiModelParams :params="profile.params" :model="modelInfo" @save="params => save({params})"/>
     </SettingsSection>
 </template>
