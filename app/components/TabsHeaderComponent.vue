@@ -144,8 +144,10 @@ function scrollToItem(index: number) {
 </script>
 
 <template>
-    <div class="w-full flex items-center" data-tauri-drag-region>
-        <div v-if="leftClosed" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2`" data-tauri-drag-region>
+    <!-- Equal side columns keep the tabs centred under the editor; when tabs run out of room, the sides shrink to their
+    content and the tabs take the rest (and scroll). -->
+    <div class="w-full h-full grid grid-cols-[1fr_minmax(0,max-content)_1fr] items-center" data-tauri-drag-region>
+        <div v-if="leftClosed" class="col-start-1 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2" data-tauri-drag-region>
             <!-- A strip already covers part of the traffic lights. -->
             <SpaceOnOs detect-os="macos" :show-on-os="true" :class="buttons ? 'w-16' : 'w-6'"/>
             <WorkspaceSwitcher/>
@@ -154,7 +156,7 @@ function scrollToItem(index: number) {
         <UScrollArea
             ref="scrollArea"
             v-if="isWorkspace"
-            class="no-scrollbar w-full h-full relative px-2 flex items-center justify-center"
+            class="col-start-2 no-scrollbar min-w-0 h-full relative px-2 flex items-center justify-center-safe"
             v-slot="{ item, index }: {item: DropdownMenuItem, index: number}"
             :items="dropdownItems[1]"
             orientation="horizontal"
@@ -186,7 +188,7 @@ function scrollToItem(index: number) {
                 </UTooltip>
             </div>
         </UScrollArea>
-        <div v-else class="grow">
+        <div v-else class="col-start-2">
             <div class="absolute top-2 left-1/2 -translate-x-1/2">
                 <UDashboardSearchButton
                     :kbs="['meta', 'p']"
@@ -197,7 +199,7 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-        <div v-if="isWorkspace || (buttons && !panels.sides.value.right.open)" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
+        <div v-if="isWorkspace || (buttons && !panels.sides.value.right.open)" class="col-start-3 justify-self-end h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>

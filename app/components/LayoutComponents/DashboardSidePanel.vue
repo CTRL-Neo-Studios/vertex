@@ -61,7 +61,7 @@ async function newSidePanelChat() {
         :id="side"
         :side
         data-tauri-drag-region
-        :min-size="10"
+        :min-size="12"
         :max-size="30"
         :default-size="18"
         :toggle="false"
@@ -77,7 +77,7 @@ async function newSidePanelChat() {
             />
         </template>
         <template #header>
-            <UDashboardNavbar :toggle="false" :ui="{ root: 'border-none h-(--ui-header-height) sm:px-1 p-2 w-full', center: 'flex w-full items-center gap-1', left: 'pl-0', right: 'pr-0' }" data-tauri-drag-region>
+            <UDashboardNavbar :toggle="false" :ui="{ root: 'border-none h-(--ui-header-height) px-2 sm:px-2 gap-0 w-full', center: 'flex flex-1 min-w-0 items-center gap-1', left: 'hidden', right: 'hidden' }" data-tauri-drag-region>
                 <template v-if="side === 'left'">
                     <!-- The traffic lights; a strip already covers part of them. -->
                     <SpaceOnOs detect-os="macos" :show-on-os="true" :class="strip ? 'w-6' : ''" data-tauri-drag-region/>
@@ -87,7 +87,7 @@ async function newSidePanelChat() {
                 </template>
                 <template v-else>
                     <SidebarCollapserButton v-if="!strip" side="right"/>
-                    <span v-else class="ps-2 text-sm font-medium text-muted truncate text-right" data-tauri-drag-region>{{ t(PANEL_VIEW_INFO[state.active!].label) }}</span>
+                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ t(PANEL_VIEW_INFO[state.active!].label) }}</span>
                     <div class="grow" data-tauri-drag-region/>
                     <PanelButtons
                         v-if="!strip"

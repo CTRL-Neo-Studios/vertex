@@ -52,7 +52,7 @@ const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
             :data-panel-axis="variant === 'pills' ? 'x' : 'y'"
             :class="{
                 list: 'flex flex-col gap-px min-h-8',
-                pills: 'inline-flex items-center gap-0.5 rounded-md bg-elevated/50 p-0.5 min-w-8 min-h-7',
+                pills: 'inline-flex items-center gap-0.5 rounded-md bg-elevated/50 p-0.5 min-w-8 min-h-7 overflow-x-auto no-scrollbar',
                 strip: 'flex flex-col items-center gap-1 min-h-8',
             }[variant]"
             @contextmenu.capture="onContextmenu"
@@ -76,7 +76,7 @@ const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
                         draggable="true"
                         color="neutral"
                         variant="ghost"
-                        :size="variant === 'strip' ? 'md' : variant === 'pills' ? 'xs' : 'sm'"
+                        :size="variant === 'strip' ? 'md' : variant === 'pills' ? 'xs' : 'md'"
                         :icon="PANEL_VIEW_INFO[s.slot].icon"
                         :label="variant === 'list' ? t(PANEL_VIEW_INFO[s.slot].label) : undefined"
                         :aria-label="t(PANEL_VIEW_INFO[s.slot].label)"

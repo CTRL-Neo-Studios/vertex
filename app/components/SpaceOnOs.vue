@@ -15,10 +15,10 @@ const props = withDefaults(defineProps<{
 </script>
 
 <template>
-    <div class="w-fit" v-if="!props.showOnOs">
+    <div class="w-fit shrink-0" v-if="!props.showOnOs">
         <div :class="(props.class == undefined || props.class == '') ? css : props.class" v-if="$platform != props.detectOs"/>
     </div>
-    <div class="w-fit" v-else>
+    <div class="w-fit shrink-0" v-else>
         <div :class="(props.class == undefined || props.class == '') ? css : props.class" v-if="$platform == props.detectOs"/>
     </div>
 </template>

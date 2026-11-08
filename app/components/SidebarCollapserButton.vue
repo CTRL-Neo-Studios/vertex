@@ -16,7 +16,7 @@ const {toggle} = usePanels($sesh.getSession($sessionId))
 </script>
 
 <template>
-    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" color="neutral" class="text-muted" size="sm" @click="toggle(props.side)"/>
+    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" color="neutral" class="text-muted shrink-0" size="sm" @click="toggle(props.side)"/>
 </template>
 
 <style scoped>
