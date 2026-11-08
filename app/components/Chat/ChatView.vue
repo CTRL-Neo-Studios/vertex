@@ -384,12 +384,20 @@ watch(pendingPrompt, async request => {
 	el?.setSelectionRange(input.value.length, input.value.length)
 }, {immediate: true})
 
-// USelect can't hold an empty value; '@default' stands for "the chat feature's profile".
+// The select can't hold an empty value; '@default' stands for "the chat feature's profile". Each profile shows its
+// provider and model, which the search also matches.
 const DEFAULT_PROFILE = '@default'
-const profileItems = computed(() => [
-	{label: t('app.chat.defaultProfile'), value: DEFAULT_PROFILE},
-	...(settings.value?.aiConfig.modelProfiles ?? []).map(p => ({label: p.name, value: p.id})),
-])
+const profileItems = computed(() => {
+	const ai = settings.value?.aiConfig
+	return [
+		{label: t('app.chat.defaultProfile'), value: DEFAULT_PROFILE, description: undefined as string | undefined},
+		...(ai?.modelProfiles ?? []).map(p => ({
+			label: p.name,
+			value: p.id,
+			description: [ai?.providers.find(x => x.id === p.providerId)?.name, p.modelId].filter(Boolean).join(' · ') || undefined,
+		})),
+	]
+})
 const profile = computed({
 	get: () => profileId(props.chatId).value ?? DEFAULT_PROFILE,
 	set: value => setProfile(props.chatId, value === DEFAULT_PROFILE ? undefined : value),
@@ -429,6 +437,8 @@ const compact = computed(() => props.inSidePanel ? {
 	trailing: 'hidden',
 	base: 'pe-1.5'
 } : {value: 'truncate'})
+/** The prompt's menus are as wide as their labels, not their (icon-only, in the side panel) trigger. */
+const MENU = 'w-max min-w-48 max-w-80'
 </script>
 
 <template>
@@ -625,7 +635,8 @@ const compact = computed(() => props.inSidePanel ? {
 									size="sm"
 									variant="ghost"
 									class="min-w-0"
-									:ui="compact"
+									:content="{ align: 'start' }"
+									:ui="{ ...compact, content: MENU }"
 									:aria-label="$t('app.chat.mode.label')"
 								/>
 							</UTooltip>
@@ -641,14 +652,25 @@ const compact = computed(() => props.inSidePanel ? {
 									class="min-w-0 max-w-48"
 									:search-input="{ placeholder: $t('app.chat.scope.search') }"
 									:content="{ align: 'start' }"
-									:ui="{ ...compact, content: 'min-w-60' }"
+									:ui="{ ...compact, content: `${MENU} min-w-60` }"
 									:aria-label="$t('app.chat.scope.label')"
 								/>
 							</UTooltip>
 							<div class="grow"/>
-							<USelect v-model="profile" :items="profileItems" icon="i-lucide-bot" size="sm"
-							         variant="ghost" class="min-w-0 max-w-48" :ui="compact"
-							         :aria-label="$t('app.chat.context.model')"/>
+							<USelectMenu
+								v-model="profile"
+								:items="profileItems"
+								value-key="value"
+								icon="i-lucide-bot"
+								size="sm"
+								variant="ghost"
+								class="min-w-0 max-w-48"
+								:filter-fields="['label', 'description']"
+								:search-input="{ placeholder: $t('app.chat.profileSearch') }"
+								:content="{ align: 'end' }"
+								:ui="{ ...compact, content: MENU }"
+								:aria-label="$t('app.chat.context.model')"
+							/>
 							<UChatPromptSubmit :status="chat.status" size="sm" @stop="chat.stop()"
 							                   @reload="chat.regenerate()"/>
 						</template>

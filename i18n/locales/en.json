@@ -1565,7 +1565,8 @@
 			"waitingPlaceholder": {
 				"question": "Answer the question above, or type your answer here…",
 				"approval": "Type here to not run it, and say why…"
-			}
+			},
+			"profileSearch": "Search profiles"
 		},
 		"workspaces": {
 			"switch": "Switch workspace",

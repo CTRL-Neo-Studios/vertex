@@ -80,6 +80,16 @@ Used AI Models during Development (via OpenRouter):
 Used AI Harnesses:
 - OpenCode
 
+## Inspirations
+- Obsidian (Cupertino Theme, Minimal Theme)
+- Nuxt UI UEditor Slash Menu and Text Hover Menus
+- Nuxt UI Chat Template
+- JetBrains WebStorm
+- DeepSeek Harness
+- Tiptap AI Extensions
+- tldraw
+- OpenCode
+
 ---
 
 **May this tool aid in your venture towards the unknown.**

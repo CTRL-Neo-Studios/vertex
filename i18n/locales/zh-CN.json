@@ -1565,7 +1565,8 @@
 			"waitingPlaceholder": {
 				"question": "回答上方的问题，或在此输入你的回答…",
 				"approval": "在此输入即不运行，并说明原因…"
-			}
+			},
+			"profileSearch": "搜索模型配置"
 		},
 		"workspaces": {
 			"switch": "切换工作区",

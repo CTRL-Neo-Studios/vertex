@@ -127,7 +127,9 @@ export default defineNuxtConfig({
                 "@type32/latex2vue",
                 "zod",
                 "@vue-flow/core",
-                "alfaaz"
+                "alfaaz",
+                // Write mode's change view (ChatChanges.vue); found at runtime otherwise, which reloads the window.
+                "diff",
             ],
             // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
             // exclude: ["@type32/workflows"]
