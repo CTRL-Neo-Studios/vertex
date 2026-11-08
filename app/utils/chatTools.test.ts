@@ -1,7 +1,7 @@
 import {describe, expect, it} from "vitest";
 import type {Tool} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
-import {chatTools, inScope, markModeSwitches, modeError, rankTools, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./chatTools";
+import {chatTools, inScope, markModeSwitches, modeError, rankTools, readLines, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./chatTools";
 
 const deps = (over: Partial<NoteToolDeps> = {}): NoteToolDeps => ({
     search: async () => [],
@@ -60,8 +60,19 @@ describe('chatTools', () => {
     it('readNote reads the one note whose path contains a partial name, and names the candidates when several do', async () => {
         const notes: Record<string, string> = {'Folder 2/Note 2-3.md': 'banana23', 'A/Note 1.md': 'one', 'B/Note 1.md': 'uno'}
         const tools = chatTools(deps({read: async path => notes[path] ?? null, list: () => Object.keys(notes)}), new Set())
-        expect(await run(tools.readNote, {path: '2-3'})).toEqual({path: 'Folder 2/Note 2-3.md', markdown: 'banana23'})
+        expect(await run(tools.readNote, {path: '2-3'})).toMatchObject({path: 'Folder 2/Note 2-3.md', markdown: 'banana23'})
         expect(await run(tools.readNote, {path: 'note 1'})).toEqual({error: expect.stringContaining('A/Note 1.md, B/Note 1.md')})
+    })
+
+    it('readNote without a path reads the note open in the editor, and says so when there is none', async () => {
+        const tools = chatTools(deps({read: async path => path === 'Open.md' ? 'a\nb' : null, openNote: () => 'Open.md'}), new Set())
+        expect(await run(tools.readNote, {})).toEqual({path: 'Open.md', markdown: 'a\nb', startLine: 1, endLine: 2, totalLines: 2})
+        expect(await run(chatTools(deps(), new Set()).readNote, {})).toEqual({error: expect.stringContaining('No note is open')})
+    })
+
+    it('fetchUrl asks before fetching, except from the sites allowed in the chat', () => {
+        const asks = chatTools(deps({allowedHost: host => host === 'docs.example.com'}), new Set()).fetchUrl!.needsApproval as (input: unknown) => boolean
+        expect([asks({url: 'https://docs.example.com/a'}), asks({url: 'https://evil.example/?q=x'}), asks({url: 'not a url'})]).toEqual([false, true, true])
     })
 
     it('findFiles filters by folder, name and kind, and reports what it left out', async () => {
@@ -92,6 +103,22 @@ describe('chatTools', () => {
         expect(await run(tools.editNote, {path: 'A.md', find: 'four', replace: '4'})).toEqual({error: expect.stringContaining('not found')})
         expect(await run(tools.editNote, {path: 'B.md', find: 'x', replace: 'y'})).toEqual({error: expect.stringContaining('"B.md"')})
         expect(staged).toHaveLength(1)
+    })
+})
+
+describe('readLines', () => {
+    const text = ['one', 'two', 'three', 'four'].join('\n')
+
+    it('reads a range of lines, clamped to the note, with its line count', () => {
+        expect(readLines(text, 2, 3)).toEqual({markdown: 'two\nthree', startLine: 2, endLine: 3, totalLines: 4})
+        expect(readLines(text, 3, 99)).toEqual({markdown: 'three\nfour', startLine: 3, endLine: 4, totalLines: 4})
+        expect(readLines(text, 5)).toEqual({error: expect.stringContaining('4 lines')})
+    })
+
+    it('stops at the last whole line under the cap and marks the read truncated', () => {
+        expect(readLines(text, 1, undefined, 9)).toEqual({markdown: 'one\ntwo', startLine: 1, endLine: 2, totalLines: 4, truncated: true})
+        expect(readLines(text, 3, undefined, 9)).toEqual({markdown: 'three', startLine: 3, endLine: 3, totalLines: 4, truncated: true})
+        expect(readLines('x'.repeat(30), 1, undefined, 10)).toMatchObject({markdown: 'x'.repeat(10), endLine: 1, truncated: true})
     })
 })
 

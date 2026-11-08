@@ -11,6 +11,7 @@ import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
+import {fetchPage} from "~/utils/webPage";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, newNotePath, textChange} from "~/utils/chatChanges";
 import {TRASH_DIR} from "#shared/workflows/vault";
@@ -270,6 +271,13 @@ export function useChats(session?: ActiveSession) {
         return read?.content ?? null
     }
 
+    /** `openInEditorTab`: the note (see `findNote`) shown in its tab, with the chat beside it. Worded for the model. */
+    async function openInEditor(chatId: string, path: string): Promise<object> {
+        const file = findNote(path)
+        if (!file) return {error: `There's no note at "${path}". Use searchNotes or findFiles for its path.`}
+        return await editorFor(chatId, file.uuid) ? {path: slashed(file.relativePath), opened: true} : {error: 'The note could not be shown in the editor.'}
+    }
+
     const defaultMode = (): ChatMode => toChatMode(effective.value?.aiConfig.chatMode)
     const modeOf = (entry: LiveChat) => entry.meta.mode ?? defaultMode()
 
@@ -328,16 +336,16 @@ export function useChats(session?: ActiveSession) {
     }
 
     /**
-     * The note an editor tool call works on: `path`'s, else the open one. A change (`proposing`) must be in the chat's
-     * scope; reading needn't. Errors are worded for the model.
+     * The note a proposal changes: `path`'s, else the open one; it must be in the chat's scope. Errors are worded for
+     * the model.
      */
-    function editTargetFor(entry: LiveChat, path: string | undefined, proposing: boolean): {id: string, open: boolean} | {error: string} {
+    function editTargetFor(entry: LiveChat, path: string | undefined): {id: string, open: boolean} | {error: string} {
         const open = editTarget()
         const file = path ? findNote(path) : open && $index.getFileByUuid(open)
         if (!file) return {error: path ? `There's no note at "${path}". Use searchNotes or findFiles for its path.` : 'No note is open in the editor. Pass the `path` of the note to change.'}
         const at = slashed(file.relativePath)
         const named = namedNotes(entry.chat.messages)
-        if (proposing && !inScope(at, entry.meta.scope, named)) {
+        if (!inScope(at, entry.meta.scope, named)) {
             return {error: `"${at}" is outside this chat's scope, which allows ${scopeText(entry.meta.scope, named)}. Ask the user to widen the scope or attach the note.`}
         }
         return {id: file.uuid, open: file.uuid === open}
@@ -505,6 +513,14 @@ export function useChats(session?: ActiveSession) {
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
             read: mode === 'write' ? path => readStaged(entry, path) : readNote,
+            openNote: () => {
+                const shown = editTarget()
+                const file = shown && $index.getFileByUuid(shown)
+                return file ? slashed(file.relativePath) : undefined
+            },
+            openInEditor: path => openInEditor(entry.meta.id, path),
+            fetchUrl: fetchPage,
+            allowedHost: host => !!entry.meta.allowedHosts?.includes(host),
             list,
             files: workspaceFiles,
             mode,
@@ -522,7 +538,7 @@ export function useChats(session?: ActiveSession) {
         const prompt = [
             profile.systemPrompt,
             toolsPrompt(mode, scopeText(entry.meta.scope, named), toolsOn),
-            openFile ? `The open note is "${slashed(openFile.relativePath)}": readDocument and readSelection read it${mode === 'suggest' ? ', and the proposals edit it unless given a path' : ''}.` : '',
+            openFile ? `The open note is "${slashed(openFile.relativePath)}": readNote without a path and readSelection read it${mode === 'suggest' ? ', and the proposals edit it unless given a path' : ''}.` : '',
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
@@ -573,16 +589,21 @@ export function useChats(session?: ActiveSession) {
                     void saveLogged(entry)
                     if (!isAbort && !isError) void autoTitle(entry)
                 },
-                // The editor tools have no `execute`: they run here, against the edited note (shown first, with the
-                // chat beside it), and a proposal answers once the user accepts or rejects it. Then the reply goes on.
-                // `askUser` has none either: its card in ChatView answers it.
+                // The editor tools have no `execute`: they run here. Reading the selection stays on the open note's
+                // editor; a proposal first shows its note with the chat beside it, and answers once the user accepts or
+                // rejects it. Then the reply goes on. `askUser` has none either: its card in ChatView answers it.
                 onToolCall: ({toolCall}) => {
                     if (!isEditorTool(toolCall)) return
                     const answer = (output: unknown) => entry.chat.addToolOutput({tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output})
                     const refused = modeError(toolCall.toolName, modeOf(entry))
                     if (refused) return void answer(refused)
+                    if (!toolCall.toolName.startsWith('propose')) {
+                        const open = editTarget()
+                        const view = open && editorViewOf(session, open)
+                        return void (view ? runEditorTool(view, toolCall).then(answer) : answer({error: 'No note is open in the editor.'}))
+                    }
                     const input = (toolCall.input ?? {}) as { path?: string, after?: string }
-                    const target = editTargetFor(entry, input.path, toolCall.toolName.startsWith('propose'))
+                    const target = editTargetFor(entry, input.path)
                     if ('error' in target) return void answer(target)
                     // Not awaited: onToolCall must return before the proposal is decided.
                     void editorFor(id, target.id)
@@ -630,6 +651,14 @@ export function useChats(session?: ActiveSession) {
     async function update(id: string, patch: Partial<Pick<ChatFile, 'title' | 'folder' | 'profileId' | 'mode' | 'scope'>>) {
         const entry = await load(id)
         Object.assign(entry.meta, patch)
+        await save(entry)
+    }
+
+    /** `fetchUrl` fetches from `host` in this chat without asking from now on. */
+    async function allowHost(id: string, host: string) {
+        const entry = await load(id)
+        if (entry.meta.allowedHosts?.includes(host)) return
+        entry.meta.allowedHosts = [...entry.meta.allowedHosts ?? [], host]
         await save(entry)
     }
 
@@ -852,6 +881,7 @@ export function useChats(session?: ActiveSession) {
         showInSidePanel,
         openInTab,
         askInChat,
+        allowHost,
         pendingPrompt,
     }
 }

@@ -98,6 +98,8 @@ export interface ChatFile extends ChatSummary {
     mode?: ChatMode,
     /** Missing = named. */
     scope?: ChatScope,
+    /** Sites (`hostname`s) `fetchUrl` may fetch from without asking. */
+    allowedHosts?: string[],
 }
 
 export interface ChatIndex {

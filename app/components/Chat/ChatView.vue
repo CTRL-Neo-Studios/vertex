@@ -12,7 +12,7 @@ import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {ASK_USER, toolsUnsupported, type AskUserOutput} from "~/utils/chatTools";
+import {ASK_USER, hostnameOf, toolsUnsupported, type AskUserOutput} from "~/utils/chatTools";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
 import ChatChanges from "~/components/Chat/ChatChanges.vue";
@@ -50,6 +50,7 @@ const {
 	renameChat,
 	showInSidePanel,
 	openInTab,
+	allowHost,
 	pendingPrompt
 } = useChats(session)
 const {updateModelProfile} = useAiConfig()
@@ -224,8 +225,10 @@ const TOOL_ICONS: Record<string, string> = {
 	findTools: 'i-lucide-search',
 	searchNotes: 'i-lucide-file-search',
 	readNote: 'i-lucide-file-text',
+	openInEditorTab: 'i-lucide-square-arrow-out-up-right',
+	fetchUrl: 'i-lucide-globe',
 	findFiles: 'i-lucide-folder-search',
-	// Chats from before findFiles.
+	// Chats from before findFiles, and from before readNote read the open note.
 	listNotes: 'i-lucide-list-tree',
 	readDocument: 'i-lucide-file-text',
 	readSelection: 'i-lucide-text-select',
@@ -240,7 +243,7 @@ const TOOL_DETAIL_CHARS = 4000
 
 function toolView(part: ToolPart) {
 	const name = getToolName(part)
-	const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string }
+	const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string, url?: string }
 	const output = part.state === 'output-available' ? part.output as {
 		status?: string,
 		error?: string,
@@ -250,9 +253,9 @@ function toolView(part: ToolPart) {
 	const suffix = part.state === 'output-error' || output?.error ? t('app.chat.tools.failed')
 		: part.state === 'output-denied' || output?.declined ? t('app.chat.tools.declined')
 			: output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
-				: part.state === 'approval-requested' ? t('app.chat.tools.asksToRun')
+				: part.state === 'approval-requested' ? t(name === 'fetchUrl' ? 'app.chat.tools.asksToFetch' : 'app.chat.tools.asksToRun')
 					: pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('app.chat.tools.waiting')
-						: input.query ?? input.path ?? input.folder
+						: input.query ?? input.path ?? input.folder ?? input.url
 	return {
 		text: te(`app.chat.tools.names.${name}`) ? t(`app.chat.tools.names.${name}`) : name,
 		suffix,
@@ -270,6 +273,17 @@ function toolDetail(part: ToolPart) {
 const isQuestion = (part: ToolPart) => getToolName(part) === ASK_USER && (part.state === 'input-available' || part.state === 'output-available')
 const answerQuestion = (part: ToolPart, output: AskUserOutput) => chat.value?.addToolOutput({tool: ASK_USER, toolCallId: part.toolCallId, output})
 const approveRun = (id: string, approved: boolean) => chat.value?.addToolApprovalResponse({id, approved})
+/** The URL a `fetchUrl` call asks for. */
+function fetchTarget(part: ToolPart) {
+	const input = part.input as { url?: string } | undefined
+	return input?.url ?? ''
+}
+const fetchSite = (part: ToolPart) => hostnameOf(fetchTarget(part))
+/** A fetch's approval with "always for this site": the site is saved to the chat first, so later fetches don't ask. */
+async function allowSite(part: ToolPart, id: string) {
+	await act(() => allowHost(props.chatId, fetchSite(part)))
+	approveRun(id, true)
+}
 /** What the last reply waits on in the chat (a question, or a run to approve), which typing in the prompt answers. */
 const waitingOn = computed(() => {
 	const last = chat.value?.messages.at(-1)
@@ -506,7 +520,17 @@ const MENU = 'w-max min-w-48 max-w-80'
 													toolDetail(part)
 												}}</pre>
 										</UChatTool>
-										<div v-if="part.state === 'approval-requested'" class="flex gap-1 mb-2">
+										<div v-if="part.state === 'approval-requested' && getToolName(part) === 'fetchUrl'" class="flex flex-wrap gap-1 mb-2">
+											<p class="w-full text-xs text-muted break-all">{{ fetchTarget(part) }}</p>
+											<UButton size="xs" icon="i-lucide-globe" :label="$t('app.chat.tools.fetch')"
+											         @click="approveRun(part.approval.id, true)"/>
+											<UButton v-if="fetchSite(part)" size="xs" color="neutral" variant="outline"
+											         :label="$t('app.chat.tools.allowSite', { host: fetchSite(part) })"
+											         @click="allowSite(part, part.approval.id)"/>
+											<UButton size="xs" color="neutral" variant="ghost" :label="$t('app.chat.tools.dontFetch')"
+											         @click="approveRun(part.approval.id, false)"/>
+										</div>
+										<div v-else-if="part.state === 'approval-requested'" class="flex gap-1 mb-2">
 											<UButton size="xs" icon="i-lucide-play" :label="$t('app.chat.tools.run')"
 											         @click="approveRun(part.approval.id, true)"/>
 											<UButton size="xs" color="neutral" variant="ghost" :label="$t('app.chat.tools.dontRun')"

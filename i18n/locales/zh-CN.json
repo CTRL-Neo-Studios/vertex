@@ -1475,8 +1475,14 @@
 					"editNote": "编辑笔记",
 					"findFiles": "查找文件",
 					"runWorkflow": "运行工作流",
-					"askUser": "向你提问"
-				}
+					"askUser": "向你提问",
+					"openInEditorTab": "在编辑器标签页中打开",
+					"fetchUrl": "获取网页"
+				},
+				"asksToFetch": "请求获取",
+				"fetch": "获取",
+				"dontFetch": "不获取",
+				"allowSite": "始终允许 {host}"
 			},
 			"edit": "编辑",
 			"send": "发送",
@@ -1564,7 +1570,7 @@
 			},
 			"waitingPlaceholder": {
 				"question": "回答上方的问题，或在此输入你的回答…",
-				"approval": "在此输入即不运行，并说明原因…"
+				"approval": "在此输入以拒绝，并说明原因…"
 			},
 			"profileSearch": "搜索模型配置"
 		},

@@ -60,12 +60,16 @@ pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, St
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 
-/// One client for every AI call. Connect timeout only: a generation can stream for minutes.
-static CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
-    // reqwest is built without a bundled crypto provider (same setup as tauri-plugin-updater).
+/// reqwest is built without a bundled crypto provider (same setup as tauri-plugin-updater): install ring's once.
+pub(crate) fn install_crypto() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
+}
+
+/// One client for every AI call. Connect timeout only: a generation can stream for minutes.
+static CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
+    install_crypto();
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
         // Redirects may not leave the provider's origin: the request was only checked against that.

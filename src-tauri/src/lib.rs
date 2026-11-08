@@ -4,6 +4,7 @@ mod fonts;
 mod notes;
 mod state;
 mod updater;
+mod web;
 
 use rayon::prelude::*;
 use state::AppState;
@@ -258,6 +259,7 @@ pub fn run() {
             ai::ai_request,
             ai::ai_request_cancel,
             ai::ai_model_catalog,
+            web::web_fetch,
             chats::chat_vault_state,
             chats::chat_vault_create,
             chats::chat_vault_unlock,

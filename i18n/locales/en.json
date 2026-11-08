@@ -1475,8 +1475,14 @@
 					"editNote": "Edit a note",
 					"findFiles": "Find files",
 					"runWorkflow": "Run a workflow",
-					"askUser": "Ask you"
-				}
+					"askUser": "Ask you",
+					"openInEditorTab": "Open in an editor tab",
+					"fetchUrl": "Fetch a web page"
+				},
+				"asksToFetch": "asks to fetch",
+				"fetch": "Fetch",
+				"dontFetch": "Don't fetch",
+				"allowSite": "Always for {host}"
 			},
 			"edit": "Edit",
 			"send": "Send",
@@ -1564,7 +1570,7 @@
 			},
 			"waitingPlaceholder": {
 				"question": "Answer the question above, or type your answer here…",
-				"approval": "Type here to not run it, and say why…"
+				"approval": "Type here to decline, and say why…"
 			},
 			"profileSearch": "Search profiles"
 		},

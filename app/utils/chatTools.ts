@@ -14,6 +14,14 @@ export interface NoteToolDeps {
     search: (query: string) => Promise<{ path: string, snippet: string | null }[]>
     /** A note's text by workspace-relative path (the open editor's buffer when it's mounted); `null` when there's none. */
     read: (path: string) => Promise<string | null>
+    /** The workspace-relative path of the note open in the editor, for `readNote` without a path. */
+    openNote?: () => string | undefined
+    /** Shows the note at `path` (or by name) in an editor tab beside the chat; returns what the model gets back. */
+    openInEditor?: (path: string) => Promise<object>
+    /** `url` fetched (Rust `web_fetch`) as text from `offset` (see `fetchPage`); returns what the model gets back. */
+    fetchUrl?: (url: string, offset: number) => Promise<object>
+    /** Sites (`hostname`s) the user allowed `fetchUrl` for in this chat: no approval asked. */
+    allowedHost?: (host: string) => boolean
     /** Workspace-relative paths of the notes under `folder` (`''` = all). */
     list: (folder: string) => string[]
     /** Every file and folder in the workspace but dot-named ones. */
@@ -110,7 +118,7 @@ export function toolsPrompt(mode: ChatMode, scope: string, tools: boolean): stri
     // Tools first: small models lose the tool search behind the mode's wording and call made-up tools.
     return [
         'You can use tools on the user\'s notes. They load on demand: first call `findTools` with what you want to do (for '
-        + 'example "search notes", "find files", "read note", "edit a note" or "run a workflow"), then call the tools it '
+        + 'example "search notes", "find files", "read note", "edit a note", "run a workflow" or "fetch a web page"), then call the tools it '
         + `returns. Only \`findTools\` and \`${ASK_USER}\` can be called without searching first.`,
         current,
         rule,
@@ -176,12 +184,38 @@ const NOTE_PATH = {type: 'string', description: 'The note to change: its workspa
 const NOT_FOUND = (path: string) => `There's no note at "${path}". Use searchNotes or findFiles for its path.`
 
 /**
+ * `readNote`'s lines `start`–`end` of `text` (1-based, inclusive; default all), ending at a whole line before `cap`
+ * characters, with the note's line count. `truncated` when lines were left out for the cap.
+ */
+export function readLines(text: string, start = 1, end?: number, cap = NOTE_READ_CHARS) {
+    const lines = text.split('\n')
+    const totalLines = lines.length
+    const from = Math.max(1, Math.floor(start))
+    if (from > totalLines) return {error: `startLine ${from} is past the end: the note has ${totalLines} lines.`}
+    const to = Math.min(totalLines, Math.max(from, Math.floor(end ?? totalLines)))
+    let last = from
+    let size = lines[from - 1]!.length
+    while (last < to && size + 1 + lines[last]!.length <= cap) size += 1 + lines[last++]!.length
+    // ponytail: one line longer than the cap is cut, and its rest can't be read; page by characters if notes have such lines.
+    const markdown = lines.slice(from - 1, last).join('\n').slice(0, cap)
+    return {markdown, startLine: from, endLine: last, totalLines, ...((last < to || size > cap) && {truncated: true as const})}
+}
+
+/** A URL's `hostname`, `''` when it doesn't parse (which never counts as allowed). */
+export const hostnameOf = (url: string) => {
+    try {
+        return new URL(url).hostname
+    } catch {
+        return ''
+    }
+}
+
+/**
  * The editor package's tools, the proposals also taking the note to change (`path`; it opens beside the chat, where
  * the user decides). They have no `execute`: `useChats` runs them in the editor, after {@link modeError}.
- * `readDocument` and `readSelection` stay on the open document.
+ * `readSelection` stays on the open document, without showing it; reading the open note is `readNote` without a path.
  */
 const editorToolSet: ToolSet = {
-    readDocument: editorTools.readDocument,
     readSelection: editorTools.readSelection,
     proposeEdit: tool({
         description: 'Suggest mode: propose replacing one passage of a note (the open document unless `path` names another). The user reviews the change and accepts or rejects it; the note only changes if they accept. The result tells you which.',
@@ -318,19 +352,55 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
             execute: ({query}) => deps.search(query),
         }),
         readNote: tool({
-            description: 'Read a note\'s Markdown by its workspace-relative path (as searchNotes or findFiles return it) or its name.',
-            inputSchema: pathInput('Workspace-relative path, e.g. "Folder/Note.md", or a note\'s name, e.g. "Note".'),
-            execute: async ({path}) => {
-                let found = path
-                let text = await deps.read(path)
+            description: 'Read a note\'s Markdown by its workspace-relative path (as searchNotes or findFiles return it) or its name; '
+                + 'without `path`, the note open in the editor. Returns the lines read and the note\'s line count. A long note comes in '
+                + 'parts: when the result says `truncated`, read on with startLine = its endLine + 1. Reading doesn\'t show the note to '
+                + 'the user (openInEditorTab does).',
+            inputSchema: jsonSchema<{ path?: string, startLine?: number, endLine?: number }>({
+                type: 'object',
+                properties: {
+                    path: {type: 'string', description: 'Workspace-relative path, e.g. "Folder/Note.md", or a note\'s name, e.g. "Note". Omit for the note open in the editor.'},
+                    startLine: {type: 'integer', minimum: 1, description: 'The first line to read (1-based). Default 1.'},
+                    endLine: {type: 'integer', minimum: 1, description: 'The last line to read, included. Default: the end of the note.'},
+                },
+                additionalProperties: false,
+            }),
+            execute: async ({path, startLine, endLine}) => {
+                const asked = path ?? deps.openNote?.()
+                if (!asked) return {error: 'No note is open in the editor. Pass the `path` of the note to read.'}
+                let found = asked
+                let text = await deps.read(asked)
                 // Models pass partial names ("2-3" for "Note 2-3"): one note containing it is the one meant.
-                const near = text === null ? deps.list('').filter(p => p.toLowerCase().includes(path.toLowerCase().replace(/\.(md|txt)$/, ''))) : []
+                const near = text === null ? deps.list('').filter(p => p.toLowerCase().includes(asked.toLowerCase().replace(/\.(md|txt)$/, ''))) : []
                 if (near.length === 1) text = await deps.read(found = near[0]!)
                 if (text === null) {
-                    return {error: near.length ? `There's no note at "${path}". Did you mean one of: ${near.slice(0, 5).join(', ')}?` : NOT_FOUND(path)}
+                    return {error: near.length ? `There's no note at "${asked}". Did you mean one of: ${near.slice(0, 5).join(', ')}?` : NOT_FOUND(asked)}
                 }
-                return text.length > NOTE_READ_CHARS ? {path: found, markdown: text.slice(0, NOTE_READ_CHARS), truncated: true} : {path: found, markdown: text}
+                const lines = readLines(text, startLine, endLine)
+                return 'error' in lines ? lines : {path: found, ...lines}
             },
+        }),
+        openInEditorTab: tool({
+            description: 'Open a note in an editor tab beside the chat, to show it to the user. It doesn\'t read the note (use readNote) or change it.',
+            inputSchema: pathInput('Workspace-relative path, e.g. "Folder/Note.md", or a note\'s name.'),
+            execute: ({path}) => deps.openInEditor ? deps.openInEditor(path) : {error: 'Notes can\'t be opened from this chat.'},
+        }),
+        fetchUrl: tool({
+            description: 'Fetch a web page (http or https) and read it as text: HTML comes back as Markdown-like text (links kept), '
+                + 'JSON and plain text as they are. The user approves the first fetch from each site. A long page comes in parts: '
+                + 'when the result says `truncated`, fetch it again with `offset` = its nextOffset. Addresses on the user\'s computer '
+                + 'or local network are refused.',
+            inputSchema: jsonSchema<{ url: string, offset?: number }>({
+                type: 'object',
+                properties: {
+                    url: {type: 'string', description: 'The full URL, e.g. "https://example.com/page".'},
+                    offset: {type: 'integer', minimum: 0, description: 'Where to start reading, in characters of the text. Default 0.'},
+                },
+                required: ['url'],
+                additionalProperties: false,
+            }),
+            needsApproval: ({url}) => !deps.allowedHost?.(hostnameOf(url)),
+            execute: ({url, offset}) => deps.fetchUrl ? deps.fetchUrl(url, offset ?? 0) : {error: 'Web pages can\'t be fetched in this chat.'},
         }),
         findFiles: tool({
             description: 'Find files and folders in the workspace by name, of any type (notes, images, PDFs, bases, canvases, workflows), or list a folder. Returns workspace-relative paths with their kind (the extension, or "folder"). To search the text of notes, use searchNotes.',
