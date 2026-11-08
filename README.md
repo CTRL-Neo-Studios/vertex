@@ -79,3 +79,7 @@ Used AI Models during Development (via OpenRouter):
 
 Used AI Harnesses:
 - OpenCode
+
+---
+
+**May this tool aid in your venture towards the unknown.**
