@@ -3,7 +3,7 @@ import {platform} from "@tauri-apps/plugin-os";
 
 const $platform = platform()
 
-const css = computed<string>(() => $platform == 'macos' ? 'w-18' : 'w-24')
+const css = computed<string>(() => $platform == 'macos' ? 'w-16' : 'w-24')
 
 const props = withDefaults(defineProps<{
     detectOs: string,

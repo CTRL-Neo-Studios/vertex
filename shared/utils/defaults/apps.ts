@@ -1,8 +1,9 @@
-import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, PanelViewId, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
+import {normalizePanelLayout, PANEL_VIEWS} from "#shared/utils/panelLayout";
 import type {DeepPartial} from "#shared/types/types";
 
 const RECOVERY_MODES: readonly SessionRecoveryMode[] = ['none', 'workspaces', 'singlespaces', 'both']
@@ -136,6 +137,8 @@ export function defaultAppSession(data?: LegacySession): AppSession {
     } satisfies AppSession
 }
 
+const panelView = (value: unknown) => PANEL_VIEWS.includes(value as PanelViewId) ? value as PanelViewId : undefined
+
 /** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
 export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {
     const relative = (path: string) => root && path.length > root.length && path.startsWith(root) && /[\\/]/.test(path[root.length]!)
@@ -149,7 +152,10 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
         openedChatIds: data?.openedChatIds || [],
         lastFocusedChatId: data?.lastFocusedChatId,
-        leftPanelView: data?.leftPanelView === 'chats' ? 'chats' : 'files',
+        leftPanelView: panelView(data?.leftPanelView),
+        rightPanelView: panelView(data?.rightPanelView),
+        leftPanelCollapsed: data?.leftPanelCollapsed === true,
+        rightPanelCollapsed: data?.rightPanelCollapsed !== false,
     } satisfies AppSessionContext
 }
 
@@ -171,6 +177,10 @@ export function defaultAppViewConfig(data?: DeepPartial<AppViewConfig>): AppView
             blockHandle: data?.editorPanel?.blockHandle ?? true,
             headerHistory: headerToolsPosition(data?.editorPanel?.headerHistory, 'left'),
             headerFormatting: headerToolsPosition(data?.editorPanel?.headerFormatting, 'right'),
-        }
+        },
+        panels: {
+            style: data?.panels?.style === 'strip' ? 'strip' : 'buttons',
+            ...normalizePanelLayout(data?.panels),
+        },
     } satisfies AppViewConfig
 }

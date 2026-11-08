@@ -21,7 +21,7 @@ import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {usePanels} from "~/composables/active/usePanels";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import {editorViewOf, editorViewsOf, lastShownNoteOf} from "~/composables/active/editor/useActiveEditorExtensions";
@@ -72,7 +72,7 @@ export function useChats(session?: ActiveSession) {
     const {effective} = useSettingsScope()
     const $tabs = useActiveTabs(session)
     const $index = useActiveWorkspaceIndex(session)
-    const {rightPanelCollapsed, rightPanelView} = useActiveLayouts(session)
+    const panels = usePanels(session)
     const $navi = useAppNavigator()
 
     const root = computed(() => session?.workspaceSession && session.rootPath ? session.rootPath : null)
@@ -243,11 +243,11 @@ export function useChats(session?: ActiveSession) {
         const shown = editorViewOf(session, noteId)
         if (shown && $tabs.activeTabUuid.value === noteId) return shown
         sidePanelChatId.value = chatId
-        rightPanelCollapsed.value = false
-        rightPanelView.value = '4'
+        // With the Chat view hidden the chat keeps its tab, and the note opens beside it.
+        const beside = panels.showView('chat')
         // The note's route first, then the chat's tab goes (see closeChatTab).
         await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(noteId))
-        if ($tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+        if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
 
@@ -767,10 +767,10 @@ export function useChats(session?: ActiveSession) {
         index.value = await chatClient.index(requireRoot(), storage.value)
     }
 
+    /** Shows the chat in the Chat view (closing its tab); with that view hidden, in a tab instead. */
     function showInSidePanel(id: string) {
+        if (!panels.showView('chat')) return void openInTab(id)
         sidePanelChatId.value = id
-        rightPanelCollapsed.value = false
-        rightPanelView.value = '4'
         void closeChatTab(id)
     }
 

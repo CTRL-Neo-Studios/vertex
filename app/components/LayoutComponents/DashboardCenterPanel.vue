@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import TabsHeaderComponent from "~/components/TabsHeaderComponent.vue";
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {usePanels} from "~/composables/active/usePanels";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 
 const $route = useRoute()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {
-    leftPanelCollapsed,
-    rightPanelCollapsed
-} = useActiveLayouts($sesh.getSession($sessionId))
+const {sides} = usePanels($sesh.getSession($sessionId))
 
-const panelsCollapsed = computed(() => {
-    return $sesh.isSessionWorkspace($sessionId) ? unref(rightPanelCollapsed) && unref(leftPanelCollapsed) : unref(rightPanelCollapsed)
-})
+
+const panelsCollapsed = computed(() => !sides.value.left.open && !sides.value.right.open)
 </script>
 
 <template>
@@ -21,7 +17,7 @@ const panelsCollapsed = computed(() => {
         id="content"
         :ui="{
             body: `relative sm:p-0 bg-default border-default overflow-visible ${panelsCollapsed ? 'border-0' : 'border-0 shadow-none shadow-neutral'}`,
-            root: `lg:not-last:border-r`,
+            root: `lg:not-last:${(!sides.left.open && !sides.right.open) ? 'border-none' : 'border-r'}`,
         }"
     >
         <template #header>

@@ -68,7 +68,25 @@ export interface AppViewConfig {
         /** Where the header shows undo/redo and the formatting buttons; `hidden` turns them off. */
         headerHistory: HeaderToolsPosition,
         headerFormatting: HeaderToolsPosition,
-    }
+    },
+    /** The side panels' views: which side each sits on, in what order (with separators), or hidden; and how they're switched. */
+    panels: AppPanelsConfig,
 }
 
 export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
+
+/** A view a side panel can show; `search` is an action (it opens a search) rather than a view. */
+export type PanelViewId = 'files' | 'chats' | 'search' | 'forelinks' | 'backlinks' | 'writersTools' | 'toc' | 'chat'
+export type PanelSlot = PanelViewId | 'separator'
+export type PanelSide = 'left' | 'right'
+
+export interface PanelLayout {
+    left: PanelSlot[],
+    right: PanelSlot[],
+    hidden: PanelViewId[],
+}
+
+export interface AppPanelsConfig extends PanelLayout {
+    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. */
+    style: 'buttons' | 'strip',
+}

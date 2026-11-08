@@ -20,7 +20,7 @@ const maxLevel = computed(() => Math.max(0, ...toc.value.map(i => i.level)))
 </script>
 
 <template>
-    <div class="w-fit h-fit">
+    <div class="w-fit h-fit" v-if="toc.length <= 20">
         <template v-if="$tabId && $sessionId">
             <div :class="['w-full flex flex-col justify-center', props.alignment == 'right' ? 'items-end' : 'items-start']">
                 <UTooltip :delay-duration="100" :text="`${item.text}`" v-for="item in toc" :key="item.from">

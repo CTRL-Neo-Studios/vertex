@@ -5,7 +5,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type { DropdownMenuItem } from '@nuxt/ui'
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {usePanels} from "~/composables/active/usePanels";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
@@ -27,10 +27,10 @@ const {
 } = useActiveTabs($sesh.getSession(sessionId))
 const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
-const {
-    leftPanelCollapsed,
-    rightPanelCollapsed
-} = useActiveLayouts($sesh.getSession(sessionId))
+const panels = usePanels($sesh.getSession(sessionId))
+// The left panel's header holds the switcher (and the traffic lights' room) while it shows; this one otherwise.
+const leftClosed = computed(() => !panels.sides.value.left.open)
+const buttons = computed(() => panels.style.value === 'buttons')
 const $win = useAppWebviewWindows()
 
 const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
@@ -145,10 +145,11 @@ function scrollToItem(index: number) {
 
 <template>
     <div class="w-full flex items-center" data-tauri-drag-region>
-        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2`" data-tauri-drag-region>
-            <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
+        <div v-if="leftClosed" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2`" data-tauri-drag-region>
+            <!-- A strip already covers part of the traffic lights. -->
+            <SpaceOnOs detect-os="macos" :show-on-os="true" :class="buttons ? 'w-16' : 'w-6'"/>
             <WorkspaceSwitcher/>
-            <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
+            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.sides.value.left.views.length"/>
         </div>
         <UScrollArea
             ref="scrollArea"
@@ -196,11 +197,11 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
+        <div v-if="isWorkspace || (buttons && !panels.sides.value.right.open)" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
-            <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
+            <SidebarCollapserButton side="right" v-if="buttons && !panels.sides.value.right.open" :disabled="!panels.sides.value.right.views.length"/>
         </div>
     </div>
 </template>

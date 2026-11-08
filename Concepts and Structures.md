@@ -217,12 +217,21 @@ most recent ends up in front. One whose folder or file is gone isn't opened; the
 Remove from recents. Older settings files with `openLastOpenedWindows: true` migrate to `workspaces`. Sessions from
 before `open` existed count as closed, so the first launch after that change reopens nothing.
 
+### Side panels
+
+- Views (`PanelViewId`: files, chats, search, forelinks, backlinks, writersTools, toc, chat; looks in `app/utils/panelViews.ts`) sit on either side, in any order with separators, or hidden: `viewConfig.panels = {style, left, right, hidden}`, overridable per workspace like all of `viewConfig`. `normalizePanelLayout` (`shared/utils/panelLayout.ts`) drops unknown ids, keeps each view where it first appears (hidden first), tidies separators and puts views missing from a saved layout (new ones) back on their default side. `search` is an action: it opens the chats' search while Chats shows on its side, else the file palette.
+- `usePanels(session)` narrows the layout to what the window can show (no files, chats or chat in a singlespace window; no note views on a Bases file), and keeps each side's view and collapsed state (`useActiveLayouts`; saved in the session context, the right side collapsed by default). A side's panel (`DashboardSidePanel`, one component for both) shows while it has a view and isn't collapsed. `showView(id)` opens whichever side holds a view; `useChats` shows a chat with it, and opens it in a tab when the Chat view is hidden.
+- Styles: `buttons` (default) keeps the buttons in the panels: labelled on the left, icons in the right panel's header, with collapse buttons. `strip` puts them in a 2.75 rem strip at each window edge (`PanelStrip`); clicking the shown view's icon collapses its panel, and the panel's header shows the view's name. Both strips always show, even empty: the editor centres in the centre panel (a `flex-1` sibling of the sidebars), so equal strips leave it centred in the window while no panel is open, and an open panel moves it by half its width (as panels always did). The traffic-light spacers shrink by the strip's width.
+- Rearranging (`PanelButtons`, in all three looks and the Settings editor): HTML5 drag and drop (`usePanelDrag`, one state per window via `provide`, so a view goes from one side's list to the other's), and a right-click menu (`panelSlotMenu`: move up or down, to the other side, hide, add or remove a separator, show a hidden view here, reset). In a window, a change is saved to the workspace when it already overrides the arrangement, else globally. Settings → View → Side Panels has the style and the same editor (left, right, hidden) for the scope being edited.
+- The sidebars have stable ids (`left`, `right`), so Nuxt UI keeps their resized widths in its cookie for every window.
+
 ---
 
 ## Composables
 
 | Composable | Responsibility |
 |---|---|
+| `usePanels` | A session window's side panels: the arrangement narrowed to what it can show, each side's view, select/toggle/`showView`, rearranging and its menu |
 | `useAppSessions` | Per-window mirror of AppSessions; CRUD via `stateClient`; current window's session; startup recovery |
 | `useAppSettings` | Per-window mirror of settings; `set` (memory) / `save` (persist + broadcast) |
 | `useAppSessionActions` | User-facing "open folder/file" actions; one AppSession + window per path |

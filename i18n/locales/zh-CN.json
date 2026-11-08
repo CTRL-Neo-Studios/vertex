@@ -209,7 +209,15 @@
 				"headerFormattingDescription": "粗体、斜体、删除线和高亮按钮在标题栏中的位置。",
 				"headerToolsLeft": "左侧",
 				"headerToolsRight": "右侧",
-				"headerToolsHidden": "隐藏"
+				"headerToolsHidden": "隐藏",
+				"panels": "侧边面板",
+				"panelsDescription": "每个侧边面板有哪些视图、顺序如何，以及如何切换。可在此重新排列，也可在窗口中拖动或右键点击它们的按钮。",
+				"panelStyle": "视图按钮",
+				"panelStyleDescription": "按钮在面板内，或以图标条显示在窗口边缘（点击当前视图的图标可收起其面板）。",
+				"panelStyleButtons": "在面板内",
+				"panelStyleStrip": "边缘图标条",
+				"panelLayout": "排列",
+				"panelLayoutDescription": "在左右两侧与“已隐藏”之间拖动视图；右键点击可移动、隐藏或添加分隔线。"
 			},
 			"workflows": {
 				"title": "工作流",
@@ -1551,6 +1559,25 @@
 			"open": "打开…",
 			"openList": "已打开的工作区",
 			"recent": "最近的工作区"
+		},
+		"panels": {
+			"moveUp": "上移",
+			"moveDown": "下移",
+			"moveTo": {
+				"left": "移到左侧",
+				"right": "移到右侧"
+			},
+			"hide": "隐藏",
+			"addSeparator": "在下方添加分隔线",
+			"removeSeparator": "移除分隔线",
+			"hidden": "已隐藏的视图",
+			"reset": "重置布局",
+			"separator": "分隔线",
+			"lists": {
+				"left": "左侧",
+				"right": "右侧",
+				"hidden": "已隐藏"
+			}
 		}
 	}
 }

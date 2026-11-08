@@ -51,6 +51,7 @@ export const StateKey = {
     leftPanelView: (s: string) => `active.layouts.left-panel-view.${s}`,
     rightPanelView: (s: string) => `active.layouts.right-panel-view.${s}`,
     fileSearchOpen: (s: string) => `active.layouts.file-search-open.${s}`,
+    chatSearchOpen: (s: string) => `active.chats.search-open.${s}`,
     chatsExpanded: (s: string) => `active.chats.expanded.${s}`,
     chatVault: (s: string) => `active.chats.vault.${s}`,
     chatIndex: (s: string) => `active.chats.index.${s}`,

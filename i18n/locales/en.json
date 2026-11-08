@@ -209,7 +209,15 @@
 				"headerFormattingDescription": "Where the header shows bold, italic, strikethrough and highlight.",
 				"headerToolsLeft": "Left",
 				"headerToolsRight": "Right",
-				"headerToolsHidden": "Hidden"
+				"headerToolsHidden": "Hidden",
+				"panels": "Side Panels",
+				"panelsDescription": "Which views each side panel has, in what order, and how you switch between them. Rearrange them here, or by dragging or right-clicking their buttons in a window.",
+				"panelStyle": "View Buttons",
+				"panelStyleDescription": "Buttons inside the panels, or icon strips at the window’s edges (click the shown view’s icon to collapse its panel).",
+				"panelStyleButtons": "In the panels",
+				"panelStyleStrip": "Strips at the edges",
+				"panelLayout": "Arrangement",
+				"panelLayoutDescription": "Drag views between the sides and Hidden; right-click one to move it, hide it or add a separator."
 			},
 			"workflows": {
 				"title": "Workflows",
@@ -1551,6 +1559,25 @@
 			"open": "Open…",
 			"openList": "Open Workspaces",
 			"recent": "Recent Workspaces"
+		},
+		"panels": {
+			"moveUp": "Move up",
+			"moveDown": "Move down",
+			"moveTo": {
+				"left": "Move to the left side",
+				"right": "Move to the right side"
+			},
+			"hide": "Hide",
+			"addSeparator": "Add separator below",
+			"removeSeparator": "Remove separator",
+			"hidden": "Hidden views",
+			"reset": "Reset layout",
+			"separator": "Separator",
+			"lists": {
+				"left": "Left side",
+				"right": "Right side",
+				"hidden": "Hidden"
+			}
 		}
 	}
 }

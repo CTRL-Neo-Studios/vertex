@@ -180,7 +180,8 @@ function onDrop(event: DragEvent) {
     else moveFolderTo(source.slice('folder:'.length), dest)
 }
 
-const searchOpen = ref(false)
+// Shared: the panels' Search opens it while this view is showing.
+const searchOpen = useState<boolean>(StateKey.chatSearchOpen(sessionId.value), () => false)
 const searchTerm = ref('')
 const hits = shallowRef<ChatHit[]>([])
 let searchRun = 0
@@ -218,7 +219,6 @@ const searchGroups = computed<CommandPaletteGroup[]>(() => {
     ]
 })
 
-defineExpose({openSearch: () => { searchOpen.value = true }})
 </script>
 
 <template>

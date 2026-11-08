@@ -1,3 +1,5 @@
+import type {PanelViewId} from "#shared/types/app/settings";
+
 /** What a session window had open, restored when it reopens. Paths are relative to the workspace root, as the index has them. */
 export interface AppSessionContext {
     openedFilePaths: string[],
@@ -7,7 +9,11 @@ export interface AppSessionContext {
     openedChatIds?: string[],
     /** Set instead of `lastFocusedFilePath` when the focused tab was a chat. */
     lastFocusedChatId?: string,
-    leftPanelView?: 'files' | 'chats',
+    /** Each side panel's view, and whether it's collapsed (the right one is, unless saved open). */
+    leftPanelView?: PanelViewId,
+    rightPanelView?: PanelViewId,
+    leftPanelCollapsed?: boolean,
+    rightPanelCollapsed?: boolean,
 }
 
 /** A workspace or single file Vertex has opened: the recents list, and what each window restores. */
