@@ -25,7 +25,8 @@
 			"docs": "Documentation",
 			"reportIssue": "Report an Issue",
 			"repo": "Source Code on GitHub",
-			"newChat": "New Chat"
+			"newChat": "New Chat",
+			"newWorkspace": "New Workspace…"
 		},
 		"about": {
 			"version": "Version",
@@ -52,12 +53,22 @@
 			"openFile": "Open File…",
 			"openFolder": "Open Folder…",
 			"recentFiles": "Recent Files",
-			"untitled": "Untitled",
 			"loading": "Loading…",
 			"createFileDialog": "Create New Markdown or Text File",
 			"fileExists": "A file already exists at that path.",
 			"notMarkdown": "The file must be a Markdown or text file.",
-			"createFailed": "Unable to create the file."
+			"createFailed": "Unable to create the file.",
+			"recentWorkspaces": "Recent Workspaces",
+			"noRecents": "No recent workspaces or files yet.",
+			"missing": "Not found",
+			"pin": "Pin to the top",
+			"unpin": "Unpin",
+			"removeRecent": "Remove from recents",
+			"notFound": "Couldn't find it",
+			"recoveryMissing": "{count} window(s) from your last session couldn't be reopened: their folder or file is gone.",
+			"newWorkspaceDialog": "Create a Workspace Folder",
+			"newWorkspaceName": "New Workspace",
+			"folderExists": "Something already exists at that path."
 		},
 		"settings": {
 			"title": "Settings",
@@ -83,7 +94,7 @@
 				"startup": "Startup",
 				"recovery": {
 					"label": "Reopen windows on launch",
-					"description": "Which windows from your last session are reopened when Vertex starts.",
+					"description": "Which of the windows open when you last quit Vertex (or when it crashed) are reopened when it starts. Each comes back at its size and place, with its tabs.",
 					"none": "None",
 					"workspaces": "Workspaces only",
 					"singlespaces": "Single files only",
@@ -1533,6 +1544,13 @@
 				"question": "Answer the question above, or type your answer here…",
 				"approval": "Type here to not run it, and say why…"
 			}
+		},
+		"workspaces": {
+			"switch": "Switch workspace",
+			"new": "New Workspace…",
+			"open": "Open…",
+			"openList": "Open Workspaces",
+			"recent": "Recent Workspaces"
 		}
 	}
 }

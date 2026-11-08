@@ -114,22 +114,39 @@ export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>):
     } satisfies AppWorkflowConfig
 }
 
-export function defaultAppSession(data?: Partial<AppSession>): AppSession {
+/** Old sessions kept absolute paths (Rust migrates the rest, see `sanitize_sessions`); read them too. */
+type LegacySession = Omit<Partial<AppSession>, 'context'> & {context?: LegacyContext}
+type LegacyContext = Partial<AppSessionContext> & {
+    openedAbsoluteFilePaths?: string[],
+    openedAbsoluteFolderPaths?: string[],
+    lastFocusedAbsoluteFilePath?: string,
+}
+
+export function defaultAppSession(data?: LegacySession): AppSession {
+    const root = data?.rootFileOrFolderAbsolutePath || ''
     return {
         uuid: data?.uuid || crypto.randomUUID(),
         sessionType: data?.sessionType || 'workspace',
-        rootFileOrFolderAbsolutePath: data?.rootFileOrFolderAbsolutePath || '',
-        context: defaultAppSessionContext(data?.context),
-        lastUpdated: data?.lastUpdated || new Date(),
-		trustedDeviceIds: data?.trustedDeviceIds || [] as string[]
+        rootFileOrFolderAbsolutePath: root,
+        context: defaultAppSessionContext(data?.context, root),
+        open: data?.open === true,
+        ...(data?.reopen === true && {reopen: true}),
+        lastOpened: typeof data?.lastOpened === 'number' ? data.lastOpened : 0,
+        ...(data?.pinned === true && {pinned: true}),
     } satisfies AppSession
 }
 
-export function defaultAppSessionContext(data?: Partial<AppSessionContext>): AppSessionContext {
+/** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
+export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {
+    const relative = (path: string) => root && path.length > root.length && path.startsWith(root) && /[\\/]/.test(path[root.length]!)
+        ? path.slice(root.length + 1)
+        : undefined
+    const paths = (current: string[] | undefined, legacy: string[] | undefined) =>
+        current ?? (legacy ?? []).map(relative).filter((p): p is string => !!p)
     return {
-        openedAbsoluteFilePaths: data?.openedAbsoluteFilePaths || [],
-        openedAbsoluteFolderPaths: data?.openedAbsoluteFolderPaths || [],
-        lastFocusedAbsoluteFilePath: data?.lastFocusedAbsoluteFilePath,
+        openedFilePaths: paths(data?.openedFilePaths, data?.openedAbsoluteFilePaths),
+        openedFolderPaths: paths(data?.openedFolderPaths, data?.openedAbsoluteFolderPaths),
+        lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
         openedChatIds: data?.openedChatIds || [],
         lastFocusedChatId: data?.lastFocusedChatId,
         leftPanelView: data?.leftPanelView === 'chats' ? 'chats' : 'files',

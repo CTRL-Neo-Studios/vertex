@@ -1,4 +1,6 @@
 import {isPermissionGranted, requestPermission} from "@tauri-apps/plugin-notification";
+import {StateKey} from "#shared/constants/app";
+import type {AppSession} from "#shared/types/app/sessions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
@@ -49,6 +51,6 @@ export default defineNuxtPlugin({
         if (!$win.isCurrentAppWindowMain()) return
 
         if (!(await isPermissionGranted())) await requestPermission()
-        if (cfg) await $asesh.recoverSavedAppSessions(cfg.recoverSessions)
+        if (cfg) useState<AppSession[]>(StateKey.recoveryMissing).value = await $asesh.recoverSavedAppSessions(cfg.recoverSessions)
     }
 })

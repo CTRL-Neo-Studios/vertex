@@ -169,6 +169,7 @@ async fn quit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     use std::sync::{Arc, Mutex};
     use tauri::{Emitter, Listener};
 
+    app.state::<AppState>().set_quitting();
     let pending: std::collections::HashSet<String> = app
         .webview_windows()
         .into_keys()
@@ -216,6 +217,9 @@ pub fn run() {
                 None => show_main_window(app),
             }
         }));
+        // Each session window (`session-{uuid}`, stable per session) and Settings reopen at their last size and
+        // place, pulled back on screen when that monitor is gone. `main`, the start window, stays centred.
+        builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[MAIN_WINDOW]).build());
     }
 
     builder
@@ -291,11 +295,12 @@ pub fn run() {
             let app_handle = app.handle().clone();
             app.listen_any("tauri://webview-created", move |event| {
                 let label = event.payload().replace('"', "");
-                if label.starts_with(SESSION_WINDOW_PREFIX) {
+                if let Some(uuid) = label.strip_prefix(SESSION_WINDOW_PREFIX) {
                     if let Some(win) = app_handle.get_webview_window(&label) {
                         apply_decorum_style(&win);
                     }
                     sync_main_visibility(&app_handle, None);
+                    app_handle.state::<AppState>().session_window(&app_handle, uuid, true);
                 }
             });
 
@@ -310,14 +315,19 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                if window.label().starts_with(SESSION_WINDOW_PREFIX) {
+                if let Some(uuid) = window.label().strip_prefix(SESSION_WINDOW_PREFIX) {
                     sync_main_visibility(window.app_handle(), Some(window.label()));
+                    window.app_handle().state::<AppState>().session_window(window.app_handle(), uuid, false);
                 }
             }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, _event| {
+            // Quitting by any route (menu, Dock, ⌘Q, shutdown): windows destroyed from now on stay `open`, for recovery.
+            if let tauri::RunEvent::ExitRequested { .. } = _event {
+                _app_handle.state::<AppState>().set_quitting();
+            }
             // macOS delivers file associations (cold and warm) as RunEvent::Opened, possibly several at once.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = _event {

@@ -2,8 +2,10 @@ import {Routes, sessionWindowLabel, StateKey} from "#shared/constants/app";
 import type {PossiblyRef} from "#shared/types/types";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {SessionRecoveryMode} from "#shared/types/app/settings";
+import {defaultAppSession} from "#shared/utils/defaults/apps";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
+import {exists} from "@tauri-apps/plugin-fs";
 import {stateClient} from "~/utils/stateClient";
 
 /*
@@ -16,6 +18,7 @@ Window model
 Persistence
 - Rust (src-tauri/src/state.rs) is the only writer of sessions.json. This composable is a per-window
   mirror kept fresh by the `sessions-changed` event; it never reads or writes disk itself.
+- Rust owns `open` and `lastOpened` (from window events), migrates old entries and caps the list.
 */
 export function useAppSessions() {
     const $win = useAppWebviewWindows()
@@ -25,10 +28,9 @@ export function useAppSessions() {
 
     /** Replace the local mirror with Rust's authoritative list, most recent first. */
     function applySessions(list: AppSession[]) {
-        const time = (s: AppSession) => (s.lastUpdated ? new Date(s.lastUpdated).getTime() : 0)
-        appSessions.value = [...list].sort((a, b) => time(b) - time(a))
+        appSessions.value = list.map(defaultAppSession).sort((a, b) => b.lastOpened - a.lastOpened)
         const current = currentAppSession.value
-        if (current) currentAppSession.value = list.find(s => s.uuid === current.uuid) ?? current
+        if (current) currentAppSession.value = appSessions.value.find(s => s.uuid === current.uuid) ?? current
     }
 
     async function load() {
@@ -49,8 +51,9 @@ export function useAppSessions() {
         await stateClient.removeSession(unref(sessionId))
     }
 
+    /** Writes `patch` over the session (`open` and `lastOpened` are Rust's and ignored). */
     async function updateAppSession(sessionId: PossiblyRef<string>, patch: Partial<AppSession>) {
-        await stateClient.upsertSession({...patch, uuid: unref(sessionId), lastUpdated: new Date()})
+        await stateClient.upsertSession({...patch, uuid: unref(sessionId)})
     }
 
     function getAppSession(sessionId: PossiblyRef<string>) {
@@ -87,13 +90,21 @@ export function useAppSessions() {
         return false
     }
 
-    /** Main window only: reopen persisted session windows allowed by the recovery setting. */
-    async function recoverSavedAppSessions(mode: SessionRecoveryMode) {
-        if (!$win.isCurrentAppWindowMain()) return
+    /**
+     * Main window only: reopens the windows that were open when Vertex last quit (`reopen`), those the recovery
+     * setting allows and not open already, oldest first so the newest ends up in front. Returns the ones whose
+     * folder or file is gone (not reopened).
+     */
+    async function recoverSavedAppSessions(mode: SessionRecoveryMode): Promise<AppSession[]> {
+        if (!$win.isCurrentAppWindowMain()) return []
         await load()
-        for (const session of unref(appSessions)) {
-            if (shouldRecover(mode, session)) await createWindowFromAppSession(session)
+        const missing: AppSession[] = []
+        for (const session of [...unref(appSessions)].reverse()) {
+            if (!session.reopen || session.open || !shouldRecover(mode, session)) continue
+            if (await exists(session.rootFileOrFolderAbsolutePath!)) await createWindowFromAppSession(session)
+            else missing.push(session)
         }
+        return missing
     }
 
     async function createWindowFromAppSession(session: AppSession) {

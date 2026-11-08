@@ -25,7 +25,8 @@
 			"docs": "文档",
 			"reportIssue": "报告问题",
 			"repo": "GitHub 上的源代码",
-			"newChat": "新建聊天"
+			"newChat": "新建聊天",
+			"newWorkspace": "新建工作区…"
 		},
 		"about": {
 			"version": "版本",
@@ -51,13 +52,23 @@
 			"newWorkspace": "新建工作区…",
 			"openFile": "打开文件…",
 			"openFolder": "打开文件夹…",
-			"recentFiles": "最近文件",
-			"untitled": "未命名",
+			"recentFiles": "最近的文件",
 			"loading": "加载中…",
 			"createFileDialog": "新建 Markdown 或文本文件",
 			"fileExists": "该路径下已存在文件。",
 			"notMarkdown": "文件必须是 Markdown 或文本文件。",
-			"createFailed": "无法创建文件。"
+			"createFailed": "无法创建文件。",
+			"recentWorkspaces": "最近的工作区",
+			"noRecents": "还没有最近的工作区或文件。",
+			"missing": "未找到",
+			"pin": "置顶",
+			"unpin": "取消置顶",
+			"removeRecent": "从最近列表移除",
+			"notFound": "找不到该项",
+			"recoveryMissing": "上次会话中有 {count} 个窗口无法重新打开：其文件夹或文件已不存在。",
+			"newWorkspaceDialog": "创建工作区文件夹",
+			"newWorkspaceName": "新工作区",
+			"folderExists": "该路径已存在内容。"
 		},
 		"settings": {
 			"title": "设置",
@@ -83,7 +94,7 @@
 				"startup": "启动",
 				"recovery": {
 					"label": "启动时重新打开窗口",
-					"description": "Vertex 启动时重新打开上次会话中的哪些窗口。",
+					"description": "Vertex 启动时，重新打开上次退出（或崩溃）时仍打开的哪些窗口。每个窗口恢复原来的大小、位置和标签页。",
 					"none": "不重新打开",
 					"workspaces": "仅工作区",
 					"singlespaces": "仅单个文件",
@@ -1533,6 +1544,13 @@
 				"question": "回答上方的问题，或在此输入你的回答…",
 				"approval": "在此输入即不运行，并说明原因…"
 			}
+		},
+		"workspaces": {
+			"switch": "切换工作区",
+			"new": "新建工作区…",
+			"open": "打开…",
+			"openList": "已打开的工作区",
+			"recent": "最近的工作区"
 		}
 	}
 }

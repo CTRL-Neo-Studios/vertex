@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppAiConfig, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
+import { defaultAppAiConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -25,6 +25,21 @@ describe('defaultAppSettings recovery migration', () => {
 
     it('keeps an existing deviceId', () => {
         expect(defaultAppSettings({ deviceId: 'abc' }).deviceId).toBe('abc')
+    })
+})
+
+describe('defaultAppSession', () => {
+    it('reads old absolute context paths as relative to the root, dropping ones outside it', () => {
+        const s = defaultAppSession({
+            uuid: 'a', rootFileOrFolderAbsolutePath: '/w/Vault', context: {
+                openedAbsoluteFilePaths: ['/w/Vault/A.md', '/w/Vault/Sub/B.md', '/w/Vault Old/C.md', '/elsewhere/D.md'],
+                openedAbsoluteFolderPaths: ['/w/Vault/Sub'],
+                lastFocusedAbsoluteFilePath: '/w/Vault/Sub/B.md',
+            },
+        })
+        expect(s.context).toMatchObject({openedFilePaths: ['A.md', 'Sub/B.md'], openedFolderPaths: ['Sub'], lastFocusedFilePath: 'Sub/B.md'})
+        expect([s.open, s.lastOpened]).toEqual([false, 0])
+        expect(defaultAppSessionContext({openedFilePaths: ['X.md']}, '/w').openedFilePaths).toEqual(['X.md'])
     })
 })
 

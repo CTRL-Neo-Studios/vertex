@@ -63,18 +63,21 @@ Vertex has **two distinct types of sessions** that work together to provide seam
 
 ### AppSession (Persistence Layer)
 
-**Purpose**: Represents a window's state for recovery across app restarts.
+**Purpose**: A workspace or single file Vertex has opened: the recents list, and what its window restores.
 
 **Characteristics**:
 - Persisted to disk (`sessions.json`) by Rust; webviews never write the file
-- Contains recovery information (opened tabs, focused tab, expanded folders)
-- Mirrored per window by `useAppSessions()`, kept fresh by the `vertex://sessions-changed` event
+- Contains recovery information (opened tabs, focused tab, expanded folders), as paths relative to the root (the index's `relativePath`), so a moved folder keeps its tabs; old absolute paths are read too (`defaultAppSessionContext`)
+- `open` (its window is open now) and `lastOpened` (when its window last opened or closed; recents are newest first) are Rust's, from window events; a webview's copy is ignored on upsert. `pinned` keeps it first and past the cap
+- Mirrored per window by `useAppSessions()` (normalized by `defaultAppSession`), kept fresh by the `vertex://sessions-changed` event
 - Updated continuously by `useAppSessionPersistence()` while the window is open
 
 **Structure**:
 [Type definition file](shared/types/app/sessions.d.ts)
 
-**Lifecycle**: Created → Updated on every tab/folder change → Loaded on restart → Recovered (per the *Reopen windows on launch* setting)
+**Lifecycle**: Created on first open → Updated on every tab/folder change → `open` cleared when you close its window, left set when Vertex quits → at the next launch Rust turns `open` into `reopen` → Recovered (per the *Reopen windows on launch* setting) → dropped when you remove it, or past the cap (50 workspaces, 20 files, unpinned, oldest first)
+
+**Recents** (`useRecents`, shared by the start page and the workspace switcher): workspaces and files, pinned first; a gone folder or file is checked whenever the list changes and shown dimmed ("Not found"). Opening one whose path is gone says so with Remove from recents (`useAppSessionActions.openFromPath`). The start page lists both with pin and remove on hover; the switcher (`WorkspaceSwitcher.vue`, title bar: the left sidebar's header, or the tabs header when it's collapsed or in a singlespace window, where it's an icon) has New Workspace…, Open…, the open workspaces (this one ticked) and the recent ones (remove on hover). Badges are the first letters of the folder name's first and last words on a colour hashed from the path (`workspaceBadge`). New Workspace… (start page, switcher, File menu) asks where and what to name the folder, creates it and opens it.
 
 ### Why Two Session Types?
 
@@ -95,10 +98,10 @@ write those files themselves. This removes the cross-window lost-update races th
 
 | Rust command | Purpose |
 |---|---|
-| `sessions_list` / `sessions_upsert` / `sessions_remove` | AppSession CRUD; every write is persisted (atomic temp-file + rename) and broadcast as `vertex://sessions-changed` |
+| `sessions_list` / `sessions_upsert` / `sessions_remove` | AppSession CRUD; every write is persisted (atomic temp-file + rename) and broadcast as `vertex://sessions-changed`. On first read, `sanitize_sessions` drops invalid and duplicate entries, migrates old ones (`lastUpdated` → `lastOpened`, `trustedDeviceIds` dropped; no `open` means closed), turns `open` into `reopen` and caps the list |
 | `settings_get` / `settings_set` | App settings; every write is broadcast as `vertex://settings-changed` |
 | `take_open_requests` | Drains the queue of paths the OS asked us to open |
-| `quit_app` | Asks every session window to flush (`vertex://flush-requested` → `vertex://flush-done`), then exits |
+| `quit_app` | Marks the app quitting (windows destroyed from then on keep their session `open`), asks every session window to flush (`vertex://flush-requested` → `vertex://flush-done`), then exits |
 
 The frontend wrapper is `app/utils/stateClient.ts`. It has no Vue lifecycle, so it is safe from plugins and callbacks.
 
@@ -169,9 +172,9 @@ calls `app/utils/chatClient.ts`.
 
 | Window | Label | Notes |
 |---|---|---|
-| Main | `main` | Anchor. Never destroyed at runtime. Hidden while any session window exists, shown when the last one closes — enforced by Rust (`sync_main_visibility`) on real window create/destroy events. Recovers saved sessions and serves the OS open queue. |
-| Session | `session-{uuid}` | One per workspace/singlespace. `uuid` is the AppSession uuid. Starts at `/loading` and initializes itself. |
-| Settings | `settings` | Singleton utility window. Not persisted. |
+| Main | `main` | Anchor. Never destroyed at runtime. Hidden while any session window exists, shown when the last one closes — enforced by Rust (`sync_main_visibility`) on real window create/destroy events. Recovers saved sessions and serves the OS open queue. Always opens centred. |
+| Session | `session-{uuid}` | One per workspace/singlespace. `uuid` is the AppSession uuid. Starts at `/loading` and initializes itself. Its creation and destruction set the session's `open` (`AppState::session_window`). Reopens at its last size and place (`tauri-plugin-window-state`, by label; pulled back on screen when that monitor is gone). |
+| Settings | `settings` | Singleton utility window. Not persisted; keeps its size and place like a session window. |
 
 Labels, routes and `useState` keys come from `shared/constants/app.ts`; never hand-build them.
 
@@ -194,21 +197,25 @@ sequenceDiagram
 ```
 
 Menu/button opens (`useAppSessionActions`) skip the queue and start at `sessions_upsert`. Opening a path that
-already has a window focuses that window instead.
+already has a window brings that window forward (unminimized) instead; a path that's gone shows a toast instead.
 
 ### Closing and quitting
 
 - **Close window**: a single `onCloseRequested` handler (`useAppSessionPersistence.registerCloseHandlers`) awaits the
   last pending session write, then lets Tauri destroy the window. Because state was persisted continuously,
-  teardown (`clearTabs`, `clearIndex`) can never overwrite it. Rust shows `main` if this was the last session window.
-- **Quit (Cmd+Q)**: `quit_app` sends `flush-requested`, waits for every session window's `flush-done`
-  (3 s guard against a hung webview), then exits. No fixed sleeps.
+  teardown (`clearTabs`, `clearIndex`) can never overwrite it. Rust shows `main` if this was the last session window,
+  and clears the session's `open`.
+- **Quit (Cmd+Q)**: `quit_app` marks the app quitting (so destroyed windows keep `open`; `RunEvent::ExitRequested`
+  does the same for any other route: Dock, shutdown), sends `flush-requested`, waits for every session window's
+  `flush-done` (3 s guard against a hung webview), then exits. No fixed sleeps. A crash leaves `open` set too.
 
 ### Startup recovery
 
-The main window reopens saved sessions according to **Settings → General → Reopen windows on launch**:
-`none`, `workspaces`, `singlespaces` or `both`. Older settings files with `openLastOpenedWindows: true` migrate to
-`workspaces`, which was the previous behaviour.
+The main window reopens the windows that were open when Vertex last quit (`reopen`), according to **Settings →
+General → Reopen windows on launch**: `none`, `workspaces`, `singlespaces` or `both`. They open oldest first, so the
+most recent ends up in front. One whose folder or file is gone isn't opened; the start page lists those once, with
+Remove from recents. Older settings files with `openLastOpenedWindows: true` migrate to `workspaces`. Sessions from
+before `open` existed count as closed, so the first launch after that change reopens nothing.
 
 ---
 

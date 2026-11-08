@@ -37,6 +37,8 @@ export const StateKey = {
     activeSessions: 'active.sessions',
     appSessions: 'app.sessions',
     currentAppSession: 'app.sessions.current',
+    /** Main window: sessions recovery couldn't reopen because their folder or file is gone. */
+    recoveryMissing: 'app.sessions.recovery-missing',
     settings: 'settings.data',
     settingsLoaded: 'settings.is_loaded',
     tabs: (s: string) => `active.tabs.${s}`,

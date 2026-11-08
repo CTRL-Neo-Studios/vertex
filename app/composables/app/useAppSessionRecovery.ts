@@ -30,21 +30,23 @@ export function useAppSessionRecovery() {
 
     /** Restore tabs (files, then chats), focused tab, expanded folders and the left sidebar's view after the workspace index is built. */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
-        const {getFilesByPaths, getFileByPath} = useActiveWorkspaceIndex(activeSession)
+        const {getFilteredFiles} = useActiveWorkspaceIndex(activeSession)
         const {openTab, openTabs, getActiveTab} = useActiveTabs(activeSession)
         const expandedFolders = useState<string[]>(StateKey.expandedFolders(activeSession.uuid), () => [])
         const context = appSession.context
+        const byPath = new Map(getFilteredFiles(() => true).map(f => [f.relativePath, f.uuid]))
+        const uuids = (paths: string[]) => paths.map(p => byPath.get(p)).filter((u): u is string => !!u)
 
-        expandedFolders.value = getFilesByPaths(context?.openedAbsoluteFolderPaths ?? []).map(f => f.uuid)
-        useActiveLayouts(activeSession).leftPanelView.value = context?.leftPanelView === 'chats' ? 'chats' : 'files'
+        expandedFolders.value = uuids(context.openedFolderPaths)
+        useActiveLayouts(activeSession).leftPanelView.value = context.leftPanelView === 'chats' ? 'chats' : 'files'
 
-        const fileUuids = getFilesByPaths(context?.openedAbsoluteFilePaths ?? []).map(f => f.uuid)
-        const chatIds = context?.openedChatIds ?? []
+        const fileUuids = uuids(context.openedFilePaths)
+        const chatIds = context.openedChatIds ?? []
         if (fileUuids.length === 0 && chatIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
 
         let lastOpened = openTabs(fileUuids)
         for (const id of chatIds) lastOpened = openTab(id, 'chat')
-        const focused = getActiveTab(context.lastFocusedChatId ?? getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
+        const focused = getActiveTab(context.lastFocusedChatId ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0])
         await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
     }
 
