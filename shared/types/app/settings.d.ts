@@ -80,17 +80,20 @@ export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
  * rather than a view. Any well-formed id is kept in a saved layout (`isPanelViewId`), registered or not.
  */
 export type PanelViewId = string
-/** `separator` draws a line between buttons; `split` starts a new pane in its area (panes stack on a side). */
+/** `separator` draws a line between buttons; `split` starts a new pane in its area (stacked on a side, side by side at the bottom). */
 export type PanelSlot = PanelViewId | 'separator' | 'split'
 export type PanelSide = 'left' | 'right'
+/** Where views show: the side panels, or the bottom area under the editor. */
+export type PanelArea = PanelSide | 'bottom'
 
 export interface PanelLayout {
     left: PanelSlot[],
     right: PanelSlot[],
+    bottom: PanelSlot[],
     hidden: PanelViewId[],
 }
 
 export interface AppPanelsConfig extends PanelLayout {
-    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. */
+    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. The bottom area always has its buttons in its own header. */
     style: 'buttons' | 'strip',
 }

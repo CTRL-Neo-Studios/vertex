@@ -15,7 +15,7 @@ const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const panels = usePanels(session)
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
-const state = computed(() => panels.sides.value[props.side])
+const state = computed(() => panels.areas.value[props.side])
 </script>
 
 <template>

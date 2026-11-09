@@ -2,10 +2,10 @@ import type {Component, InjectionKey, MaybeRefOrGetter, ShallowRef} from "vue";
 import type {ContextMenuItem} from "@nuxt/ui";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
-import type {AppSettings, PanelLayout, PanelSide, PanelViewId} from "#shared/types/app/settings";
+import type {AppSettings, PanelArea, PanelLayout, PanelViewId} from "#shared/types/app/settings";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {isBasesFile} from "#shared/utils/fs/filenames";
-import {addPanelSeparator, addPanelSplit, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
+import {PANEL_AREAS, addPanelSeparator, addPanelSplit, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 
 /** What a view's `when` sees: the session window it would show in. */
@@ -18,14 +18,14 @@ export interface PanelViewContext {
     settings: AppSettings | undefined
 }
 
-/** What an action and its shortcut hint see: the context, plus the side its button is on and the view shown there. */
+/** What an action and its shortcut hint see: the context, plus the area its button is in and the view shown there. */
 export interface PanelActionContext extends PanelViewContext {
-    area: PanelSide
-    /** The view shown in the pane holding the button, `undefined` when the side is collapsed. */
+    area: PanelArea
+    /** The view shown in the pane holding the button, `undefined` when the area is collapsed. */
     shown: PanelViewId | undefined
 }
 
-/** A side-panel view: either a `component` shown in the panel, or an `action` its button runs (Search). */
+/** A panel view: either a `component` shown in a pane (on a side or at the bottom), or an `action` its button runs (Search). */
 export interface PanelViewDef {
     id: PanelViewId
     /** i18n key. */
@@ -166,29 +166,30 @@ export function panelSlotMenu(o: {
     const slot = index === undefined ? undefined : l[list][index]
     const at = index === undefined ? -1 : shown.indexOf(index)
     const move = (to: PanelList, at: number) => save(movePanelSlot(l, {list, index: index!}, {list: to, index: at}))
-    const toSide = (side: PanelSide) => ({label: t(`app.panels.moveTo.${side}`), icon: `i-lucide-panel-${side}`, onSelect: () => move(side, l[side].length)})
+    const toArea = (area: PanelArea) => ({label: t(`app.panels.moveTo.${area}`), icon: `i-lucide-panel-${area}`, onSelect: () => move(area, l[area].length)})
     const items: ContextMenuItem[][] = []
-    if (slot !== undefined && list === 'hidden') items.push([toSide('left'), toSide('right')])
+    if (slot !== undefined && list === 'hidden') items.push(PANEL_AREAS.map(toArea))
     else if (slot !== undefined) {
-        const side = list as PanelSide
+        const area = list as PanelArea
         items.push([
-            {label: t('app.panels.moveUp'), icon: 'i-lucide-arrow-up', disabled: at <= 0, onSelect: () => move(side, shown[at - 1]!)},
-            {label: t('app.panels.moveDown'), icon: 'i-lucide-arrow-down', disabled: at >= shown.length - 1, onSelect: () => move(side, shown[at + 1]! + 1)},
+            {label: t('app.panels.moveUp'), icon: 'i-lucide-arrow-up', disabled: at <= 0, onSelect: () => move(area, shown[at - 1]!)},
+            {label: t('app.panels.moveDown'), icon: 'i-lucide-arrow-down', disabled: at >= shown.length - 1, onSelect: () => move(area, shown[at + 1]! + 1)},
             ...slot === 'separator'
                 ? [{label: t('app.panels.removeSeparator'), icon: 'i-lucide-x', onSelect: () => move('hidden', 0)}]
                 : slot === 'split'
                     ? [{label: t('app.panels.removeSplit'), icon: 'i-lucide-x', onSelect: () => move('hidden', 0)}]
                     : [
-                        toSide(side === 'left' ? 'right' : 'left'),
+                        ...PANEL_AREAS.filter(other => other !== area).map(toArea),
                         {label: t('app.panels.hide'), icon: 'i-lucide-eye-off', onSelect: () => move('hidden', l.hidden.length)},
-                        {label: t('app.panels.addSeparator'), icon: 'i-lucide-separator-horizontal', onSelect: () => save(addPanelSeparator(l, side, index! + 1))},
+                        {label: t('app.panels.addSeparator'), icon: 'i-lucide-separator-horizontal', onSelect: () => save(addPanelSeparator(l, area, index! + 1))},
                         // Not before a pane's first view: it already starts one.
-                        {label: t('app.panels.splitHere'), icon: 'i-lucide-rows-2', disabled: index === 0 || l[side][index! - 1] === 'split', onSelect: () => save(addPanelSplit(l, side, index!))},
+                        {label: t('app.panels.splitHere'), icon: area === 'bottom' ? 'i-lucide-columns-2' : 'i-lucide-rows-2', disabled: index === 0 || l[area][index! - 1] === 'split', onSelect: () => save(addPanelSplit(l, area, index!))},
                     ],
         ])
     }
     if (splitBefore !== undefined && list !== 'hidden') {
-        items.push([{label: t('app.panels.mergeUp'), icon: 'i-lucide-fold-vertical', onSelect: () => save(movePanelSlot(l, {list, index: splitBefore}, {list: 'hidden', index: 0}))}])
+        const merge = list === 'bottom' ? {label: t('app.panels.mergeLeft'), icon: 'i-lucide-fold-horizontal'} : {label: t('app.panels.mergeUp'), icon: 'i-lucide-fold-vertical'}
+        items.push([{...merge, onSelect: () => save(movePanelSlot(l, {list, index: splitBefore}, {list: 'hidden', index: 0}))}])
     }
     const items2: ContextMenuItem[] = [{label: t('app.panels.reset'), icon: 'i-lucide-rotate-ccw', onSelect: () => void o.reset()}]
     // Hidden views that aren't registered (a plugin that's off, later) keep their place but aren't offered.

@@ -48,6 +48,7 @@ export const StateKey = {
     tabActiveHeading: (s: string, f: string) => `active.tabs.currentTab.${s}.${f}.active-heading`,
     leftPanel: (s: string) => `active.layouts.left-panel.${s}`,
     rightPanel: (s: string) => `active.layouts.right-panel.${s}`,
+    bottomPanel: (s: string) => `active.layouts.bottom-panel.${s}`,
     shownPanelViews: (s: string) => `active.layouts.shown-panel-views.${s}`,
     fileSearchOpen: (s: string) => `active.layouts.file-search-open.${s}`,
     chatSearchOpen: (s: string) => `active.chats.search-open.${s}`,

@@ -19,6 +19,7 @@
 			"save": "Save",
 			"reload": "Reload",
 			"toggleFullscreen": "Toggle Full Screen",
+			"toggleBottomPanel": "Toggle Bottom Panel",
 			"closeTab": "Close Tab",
 			"closeAllTabs": "Close All Tabs",
 			"closeWindow": "Close Window",
@@ -1646,7 +1647,8 @@
 			"moveDown": "Move down",
 			"moveTo": {
 				"left": "Move to the left side",
-				"right": "Move to the right side"
+				"right": "Move to the right side",
+				"bottom": "Move to the bottom"
 			},
 			"hide": "Hide",
 			"addSeparator": "Add separator below",
@@ -1658,9 +1660,13 @@
 			"splitHere": "Split here",
 			"removeSplit": "Remove split",
 			"mergeUp": "Merge with the pane above",
+			"mergeLeft": "Merge with the pane on the left",
+			"collapseBottom": "Collapse bottom panel",
+			"expandBottom": "Expand bottom panel",
 			"lists": {
 				"left": "Left side",
 				"right": "Right side",
+				"bottom": "Bottom",
 				"hidden": "Hidden"
 			}
 		}

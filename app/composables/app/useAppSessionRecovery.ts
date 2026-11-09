@@ -42,6 +42,7 @@ export function useAppSessionRecovery() {
         layouts.shownPanelViews.value = context.shownPanelViews ?? []
         layouts.leftPanelCollapsed.value = context.leftPanelCollapsed ?? false
         layouts.rightPanelCollapsed.value = context.rightPanelCollapsed ?? true
+        layouts.bottomPanelCollapsed.value = context.bottomPanelCollapsed ?? false
 
         const fileUuids = uuids(context.openedFilePaths)
         const chatIds = context.openedChatIds ?? []

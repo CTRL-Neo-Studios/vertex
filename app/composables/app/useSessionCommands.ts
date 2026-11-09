@@ -9,6 +9,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
+import {usePanels} from "~/composables/active/usePanels";
 
 /**
  * Commands that act on the open session (tabs, save, new folder). Registered by the session layout,
@@ -27,6 +28,7 @@ export function useSessionCommands(session?: ActiveSession) {
     const tabId = () => route.params.tabId as string | undefined
     const hasTab = () => !!tabId() && !!getActiveTab(tabId())
     const {effective} = useSettingsScope()
+    const panels = usePanels(session)
 
     async function showTab(uuid?: string | null) {
         const tab = uuid ? getActiveTab(uuid) : undefined
@@ -49,6 +51,7 @@ export function useSessionCommands(session?: ActiveSession) {
 
     useCommands({
         'file.save': {run: save, enabled: hasTab},
+        'view.toggleBottomPanel': {run: () => panels.toggle('bottom'), enabled: () => panels.areas.value.bottom.panes.length > 0},
         ...(isWorkspace ? {
             'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
             'file.newWorkflow': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'workflow', modalTitle: t('app.editor.ui.filetree.newWorkflow')})},

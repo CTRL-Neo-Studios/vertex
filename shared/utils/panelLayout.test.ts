@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, addPanelSplit, isPanelViewId, movePanelSlot, normalizePanelLayout, panesOf, placeMissingViews, tidySlots} from "./panelLayout";
+import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, addPanelSplit, isPanelViewId, movePanelSlot, normalizePanelLayout, panelAreaOf, panesOf, placeMissingViews, tidySlots} from "./panelLayout";
 
 describe('tidySlots', () => {
     it('keeps a split only between views, and no separator at a pane\'s edge', () => {
@@ -22,6 +22,7 @@ describe('normalizePanelLayout', () => {
             // Missing built-in views go back to the end of their stock side.
             left: ['chat', 'plugin:view', 'separator', 'files', 'chats', 'search'],
             right: ['forelinks', 'backlinks', 'writersTools'],
+            bottom: [],
             hidden: ['toc', 'gone'],
         })
     })
@@ -68,6 +69,22 @@ describe('movePanelSlot', () => {
     it('shows a hidden view where it\'s dropped', () => {
         const hidden = {...layout, right: layout.right.filter(v => v !== 'toc'), hidden: ['toc' as const]}
         expect(movePanelSlot(hidden, {list: 'hidden', index: 0}, {list: 'right', index: 0}).right[0]).toBe('toc')
+    })
+
+    it('moves into and out of the bottom area', () => {
+        const down = movePanelSlot(layout, {list: 'right', index: 3}, {list: 'bottom', index: 0})
+        expect([down.right, down.bottom]).toEqual([['forelinks', 'backlinks', 'writersTools', 'chat'], ['toc']])
+        expect(panelAreaOf(down, 'toc')).toBe('bottom')
+        const back = movePanelSlot(down, {list: 'bottom', index: 0}, {list: 'left', index: 0})
+        expect([back.left[0], back.bottom]).toEqual(['toc', []])
+    })
+})
+
+describe('the bottom area', () => {
+    it('is empty in layouts saved before it, and keeps its views and splits', () => {
+        expect(normalizePanelLayout({left: ['files', 'chats', 'search'], right: ['forelinks'], hidden: []}).bottom).toEqual([])
+        const layout = normalizePanelLayout({right: ['forelinks', 'backlinks', 'writersTools'], bottom: ['toc', 'split', 'chat', 'split']})
+        expect([layout.right, layout.bottom]).toEqual([['forelinks', 'backlinks', 'writersTools'], ['toc', 'split', 'chat']])
     })
 })
 

@@ -29,7 +29,7 @@ const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
 const panels = usePanels($sesh.getSession(sessionId))
 // The left panel's header holds the switcher (and the traffic lights' room) while it shows; this one otherwise.
-const leftClosed = computed(() => !panels.sides.value.left.open)
+const leftClosed = computed(() => !panels.areas.value.left.open)
 const buttons = computed(() => panels.style.value === 'buttons')
 const $win = useAppWebviewWindows()
 
@@ -151,7 +151,7 @@ function scrollToItem(index: number) {
             <!-- A strip already covers part of the traffic lights. -->
             <SpaceOnOs detect-os="macos" :show-on-os="true" :class="buttons ? 'w-16' : 'w-6'"/>
             <WorkspaceSwitcher/>
-            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.sides.value.left.panes.length"/>
+            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.areas.value.left.panes.length"/>
         </div>
         <UScrollArea
             ref="scrollArea"
@@ -199,11 +199,11 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-        <div v-if="isWorkspace || (buttons && !panels.sides.value.right.open)" class="col-start-3 justify-self-end h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1" data-tauri-drag-region>
+        <div v-if="isWorkspace || (buttons && !panels.areas.value.right.open)" class="col-start-3 justify-self-end h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
-            <SidebarCollapserButton side="right" v-if="buttons && !panels.sides.value.right.open" :disabled="!panels.sides.value.right.panes.length"/>
+            <SidebarCollapserButton side="right" v-if="buttons && !panels.areas.value.right.open" :disabled="!panels.areas.value.right.panes.length"/>
         </div>
     </div>
 </template>

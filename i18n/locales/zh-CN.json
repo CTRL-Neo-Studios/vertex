@@ -19,6 +19,7 @@
 			"save": "保存",
 			"reload": "重新加载",
 			"toggleFullscreen": "切换全屏",
+			"toggleBottomPanel": "切换底部面板",
 			"closeTab": "关闭标签页",
 			"closeAllTabs": "关闭所有标签页",
 			"closeWindow": "关闭窗口",
@@ -1646,7 +1647,8 @@
 			"moveDown": "下移",
 			"moveTo": {
 				"left": "移到左侧",
-				"right": "移到右侧"
+				"right": "移到右侧",
+				"bottom": "移到底部"
 			},
 			"hide": "隐藏",
 			"addSeparator": "在下方添加分隔线",
@@ -1658,9 +1660,13 @@
 			"splitHere": "在此处分栏",
 			"removeSplit": "取消分栏",
 			"mergeUp": "与上方窗格合并",
+			"mergeLeft": "与左侧窗格合并",
+			"collapseBottom": "折叠底部面板",
+			"expandBottom": "展开底部面板",
 			"lists": {
 				"left": "左侧",
 				"right": "右侧",
+				"bottom": "底部",
 				"hidden": "已隐藏"
 			}
 		}

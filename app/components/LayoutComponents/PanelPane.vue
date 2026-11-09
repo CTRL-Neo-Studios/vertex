@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {MaybeRefOrGetter, ShallowRef} from "vue";
-import type {PanelSide} from "#shared/types/app/settings";
+import type {PanelArea} from "#shared/types/app/settings";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels, type PanelPaneState} from "~/composables/active/usePanels";
@@ -8,12 +8,13 @@ import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
- * One pane of a side panel: its view buttons (a list on the left, pills on the right; the strips hold them in the
- * `strip` style), a row with the view's name and header actions, and the view. The right side's first pane has its
- * buttons, name and actions in the panel's header instead (`inHeader`), drawn by `DashboardSidePanel`.
+ * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
+ * list on the left, pills on the right (the strips hold them in the `strip` style), and the right side's first pane
+ * has its buttons, name and actions in the panel's header instead (`inHeader`), drawn by `DashboardSidePanel`. At the
+ * bottom: one compact row with the pills, name, actions and `#trailing` (the area's collapse button), in every style.
  */
 const props = defineProps<{
-    side: PanelSide
+    area: PanelArea
     pane: PanelPaneState
     /** This pane's slot for its view's `usePanelActions`; the panel owns it, so its header can draw them too. */
     actions: ShallowRef<MaybeRefOrGetter<PanelViewAction[]> | undefined>
@@ -28,14 +29,14 @@ const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 provide(PANEL_ACTIONS, props.actions)
 
 const strip = computed(() => panels.style.value === 'strip')
-const kbds = computed(() => panels.kbdsOf(props.side))
+const kbds = computed(() => panels.kbdsOf(props.area))
 const view = computed(() => panelViews.get(props.pane.active))
 const viewComponent = computed(() => panelViewComponent(props.pane.active))
 const actions = computed(() => toValue(props.actions.value) ?? [])
 // Strip: the name always (the strips hold no names). Buttons: only while there are actions, and the name only on the
 // right (the left list already names the view).
 const showBar = computed(() => (strip.value ? !props.inHeader : actions.value.length > 0))
-const barLabel = computed(() => (strip.value || props.side === 'right') && view.value ? t(view.value.label) : '')
+const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
@@ -44,9 +45,29 @@ const isScrolled = computed(() => scrollY.value > 2)
 
 <template>
     <div class="h-full min-h-0 flex flex-col" data-tauri-drag-region>
-        <template v-if="!strip">
+        <div v-if="area === 'bottom'" class="flex items-center gap-1 h-8 shrink-0" data-tauri-drag-region>
             <PanelButtons
-                v-if="side === 'left'"
+                list="bottom"
+                variant="pills"
+                :slots="pane.slots"
+                :end="pane.end"
+                :active="[pane.active]"
+                open
+                :drag
+                :menu="index => panels.slotMenu('bottom', index, pane)"
+                :kbds
+                @select="id => panels.select('bottom', id)"
+            />
+            <span v-if="view" class="ps-1 text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ t(view.label) }}</span>
+            <div class="grow" data-tauri-drag-region/>
+            <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'top' }">
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+            </UTooltip>
+            <slot name="trailing"/>
+        </div>
+        <template v-else-if="!strip">
+            <PanelButtons
+                v-if="area === 'left'"
                 class="pb-2"
                 list="left"
                 variant="list"
@@ -75,7 +96,7 @@ const isScrolled = computed(() => scrollY.value > 2)
                 />
             </div>
         </template>
-        <div v-if="showBar" class="flex items-center gap-0.5 px-1 pb-1 min-h-7" data-tauri-drag-region>
+        <div v-if="area !== 'bottom' && showBar" class="flex items-center gap-0.5 px-1 pb-1 min-h-7" data-tauri-drag-region>
             <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
             <div class="grow" data-tauri-drag-region/>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">

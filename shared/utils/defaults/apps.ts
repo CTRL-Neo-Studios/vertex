@@ -173,6 +173,7 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         shownPanelViews: panelViews(data?.shownPanelViews, [data?.leftPanelView, data?.rightPanelView]),
         leftPanelCollapsed: data?.leftPanelCollapsed === true,
         rightPanelCollapsed: data?.rightPanelCollapsed !== false,
+        bottomPanelCollapsed: data?.bottomPanelCollapsed === true,
     } satisfies AppSessionContext
 }
 

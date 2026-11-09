@@ -20,7 +20,7 @@ export function useAppSessionPersistence(session: ActiveSession) {
     const {tabs, activeTabUuid} = useActiveTabs(session)
     const expandedFolders = useState<string[]>(StateKey.expandedFolders(session.uuid), () => [])
     const pathOf = useActiveWorkspaceIndex(session).getFileByUuid
-    const {shownPanelViews, leftPanelCollapsed, rightPanelCollapsed} = useActiveLayouts(session)
+    const {shownPanelViews, leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed} = useActiveLayouts(session)
 
     function snapshot(): AppSessionContext {
         const paths = (uuids: (string | null | undefined)[]) =>
@@ -36,6 +36,7 @@ export function useAppSessionPersistence(session: ActiveSession) {
             shownPanelViews: [...unref(shownPanelViews)],
             leftPanelCollapsed: unref(leftPanelCollapsed),
             rightPanelCollapsed: unref(rightPanelCollapsed),
+            bottomPanelCollapsed: unref(bottomPanelCollapsed),
         }
     }
 
@@ -61,7 +62,7 @@ export function useAppSessionPersistence(session: ActiveSession) {
 
     /** Begin tracking. Call after tabs have been restored so the restored state is not overwritten by an empty one. */
     function start() {
-        watch([tabs, activeTabUuid, expandedFolders, shownPanelViews, leftPanelCollapsed, rightPanelCollapsed], () => persistSoon(), {deep: true})
+        watch([tabs, activeTabUuid, expandedFolders, shownPanelViews, leftPanelCollapsed, rightPanelCollapsed, bottomPanelCollapsed], () => persistSoon(), {deep: true})
     }
     /**
      * Single close path for session windows: flush the latest state, then let Tauri destroy the window.

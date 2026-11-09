@@ -9,11 +9,12 @@ export interface AppSessionContext {
     openedChatIds?: string[],
     /** Set instead of `lastFocusedFilePath` when the focused tab was a chat. */
     lastFocusedChatId?: string,
-    /** The view each side-panel pane shows: a pane shows the first of its views listed here, else its first view. */
+    /** The view each panel pane shows: a pane shows the first of its views listed here, else its first view. */
     shownPanelViews?: PanelViewId[],
-    /** Whether each side panel is collapsed (the right one is, unless saved open). */
+    /** Whether each side panel is collapsed (the right one is, unless saved open), and the bottom area (to its header). */
     leftPanelCollapsed?: boolean,
     rightPanelCollapsed?: boolean,
+    bottomPanelCollapsed?: boolean,
 }
 
 /** A workspace or single file Vertex has opened: the recents list, and what each window restores. */

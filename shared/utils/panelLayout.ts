@@ -1,4 +1,4 @@
-import type {PanelLayout, PanelSide, PanelSlot, PanelViewId} from "#shared/types/app/settings";
+import type {PanelArea, PanelLayout, PanelSlot, PanelViewId} from "#shared/types/app/settings";
 
 /**
  * The built-in views' stock arrangement: the settings' default, and where a built-in view goes back to when it's
@@ -8,11 +8,15 @@ import type {PanelLayout, PanelSide, PanelSlot, PanelViewId} from "#shared/types
 export const DEFAULT_PANEL_LAYOUT: Readonly<PanelLayout> = {
     left: ['files', 'chats', 'search'],
     right: ['forelinks', 'backlinks', 'writersTools', 'toc', 'chat'],
+    bottom: [],
     hidden: [],
 }
 
-/** A list in a layout: either side, or the hidden views. */
-export type PanelList = PanelSide | 'hidden'
+/** The areas views can show in, in layout order. */
+export const PANEL_AREAS = ['left', 'right', 'bottom'] as const satisfies readonly PanelArea[]
+
+/** A list in a layout: an area, or the hidden views. */
+export type PanelList = PanelArea | 'hidden'
 /** A slot by list and index; as a destination, the index it's inserted before (the list's length = at the end). */
 export interface PanelSlotRef {
     list: PanelList
@@ -82,35 +86,36 @@ export function panesOf<T>(items: T[], slotOf: (item: T) => PanelSlot, hasView: 
 
 /**
  * A stored layout as a valid one: malformed entries go; each view is kept where it first appears (hidden first, then
- * left, then right), whether or not it's registered, so a view missing for a while keeps its place; separators are
- * tidied; built-in views missing from it go to the end of their stock side.
+ * left, right and bottom), whether or not it's registered, so a view missing for a while keeps its place; separators
+ * and splits are tidied; built-in views missing from it go to the end of their stock side. No `bottom` (layouts from
+ * before it): an empty one.
  */
 export function normalizePanelLayout(data?: Partial<Record<keyof PanelLayout, unknown>>): PanelLayout {
     const seen = new Set<PanelViewId>()
     const take = (v: unknown): v is PanelViewId => isPanelViewId(v) && !seen.has(v) && !!seen.add(v)
     const list = (value: unknown) => Array.isArray(value) ? value : []
     const hidden = list(data?.hidden).filter(take)
-    const side = (value: unknown) => tidySlots(list(value).filter((v): v is PanelSlot => isPanelMarker(v) || take(v)))
-    const layout: PanelLayout = {left: side(data?.left), right: side(data?.right), hidden}
-    for (const list of ['left', 'right'] as const) {
+    const area = (value: unknown) => tidySlots(list(value).filter((v): v is PanelSlot => isPanelMarker(v) || take(v)))
+    const layout: PanelLayout = {left: area(data?.left), right: area(data?.right), bottom: area(data?.bottom), hidden}
+    for (const list of PANEL_AREAS) {
         for (const id of DEFAULT_PANEL_LAYOUT[list]) if (!isPanelMarker(id) && !seen.has(id)) layout[list].push(id)
     }
-    return {left: tidySlots(layout.left), right: tidySlots(layout.right), hidden}
+    return {left: tidySlots(layout.left), right: tidySlots(layout.right), bottom: tidySlots(layout.bottom), hidden}
 }
 
 /** `layout` with each of `views` it doesn't hold, at the end of the view's default list; unchanged when it holds them all. */
 export function placeMissingViews(layout: PanelLayout, views: Iterable<{ id: PanelViewId, defaultArea: PanelList }>): PanelLayout {
-    const has = new Set([...layout.left, ...layout.right, ...layout.hidden])
+    const has = new Set([...layout.left, ...layout.right, ...layout.bottom, ...layout.hidden])
     const missing = [...views].filter(v => !has.has(v.id))
     if (!missing.length) return layout
-    const next: PanelLayout = {left: [...layout.left], right: [...layout.right], hidden: [...layout.hidden]}
+    const next: PanelLayout = {left: [...layout.left], right: [...layout.right], bottom: [...layout.bottom], hidden: [...layout.hidden]}
     for (const view of missing) next[view.defaultArea].push(view.id)
     return next
 }
 
 /** Moves a slot (a view or a marker) to another place, in its list or another; a marker dropped on `hidden` goes. */
 export function movePanelSlot(layout: PanelLayout, from: PanelSlotRef, to: PanelSlotRef): PanelLayout {
-    const lists: Record<PanelList, PanelSlot[]> = {left: [...layout.left], right: [...layout.right], hidden: [...layout.hidden]}
+    const lists: Record<PanelList, PanelSlot[]> = {left: [...layout.left], right: [...layout.right], bottom: [...layout.bottom], hidden: [...layout.hidden]}
     const [slot] = lists[from.list].splice(from.index, 1)
     if (slot === undefined) return layout
     const at = from.list === to.list && to.index > from.index ? to.index - 1 : to.index
@@ -118,18 +123,17 @@ export function movePanelSlot(layout: PanelLayout, from: PanelSlotRef, to: Panel
     return normalizePanelLayout(lists)
 }
 
-/** A separator inserted at `index` on `side`. */
-export const addPanelSeparator = (layout: PanelLayout, side: PanelSide, index: number) => addPanelMarker(layout, side, index, 'separator')
+/** A separator inserted at `index` in `area`. */
+export const addPanelSeparator = (layout: PanelLayout, area: PanelArea, index: number) => addPanelMarker(layout, area, index, 'separator')
 
-/** A split inserted at `index` on `side`: the slots from there on form a new pane. */
-export const addPanelSplit = (layout: PanelLayout, side: PanelSide, index: number) => addPanelMarker(layout, side, index, 'split')
+/** A split inserted at `index` in `area`: the slots from there on form a new pane. */
+export const addPanelSplit = (layout: PanelLayout, area: PanelArea, index: number) => addPanelMarker(layout, area, index, 'split')
 
-function addPanelMarker(layout: PanelLayout, side: PanelSide, index: number, marker: 'separator' | 'split'): PanelLayout {
-    const slots = [...layout[side]]
+function addPanelMarker(layout: PanelLayout, area: PanelArea, index: number, marker: 'separator' | 'split'): PanelLayout {
+    const slots = [...layout[area]]
     slots.splice(index, 0, marker)
-    return normalizePanelLayout({...layout, [side]: slots})
+    return normalizePanelLayout({...layout, [area]: slots})
 }
 
-/** The side holding view `id`, if it isn't hidden. */
-export const panelSideOf = (layout: PanelLayout, id: PanelViewId): PanelSide | undefined =>
-    layout.left.includes(id) ? 'left' : layout.right.includes(id) ? 'right' : undefined
+/** The area holding view `id`, if it isn't hidden. */
+export const panelAreaOf = (layout: PanelLayout, id: PanelViewId): PanelArea | undefined => PANEL_AREAS.find(area => layout[area].includes(id))

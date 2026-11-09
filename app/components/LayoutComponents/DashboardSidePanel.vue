@@ -26,7 +26,7 @@ const panels = usePanels(session)
 // One drag state for the window, so a slot can go from one list to another.
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 
-const state = computed(() => panels.sides.value[props.side])
+const state = computed(() => panels.areas.value[props.side])
 const strip = computed(() => panels.style.value === 'strip')
 const kbds = computed(() => panels.kbdsOf(props.side))
 
@@ -108,7 +108,7 @@ const firstLabel = computed(() => {
                         class="relative shrink-0 my-1 h-px bg-default transition-colors data-[state=hover]:bg-primary data-[state=drag]:bg-primary after:absolute after:inset-x-0 after:-inset-y-1.5 cursor-ns-resize"
                     />
                     <SplitterPanel :id="`${side}-pane-${index}`" :order="index" :min-size="10">
-                        <PanelPane :side :pane :actions="actionsOf(index)" :in-header="side === 'right' && index === 0"/>
+                        <PanelPane :area="side" :pane :actions="actionsOf(index)" :in-header="side === 'right' && index === 0"/>
                     </SplitterPanel>
                 </template>
             </SplitterGroup>

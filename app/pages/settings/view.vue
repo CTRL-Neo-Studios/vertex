@@ -48,14 +48,15 @@ const panelStyleItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.panelStyleButtons'), value: 'buttons'},
     {label: t('app.settings.view.panelStyleStrip'), value: 'strip'},
 ])
-const layoutPaths = ['viewConfig.panels.left', 'viewConfig.panels.right', 'viewConfig.panels.hidden'] as const
+const layoutPaths = ['viewConfig.panels.left', 'viewConfig.panels.right', 'viewConfig.panels.bottom', 'viewConfig.panels.hidden'] as const
 const panelPaths = ['viewConfig.panels.style' as const, ...layoutPaths]
 const panelLayout = computed<PanelLayout>(() => ({
     left: scope.value('viewConfig.panels.left'),
     right: scope.value('viewConfig.panels.right'),
+    bottom: scope.value('viewConfig.panels.bottom'),
     hidden: scope.value('viewConfig.panels.hidden'),
 }))
-const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left, [layoutPaths[1]]: next.right, [layoutPaths[2]]: next.hidden})
+const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left, [layoutPaths[1]]: next.right, [layoutPaths[2]]: next.bottom, [layoutPaths[3]]: next.hidden})
 </script>
 
 <template>

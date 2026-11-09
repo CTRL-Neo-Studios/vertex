@@ -475,10 +475,7 @@ const sorting = ref<{ id: string, desc: boolean }[]>([])
         :bottomSpacing="false"
     >
         <template #default>
-            <div
-                class="w-full flex flex-col flex-1 h-full pb-10"
-                :style="{maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)'}"
-            >
+            <div class="w-full flex flex-col flex-1 h-full pb-10">
                 <div class="w-full">
                     <div class="w-full flex items-center justify-center p-1 px-2">
                         <UDropdownMenu

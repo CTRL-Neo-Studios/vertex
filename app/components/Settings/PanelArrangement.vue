@@ -17,14 +17,14 @@ const layout = computed(() => withRegisteredViews(normalizePanelLayout(props.lay
 const save = (next: PanelLayout) => emit('update', next)
 const drag = usePanelDrag((from, to) => save(movePanelSlot(layout.value, from, to)))
 
-const lists: PanelList[] = ['left', 'right', 'hidden']
+const lists: PanelList[] = ['left', 'right', 'bottom', 'hidden']
 const slotsOf = (list: PanelList) => layout.value[list].map((slot, index) => ({slot, index})).filter(s => isPanelMarker(s.slot) || panelViews.has(s.slot))
 const menu = (list: PanelList) => (index?: number) =>
     panelSlotMenu({layout: layout.value, list, index, shown: slotsOf(list).map(s => s.index), save, reset: () => emit('reset'), t})
 </script>
 
 <template>
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-4 gap-3">
         <div v-for="list in lists" :key="list" class="flex flex-col gap-1.5 min-w-0">
             <span class="text-xs font-medium text-muted">{{ t(`app.panels.lists.${list}`) }}</span>
             <PanelButtons
