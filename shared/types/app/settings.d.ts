@@ -14,9 +14,16 @@ export interface AppSettings {
     workflowConfig: AppWorkflowConfig,
     /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
     aiConfig: AppAiConfig,
+    /** Global only: a workspace mustn't choose which program runs as git. */
+    gitConfig: AppGitConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
+}
+
+export interface AppGitConfig {
+    /** The git executable; `''` finds it (src-tauri/src/git.rs `find_git`). */
+    path: string,
 }
 
 /** Trusted folders and files aren't settings: they live in `trust.json` (`shared/workflows/trust.ts`). */

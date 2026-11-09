@@ -170,6 +170,17 @@ calls `app/utils/chatClient.ts`.
   - Tool search: every tool but `findTools` (the AI SDK's `toolSearch`, with `rankTools`: words in the name count double, plurals match singulars, this mode's tools before other modes'; all tools when none match, so a model searching with the user's topic still finds them) and `askUser` is `deferLoading`. The system prompt explains tool search before the mode: placed after it, a small model called made-up tools. Discovery lasts one generation, so tools the conversation already used or found (`usedToolNames`) are sent loaded. At most 8 steps per reply.
   - Tool calls render as `UChatTool` rows (name, its query/path or the outcome: accepted, rejected, failed, declined, asks to run, the raw result when opened). A provider error saying the model can't take tools (`toolsUnsupported`) clears the error and asks (native dialog) to turn Tools off for that profile and retry.
 
+### Git
+
+Git runs in Rust (`src-tauri/src/git.rs`), which spawns the installed `git`, so the user's config, credential helpers, SSH agent, hooks and LFS apply as in their terminal; the webview calls `app/utils/gitClient.ts` (types in `shared/types/app/git.d.ts`). Plan and phases: `Git Integration Plan.md` (#42).
+
+- Finding git (`find_git`, cached until it goes missing): `gitConfig.path` alone when set (global settings only, so a workspace can't choose the program), else on macOS `/opt/homebrew/bin/git` and `/usr/local/bin/git` (an app opened from Finder gets launchd's `PATH`), then `PATH`. `/usr/bin/git` on macOS counts only when `xcode-select -p` succeeds, since the stub opens the developer tools installer.
+- Every run: `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C` (English messages for `classify`), stdin closed, no console window on Windows. Commands run in the repository's top folder (`rev-parse --show-toplevel`; it may sit above the workspace) and paths are relative to it; paths go after `--` with `--literal-pathspecs`, and anything that isn't a plain relative path, or reaches into `.git`, is refused.
+- Changing commands take a lock per repository (`Git.locks`), so two never meet on `index.lock`; reads don't wait.
+- Expected failures come back as `GitError` codes (`missing`, `not-repo`, `auth`, `conflict`, `rejected`, `no-remote`, `no-upstream`, `identity`), read from git's output; anything else is git's message.
+- Pull merges unless the user set `pull.rebase`; push of a branch without an upstream goes to `origin` (or the only remote) and tracks it; init uses `main` unless `init.defaultBranch` is set; discard restores what the last commit has and deletes the rest.
+- `round_trip_against_a_real_repository` runs it all against real git (init, stage, discard, commit, log, a bare remote, a rejected push and a conflicting pull) with the user's and system config kept out.
+
 ---
 
 ## Window Model

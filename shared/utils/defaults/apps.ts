@@ -1,4 +1,4 @@
-import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
@@ -28,6 +28,7 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         viewConfig: defaultAppViewConfig(data?.viewConfig),
         workflowConfig: defaultAppWorkflowConfig(data?.workflowConfig),
         aiConfig: defaultAppAiConfig(data?.aiConfig),
+        gitConfig: defaultAppGitConfig(data?.gitConfig),
 		deviceId: data?.deviceId || crypto.randomUUID(),
         updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
@@ -128,6 +129,10 @@ export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>):
         confirmTrash: data?.confirmTrash ?? true,
         fileTrust: data?.fileTrust === 'path' ? 'path' : 'content',
     } satisfies AppWorkflowConfig
+}
+
+export function defaultAppGitConfig(data?: DeepPartial<AppGitConfig>): AppGitConfig {
+    return {path: typeof data?.path === 'string' ? data.path : ''}
 }
 
 /** Old sessions kept absolute paths (Rust migrates the rest, see `sanitize_sessions`); read them too. */

@@ -1,6 +1,7 @@
 mod ai;
 mod chats;
 mod fonts;
+mod git;
 mod notes;
 mod state;
 mod updater;
@@ -207,6 +208,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(ai::AiRequests::default())
         .manage(chats::ChatVaults::default())
+        .manage(git::Git::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -274,6 +276,26 @@ pub fn run() {
             chats::chat_folder_rename,
             chats::chat_folder_delete,
             chats::chat_search,
+            git::git_version,
+            git::git_status,
+            git::git_log,
+            git::git_commit_files,
+            git::git_diff,
+            git::git_show_file,
+            git::git_stage,
+            git::git_unstage,
+            git::git_discard,
+            git::git_commit,
+            git::git_fetch,
+            git::git_pull,
+            git::git_push,
+            git::git_branches,
+            git::git_switch,
+            git::git_remotes,
+            git::git_remote_set,
+            git::git_merge_abort,
+            git::git_init,
+            git::git_clone,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
