@@ -300,7 +300,16 @@
 					"model": "模型",
 					"capabilities": "能力",
 					"selectedCount": "已选择：{count}",
-					"saveModels": "保存"
+					"saveModels": "保存",
+					"search": "搜索提供商或 URL",
+					"removeConfirm": "移除 {count} 个提供商？其保存的 API 密钥会被删除，使用它们的配置需要改选提供商。",
+					"modelCount": "{count} 个模型",
+					"edit": "编辑提供商",
+					"back": "返回提供商",
+					"connection": "连接",
+					"notFound": "此提供商已不存在。",
+					"noEnabledModels": "尚未启用模型：从提供商的列表中添加。",
+					"removeModelsConfirm": "从此提供商移除 {count} 个模型？使用它们的配置在编辑前保持原选择。"
 				},
 				"models": {
 					"title": "模型配置",
@@ -332,7 +341,6 @@
 					"params": {
 						"title": "参数",
 						"description": "随此配置的聊天回复和编辑器助手请求一起发送（不含聊天标题）。关闭的参数交由提供商决定。提供商会忽略不支持的参数：Ollama 的 OpenAI 兼容接口不支持 Top K、Min P 和重复惩罚。",
-						"reset": "重置参数",
 						"providerDefault": "提供商默认",
 						"temperature": "温度",
 						"temperatureDescription": "随机性：越低越集中、可重复，越高越多样。",
@@ -358,7 +366,21 @@
 						"extra": "额外请求字段",
 						"extraDescription": "一个 JSON 对象，原样随每个请求发送，用于提供商特有的选项。请求已设置的字段保持不变。",
 						"extraInvalid": "不是 JSON 对象，未保存。"
-					}
+					},
+					"noModel": "未选模型",
+					"copyName": "{name}（副本）",
+					"duplicate": "创建副本",
+					"setDefault": "设为默认",
+					"toolsOff": "工具已关闭",
+					"customParams": "自定义参数",
+					"actions": "配置操作",
+					"edit": "编辑配置",
+					"search": "搜索配置、模型或提供商",
+					"removeConfirm": "移除 {count} 个模型配置？使用它们的功能和聊天会改用默认配置。",
+					"back": "返回模型配置",
+					"general": "常规",
+					"behaviour": "行为",
+					"notFound": "此模型配置已不存在。"
 				},
 				"features": {
 					"title": "AI 功能",
@@ -392,10 +414,18 @@
 						"slashDescription": "在块列表中显示“询问 AI”“继续写作”等预设。",
 						"shortcut": "快捷键",
 						"shortcutDescription": "⌘J 在光标处或选区上打开助手。"
-					}
+					},
+					"editProfile": "编辑配置"
 				},
 				"off": "辅助 AI 已关闭，这里的设置不会被使用。",
-				"turnOn": "前往开关"
+				"turnOn": "前往开关",
+				"list": {
+					"selectAll": "全选显示的项",
+					"select": "选择",
+					"removeSelected": "移除所选（{count}）",
+					"noMatch": "没有匹配搜索的项。",
+					"remove": "移除"
+				}
 			},
 			"scope": {
 				"label": "正在编辑",

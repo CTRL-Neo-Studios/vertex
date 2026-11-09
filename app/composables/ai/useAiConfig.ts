@@ -33,8 +33,8 @@ export function useAiConfig() {
     }
     const updateProvider = (id: string, patch: Partial<Omit<AiProviderProfile, 'id'>>) =>
         write({providers: ai.value!.providers.map(p => (p.id === id ? {...p, ...patch} : p))})
-    /** Rust drops the provider's saved key with it. Profiles using it stay, without a provider, until edited. */
-    const removeProvider = (id: string) => write({providers: ai.value!.providers.filter(p => p.id !== id)})
+    /** Rust drops each removed provider's saved key. Profiles using one stay, without a provider, until edited. */
+    const removeProviders = (ids: string[]) => write({providers: ai.value!.providers.filter(p => !ids.includes(p.id))})
 
     async function addModelProfile(data: Omit<AiModelProfile, 'id'>) {
         const profile = {...data, id: crypto.randomUUID()}
@@ -43,9 +43,10 @@ export function useAiConfig() {
     }
     const updateModelProfile = (id: string, patch: Partial<Omit<AiModelProfile, 'id'>>) =>
         write({modelProfiles: ai.value!.modelProfiles.map(p => (p.id === id ? {...p, ...patch} : p))})
-    /** The default profile can't go; features using a removed one fall back to the default. */
-    const removeModelProfile = (id: string) => id !== ai.value!.defaultModelProfile
-        && write({modelProfiles: ai.value!.modelProfiles.filter(p => p.id !== id)})
+    /** The default profile never goes; features and chats using a removed one fall back to the default. */
+    const removeModelProfiles = (ids: string[]) =>
+        write({modelProfiles: ai.value!.modelProfiles.filter(p => p.id === ai.value!.defaultModelProfile || !ids.includes(p.id))})
+    const setDefaultModelProfile = (id: string) => write({defaultModelProfile: id})
 
-    return {ai, addProvider, updateProvider, removeProvider, addModelProfile, updateModelProfile, removeModelProfile}
+    return {ai, addProvider, updateProvider, removeProviders, addModelProfile, updateModelProfile, removeModelProfiles, setDefaultModelProfile}
 }

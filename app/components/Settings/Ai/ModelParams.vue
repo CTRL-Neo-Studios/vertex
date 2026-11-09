@@ -5,8 +5,9 @@ import {AI_NUMBER_PARAMS, sanitizeModelParams} from "#shared/utils/aiParams";
 type NumberParam = typeof AI_NUMBER_PARAMS[number]
 
 /**
- * A model profile's request parameters: per parameter a switch (off = the provider's default, not sent) and its value;
- * stop sequences and extra JSON fields. Every change goes out through `save` (sliders when let go), sanitized.
+ * A model profile's request parameters, as a settings section (its reset clears them all): per parameter a switch
+ * (off = the provider's default, not sent) and its value; stop sequences and extra JSON fields. Every change goes out
+ * through `save` (sliders when let go), sanitized.
  */
 const props = defineProps<{ params?: AiModelParams, model?: AiModelInfo }>()
 const emit = defineEmits<{ save: [params: AiModelParams | undefined] }>()
@@ -44,21 +45,12 @@ function saveExtra() {
 </script>
 
 <template>
-    <div class="flex items-start gap-2 px-4 pt-3 pb-1">
-        <div class="flex-1 min-w-0">
-            <div class="text-sm text-default">{{ t('app.settings.ai.models.params.title') }}</div>
-            <div class="text-xs text-muted">{{ t('app.settings.ai.models.params.description') }}</div>
-        </div>
-        <UButton
-            v-if="params"
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-rotate-ccw"
-            :label="t('app.settings.ai.models.params.reset')"
-            @click="emit('save', undefined)"
-        />
-    </div>
+    <SettingsSection
+        :title="t('app.settings.ai.models.params.title')"
+        :description="t('app.settings.ai.models.params.description')"
+        :dirty="!!params"
+        @reset="emit('save', undefined)"
+    >
     <SettingsRow
         v-for="p in AI_NUMBER_PARAMS"
         :key="p.key"
@@ -111,4 +103,5 @@ function saveExtra() {
             @blur="saveExtra"
         />
     </div>
+    </SettingsSection>
 </template>

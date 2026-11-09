@@ -300,7 +300,16 @@
 					"model": "Model",
 					"capabilities": "Capabilities",
 					"selectedCount": "Selected: {count}",
-					"saveModels": "Save"
+					"saveModels": "Save",
+					"search": "Search providers or URLs",
+					"removeConfirm": "Remove {count} provider(s)? Their saved API keys are deleted, and profiles using them need another provider.",
+					"modelCount": "{count} model(s)",
+					"edit": "Edit provider",
+					"back": "Back to providers",
+					"connection": "Connection",
+					"notFound": "This provider doesn't exist any more.",
+					"noEnabledModels": "No models enabled yet: add some from the provider's list.",
+					"removeModelsConfirm": "Remove {count} model(s) from this provider? Profiles using them keep their choice until edited."
 				},
 				"models": {
 					"title": "Model Profiles",
@@ -332,7 +341,6 @@
 					"params": {
 						"title": "Parameters",
 						"description": "Sent with this profile's chat replies and editor assistant requests (not chat titles). Off leaves a parameter to the provider. Providers ignore what they don't support: Ollama's OpenAI-compatible API has no top K, min P or repetition penalty.",
-						"reset": "Reset parameters",
 						"providerDefault": "Provider default",
 						"temperature": "Temperature",
 						"temperatureDescription": "Randomness: lower is more focused and repeatable, higher more varied.",
@@ -358,7 +366,21 @@
 						"extra": "Extra request fields",
 						"extraDescription": "A JSON object sent with each request as it is, for provider-specific options. Fields the request already sets are kept.",
 						"extraInvalid": "Not a JSON object; not saved."
-					}
+					},
+					"noModel": "No model",
+					"copyName": "{name} (copy)",
+					"duplicate": "Duplicate",
+					"setDefault": "Set as default",
+					"toolsOff": "Tools off",
+					"customParams": "Custom parameters",
+					"actions": "Profile actions",
+					"edit": "Edit profile",
+					"search": "Search profiles, models or providers",
+					"removeConfirm": "Remove {count} model profile(s)? Features and chats that use them switch to the default profile.",
+					"back": "Back to model profiles",
+					"general": "General",
+					"behaviour": "Behaviour",
+					"notFound": "This model profile doesn't exist any more."
 				},
 				"features": {
 					"title": "AI Features",
@@ -392,10 +414,18 @@
 						"slashDescription": "Ask AI, Continue writing and the other presets among the blocks.",
 						"shortcut": "Shortcut",
 						"shortcutDescription": "⌘J opens the assistant at the cursor or on the selection."
-					}
+					},
+					"editProfile": "Edit profile"
 				},
 				"off": "Assistive AI is off, so nothing here is used.",
-				"turnOn": "Go to its switch"
+				"turnOn": "Go to its switch",
+				"list": {
+					"selectAll": "Select all shown",
+					"select": "Select",
+					"removeSelected": "Remove selected ({count})",
+					"noMatch": "Nothing matches the search.",
+					"remove": "Remove"
+				}
 			},
 			"scope": {
 				"label": "Editing",

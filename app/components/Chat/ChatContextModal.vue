@@ -2,7 +2,9 @@
 import {getToolName, isToolUIPart} from "ai";
 import type {ChatRequestInfo, VertexChatMessage} from "#shared/types/app/chats";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
+import {Routes} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 
 /**
  * What a chat sent and got back, as of opening. Totals on top; per message its parts and raw JSON, a reply's model
@@ -13,9 +15,14 @@ const props = defineProps<{ messages: VertexChatMessage[], title: string, focus?
 const emit = defineEmits<{ close: [] }>()
 
 const {t, locale} = useI18n()
-const settings = useSettingsScope().effective
+const scope = useSettingsScope()
+const settings = scope.effective
+const {createOrFocusSettingsWindow} = useAppSettings()
 
 const profileName = (id: string) => settings.value?.aiConfig.modelProfiles.find(p => p.id === id)?.name ?? id
+const profileExists = (id: string) => !!settings.value?.aiConfig.modelProfiles.some(p => p.id === id)
+/** The profile's page in Settings (opened, or brought forward and switched to it). */
+const editProfile = (id: string) => createOrFocusSettingsWindow(scope.root.value, `${Routes.settings}/ai/models/${id}`)
 const num = (n: number | undefined) => n === undefined ? '—' : n.toLocaleString(locale.value)
 const when = (ms: number | undefined) => ms ? new Date(ms).toLocaleString(locale.value) : '—'
 const seconds = (ms: number) => (ms / 1000).toLocaleString(locale.value, {maximumFractionDigits: 1})
@@ -104,7 +111,10 @@ const tokens = (r: ChatRequestInfo) => [
                                     <h4 class="font-medium">{{ $t('app.chat.context.call', { n: n + 1 }) }}</h4>
                                     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
                                         <dt class="text-muted">{{ $t('app.chat.context.model') }}</dt>
-                                        <dd>{{ request.modelId }} ({{ profileName(request.profileId) }})</dd>
+                                        <dd class="flex items-center gap-1 min-w-0">
+                                            <span class="truncate">{{ request.modelId }} ({{ profileName(request.profileId) }})</span>
+                                            <UButton v-if="profileExists(request.profileId)" size="xs" color="neutral" variant="link" :label="$t('app.settings.ai.features.editProfile')" @click="editProfile(request.profileId)"/>
+                                        </dd>
                                         <dt class="text-muted">{{ $t('app.chat.context.started') }}</dt>
                                         <dd>{{ when(request.startedAt) }}</dd>
                                         <dt class="text-muted">{{ $t('app.chat.context.duration') }}</dt>

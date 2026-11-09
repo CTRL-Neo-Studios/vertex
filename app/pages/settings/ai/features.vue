@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {AI_FEATURES} from "#shared/constants/ai";
+import {Routes} from "#shared/constants/app";
 import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -25,10 +26,20 @@ const ENTRIES = 'aiConfig.editorAssistant' as const
 const ENTRY_KEYS = ['toolbar', 'slash', 'shortcut'] as const
 const path = (id: string) => `${FEATURES}.${id}` as AppSettingPath
 
-// Profiles are global: the effective settings carry the global ones.
+// Profiles are global: the effective settings carry the global ones. Each shows its provider and model.
 const profiles = computed(() => scope.effective.value?.aiConfig.modelProfiles ?? [])
-const profileItems = computed(() => profiles.value.map(p => ({label: p.name, value: p.id})))
+const profileItems = computed(() => profiles.value.map(p => ({
+    label: p.name,
+    value: p.id,
+    description: [scope.effective.value?.aiConfig.providers.find(x => x.id === p.providerId)?.name, p.modelId].filter(Boolean).join(' · ') || undefined,
+})))
 const defaultName = computed(() => profiles.value.find(p => p.id === scope.value(DEFAULT_PROFILE))?.name ?? '')
+const MODELS = `${Routes.settings}/ai/models`
+/** The profile a feature uses now (its own, else the default), for its Edit link. */
+function profileOf(id: string) {
+    const ai = scope.effective.value?.aiConfig
+    return profiles.value.find(p => p.id === ai?.features[id])?.id ?? ai?.defaultModelProfile
+}
 
 const aiOn = computed(() => scope.value(ENABLED))
 
@@ -79,13 +90,19 @@ const untrusted = computed(() => scope.root.value !== null && (scope.overridden(
 
             <SettingsSection :title="t('app.settings.ai.features.defaultSection')" :class="!aiOn && 'opacity-50'">
                 <SettingsRow :setting="DEFAULT_PROFILE" :label="t('app.settings.ai.features.defaultProfile')" :description="t('app.settings.ai.features.defaultProfileDescription')">
-                    <USelect
+                    <USelectMenu
                         class="w-56"
                         :items="profileItems"
+                        value-key="value"
+                        :filter-fields="['label', 'description']"
+                        :search-input="{placeholder: t('app.chat.profileSearch')}"
                         :disabled="!aiOn"
                         :model-value="scope.value(DEFAULT_PROFILE)"
                         @update:model-value="scope.set({[DEFAULT_PROFILE]: $event})"
                     />
+                    <UTooltip :text="t('app.settings.ai.features.editProfile')">
+                        <UButton :to="`${MODELS}/${scope.value(DEFAULT_PROFILE)}`" size="sm" color="neutral" variant="ghost" icon="i-lucide-pencil" :aria-label="t('app.settings.ai.features.editProfile')"/>
+                    </UTooltip>
                 </SettingsRow>
             </SettingsSection>
 
@@ -111,13 +128,19 @@ const untrusted = computed(() => scope.root.value !== null && (scope.overridden(
                         :label="t(feature.label)"
                         :description="t(feature.description)"
                     >
-                        <USelect
+                        <USelectMenu
                             class="w-56"
                             :items="featureItems"
+                            value-key="value"
+                            :filter-fields="['label', 'description']"
+                            :search-input="{placeholder: t('app.chat.profileSearch')}"
                             :disabled="!aiOn || !featureOn(feature.id)"
                             :model-value="featureValue(feature.id)"
                             @update:model-value="setFeature(feature.id, $event as string)"
                         />
+                        <UTooltip :text="t('app.settings.ai.features.editProfile')">
+                            <UButton :to="`${MODELS}/${profileOf(feature.id)}`" size="sm" color="neutral" variant="ghost" icon="i-lucide-pencil" :aria-label="t('app.settings.ai.features.editProfile')"/>
+                        </UTooltip>
                         <USwitch
                             :disabled="!aiOn"
                             :aria-label="t(feature.label)"
