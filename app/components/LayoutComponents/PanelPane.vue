@@ -2,12 +2,11 @@
 import type {MaybeRefOrGetter, ShallowRef} from "vue";
 import type {PanelArea} from "#shared/types/app/settings";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
-import PanelPulse from "~/components/LayoutComponents/PanelPulse.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels, type PanelPaneState} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
-import {PANEL_ACTIONS, PANEL_BUSY, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
+import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
  * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
@@ -29,9 +28,6 @@ const session = useActiveSessions().getSession(computed(() => $route.params.sess
 const panels = usePanels(session)
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 provide(PANEL_ACTIONS, props.actions)
-const busySlot = shallowRef<MaybeRefOrGetter<boolean>>()
-provide(PANEL_BUSY, busySlot)
-const busy = computed(() => !!toValue(busySlot.value))
 
 const strip = computed(() => panels.style.value === 'strip')
 const kbds = computed(() => panels.kbdsOf(props.area))
@@ -40,9 +36,11 @@ const viewComponent = computed(() => panelViewComponent(props.pane.active))
 const actions = computed(() => toValue(props.actions.value) ?? [])
 // Every pane has this row, whatever its view declares, so switching views doesn't move the view up or down: the
 // name (strips hold no names; in buttons style only on the right, the left list already names the view), the
-// pulse line, then the actions. The right side's first pane has it in the panel's header instead.
+// actions, then a separator line. The right side's first pane has it in the panel's header instead.
 const showBar = computed(() => !props.inHeader)
 const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
+/** The rest of the row: a hairline across its middle, the full height a drag region. */
+const SEPARATOR = 'relative flex-1 self-stretch ms-1 after:absolute after:inset-x-0 after:top-1/2 after:border-t after:border-default'
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const fade = useScrollFade(() => scrollAreaRef.value?.$el)
@@ -64,10 +62,10 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
                 @select="id => panels.select('bottom', id)"
             />
             <span v-if="view" class="ps-1 text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ t(view.label) }}</span>
-            <PanelPulse :active="busy"/>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'top' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>
+            <div :class="SEPARATOR" data-tauri-drag-region/>
             <slot name="trailing"/>
         </div>
         <template v-else-if="!strip">
@@ -103,10 +101,10 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
         </template>
         <div v-if="area !== 'bottom' && showBar" class="flex items-center gap-0.5 px-1 pb-1 min-h-7" data-tauri-drag-region>
             <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
-            <PanelPulse :active="busy"/>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>
+            <div :class="SEPARATOR" data-tauri-drag-region/>
         </div>
         <!-- The view's box: views size themselves to it (`h-full`, `flex-1`). -->
         <div class="relative flex-1 min-h-0 flex flex-col">

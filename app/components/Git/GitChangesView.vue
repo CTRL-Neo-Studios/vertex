@@ -12,7 +12,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {isStaged, isUnstaged, useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
-import {usePanelActions, usePanelBusy} from "~/utils/panelViews";
+import {usePanelActions} from "~/utils/panelViews";
 
 /** The Git view: the branch, Sync, what changed (staged and not), and the commit box. */
 const {t} = useI18n()
@@ -38,8 +38,6 @@ const syncChats = ref(true)
 const createRepo = () => git.init(syncChats.value)
 const canCommit = computed(() => idle.value && !!message.value.trim() && !!status.value?.files.length)
 
-// The pane's header line beats while an operation runs.
-usePanelBusy(() => !!busy.value)
 usePanelActions(() => {
     const refresh = {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
     if (!status.value) return [refresh]

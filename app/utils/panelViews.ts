@@ -81,27 +81,20 @@ export interface PanelViewAction {
 
 /** A pane's slot for its shown view's actions; each pane (`PanelPane`) provides one. */
 export const PANEL_ACTIONS: InjectionKey<ShallowRef<MaybeRefOrGetter<PanelViewAction[]> | undefined>> = Symbol('panel-actions')
-/** A pane's slot for whether its shown view is working; its header line (`PanelPulse`) beats meanwhile. */
-export const PANEL_BUSY: InjectionKey<ShallowRef<MaybeRefOrGetter<boolean> | undefined>> = Symbol('panel-busy')
-
-/** Puts `value` in the pane's slot while the calling view is mounted. Outside a pane it does nothing. */
-function fillPaneSlot<T>(key: InjectionKey<ShallowRef<T | undefined>>, value: T) {
-    const slot = inject(key, null)
-    if (!slot) return
-    slot.value = value
-    // Views can swap in either order; only clear what this one put there.
-    onBeforeUnmount(() => {
-        if (slot.value === value) slot.value = undefined
-    })
-}
 
 /**
  * Declares the calling view's header actions while it's mounted; the pane draws them the same way in every panel
- * style. Called inside a view's component, so the actions can use its state.
+ * style. Called inside a view's component, so the actions can use its state. Outside a pane it does nothing.
  */
-export const usePanelActions = (actions: MaybeRefOrGetter<PanelViewAction[]>) => fillPaneSlot(PANEL_ACTIONS, actions)
-/** Declares when the calling view is busy (syncing, generating…), so its pane's header line beats meanwhile. */
-export const usePanelBusy = (busy: MaybeRefOrGetter<boolean>) => fillPaneSlot(PANEL_BUSY, busy)
+export function usePanelActions(actions: MaybeRefOrGetter<PanelViewAction[]>) {
+    const slot = inject(PANEL_ACTIONS, null)
+    if (!slot) return
+    slot.value = actions
+    // Views can swap in either order; only clear what this one put there.
+    onBeforeUnmount(() => {
+        if (slot.value === actions) slot.value = undefined
+    })
+}
 
 const chatOn = (ctx: PanelViewContext) => ctx.isWorkspace && aiFeatureOn(ctx.settings?.aiConfig, 'chat')
 /** Views about the open note, which a Bases file doesn't have. */
