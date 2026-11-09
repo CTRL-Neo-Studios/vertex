@@ -1,4 +1,5 @@
 import type {FileTrustMode} from "#shared/workflows/trust"
+import type {AppAiConfig} from "#shared/types/app/ai"
 
 export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both'
 
@@ -11,6 +12,8 @@ export interface AppSettings {
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
     workflowConfig: AppWorkflowConfig,
+    /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
+    aiConfig: AppAiConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
@@ -59,5 +62,31 @@ export interface AppViewConfig {
     },
     editorPanel: {
         showStatusBar: 'show-on-hover' | 'always-shown' | 'always-hidden',
-    }
+        selectionToolbar: boolean,
+        slashMenu: boolean,
+        blockHandle: boolean,
+        /** Where the header shows undo/redo and the formatting buttons; `hidden` turns them off. */
+        headerHistory: HeaderToolsPosition,
+        headerFormatting: HeaderToolsPosition,
+    },
+    /** The side panels' views: which side each sits on, in what order (with separators), or hidden; and how they're switched. */
+    panels: AppPanelsConfig,
+}
+
+export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
+
+/** A view a side panel can show; `search` is an action (it opens a search) rather than a view. */
+export type PanelViewId = 'files' | 'chats' | 'search' | 'forelinks' | 'backlinks' | 'writersTools' | 'toc' | 'chat'
+export type PanelSlot = PanelViewId | 'separator'
+export type PanelSide = 'left' | 'right'
+
+export interface PanelLayout {
+    left: PanelSlot[],
+    right: PanelSlot[],
+    hidden: PanelViewId[],
+}
+
+export interface AppPanelsConfig extends PanelLayout {
+    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. */
+    style: 'buttons' | 'strip',
 }

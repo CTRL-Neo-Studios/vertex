@@ -20,9 +20,10 @@ const locked = computed(() => props.globalOnly && scope.root.value !== null)
         <!-- Fixed Header -->
         <div class="shrink-0 border-b border-default bg-default/75 backdrop-blur-lg z-10 w-full" data-tauri-drag-region>
             <div class="px-6 py-4" data-tauri-drag-region>
-                <div class="flex items-center justify-between" data-tauri-drag-region>
-                    <div data-tauri-drag-region>
-                        <h1 class="font-semibold select-none">{{ title ?? $t('app.settings.title') }}</h1>
+                <div class="flex items-center justify-between gap-2" data-tauri-drag-region>
+                    <div class="flex items-center gap-1 min-w-0" data-tauri-drag-region>
+                        <slot name="header-leading"/>
+                        <h1 class="font-semibold select-none truncate">{{ title ?? $t('app.settings.title') }}</h1>
                     </div>
                     <div class="flex items-center gap-2 h-8">
                         <slot name="header-trailing"/>

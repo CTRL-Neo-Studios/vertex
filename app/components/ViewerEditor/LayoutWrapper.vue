@@ -4,7 +4,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * Flexible layout wrapper for different viewer/editor types.
- * 
+ *
  * Supports:
  * - Different scroll behaviors (vertical, both, none)
  * - Optional header with breadcrumbs
@@ -18,6 +18,8 @@ const fileName = defineModel<string>('fileName')
 const {effective} = useSettingsScope()
 const statusBarDisplayMode = computed(() => effective.value?.viewConfig.editorPanel.showStatusBar)
 
+// One header row for both root variants: left slot, breadcrumbs always centered, right slot.
+const [DefineHeaderRow, HeaderRow] = createReusableTemplate()
     type ScrollMode = 'vertical' | 'both' | 'none'
 type ContentAlignment = 'center' | 'start' | 'stretch'
 
@@ -27,20 +29,20 @@ const props = withDefaults(defineProps<{
     showBreadcrumbs?: boolean,
     renaming?: boolean,
     filePath?: string,
-    
+
     // Scroll configuration
     scrollMode?: ScrollMode,
     showScrollbar?: boolean,
-    
+
     // Status bar configuration
     showStatusBar?: boolean,
-    
+
     // Content area configuration
     contentAlignment?: ContentAlignment,
     contentMaxWidth?: string,
     contentPadding?: boolean,
     cursorText?: boolean,
-    
+
     // Layout spacing
     topSpacing?: boolean,
     bottomSpacing?: boolean,
@@ -71,7 +73,7 @@ const emit = defineEmits<{
 // Compute classes based on props
 const contentClasses = computed(() => {
     const classes = ['flex flex-col', 'w-full']
-    
+
     // Alignment
     if (props.contentAlignment === 'center') {
         classes.push('items-center')
@@ -80,14 +82,14 @@ const contentClasses = computed(() => {
     } else if (props.contentAlignment === 'stretch') {
         classes.push('items-stretch')
     }
-    
+
     classes.push('justify-start')
-    
+
     // Padding
     if (props.contentPadding) {
         classes.push('md:p-0')
     }
-    
+
     // Spacing
     if (props.bottomSpacing) {
         classes.push('mb-32')
@@ -95,18 +97,18 @@ const contentClasses = computed(() => {
     if (props.topSpacing) {
         classes.push('mt-10')
     }
-    
+
     // Cursor
     if (props.cursorText) {
         classes.push('cursor-text')
     }
-    
+
     return classes.join(' ')
 })
 
 const viewportClasses = computed(() => {
     const classes = ['w-full']
-    
+
     if (props.scrollMode === 'vertical') {
         classes.push('flex-none h-full')
     } else if (props.scrollMode === 'both') {
@@ -114,18 +116,39 @@ const viewportClasses = computed(() => {
     } else if (props.scrollMode === 'none') {
         classes.push('flex-none h-full overflow-hidden')
     }
-    
+
     if (props.cursorText) {
         classes.push('cursor-text')
     }
-    
+
     return classes.join(' ')
 })
 </script>
 
 <template>
+    <DefineHeaderRow>
+        <div class="group/header w-full h-full flex items-center p-2 relative">
+            <slot name="header-left"/>
+            <div class="grow"/>
+            <!-- Only the breadcrumbs fade: hidden until the header is pointed at (or they're being renamed). -->
+            <div
+                v-if="showBreadcrumbs"
+                class="absolute inset-y-0 left-1/2 -translate-x-1/2 max-w-1/2 flex items-center justify-center opacity-0 group-hover/header:opacity-100 focus-within:opacity-100 transition-opacity duration-300"
+            >
+                <EditorHeaderBreadcrumbs
+                    :renaming="renaming"
+                    v-model="fileName"
+                    :relativeFilePath="filePath"
+                    @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)"
+                    class="w-fit"
+                />
+            </div>
+            <slot name="header-right"/>
+        </div>
+    </DefineHeaderRow>
+
     <!-- Root container with conditional scroll -->
-    <div 
+    <div
         v-if="scrollMode === 'none'"
         class="w-full h-full flex flex-col relative"
         :class="ui?.root"
@@ -133,23 +156,7 @@ const viewportClasses = computed(() => {
     >
         <!-- Header (no scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
-            <div class="w-full flex items-center justify-center p-2 relative">
-                <slot name="header-left"/>
-                <template v-if="showBreadcrumbs" >
-                    <div class="flex items-center justify-center absolute top-2 left-1/2 -translate-x-1/2">
-                        <EditorHeaderBreadcrumbs
-                            :renaming="renaming"
-                            v-model="fileName"
-                            :relativeFilePath="filePath"
-                            @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)"
-                            class="w-fit"
-                        />
-                    </div>
-                    <div class="grow"/>
-                </template>
-                <div v-else class="grow"/>
-                <slot name="header-right"/>
-            </div>
+            <HeaderRow/>
         </div>
 
         <!-- Content (no scroll) -->
@@ -173,20 +180,7 @@ const viewportClasses = computed(() => {
     >
         <!-- Header (with scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
-            <div class="w-full flex items-center justify-center p-2">
-                <slot name="header-left"/>
-                <div v-if="showBreadcrumbs" class="grow flex items-center justify-center">
-                    <EditorHeaderBreadcrumbs 
-                        :renaming="renaming" 
-                        v-model="fileName" 
-                        :relativeFilePath="filePath" 
-                        @on-rename="(oldValue, newValue) => emit('on-rename', oldValue, newValue)" 
-                        class="w-fit"
-                    />
-                </div>
-                <div v-else class="grow"/>
-                <slot name="header-right"/>
-            </div>
+            <HeaderRow/>
         </div>
 
         <!-- Scroll Viewport -->
@@ -197,11 +191,31 @@ const viewportClasses = computed(() => {
         </ScrollAreaViewport>
 
         <!-- Status bar (with scroll) -->
-        <div v-if="showStatusBar" :class="[`bg-default absolute z-10 left-0 right-0 bottom-0 h-fit group`, statusBarDisplayMode == 'show-on-hover' ? 'group-hover:opacity-100 hover:opacity-100 opacity-0' : statusBarDisplayMode == 'always-hidden' ? 'hidden' : '']">
-            <div class="bg-submuted inline-flex justify-start items-center w-full border-t border-default p-1 px-3 pb-1.5">
-                <slot name="status-bar"/>
-            </div>
-        </div>
+		<div
+			v-if="showStatusBar"
+			:class="[
+				'group/sb absolute z-10 left-0 right-0 bottom-2 flex justify-center items-end',
+				statusBarDisplayMode == 'always-hidden' ? 'hidden' : ''
+			]"
+		>
+			<!-- iOS-style home indicator pill (only in show-on-hover mode) -->
+			<div
+				v-if="statusBarDisplayMode == 'show-on-hover'"
+				class="pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1.5 w-16 rounded-full bg-muted transition duration-300 group-hover/sb:opacity-0 group-hover/sb:scale-x-200"
+			/>
+
+			<!-- Actual status bar -->
+			<div
+				:class="[
+					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300',
+					statusBarDisplayMode == 'show-on-hover'
+					? 'opacity-0 translate-y-1 group-hover/sb:h-fit scale-0 group-hover/sb:opacity-100 group-hover/sb:translate-y-0 group-hover/sb:scale-100'
+					: ''
+				]"
+			>
+				<slot name="status-bar" />
+			</div>
+		</div>
 
         <!-- Scrollbar (vertical) -->
         <ScrollAreaScrollbar

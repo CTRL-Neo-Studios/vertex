@@ -315,13 +315,18 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     async function handleWatchEvent(event: WatchEvent) {
         const type = event.type
         if (typeof type !== 'object' || type === null) return
-        const paths = event.paths.filter(p => !p.endsWith('.DS_Store'))
-        if (paths.length === 0 || 'access' in type || 'metadata' in type) return
+        if (event.paths.length === 0 || 'access' in type || 'metadata' in type) return
         const rt = runtime()
         // The workspace's own settings changed on disk (an editor, git, sync): Rust re-reads and broadcasts them.
-        if (rt.wholeFolder && paths.includes(`${rt.root}/.vertex/settings.json`)) {
+        if (rt.wholeFolder && event.paths.includes(`${rt.root}/.vertex/settings.json`)) {
             void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
         }
+        const chatPath = rt.wholeFolder && event.paths.find(p => relativeOf(p).startsWith('.vertex/chats/'))
+        if (chatPath) broadcast({type: 'chats', path: chatPath})
+        // Same rule as the initial scan (`scan_directory_recursive`): nothing under a dot-name is indexed, so
+        // `.vertex/` (settings temp files, trash), `.git/` and `.DS_Store` never reach the index.
+        const paths = event.paths.filter(p => !relativeOf(p).split('/').some(part => part.startsWith('.')))
+        if (paths.length === 0) return
         const drop = (path: string) => {
             const removedNodes = removeFileFromIndex(path)
             if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type {SelectItem} from '@nuxt/ui'
-import type {AppViewConfig} from "#shared/types/app/settings";
+import type {AppViewConfig, PanelLayout} from "#shared/types/app/settings";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import PanelArrangement from "~/components/Settings/PanelArrangement.vue";
 
 definePageMeta({
     layout: 'settings'
@@ -30,7 +31,31 @@ const statusBarItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.statusBarAlways'), value: 'always-shown'},
     {label: t('app.settings.view.statusBarNever'), value: 'always-hidden'},
 ])
+const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
+const headerTools = ['headerHistory', 'headerFormatting'] as const
+const headerToolsItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.headerToolsLeft'), value: 'left'},
+    {label: t('app.settings.view.headerToolsRight'), value: 'right'},
+    {label: t('app.settings.view.headerToolsHidden'), value: 'hidden'},
+])
+const editorPanelPaths = [
+    'viewConfig.editorPanel.showStatusBar' as const,
+    ...[...editorToggles, ...headerTools].map(k => `viewConfig.editorPanel.${k}` as const),
+]
 const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as const)
+
+const panelStyleItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.panelStyleButtons'), value: 'buttons'},
+    {label: t('app.settings.view.panelStyleStrip'), value: 'strip'},
+])
+const layoutPaths = ['viewConfig.panels.left', 'viewConfig.panels.right', 'viewConfig.panels.hidden'] as const
+const panelPaths = ['viewConfig.panels.style' as const, ...layoutPaths]
+const panelLayout = computed<PanelLayout>(() => ({
+    left: scope.value('viewConfig.panels.left'),
+    right: scope.value('viewConfig.panels.right'),
+    hidden: scope.value('viewConfig.panels.hidden'),
+}))
+const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left, [layoutPaths[1]]: next.right, [layoutPaths[2]]: next.hidden})
 </script>
 
 <template>
@@ -53,8 +78,8 @@ const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as co
 
             <SettingsSection
                 :title="t('app.settings.view.editorPanel')"
-                :dirty="scope.isDirty(['viewConfig.editorPanel.showStatusBar'])"
-                @reset="scope.reset(['viewConfig.editorPanel.showStatusBar'])"
+                :dirty="scope.isDirty(editorPanelPaths)"
+                @reset="scope.reset(editorPanelPaths)"
             >
                 <SettingsRow setting="viewConfig.editorPanel.showStatusBar" :label="t('app.settings.view.statusBar')" :description="t('app.settings.view.statusBarDescription')">
                     <USelect
@@ -64,6 +89,55 @@ const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as co
                         @update:model-value="scope.set({'viewConfig.editorPanel.showStatusBar': $event})"
                     />
                 </SettingsRow>
+                <SettingsRow
+                    v-for="key in editorToggles"
+                    :key="key"
+                    :setting="`viewConfig.editorPanel.${key}`"
+                    :label="t(`app.settings.view.${key}`)"
+                    :description="t(`app.settings.view.${key}Description`)"
+                >
+                    <USwitch
+                        :model-value="scope.value(`viewConfig.editorPanel.${key}`)"
+                        @update:model-value="scope.set({[`viewConfig.editorPanel.${key}`]: $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow
+                    v-for="key in headerTools"
+                    :key="key"
+                    :setting="`viewConfig.editorPanel.${key}`"
+                    :label="t(`app.settings.view.${key}`)"
+                    :description="t(`app.settings.view.${key}Description`)"
+                >
+                    <USelect
+                        :model-value="scope.value(`viewConfig.editorPanel.${key}`)"
+                        :items="headerToolsItems"
+                        class="w-52"
+                        @update:model-value="scope.set({[`viewConfig.editorPanel.${key}`]: $event})"
+                    />
+                </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection
+                :title="t('app.settings.view.panels')"
+                :description="t('app.settings.view.panelsDescription')"
+                :dirty="scope.isDirty(panelPaths)"
+                @reset="scope.reset(panelPaths)"
+            >
+                <SettingsRow setting="viewConfig.panels.style" :label="t('app.settings.view.panelStyle')" :description="t('app.settings.view.panelStyleDescription')">
+                    <USelect
+                        :model-value="scope.value('viewConfig.panels.style')"
+                        :items="panelStyleItems"
+                        class="w-52"
+                        @update:model-value="scope.set({'viewConfig.panels.style': $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow setting="viewConfig.panels.left" :label="t('app.settings.view.panelLayout')" :description="t('app.settings.view.panelLayoutDescription')"/>
+                <PanelArrangement
+                    class="px-4 pb-4"
+                    :layout="panelLayout"
+                    @update="setLayout"
+                    @reset="scope.reset([...layoutPaths])"
+                />
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

@@ -9,7 +9,7 @@ import {isBasesFile, isImage, isLatexFile, isPlainTextFile, isUnreadableAsText, 
  *   `contentSaved`, `onRename`) that the tab page should pass to this viewer.
  */
 export type ViewerId = 'markdown' | 'image' | 'bases' | 'workflow' | 'yaml' | 'latex' | 'code'
-export type ViewerExtra = 'editorInstance' | 'internalLinks' | 'codeBlocks' | 'sessionId' | 'imageSrc'
+export type ViewerExtra = 'editorInstance' | 'internalLinks' | 'codeBlocks' | 'sessionId' | 'imageSrc' | 'extensions'
 
 export interface ViewerDefinition {
     id: ViewerId
@@ -21,7 +21,7 @@ export interface ViewerDefinition {
 }
 
 export const viewers: ViewerDefinition[] = [
-    {id: 'markdown', loadsText: true, extras: ['editorInstance', 'internalLinks', 'codeBlocks'], match: isPlainTextFile},
+    {id: 'markdown', loadsText: true, extras: ['editorInstance', 'internalLinks', 'codeBlocks', 'extensions'], match: isPlainTextFile},
     {id: 'image', loadsText: false, extras: ['imageSrc'], match: isImage},
     {id: 'bases', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
     {id: 'workflow', loadsText: true, extras: ['sessionId'], modes: ['workspace'], match: isWorkflowFile},

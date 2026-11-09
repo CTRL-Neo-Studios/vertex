@@ -5,8 +5,9 @@
 //! broadcasts the new value. That removes the read-modify-write races that existed when each window kept its own copy.
 
 use serde_json::{Map, Value};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -35,6 +36,8 @@ pub struct AppState {
     /// Workspace root → its `.vertex/settings.json` as last read or written, to tell real changes from echoes.
     workspace: Mutex<HashMap<String, Value>>,
     open_queue: Mutex<VecDeque<String>>,
+    /// Set once the app starts quitting: windows destroyed from then on keep their session's `open`.
+    quitting: AtomicBool,
 }
 
 fn store_path<R: Runtime>(app: &AppHandle<R>, file: &str) -> Result<PathBuf, String> {
@@ -52,9 +55,14 @@ fn read_json<R: Runtime>(app: &AppHandle<R>, file: &str) -> Value {
 }
 
 /// Write via temp file + rename so a crash mid-write never leaves a truncated store.
-fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
-    let tmp = path.with_extension("json.tmp");
-    let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
+pub(crate) fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
+    write_bytes_atomic(path, &serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?)
+}
+
+/// `write_atomic` for raw bytes: `<path>.tmp` + rename.
+pub(crate) fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
@@ -67,11 +75,50 @@ fn session_uuid(v: &Value) -> Option<&str> {
     v.get("uuid").and_then(Value::as_str)
 }
 
-/// Same rules the frontend used to apply on every load: drop entries missing required
-/// fields and keep only the first session per (type, root path).
+/// Recents kept past these counts only while open or pinned; the oldest go first.
+const RECENT_WORKSPACES: usize = 50;
+const RECENT_FILES: usize = 20;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// `YYYY-MM-DDTHH:MM:SS[.sss]Z` (a JS `Date` as JSON) as Unix milliseconds.
+fn iso_millis(s: &str) -> Option<u64> {
+    let n = |at: std::ops::Range<usize>| s.get(at)?.parse::<i64>().ok();
+    let (y, m, d) = (n(0..4)?, n(5..7)?, n(8..10)?);
+    let (hh, mm, ss) = (n(11..13)?, n(14..16)?, n(17..19)?);
+    let ms = if s.as_bytes().get(19) == Some(&b'.') { n(20..23).unwrap_or(0) } else { 0 };
+    // Days since 1970-01-01 from a civil date (Howard Hinnant's `days_from_civil`).
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let days = era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468;
+    u64::try_from((((days * 24 + hh) * 60 + mm) * 60 + ss) * 1000 + ms).ok()
+}
+
+fn flag(s: &Value, key: &str) -> bool {
+    s.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn last_opened(s: &Value) -> u64 {
+    s.get("lastOpened").and_then(Value::as_u64).unwrap_or(0)
+}
+
+/// Run once, when `sessions.json` is read at launch:
+/// - drop entries missing required fields, and all but the first per (type, root path);
+/// - migrate old entries (`lastUpdated` becomes `lastOpened`; `trustedDeviceIds` goes);
+/// - turn `open` (left set by the last quit or a crash) into `reopen`, for recovery; nothing is open yet;
+/// - keep open and pinned ones, and the newest [`RECENT_WORKSPACES`] / [`RECENT_FILES`] of the rest.
+///
+/// Old entries have no `open`, so the first launch after this reopens nothing.
 pub fn sanitize_sessions(list: Vec<Value>) -> Vec<Value> {
-    let mut seen = std::collections::HashSet::new();
-    list.into_iter()
+    let mut seen = HashSet::new();
+    let mut list: Vec<Value> = list
+        .into_iter()
         .filter(|s| {
             let (Some(uuid), Some(kind), Some(root)) = (
                 session_uuid(s),
@@ -83,14 +130,44 @@ pub fn sanitize_sessions(list: Vec<Value>) -> Vec<Value> {
             };
             !uuid.is_empty() && !root.is_empty() && seen.insert(format!("{kind}:{root}"))
         })
-        .collect()
+        .map(|mut s| {
+            let o = s.as_object_mut().unwrap();
+            if !o.get("lastOpened").is_some_and(Value::is_u64) {
+                let at = o.get("lastUpdated").and_then(Value::as_str).and_then(iso_millis).unwrap_or(0);
+                o.insert("lastOpened".into(), at.into());
+            }
+            o.remove("lastUpdated");
+            o.remove("trustedDeviceIds");
+            let reopen = o.get("open").and_then(Value::as_bool).unwrap_or(false);
+            o.insert("reopen".into(), reopen.into());
+            o.insert("open".into(), false.into());
+            s
+        })
+        .collect();
+    list.sort_by_key(|s| std::cmp::Reverse(last_opened(s)));
+    let mut kept: HashMap<String, usize> = HashMap::new();
+    list.retain(|s| {
+        if flag(s, "reopen") || flag(s, "pinned") {
+            return true;
+        }
+        let kind = s.get("sessionType").and_then(Value::as_str).unwrap_or_default();
+        let count = kept.entry(kind.to_owned()).or_default();
+        *count += 1;
+        *count <= if kind == "workspace" { RECENT_WORKSPACES } else { RECENT_FILES }
+    });
+    list
 }
 
-/// Insert or merge one session by uuid. Returns the merged session.
-pub fn upsert_session(list: &mut Vec<Value>, session: Value) -> Result<Value, String> {
+/// Insert or merge one session by uuid. Returns the merged session. `open` and `reopen` are Rust's (see
+/// [`mark_session_window`]): a webview's copy is ignored, and a new session starts closed.
+pub fn upsert_session(list: &mut Vec<Value>, mut session: Value) -> Result<Value, String> {
     let uuid = session_uuid(&session)
         .ok_or("session has no uuid")?
         .to_owned();
+    if let Some(o) = session.as_object_mut() {
+        o.remove("open");
+        o.remove("reopen");
+    }
     match list
         .iter_mut()
         .find(|s| session_uuid(s) == Some(uuid.as_str()))
@@ -100,10 +177,22 @@ pub fn upsert_session(list: &mut Vec<Value>, session: Value) -> Result<Value, St
             Ok(existing.clone())
         }
         None => {
+            session["open"] = false.into();
             list.push(session.clone());
             Ok(session)
         }
     }
+}
+
+/// A session window opened (`open`) or closed: its session's `open`, and `lastOpened` = `now`.
+/// Returns whether a session matched.
+pub fn mark_session_window(list: &mut [Value], uuid: &str, open: bool, now: u64) -> bool {
+    let Some(s) = list.iter_mut().find(|s| session_uuid(s) == Some(uuid)) else {
+        return false;
+    };
+    s["open"] = open.into();
+    s["lastOpened"] = now.into();
+    true
 }
 
 /// Shallow-merge `patch` into `target` (objects only); nested objects are replaced, not merged,
@@ -247,12 +336,17 @@ pub fn pin_trust(trust: &mut Value, folder: &str, path: &str, hash: Option<Strin
 
 const WORKSPACE_SETTINGS: [&str; 2] = [".vertex", "settings.json"];
 
-fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
+/// `root` as a workspace folder: absolute and an existing directory.
+pub(crate) fn workspace_root(root: &str) -> Result<&Path, String> {
     let root = Path::new(root);
     if !root.is_absolute() || !root.is_dir() {
         return Err(format!("{root:?} is not a workspace folder"));
     }
-    Ok(WORKSPACE_SETTINGS.iter().fold(root.to_path_buf(), |p, part| p.join(part)))
+    Ok(root)
+}
+
+fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
+    Ok(WORKSPACE_SETTINGS.iter().fold(workspace_root(root)?.to_path_buf(), |p, part| p.join(part)))
 }
 
 /// The file's object; anything else (missing, unreadable, not an object) is no overrides.
@@ -394,6 +488,31 @@ impl AppState {
         self.with_trust(app, |_| Ok(()), false)
     }
 
+    /// `settings.aiConfig.providers[id].baseURL`, the only origin `ai_request` may call for that provider.
+    pub fn ai_provider_base_url<R: Runtime>(&self, app: &AppHandle<R>, id: &str) -> Result<Option<String>, String> {
+        self.with_settings(
+            app,
+            |s| ai_providers(s).and_then(|p| p.get(id).map(|url| url.to_string())),
+            false,
+        )
+    }
+
+    /// From now on, a destroyed session window is the app quitting, not the user closing it.
+    pub fn set_quitting(&self) {
+        self.quitting.store(true, Ordering::SeqCst);
+    }
+
+    /// A `session-{uuid}` window was created (`open`) or destroyed; a destroy while quitting changes nothing,
+    /// so the session stays `open` and the next launch reopens it.
+    pub fn session_window<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str, open: bool) {
+        if !open && self.quitting.load(Ordering::SeqCst) {
+            return;
+        }
+        if let Err(e) = self.with_sessions(app, |l| Ok(mark_session_window(l, uuid, open, now_ms())), true) {
+            eprintln!("[state] could not mark session {uuid} {}: {e}", if open { "open" } else { "closed" });
+        }
+    }
+
     pub fn push_open_request<R: Runtime>(&self, app: &AppHandle<R>, path: String) {
         if let Ok(mut q) = self.open_queue.lock() {
             q.push_back(path);
@@ -444,13 +563,50 @@ pub fn settings_get<R: Runtime>(
     state.with_settings(&app, |s| s.clone(), false)
 }
 
+/// `aiConfig.providers` as id → baseURL; `None` when the settings have no provider list at all.
+fn ai_providers(settings: &Value) -> Option<HashMap<&str, &str>> {
+    let list = settings.get("aiConfig")?.get("providers")?.as_array()?;
+    Some(
+        list.iter()
+            .filter_map(|p| Some((p.get("id")?.as_str()?, p.get("baseURL").and_then(Value::as_str).unwrap_or(""))))
+            .collect(),
+    )
+}
+
+/// Providers whose saved API key must go: removed, or pointed at another baseURL (a key is bound to its host, so it
+/// is never sent somewhere the user didn't save it for). New settings without a provider list remove nothing.
+pub fn stale_ai_providers(old: &Value, new: &Value) -> Vec<String> {
+    let (Some(old), Some(new)) = (ai_providers(old), ai_providers(new)) else {
+        return Vec::new();
+    };
+    old.into_iter()
+        .filter(|(id, url)| new.get(id) != Some(url))
+        .map(|(id, _)| id.to_owned())
+        .collect()
+}
+
 #[tauri::command]
 pub fn settings_set<R: Runtime>(
     app: AppHandle<R>,
     state: tauri::State<'_, AppState>,
     settings: Value,
 ) -> Result<(), String> {
-    state.with_settings(&app, |s| *s = settings, true)
+    let stale = state.with_settings(
+        &app,
+        |s| {
+            let stale = stale_ai_providers(s, &settings);
+            *s = settings;
+            stale
+        },
+        true,
+    )?;
+    // Deleted before returning, so an `ai_key_set` issued after this resolves can't be undone by it.
+    for id in stale {
+        if let Err(e) = crate::ai::delete_key(&id) {
+            eprintln!("[ai] could not delete the key of provider {id}: {e}");
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -657,6 +813,53 @@ mod tests {
     }
 
     #[test]
+    fn upsert_ignores_the_webviews_open_flags() {
+        let mut list = vec![json!({"uuid": "a", "open": true})];
+        upsert_session(&mut list, json!({"uuid": "a", "open": false, "reopen": true, "pinned": true})).unwrap();
+        assert_eq!(list[0], json!({"uuid": "a", "open": true, "pinned": true}));
+        upsert_session(&mut list, json!({"uuid": "n", "open": true})).unwrap();
+        assert_eq!(list[1]["open"], false);
+    }
+
+    #[test]
+    fn sanitize_turns_open_into_reopen_and_migrates_old_entries() {
+        let ws = |uuid: &str, extra: Value| {
+            let mut s = json!({"uuid": uuid, "sessionType": "workspace", "rootFileOrFolderAbsolutePath": format!("/{uuid}")});
+            s.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            s
+        };
+        let out = sanitize_sessions(vec![
+            ws("old", json!({"lastUpdated": "2026-11-05T10:20:30.456Z", "trustedDeviceIds": []})),
+            ws("quit", json!({"open": true, "lastOpened": 5})),
+        ]);
+        assert_eq!(out[0], ws("old", json!({"lastOpened": 1_793_874_030_456u64, "open": false, "reopen": false})));
+        assert_eq!(out[1], ws("quit", json!({"lastOpened": 5, "open": false, "reopen": true})));
+    }
+
+    #[test]
+    fn sanitize_caps_recents_but_keeps_reopened_and_pinned() {
+        let mut list: Vec<Value> = (0..25)
+            .map(|i| json!({"uuid": format!("f{i}"), "sessionType": "singlespace", "rootFileOrFolderAbsolutePath": format!("/f{i}.md"), "lastOpened": i}))
+            .collect();
+        list[0]["pinned"] = true.into();
+        list[1]["open"] = true.into();
+        let out = sanitize_sessions(list);
+        let ids: Vec<_> = out.iter().map(|s| s["uuid"].as_str().unwrap()).collect();
+        // Newest first: f24..f5 (20), then the old pinned and reopened ones.
+        assert_eq!(ids.len(), 22);
+        assert_eq!((ids[0], ids[19]), ("f24", "f5"));
+        assert!(ids.contains(&"f0") && ids.contains(&"f1") && !ids.contains(&"f2"));
+    }
+
+    #[test]
+    fn mark_session_window_sets_open_and_time() {
+        let mut list = vec![json!({"uuid": "a", "open": false, "lastOpened": 1})];
+        assert!(mark_session_window(&mut list, "a", true, 9));
+        assert_eq!(list[0], json!({"uuid": "a", "open": true, "lastOpened": 9}));
+        assert!(!mark_session_window(&mut list, "b", true, 9));
+    }
+
+    #[test]
     fn migrate_trust_keeps_workspaces_as_nested_folders_and_drops_programs() {
         let settings = json!({"workflowConfig": {
             "trustedPrograms": {"ab": {"name": "x", "trustedAt": "t0"}},
@@ -731,5 +934,25 @@ mod tests {
         assert_eq!(trust["folders"]["/v/Z"]["files"], json!({"/v/Z/C/new.workflow": "n2"}));
         pin_trust(&mut trust, "/v/Z", "/v/Z/C/new.workflow", None).unwrap();
         assert_eq!(trust["folders"]["/v/Z"]["files"], json!({}));
+    }
+
+    #[test]
+    fn ai_keys_go_with_removed_or_moved_providers() {
+        let cfg = |providers: Value| json!({"aiConfig": {"providers": providers}});
+        let old = cfg(json!([
+            {"id": "a", "baseURL": "https://a.dev/v1"},
+            {"id": "b", "baseURL": "https://b.dev/v1"},
+            {"id": "c", "baseURL": "https://c.dev/v1"}
+        ]));
+        let new = cfg(json!([
+            {"id": "a", "baseURL": "https://a.dev/v1", "name": "renamed"},
+            {"id": "b", "baseURL": "https://evil.dev/v1"},
+            {"id": "d", "baseURL": "https://d.dev/v1"}
+        ]));
+        let mut stale = stale_ai_providers(&old, &new);
+        stale.sort();
+        assert_eq!(stale, ["b", "c"]);
+        assert!(stale_ai_providers(&old, &json!({})).is_empty());
+        assert_eq!(stale_ai_providers(&old, &cfg(json!([]))).len(), 3);
     }
 }

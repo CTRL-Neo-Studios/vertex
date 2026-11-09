@@ -34,6 +34,7 @@ useCommands({
     'app.quit': {run: () => stateClient.quit()},
     'file.openFile': {run: () => $act.openSinglespaceAction(), enabled: notInUtilityPage},
     'file.openFolder': {run: () => $act.openWorkspaceAction(), enabled: notInUtilityPage},
+    'file.newWorkspace': {run: () => $act.newWorkspaceAction(), enabled: notInUtilityPage},
     'file.newFile': {run: () => $act.createNewFileForSinglespace(), enabled: notInUtilityPage},
     'view.reload': {run: () => relaunch()},
     'view.toggleFullscreen': {run: async () => {

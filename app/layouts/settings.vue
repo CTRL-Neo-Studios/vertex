@@ -4,7 +4,7 @@ import {getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
 import {Routes} from "#shared/constants/app";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {useAppSessions} from "~/composables/app/useAppSessions";
-import {SETTINGS_SCOPE_EVENT} from "~/composables/app/useAppSettings";
+import {SETTINGS_ROUTE_EVENT, SETTINGS_SCOPE_EVENT} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 const {t} = useI18n()
@@ -18,6 +18,17 @@ const links = computed(() => [
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
     {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
+    {
+        label: t('app.settings.nav.ai'),
+        icon: 'i-lucide-sparkles',
+        defaultOpen: $route.path.startsWith(`${Routes.settings}/ai`),
+        children: [
+            // `active` by prefix: a profile's or provider's own page keeps its list highlighted.
+            {label: t('app.settings.nav.aiProviders'), icon: 'i-lucide-server', to: `${Routes.settings}/ai/providers`, active: $route.path.startsWith(`${Routes.settings}/ai/providers`)},
+            {label: t('app.settings.nav.aiModels'), icon: 'i-lucide-box', to: `${Routes.settings}/ai/models`, active: $route.path.startsWith(`${Routes.settings}/ai/models`)},
+            {label: t('app.settings.nav.aiFeatures'), icon: 'i-lucide-toggle-right', to: `${Routes.settings}/ai/features`},
+        ],
+    },
 ] satisfies NavigationMenuItem[])
 
 // User, or a workspace this app has opened. Select items need a non-empty value; a root is an absolute path.
@@ -32,12 +43,14 @@ const scopes = computed(() => {
 })
 const choose = (root: string | null) => scope.open(root === USER ? null : root).catch(e => console.error('[settings] could not open scope', e))
 
-let unlisten: (() => void) | undefined
-onBeforeUnmount(() => unlisten?.())
+const unlisten: (() => void)[] = []
+onBeforeUnmount(() => unlisten.forEach(stop => stop()))
 onMounted(async () => {
     await choose(typeof $route.query.scope === 'string' ? $route.query.scope : null)
-    // Settings opened again from another window: switch to that window's scope.
-    unlisten = await getCurrentWebviewWindow().listen<string | null>(SETTINGS_SCOPE_EVENT, e => choose(e.payload))
+    // Settings opened again from another window: switch to that window's scope, and to the page it asked for.
+    const window = getCurrentWebviewWindow()
+    unlisten.push(await window.listen<string | null>(SETTINGS_SCOPE_EVENT, e => choose(e.payload)))
+    unlisten.push(await window.listen<string>(SETTINGS_ROUTE_EVENT, e => void navigateTo(e.payload)))
 })
 </script>
 

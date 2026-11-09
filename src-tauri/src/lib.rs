@@ -1,6 +1,10 @@
+mod ai;
+mod chats;
 mod fonts;
+mod notes;
 mod state;
 mod updater;
+mod web;
 
 use rayon::prelude::*;
 use state::AppState;
@@ -166,6 +170,7 @@ async fn quit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     use std::sync::{Arc, Mutex};
     use tauri::{Emitter, Listener};
 
+    app.state::<AppState>().set_quitting();
     let pending: std::collections::HashSet<String> = app
         .webview_windows()
         .into_keys()
@@ -200,6 +205,8 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
+        .manage(ai::AiRequests::default())
+        .manage(chats::ChatVaults::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -211,6 +218,9 @@ pub fn run() {
                 None => show_main_window(app),
             }
         }));
+        // Each session window (`session-{uuid}`, stable per session) and Settings reopen at their last size and
+        // place, pulled back on screen when that monitor is gone. `main`, the start window, stays centred.
+        builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[MAIN_WINDOW]).build());
     }
 
     builder
@@ -244,6 +254,26 @@ pub fn run() {
             updater::update_token_set,
             updater::update_channels,
             fonts::system_fonts,
+            ai::ai_key_set,
+            ai::ai_key_has,
+            ai::ai_request,
+            ai::ai_request_cancel,
+            ai::ai_model_catalog,
+            web::web_fetch,
+            chats::chat_vault_state,
+            chats::chat_vault_create,
+            chats::chat_vault_unlock,
+            chats::chat_vault_lock,
+            chats::chat_vault_change,
+            notes::notes_search,
+            chats::chat_index,
+            chats::chat_read,
+            chats::chat_write,
+            chats::chat_delete,
+            chats::chat_folders_set,
+            chats::chat_folder_rename,
+            chats::chat_folder_delete,
+            chats::chat_search,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
@@ -266,12 +296,13 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             app.listen_any("tauri://webview-created", move |event| {
-                let label = event.payload().replace('"', "");
-                if label.starts_with(SESSION_WINDOW_PREFIX) {
+                let Some(label) = created_label(event.payload()) else { return };
+                if let Some(uuid) = label.strip_prefix(SESSION_WINDOW_PREFIX) {
                     if let Some(win) = app_handle.get_webview_window(&label) {
                         apply_decorum_style(&win);
                     }
                     sync_main_visibility(&app_handle, None);
+                    app_handle.state::<AppState>().session_window(&app_handle, uuid, true);
                 }
             });
 
@@ -286,14 +317,19 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                if window.label().starts_with(SESSION_WINDOW_PREFIX) {
+                if let Some(uuid) = window.label().strip_prefix(SESSION_WINDOW_PREFIX) {
                     sync_main_visibility(window.app_handle(), Some(window.label()));
+                    window.app_handle().state::<AppState>().session_window(window.app_handle(), uuid, false);
                 }
             }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, _event| {
+            // Quitting by any route (menu, Dock, ⌘Q, shutdown): windows destroyed from now on stay `open`, for recovery.
+            if let tauri::RunEvent::ExitRequested { .. } = _event {
+                _app_handle.state::<AppState>().set_quitting();
+            }
             // macOS delivers file associations (cold and warm) as RunEvent::Opened, possibly several at once.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = _event {
@@ -330,4 +366,18 @@ fn parse_file_path_from_args(args: &[String]) -> Option<String> {
         return Some(arg.clone());
     }
     None
+}
+
+/// The label in a `tauri://webview-created` payload (`{"label": "…"}`).
+fn created_label(payload: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(payload).ok()?.get("label")?.as_str().map(str::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn created_label_reads_the_event_payload() {
+        assert_eq!(super::created_label(r#"{"label":"session-a"}"#).as_deref(), Some("session-a"));
+        assert_eq!(super::created_label(r#""session-a""#), None);
+    }
 }

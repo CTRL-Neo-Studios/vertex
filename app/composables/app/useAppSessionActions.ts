@@ -1,9 +1,11 @@
 import {save} from "@tauri-apps/plugin-dialog";
-import {create, exists} from "@tauri-apps/plugin-fs";
-import {defaultAppSession, defaultAppSessionContext} from "#shared/utils/defaults/apps";
+import {create, exists, mkdir} from "@tauri-apps/plugin-fs";
+import {defaultAppSession} from "#shared/utils/defaults/apps";
+import {sessionWindowLabel} from "#shared/constants/app";
 import type {AppSession} from "#shared/types/app/sessions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
+import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 /**
@@ -14,7 +16,9 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 export function useAppSessionActions() {
     const $sessions = useAppSessions()
     const $open = useAppSessionNavigator()
+    const $win = useAppWebviewWindows()
     const $qt = useQuickToasts()
+    const $toast = useToast()
     const {t} = useI18n()
 
     /**
@@ -77,20 +81,45 @@ export function useAppSessionActions() {
         return path;
     }
 
-    async function openFromPath(path: string | undefined, sessionType: AppSession['sessionType']) {
-        if (!path || !(await exists(path))) return
+    /** A save dialog for the new folder's place and name; creates it and opens it as a workspace. */
+    async function newWorkspaceAction() {
+        const path = await save({title: t('app.home.newWorkspaceDialog'), defaultPath: t('app.home.newWorkspaceName')})
+        if (!path) return
+        if (await exists(path)) return $qt.error(t('app.home.folderExists'), path)
+        try {
+            await mkdir(path, {recursive: true})
+        } catch (e) {
+            return $qt.error(t('app.home.createFailed'), e instanceof Error ? e.message : String(e))
+        }
+        return openWorkspaceFromPath(path)
+    }
 
+    /** The path is gone: says so, offering to drop its recent entry. */
+    function notFound(path: string, session: AppSession | undefined) {
+        $toast.add({
+            title: t('app.home.notFound'),
+            description: path,
+            color: 'warning',
+            icon: 'i-lucide-folder-x',
+            ...(session && {
+                actions: [{
+                    label: t('app.home.removeRecent'),
+                    color: 'neutral' as const,
+                    variant: 'outline' as const,
+                    onClick: () => void $sessions.removeAppSession(session.uuid),
+                }],
+            }),
+        })
+    }
+
+    /** Opens `path` in its own window, or brings that window forward (unminimized) when it's open already. */
+    async function openFromPath(path: string | undefined, sessionType: AppSession['sessionType']) {
+        if (!path) return
         await $sessions.load()
         const existing = $sessions.getAppSessionFromAbsolutePath(path)
-        if (existing) {
-            const window = await $sessions.getWebviewWindowWithAppSession(existing)
-            if (window) return window.setFocus()
-        }
-        const session = existing ?? await $sessions.addAppSession(defaultAppSession({
-            rootFileOrFolderAbsolutePath: path,
-            sessionType,
-            context: defaultAppSessionContext({openedAbsoluteFilePaths: sessionType === 'singlespace' ? [path] : []}),
-        }))
+        if (!(await exists(path))) return notFound(path, existing)
+        if (existing && await $win.showWindowWithLabel(sessionWindowLabel(existing.uuid))) return
+        const session = existing ?? await $sessions.addAppSession(defaultAppSession({rootFileOrFolderAbsolutePath: path, sessionType}))
         await $sessions.createWindowFromAppSession(session)
     }
 
@@ -103,7 +132,8 @@ export function useAppSessionActions() {
         // Actions with file picker
         openWorkspaceAction,
         openSinglespaceAction,
-        
+        newWorkspaceAction,
+
         // Actions with known paths (for "Open Recent", drag & drop, etc.)
         openWorkspaceFromPath,
         openSinglespaceFromPath,

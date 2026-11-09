@@ -5,10 +5,11 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type { DropdownMenuItem } from '@nuxt/ui'
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {usePanels} from "~/composables/active/usePanels";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {useChats} from "~/composables/ai/useChats";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -25,10 +26,11 @@ const {
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
 const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
-const {
-    leftPanelCollapsed,
-    rightPanelCollapsed
-} = useActiveLayouts($sesh.getSession(sessionId))
+const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
+const panels = usePanels($sesh.getSession(sessionId))
+// The left panel's header holds the switcher (and the traffic lights' room) while it shows; this one otherwise.
+const leftClosed = computed(() => !panels.sides.value.left.open)
+const buttons = computed(() => panels.style.value === 'buttons')
 const $win = useAppWebviewWindows()
 
 const isWorkspace = computed(() => $sesh.isSessionWorkspace(sessionId))
@@ -98,11 +100,12 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
 
     unref(tabs)?.forEach(i => {
         const node = getFileByUuid(i.fileUuid)
+        const isChat = i.kind === 'chat'
 
-        if (node) {
+        if (node || isChat) {
             items[1]?.push({
-                label: node.fileName,
-                icon: i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : node?.fileName,
+                icon: isChat ? 'i-lucide-message-square' : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)
@@ -141,31 +144,39 @@ function scrollToItem(index: number) {
 </script>
 
 <template>
-    <div class="w-full flex items-center" data-tauri-drag-region>
-        <div v-if="isWorkspace ? leftPanelCollapsed : true" :class="`transition-all duration-300 left-0 top-0 bottom-0 h-full w-fit gap-2 z-10 inline-flex justify-start items-center border-r border-default px-2`" data-tauri-drag-region>
-            <SpaceOnOs detect-os="macos" :show-on-os="true" class="w-16"/>
-            <SidebarCollapserButton class="z-20" side="left" v-if="isWorkspace ? leftPanelCollapsed : true" :disabled="!isWorkspace"/>
+    <!-- Equal side columns keep the tabs centred under the editor; when tabs run out of room, the sides shrink to their
+    content and the tabs take the rest (and scroll). -->
+    <div class="w-full h-full grid grid-cols-[1fr_minmax(0,max-content)_1fr] items-center" data-tauri-drag-region>
+        <div v-if="leftClosed" class="col-start-1 h-full w-fit gap-2 z-10 inline-flex justify-start items-center px-2" data-tauri-drag-region>
+            <!-- A strip already covers part of the traffic lights. -->
+            <SpaceOnOs detect-os="macos" :show-on-os="true" :class="buttons ? 'w-16' : 'w-6'"/>
+            <WorkspaceSwitcher/>
+            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.sides.value.left.views.length"/>
         </div>
         <UScrollArea
             ref="scrollArea"
             v-if="isWorkspace"
-            class="no-scrollbar w-full h-full relative"
+            class="col-start-2 no-scrollbar min-w-0 h-full relative px-2 flex items-center justify-center-safe"
             v-slot="{ item, index }: {item: DropdownMenuItem, index: number}"
             :items="dropdownItems[1]"
             orientation="horizontal"
-            virtualize
+            :virtualize="{ gap: 8 }"
+			:ui="{
+				item: 'flex items-center justify-center rounded'
+			}"
+			data-tauri-drag-region
         >
             <div v-if="tabs.length == 0" class="w-full items-center text-center">
                 <span class="text-sm text-dimmed">{{ $t('app.editor.ui.selectFileShort') }}</span>
             </div>
             <div
                 v-else
-                :class="['w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 after:border-b-2 after:border-neutral after:w-0 after:bottom-0 after:h-full after:bg-linear-to-t after:from-primary/10 dark:after:from-primary/20 after:via-transparent after:to-transparent', 'h-full', tabId == item.id ? 'after:absolute after:transition after:border-b-2 after:border-primary after:w-full' : '']"
+                :class="['rounded-md w-fit relative inline-flex items-center justify-center group transition after:absolute after:transition-all after:duration-300 ', 'h-fit', tabId == item.id ? 'after:absolute after:transition after:w-full shadow shadow-primary/20' : '']"
             >
                 <UButton
                     :key="index"
                     size="sm"
-                    :class="['cursor-pointer transition-all duration-300 h-full align-middle font-mono', 'rounded-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
+                    :class="['rounded-md cursor-pointer transition-all duration-300 h-fit py-2 align-middle', 'border-none pr-8 pl-3', tabId == item.id ? 'w-fit' : 'text-muted w-fit']"
                     :color="tabId == item.id ? 'primary' : 'neutral'"
                     :variant="tabId == item.id ? 'soft' : 'ghost'"
                     :label="item.label"
@@ -177,7 +188,7 @@ function scrollToItem(index: number) {
                 </UTooltip>
             </div>
         </UScrollArea>
-        <div v-else class="grow">
+        <div v-else class="col-start-2">
             <div class="absolute top-2 left-1/2 -translate-x-1/2">
                 <UDashboardSearchButton
                     :kbs="['meta', 'p']"
@@ -188,24 +199,11 @@ function scrollToItem(index: number) {
                 />
             </div>
         </div>
-<!--        <ScrollAreaRoot v-if="isWorkspace" class="w-full relative h-full" style="&#45;&#45;scrollbar-size: 10px" data-tauri-drag-region>-->
-<!--            <ScrollAreaViewport class="grid grid-cols-1 h-full">-->
-
-<!--            </ScrollAreaViewport>-->
-<!--            <ScrollAreaScrollbar-->
-<!--                class="select-none touch-none z-20 h-0 m-2"-->
-<!--                orientation="horizontal"-->
-<!--            >-->
-<!--                <ScrollAreaThumb-->
-<!--                    class="flex-1 bg-accented rounded-lg"-->
-<!--                />-->
-<!--            </ScrollAreaScrollbar>-->
-<!--        </ScrollAreaRoot>-->
-        <div v-if="isWorkspace ? true : rightPanelCollapsed" :class="`transition-all duration-300 right-0 top-0 bottom-0 h-full w-fit z-20 px-2 border-l border-default inline-flex justify-end items-center gap-1`" data-tauri-drag-region>
+        <div v-if="isWorkspace || (buttons && !panels.sides.value.right.open)" class="col-start-3 justify-self-end h-full w-fit z-20 px-2 inline-flex justify-end items-center gap-1" data-tauri-drag-region>
             <UDropdownMenu :items="dropdownItems" size="sm">
-                <UButton icon="i-lucide-chevron-down" variant="ghost" size="sm" v-if="isWorkspace"/>
+                <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
-            <SidebarCollapserButton side="right" v-if="rightPanelCollapsed"/>
+            <SidebarCollapserButton side="right" v-if="buttons && !panels.sides.value.right.open" :disabled="!panels.sides.value.right.views.length"/>
         </div>
     </div>
 </template>

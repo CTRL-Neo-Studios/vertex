@@ -9,17 +9,19 @@ import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {YamlFormData} from "@type32/yaml-editor-form";
-import type {DropdownMenuItem,TableColumn} from "@nuxt/ui";
+import type {DropdownMenuItem, TableColumn, TableData} from "@nuxt/ui";
 import {h, resolveComponent, type VNode} from 'vue'
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {toLargestFileSizeUnit} from "#shared/utils/fs/filestats";
-import type { Column, SortingState } from '@tanstack/vue-table'
 import NewBaseViewModal from "~/components/Modals/Bases/NewBaseViewModal.vue";
 import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {parentPathOf} from "#shared/utils/index/parse";
 import {EditorProseEmbedImageDisplay} from "#components";
 import {convertFileSrc} from "@tauri-apps/api/core";
+
+/** The `column` a header callback gets (Nuxt UI doesn't re-export TanStack's `Column`). */
+type HeaderColumn<T extends TableData> = Parameters<Extract<TableColumn<T>['header'], (...args: never[]) => unknown>>[0]['column']
 
 const {t} = useI18n()
 const $ovl = useOverlay()
@@ -64,7 +66,7 @@ const {
 const $tab = useActiveTabs(unref($session))
 const $navi = useAppNavigator()
 
-function getHeader(column: Column<BaseSource<YamlFormData>>, label: string) {
+function getHeader(column: HeaderColumn<BaseSource<YamlFormData>>, label: string) {
     const isSorted = column.getIsSorted()
 
     return h(
@@ -237,31 +239,29 @@ function propogateDisplayDataColumns(): TableColumn<Row>[] {
 	const propCols: TableColumn<BaseSource<YamlFormData>>[] = columnMap.keys().toArray().map((key) => {
 		const keyType = columnMap.get(key)
 		if (!keyType || columnIds.includes(key)) return;
-		let flag = true
 
 		const col: TableColumn<BaseSource<YamlFormData>> = {
 			accessorFn: (originalRow) => originalRow.properties || originalRow.data,
 			id: key,
 			header: ({column}) => getHeader(column, key),
 			cell: ({row}) => {
-				const rowVal = (row.getValue(key) as any)
-				if (!rowVal[key]) {
-					flag = false
-					return
-				}
+				const value = (row.getValue(key) as Record<string, unknown> | undefined)?.[key]
+				if (value === null || value === undefined) return
 
 				if (keyType === 'array[string]') {
-					return getTagsBadgeList(rowVal[key] as string[])
+					return getTagsBadgeList(value as string[])
 				} else if (keyType === 'array[object]' || keyType === 'object') {
-					return JSON.stringify(rowVal[key])
+					return JSON.stringify(value)
 				} else if (keyType === 'string') {
-					const links = getInternalLinks(rowVal[key] as string)
-					if (links.length <= 0) return;
+					const text = String(value)
+					const links = getInternalLinks(text)
+					// Plain text, or links that don't resolve, show as the text itself.
+					if (links.length <= 0) return text
 					else if (links.length == 1) {
 						const [link]: InternalLinkNode[] = links
-						if (!link) return;
+						if (!link) return text;
 						const internalLink = props.internalLinkList.find(value => value.filePath?.endsWith(link.path))
-						if (!internalLink) return;
+						if (!internalLink) return text;
 						if (isImage(getFileExtensionFromPath(`${internalLink.filePath}`)))
 							return h(UPopover, {}, {
 								default: () => h(UTooltip, { text: t('app.editor.ui.viewImage') }, () => h(UButton, { color: 'neutral', variant: 'ghost', size: 'xs', icon: 'i-lucide-image' })),
@@ -279,17 +279,16 @@ function propogateDisplayDataColumns(): TableColumn<Row>[] {
 							})
 					} else {
 						const [link]: InternalLinkNode[] = links
-						if (!link) return;
+						if (!link) return text;
 						const internalLinkIds = props.internalLinkList.filter(value => value.filePath?.endsWith(link.path)).map(value => value.referenceId)
-						return getFileLinkBadgeList(internalLinkIds)
+						return internalLinkIds.length ? getFileLinkBadgeList(internalLinkIds) : text
 					}
 				} else {
-					return rowVal[key]
+					return value instanceof Date ? formatTime(value) : String(value)
 				}
 			}
 		} satisfies TableColumn<BaseSource<YamlFormData>>
 
-		if (!flag) return;
 		return col
 	}).filter((value) => value != undefined)
 
@@ -461,7 +460,7 @@ onMounted(async () => {
     loadColumnsSortingFromBase()
 })
 
-const sorting = ref<SortingState>([])
+const sorting = ref<{ id: string, desc: boolean }[]>([])
 
 </script>
 
@@ -519,21 +518,23 @@ const sorting = ref<SortingState>([])
                         </UDropdownMenu>
                     </div>
                 </div>
-                <UTable
-					v-if="!loadingData"
-                    v-model:sorting="sorting"
-                    :columns="columns"
-                    ref="table"
-                    sticky
-                    :data="currentViewResults"
-                    class="flex-1"
-					v-model:global-filter="searchTerm"
-                    :ui="{
-                        thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
-                        td: 'py-1',
-                        th: 'py-2 pt-0 text-xs',
-                    }"
-                />
+                <!-- Hidden, not unmounted, while loading: onMounted waits on the table's ref. v-show needs an element root, which UTable doesn't have. -->
+                <div v-show="!loadingData" class="flex-1 min-h-0 flex flex-col">
+                    <UTable
+                        v-model:sorting="sorting"
+                        :columns="columns"
+                        ref="table"
+                        sticky
+                        :data="currentViewResults"
+                        class="flex-1 min-h-0"
+                        v-model:global-filter="searchTerm"
+                        :ui="{
+                            thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
+                            td: 'py-1',
+                            th: 'py-2 pt-0 text-xs',
+                        }"
+                    />
+                </div>
             </div>
         </template>
     </ViewerEditorLayoutWrapper>
