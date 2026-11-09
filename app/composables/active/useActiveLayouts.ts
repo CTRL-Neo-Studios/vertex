@@ -7,14 +7,12 @@ export function useActiveLayouts(session?: ActiveSession) {
     const scope = sessionScope(session, 'useActiveLayouts')
     const leftPanelCollapsed = useState<boolean>(StateKey.leftPanel(scope), () => false)
     const rightPanelCollapsed = useState<boolean>(StateKey.rightPanel(scope), () => true)
-    /** The view each side shows; unset or not on that side (any more): its first one. */
-    const leftPanelView = useState<PanelViewId | undefined>(StateKey.leftPanelView(scope), () => undefined)
-    const rightPanelView = useState<PanelViewId | undefined>(StateKey.rightPanelView(scope), () => undefined)
+    /** The view each pane shows: the first of its views listed here, else its first one. */
+    const shownPanelViews = useState<PanelViewId[]>(StateKey.shownPanelViews(scope), () => [])
 
     return {
         leftPanelCollapsed,
         rightPanelCollapsed,
-        leftPanelView,
-        rightPanelView,
+        shownPanelViews,
     }
 }

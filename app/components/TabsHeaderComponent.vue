@@ -151,7 +151,7 @@ function scrollToItem(index: number) {
             <!-- A strip already covers part of the traffic lights. -->
             <SpaceOnOs detect-os="macos" :show-on-os="true" :class="buttons ? 'w-16' : 'w-6'"/>
             <WorkspaceSwitcher/>
-            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.sides.value.left.views.length"/>
+            <SidebarCollapserButton v-if="buttons" class="z-20" side="left" :disabled="!panels.sides.value.left.panes.length"/>
         </div>
         <UScrollArea
             ref="scrollArea"
@@ -203,7 +203,7 @@ function scrollToItem(index: number) {
             <UDropdownMenu :items="dropdownItems" size="sm">
                 <UButton icon="i-lucide-chevron-down" variant="ghost" color="neutral" class="text-muted" size="sm" v-if="isWorkspace"/>
             </UDropdownMenu>
-            <SidebarCollapserButton side="right" v-if="buttons && !panels.sides.value.right.open" :disabled="!panels.sides.value.right.views.length"/>
+            <SidebarCollapserButton side="right" v-if="buttons && !panels.sides.value.right.open" :disabled="!panels.sides.value.right.panes.length"/>
         </div>
     </div>
 </template>

@@ -41,6 +41,12 @@ describe('defaultAppSession', () => {
         expect([s.open, s.lastOpened]).toEqual([false, 0])
         expect(defaultAppSessionContext({openedFilePaths: ['X.md']}, '/w').openedFilePaths).toEqual(['X.md'])
     })
+
+    it('reads the old one-view-per-side panel state as the shown views', () => {
+        expect(defaultAppSessionContext({leftPanelView: 'chats', rightPanelView: 'toc'}).shownPanelViews).toEqual(['chats', 'toc'])
+        expect(defaultAppSessionContext({shownPanelViews: ['files', 'split', 'plugin:view'], leftPanelView: 'chats'}).shownPanelViews).toEqual(['files', 'plugin:view'])
+        expect(defaultAppSessionContext({}).shownPanelViews).toEqual([])
+    })
 })
 
 describe('defaultAppWorkflowConfig', () => {

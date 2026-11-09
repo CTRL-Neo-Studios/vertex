@@ -5,7 +5,7 @@ import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import type {AppSettings, PanelLayout, PanelSide, PanelViewId} from "#shared/types/app/settings";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {isBasesFile} from "#shared/utils/fs/filenames";
-import {addPanelSeparator, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
+import {addPanelSeparator, addPanelSplit, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 
 /** What a view's `when` sees: the session window it would show in. */
@@ -21,7 +21,7 @@ export interface PanelViewContext {
 /** What an action and its shortcut hint see: the context, plus the side its button is on and the view shown there. */
 export interface PanelActionContext extends PanelViewContext {
     area: PanelSide
-    /** The view the side's panel shows, `undefined` when it's collapsed. */
+    /** The view shown in the pane holding the button, `undefined` when the side is collapsed. */
     shown: PanelViewId | undefined
 }
 
@@ -79,7 +79,7 @@ export interface PanelViewAction {
     disabled?: boolean
 }
 
-/** The pane's slot for its shown view's actions; `DashboardSidePanel` provides it. */
+/** A pane's slot for its shown view's actions; each pane (`PanelPane`) provides one. */
 export const PANEL_ACTIONS: InjectionKey<ShallowRef<MaybeRefOrGetter<PanelViewAction[]> | undefined>> = Symbol('panel-actions')
 
 /**
@@ -148,19 +148,21 @@ definePanelView({
 
 /**
  * The right-click menu of a slot (`index` in `list`), or of a list's empty space: move it (up, down, to the other side),
- * hide it, add or remove a separator, show a hidden view here, reset. `shown`: the indices of the list's slots on
- * screen, for up and down.
+ * hide it, split before it, add or remove a separator or split, show a hidden view here, reset. `shown`: the indices of
+ * the list's slots on screen, for up and down. `splitBefore`: the split starting the pane the list belongs to, to
+ * merge the pane with the one above.
  */
 export function panelSlotMenu(o: {
     layout: PanelLayout
     list: PanelList
     index?: number
     shown: number[]
+    splitBefore?: number
     save: (next: PanelLayout) => unknown
     reset: () => unknown
     t: (key: string) => string
 }): ContextMenuItem[][] {
-    const {layout: l, list, index, shown, save, t} = o
+    const {layout: l, list, index, shown, splitBefore, save, t} = o
     const slot = index === undefined ? undefined : l[list][index]
     const at = index === undefined ? -1 : shown.indexOf(index)
     const move = (to: PanelList, at: number) => save(movePanelSlot(l, {list, index: index!}, {list: to, index: at}))
@@ -174,12 +176,19 @@ export function panelSlotMenu(o: {
             {label: t('app.panels.moveDown'), icon: 'i-lucide-arrow-down', disabled: at >= shown.length - 1, onSelect: () => move(side, shown[at + 1]! + 1)},
             ...slot === 'separator'
                 ? [{label: t('app.panels.removeSeparator'), icon: 'i-lucide-x', onSelect: () => move('hidden', 0)}]
-                : [
-                    toSide(side === 'left' ? 'right' : 'left'),
-                    {label: t('app.panels.hide'), icon: 'i-lucide-eye-off', onSelect: () => move('hidden', l.hidden.length)},
-                    {label: t('app.panels.addSeparator'), icon: 'i-lucide-separator-horizontal', onSelect: () => save(addPanelSeparator(l, side, index! + 1))},
-                ],
+                : slot === 'split'
+                    ? [{label: t('app.panels.removeSplit'), icon: 'i-lucide-x', onSelect: () => move('hidden', 0)}]
+                    : [
+                        toSide(side === 'left' ? 'right' : 'left'),
+                        {label: t('app.panels.hide'), icon: 'i-lucide-eye-off', onSelect: () => move('hidden', l.hidden.length)},
+                        {label: t('app.panels.addSeparator'), icon: 'i-lucide-separator-horizontal', onSelect: () => save(addPanelSeparator(l, side, index! + 1))},
+                        // Not before a pane's first view: it already starts one.
+                        {label: t('app.panels.splitHere'), icon: 'i-lucide-rows-2', disabled: index === 0 || l[side][index! - 1] === 'split', onSelect: () => save(addPanelSplit(l, side, index!))},
+                    ],
         ])
+    }
+    if (splitBefore !== undefined && list !== 'hidden') {
+        items.push([{label: t('app.panels.mergeUp'), icon: 'i-lucide-fold-vertical', onSelect: () => save(movePanelSlot(l, {list, index: splitBefore}, {list: 'hidden', index: 0}))}])
     }
     const items2: ContextMenuItem[] = [{label: t('app.panels.reset'), icon: 'i-lucide-rotate-ccw', onSelect: () => void o.reset()}]
     // Hidden views that aren't registered (a plugin that's off, later) keep their place but aren't offered.

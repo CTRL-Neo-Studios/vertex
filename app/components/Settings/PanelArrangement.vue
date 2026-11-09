@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type {PanelLayout} from "#shared/types/app/settings";
-import {movePanelSlot, normalizePanelLayout, type PanelList} from "#shared/utils/panelLayout";
+import {isPanelMarker, movePanelSlot, normalizePanelLayout, type PanelList} from "#shared/utils/panelLayout";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
 import {usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {panelSlotMenu, panelViews, withRegisteredViews} from "~/utils/panelViews";
 
 /**
- * Settings → View → Panels: the left and right sides' views (with separators) and the hidden ones, dragged or
- * right-clicked between them. Every registered view is listed; ids that aren't registered keep their place unseen.
+ * Settings → View → Panels: the left and right sides' views (with separators and splits) and the hidden ones, dragged
+ * or right-clicked between them. Every registered view is listed; ids that aren't registered keep their place unseen.
  */
 const props = defineProps<{ layout: PanelLayout }>()
 const emit = defineEmits<{ update: [layout: PanelLayout], reset: [] }>()
@@ -18,7 +18,7 @@ const save = (next: PanelLayout) => emit('update', next)
 const drag = usePanelDrag((from, to) => save(movePanelSlot(layout.value, from, to)))
 
 const lists: PanelList[] = ['left', 'right', 'hidden']
-const slotsOf = (list: PanelList) => layout.value[list].map((slot, index) => ({slot, index})).filter(s => s.slot === 'separator' || panelViews.has(s.slot))
+const slotsOf = (list: PanelList) => layout.value[list].map((slot, index) => ({slot, index})).filter(s => isPanelMarker(s.slot) || panelViews.has(s.slot))
 const menu = (list: PanelList) => (index?: number) =>
     panelSlotMenu({layout: layout.value, list, index, shown: slotsOf(list).map(s => s.index), save, reset: () => emit('reset'), t})
 </script>

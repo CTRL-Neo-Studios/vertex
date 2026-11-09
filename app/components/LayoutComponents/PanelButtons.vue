@@ -7,9 +7,10 @@ import {panelViews} from "~/utils/panelViews";
 
 /**
  * One list of panel view buttons, in one of three looks: `list` (labelled rows: the left panel's buttons, and the
- * Settings editor), `pills` (icons in the right panel's header) or `strip` (icons at a window edge). Buttons and
- * separators drag (`drag`, shared by the lists that trade slots) and have a right-click menu (`menu`, by the slot's
- * index in its list; none for the empty space). `slots` holds registered views only (and separators).
+ * Settings editor), `pills` (icons in the right panel's header) or `strip` (icons at a window edge). Buttons, separators
+ * and splits drag (`drag`, shared by the lists that trade slots) and have a right-click menu (`menu`, by the slot's
+ * index in its list; none for the empty space). `slots` holds registered views only (and markers). A split (a new
+ * pane) shows only in the strips and the Settings editor; elsewhere each pane has its own list.
  */
 const props = defineProps<{
     list: PanelList
@@ -18,7 +19,8 @@ const props = defineProps<{
     /** The layout list's length: where a drop past the last slot goes. */
     end: number
     variant: 'list' | 'pills' | 'strip'
-    active?: PanelViewId
+    /** The views shown: one per pane. */
+    active?: readonly PanelViewId[]
     /** Whether the active view's panel shows (a strip marks it only then). */
     open?: boolean
     drag: PanelDrag
@@ -39,7 +41,7 @@ const dropIndex = computed(() => props.drag.dropAt.value?.list === props.list ? 
 const lineBefore = (k: number) => dropIndex.value !== undefined && dropIndex.value <= props.slots[k]!.index && (k === 0 || dropIndex.value > props.slots[k - 1]!.index)
 const lineAtEnd = computed(() => dropIndex.value !== undefined && (!props.slots.length || dropIndex.value > props.slots.at(-1)!.index))
 
-const isActive = (id: PanelViewId) => props.active === id && (props.variant !== 'strip' || props.open)
+const isActive = (id: PanelViewId) => !!props.active?.includes(id) && (props.variant !== 'strip' || props.open)
 const view = (id: PanelViewId) => panelViews.get(id)!
 const tooltipSide = computed(() => props.variant === 'strip' ? (props.list === 'left' ? 'right' : 'left') : 'bottom')
 const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
@@ -70,6 +72,19 @@ const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
                     :aria-label="t('app.panels.separator')"
                 >
                     <div :class="['bg-accented', variant === 'pills' ? 'w-px h-4' : variant === 'strip' ? 'h-px w-6' : 'h-px w-full']"/>
+                </div>
+                <div
+                    v-else-if="s.slot === 'split'"
+                    :data-panel-slot="`${list}:${s.index}`"
+                    draggable="true"
+                    :class="['shrink-0 w-full flex items-center justify-center gap-2 cursor-grab', variant === 'strip' ? 'py-3' : 'py-1.5']"
+                    :aria-label="t('app.panels.split')"
+                >
+                    <div :class="['border-t border-dashed border-accented', variant === 'strip' ? 'w-6' : 'flex-1']"/>
+                    <template v-if="variant === 'list'">
+                        <span class="text-xs text-dimmed select-none">{{ t('app.panels.split') }}</span>
+                        <div class="flex-1 border-t border-dashed border-accented"/>
+                    </template>
                 </div>
                 <UTooltip v-else :text="t(view(s.slot).label)" :kbds="kbds?.[s.slot]" :content="{ side: tooltipSide }" :disabled="variant === 'list'">
                     <UButton

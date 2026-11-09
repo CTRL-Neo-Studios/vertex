@@ -80,7 +80,8 @@ export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
  * rather than a view. Any well-formed id is kept in a saved layout (`isPanelViewId`), registered or not.
  */
 export type PanelViewId = string
-export type PanelSlot = PanelViewId | 'separator'
+/** `separator` draws a line between buttons; `split` starts a new pane in its area (panes stack on a side). */
+export type PanelSlot = PanelViewId | 'separator' | 'split'
 export type PanelSide = 'left' | 'right'
 
 export interface PanelLayout {

@@ -136,6 +136,9 @@ type LegacyContext = Partial<AppSessionContext> & {
     openedAbsoluteFilePaths?: string[],
     openedAbsoluteFolderPaths?: string[],
     lastFocusedAbsoluteFilePath?: string,
+    /** Before split panes: one view per side, now `shownPanelViews`. */
+    leftPanelView?: string,
+    rightPanelView?: string,
 }
 
 export function defaultAppSession(data?: LegacySession): AppSession {
@@ -152,7 +155,7 @@ export function defaultAppSession(data?: LegacySession): AppSession {
     } satisfies AppSession
 }
 
-const panelView = (value: unknown) => isPanelViewId(value) ? value : undefined
+const panelViews = (current: unknown, legacy: unknown[]) => (Array.isArray(current) ? current : legacy).filter(isPanelViewId)
 
 /** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
 export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {
@@ -167,8 +170,7 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
         openedChatIds: data?.openedChatIds || [],
         lastFocusedChatId: data?.lastFocusedChatId,
-        leftPanelView: panelView(data?.leftPanelView),
-        rightPanelView: panelView(data?.rightPanelView),
+        shownPanelViews: panelViews(data?.shownPanelViews, [data?.leftPanelView, data?.rightPanelView]),
         leftPanelCollapsed: data?.leftPanelCollapsed === true,
         rightPanelCollapsed: data?.rightPanelCollapsed !== false,
     } satisfies AppSessionContext

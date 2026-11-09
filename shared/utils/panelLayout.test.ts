@@ -1,5 +1,12 @@
 import {describe, expect, it} from "vitest";
-import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, isPanelViewId, movePanelSlot, normalizePanelLayout, placeMissingViews} from "./panelLayout";
+import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, addPanelSplit, isPanelViewId, movePanelSlot, normalizePanelLayout, panesOf, placeMissingViews, tidySlots} from "./panelLayout";
+
+describe('tidySlots', () => {
+    it('keeps a split only between views, and no separator at a pane\'s edge', () => {
+        expect(tidySlots(['split', 'files', 'separator', 'split', 'separator', 'split', 'chats', 'separator', 'split'])).toEqual(['files', 'split', 'chats'])
+        expect(tidySlots(['files', 'separator', 'chats', 'split', 'toc'])).toEqual(['files', 'separator', 'chats', 'split', 'toc'])
+    })
+})
 
 describe('normalizePanelLayout', () => {
     it('gives the stock arrangement for nothing stored', () => {
@@ -68,5 +75,43 @@ describe('addPanelSeparator', () => {
     it('inserts one, but never at an end or beside another', () => {
         expect(addPanelSeparator(DEFAULT_PANEL_LAYOUT, 'left', 1).left).toEqual(['files', 'separator', 'chats', 'search'])
         expect(addPanelSeparator(DEFAULT_PANEL_LAYOUT, 'left', 3).left).toEqual(['files', 'chats', 'search'])
+    })
+})
+
+describe('splits', () => {
+    it('are kept on a side, never taken for a view id, and go when dropped on hidden', () => {
+        const layout = normalizePanelLayout({left: ['files', 'split', 'chats', 'search'], hidden: ['split']})
+        expect([layout.left, layout.hidden]).toEqual([['files', 'split', 'chats', 'search'], []])
+        expect(isPanelViewId('split')).toBe(false)
+        const dropped = movePanelSlot(layout, {list: 'left', index: 1}, {list: 'hidden', index: 0})
+        expect([dropped.left, dropped.hidden]).toEqual([['files', 'chats', 'search'], []])
+    })
+
+    it('are inserted before a view, but never at an end or beside another', () => {
+        expect(addPanelSplit(DEFAULT_PANEL_LAYOUT, 'left', 1).left).toEqual(['files', 'split', 'chats', 'search'])
+        expect(addPanelSplit(DEFAULT_PANEL_LAYOUT, 'left', 0).left).toEqual(['files', 'chats', 'search'])
+        expect(addPanelSplit({...DEFAULT_PANEL_LAYOUT, left: ['files', 'split', 'chats', 'search']}, 'left', 2).left).toEqual(['files', 'split', 'chats', 'search'])
+    })
+})
+
+describe('panesOf', () => {
+    const slot = (s: {slot: string}) => s.slot
+    const isView = (s: {slot: string}) => s.slot !== 'search' && s.slot !== 'separator'
+    const items = (...slots: string[]) => slots.map((s, index) => ({slot: s, index}))
+
+    it('cuts at splits and records the splits around each pane', () => {
+        const [first, second] = panesOf(items('files', 'separator', 'chats', 'split', 'toc'), slot, isView)
+        expect(first).toEqual({slots: [{slot: 'files', index: 0}, {slot: 'separator', index: 1}, {slot: 'chats', index: 2}], splitAfter: {slot: 'split', index: 3}})
+        expect(second).toEqual({slots: [{slot: 'toc', index: 4}], splitBefore: {slot: 'split', index: 3}})
+    })
+
+    it('folds a run without views into the pane before it, or after it at the start', () => {
+        const middle = panesOf(items('files', 'split', 'search', 'split', 'chats'), slot, isView)
+        expect(middle.map(p => p.slots.map(s => s.slot))).toEqual([['files', 'search'], ['chats']])
+        // The pane boundary is the split before the next real pane.
+        expect([middle[0]!.splitAfter?.index, middle[1]!.splitBefore?.index]).toEqual([3, 3])
+        const leading = panesOf(items('search', 'split', 'files'), slot, isView)
+        expect(leading).toEqual([{slots: [{slot: 'search', index: 0}, {slot: 'files', index: 2}]}])
+        expect(panesOf(items('search'), slot, isView)).toEqual([{slots: [{slot: 'search', index: 0}]}])
     })
 })

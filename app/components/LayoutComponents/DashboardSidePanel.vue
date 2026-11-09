@@ -1,19 +1,21 @@
 <script setup lang="ts">
+import type {MaybeRefOrGetter, ShallowRef} from "vue";
+import {SplitterGroup, SplitterPanel, SplitterResizeHandle} from "reka-ui";
 import type {PanelSide} from "#shared/types/app/settings";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import WorkspaceSwitcher from "~/components/WorkspaceSwitcher.vue";
 import SidebarCollapserButton from "~/components/SidebarCollapserButton.vue";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
+import PanelPane from "~/components/LayoutComponents/PanelPane.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
-import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
+import {panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
- * One side panel (left or right): the view its side shows (see `usePanels`), drawn from the view registry
- * (`app/utils/panelViews.ts`). With the `buttons` style it holds that side's view buttons (a list on the left, icons
- * in the header on the right); with `strip`, the strip at the window's edge does, and the header shows the view's
- * name. The left one's header holds the workspace switcher.
+ * One side panel (left or right): its panes stacked (split by the layout's `split` slots, resized by dragging between
+ * them), each showing one view from the registry (`app/utils/panelViews.ts`, see `PanelPane`). The left one's header
+ * holds the workspace switcher; the right one's holds its first pane's buttons (or, with `strip`, its name and actions).
  */
 const props = defineProps<{ side: PanelSide }>()
 
@@ -27,22 +29,16 @@ const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 const state = computed(() => panels.sides.value[props.side])
 const strip = computed(() => panels.style.value === 'strip')
 const kbds = computed(() => panels.kbdsOf(props.side))
-const view = computed(() => (state.value.active ? panelViews.get(state.value.active) : undefined))
-const viewComponent = computed(() => panelViewComponent(state.value.active))
-const viewLabel = computed(() => (view.value ? t(view.value.label) : ''))
 
-// The shown view's header actions (`usePanelActions`).
-const actionsSlot = shallowRef<MaybeRefOrGetter<PanelViewAction[]>>()
-provide(PANEL_ACTIONS, actionsSlot)
-const actions = computed(() => toValue(actionsSlot.value) ?? [])
-// A row under the header with the view's name and actions: always for the left strip style (the name has nowhere
-// else to go), otherwise only when there are actions. The left button list already names the view.
-const showBar = computed(() => (props.side === 'left' ? strip.value || actions.value.length > 0 : !strip.value && actions.value.length > 0))
-const barLabel = computed(() => (props.side === 'left' && !strip.value ? '' : viewLabel.value))
-
-const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
-const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
-const isScrolled = computed(() => scrollY.value > 2)
+// Each pane's slot for its view's header actions, by position; owned here so the header can draw the first pane's.
+const actionSlots: ShallowRef<MaybeRefOrGetter<PanelViewAction[]> | undefined>[] = []
+const actionsOf = (index: number) => (actionSlots[index] ??= shallowRef())
+const first = computed(() => state.value.panes[0])
+const firstActions = computed(() => toValue(actionsOf(0).value) ?? [])
+const firstLabel = computed(() => {
+    const view = first.value && panelViews.get(first.value.active)
+    return view ? t(view.label) : ''
+})
 </script>
 
 <template>
@@ -78,65 +74,44 @@ const isScrolled = computed(() => scrollY.value > 2)
                     <div class="grow" data-tauri-drag-region/>
                     <SidebarCollapserButton v-if="!strip" side="left"/>
                 </template>
-                <template v-else>
+                <template v-else-if="first">
                     <SidebarCollapserButton v-if="!strip" side="right"/>
-                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ viewLabel }}</span>
+                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ firstLabel }}</span>
                     <div class="grow" data-tauri-drag-region/>
                     <template v-if="strip">
-                        <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
+                        <UTooltip v-for="action in firstActions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
                             <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
                         </UTooltip>
                     </template>
                     <PanelButtons
-                        v-if="!strip"
+                        v-else
                         list="right"
                         variant="pills"
-                        :slots="state.slots"
-                        :end="panels.layout.value.right.length"
-                        :active="state.active"
+                        :slots="first.slots"
+                        :end="first.end"
+                        :active="[first.active]"
                         open
                         :drag
-                        :menu="index => panels.slotMenu('right', index)"
+                        :menu="index => panels.slotMenu('right', index, first)"
                         :kbds
                         @select="id => panels.select('right', id)"
                     />
                 </template>
             </UDashboardNavbar>
-            <PanelButtons
-                v-if="side === 'left' && !strip"
-                class="px-2 pb-2"
-                list="left"
-                variant="list"
-                :slots="state.slots"
-                :end="panels.layout.value.left.length"
-                :active="state.active"
-                open
-                :drag
-                :menu="index => panels.slotMenu('left', index)"
-                :kbds
-                @select="id => panels.select('left', id)"
-            />
-            <div v-if="showBar" class="flex items-center gap-0.5 px-3 pb-1 min-h-7" data-tauri-drag-region>
-                <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
-                <div class="grow" data-tauri-drag-region/>
-                <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
-                    <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
-                </UTooltip>
-            </div>
         </template>
         <template #default>
-            <UScrollArea
-                v-if="view?.scroll"
-                ref="scrollAreaRef"
-                orientation="vertical"
-                :class="['no-scrollbar h-full relative scroll-fade', isScrolled && 'is-scrolled']"
-                data-tauri-drag-region
-            >
-                <div class="w-full">
-                    <component :is="viewComponent" class="w-full h-full mt-2"/>
-                </div>
-            </UScrollArea>
-            <component :is="viewComponent" v-else-if="viewComponent"/>
+            <!-- Sizes are kept per side and set of panes (`localStorage`), shared by every window like the widths. -->
+            <SplitterGroup direction="vertical" :auto-save-id="`vertex-panes-${side}`" class="flex-1 min-h-0">
+                <template v-for="(pane, index) in state.panes" :key="index">
+                    <SplitterResizeHandle
+                        v-if="index > 0"
+                        class="relative shrink-0 my-1 h-px bg-default transition-colors data-[state=hover]:bg-primary data-[state=drag]:bg-primary after:absolute after:inset-x-0 after:-inset-y-1.5 cursor-ns-resize"
+                    />
+                    <SplitterPanel :id="`${side}-pane-${index}`" :order="index" :min-size="10">
+                        <PanelPane :side :pane :actions="actionsOf(index)" :in-header="side === 'right' && index === 0"/>
+                    </SplitterPanel>
+                </template>
+            </SplitterGroup>
         </template>
     </UDashboardSidebar>
 </template>

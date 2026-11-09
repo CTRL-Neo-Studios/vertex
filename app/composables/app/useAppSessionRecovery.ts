@@ -39,8 +39,7 @@ export function useAppSessionRecovery() {
 
         expandedFolders.value = uuids(context.openedFolderPaths)
         const layouts = useActiveLayouts(activeSession)
-        layouts.leftPanelView.value = context.leftPanelView
-        layouts.rightPanelView.value = context.rightPanelView
+        layouts.shownPanelViews.value = context.shownPanelViews ?? []
         layouts.leftPanelCollapsed.value = context.leftPanelCollapsed ?? false
         layouts.rightPanelCollapsed.value = context.rightPanelCollapsed ?? true
 
