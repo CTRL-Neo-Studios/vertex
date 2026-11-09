@@ -164,7 +164,7 @@ function scrollToItem(index: number) {
 			:ui="{
 				item: 'flex items-center justify-center rounded'
 			}"
-			data-tauri-drag-region
+			data-tauri-drag-region="deep"
         >
             <div v-if="tabs.length == 0" class="w-full items-center text-center">
                 <span class="text-sm text-dimmed">{{ $t('app.editor.ui.selectFileShort') }}</span>

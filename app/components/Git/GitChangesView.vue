@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ask} from "@tauri-apps/plugin-dialog";
-import type {CommandPaletteGroup} from "@nuxt/ui";
+import {writeText} from "@tauri-apps/plugin-clipboard-manager";
+import type {CommandPaletteGroup, ContextMenuItem} from "@nuxt/ui";
 import type {GitBranch, GitFile, GitState} from "#shared/types/app/git";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
@@ -11,13 +12,13 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {isStaged, isUnstaged, useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
-import {usePanelActions} from "~/utils/panelViews";
+import {usePanelActions, usePanelBusy} from "~/utils/panelViews";
 
 /** The Git view: the branch, Sync, what changed (staged and not), and the commit box. */
 const {t} = useI18n()
 const $route = useRoute()
 const $navi = useAppNavigator()
-const {openUrlInBrowser} = useAppOpener()
+const {openUrlInBrowser, openFileWithDefaultApp, revealFilesInFileManager} = useAppOpener()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {getFileByPath} = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
@@ -37,6 +38,8 @@ const syncChats = ref(true)
 const createRepo = () => git.init(syncChats.value)
 const canCommit = computed(() => idle.value && !!message.value.trim() && !!status.value?.files.length)
 
+// The pane's header line beats while an operation runs.
+usePanelBusy(() => !!busy.value)
 usePanelActions(() => {
     const refresh = {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
     if (!status.value) return [refresh]
@@ -109,6 +112,45 @@ const sections = computed(() => {
         },
     ].filter(s => s.files.length)
 })
+type Section = (typeof sections.value)[number]
+
+/** Gone from the disk: nothing to open or reveal. */
+const deleted = (file: GitFile) => file.worktree === 'D' || (file.index === 'D' && file.worktree === '.')
+const fullPathOf = (file: GitFile) => `${status.value?.top}/${file.path}`
+
+/** A file row's right-click menu: open it, stage or unstage it (or discard it), copy its path, reveal it. */
+function fileMenu(section: Section, file: GitFile): ContextMenuItem[][] {
+    const disabled = !idle.value
+    const changes: ContextMenuItem[] = section.id === 'staged'
+        ? [{label: t('app.git.unstage'), icon: 'i-lucide-minus', disabled, onSelect: () => void git.unstage([file])}]
+        : [
+            {label: t('app.git.stage'), icon: 'i-lucide-plus', disabled, onSelect: () => void git.stage([file])},
+            {label: t('app.git.discard'), icon: 'i-lucide-undo-2', color: 'error', disabled, onSelect: () => void discard([file])},
+        ]
+    return [
+        [
+            {label: t('app.git.openFile'), icon: 'i-lucide-file-text', disabled: !indexed(file), onSelect: () => void open(file)},
+            {label: t('app.editor.ui.openInDefaultApp'), icon: 'i-lucide-square-arrow-out-up-right', disabled: deleted(file), onSelect: () => void openFileWithDefaultApp(fullPathOf(file))},
+        ],
+        changes,
+        [
+            {label: t('app.editor.ui.copyRelativePath'), icon: 'i-lucide-copy', onSelect: () => void writeText(file.path)},
+            {label: t('app.editor.ui.copyFullPath'), icon: 'i-lucide-copy', onSelect: () => void writeText(fullPathOf(file))},
+            {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-folder-search', disabled: deleted(file), onSelect: () => void revealFilesInFileManager([fullPathOf(file)])},
+        ],
+    ]
+}
+
+/** A section header's right-click menu: the bulk action, and for Changes, discarding them all (asks first). */
+function sectionMenu(section: Section): ContextMenuItem[][] {
+    const disabled = !idle.value
+    return [[
+        {label: section.bulk.label, icon: section.bulk.icon, disabled, onSelect: () => void section.bulk.run()},
+        ...(section.id === 'changes'
+            ? [{label: t('app.git.discardAll'), icon: 'i-lucide-undo-2', color: 'error' as const, disabled, onSelect: () => void discard(section.files)}]
+            : []),
+    ]]
+}
 
 async function commit(andPush: boolean) {
     if (!canCommit.value || !await git.commit(message.value.trim())) return
@@ -272,57 +314,59 @@ const mergeActions = computed(() => [{
                     :description="t('app.git.cleanHint')"
                 />
                 <section v-for="section in sections" :key="section.id" :data-git-section="section.id" class="mt-1">
-                    <div class="flex items-center gap-1 ps-1.5 h-7 text-xs font-medium text-muted">
-                        <UTooltip :text="section.hint">
-                            <span class="flex items-center gap-1.5">
-                                {{ section.label }}
-                                <UBadge :label="String(section.files.length)" size="sm" color="neutral" variant="soft"/>
-                            </span>
-                        </UTooltip>
-                        <UTooltip :text="section.bulk.label">
-                            <UButton
-                                class="ms-auto"
-                                :icon="section.bulk.icon"
-                                color="neutral"
-                                variant="ghost"
-                                size="xs"
-                                :aria-label="section.bulk.label"
-                                :disabled="!idle"
-                                @click="section.bulk.run()"
-                            />
-                        </UTooltip>
-                    </div>
-                    <div
-                        v-for="file in section.files"
-                        :key="file.path"
-                        :data-git-file="file.path"
-                        :class="['group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm hover:bg-elevated/60 focus-within:bg-elevated/60 outline-none', indexed(file) ? 'cursor-pointer' : 'cursor-default']"
-                        tabindex="0"
-                        @click="open(file)"
-                        @keydown.enter.self="open(file)"
-                    >
-                        <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(file.path) }}</span>
-                        <span class="truncate text-xs text-dimmed">{{ dirOf(file.path) }}</span>
-                        <div class="ms-auto flex items-center shrink-0">
-                            <!-- Shown on hover, and while the row or a button in it has focus. -->
-                            <div class="hidden group-hover:flex group-focus-within:flex">
-                                <UTooltip v-for="action in section.actions" :key="action.id" :text="action.label">
-                                    <UButton
-                                        :icon="action.icon"
-                                        color="neutral"
-                                        variant="ghost"
-                                        size="xs"
-                                        :aria-label="action.label"
-                                        :disabled="!idle || (action.id === 'open' && !indexed(file))"
-                                        @click.stop="action.run(file)"
-                                    />
-                                </UTooltip>
-                            </div>
-                            <UTooltip :text="t(`app.git.states.${stateOf(section.letter(file)).key}`)">
-                                <span :class="['w-5 text-center font-mono text-xs', stateOf(section.letter(file)).color]">{{ section.letter(file) }}</span>
+                    <UContextMenu :items="sectionMenu(section)" size="sm">
+                        <div class="flex items-center gap-1 ps-1.5 h-7 text-xs font-medium text-muted">
+                            <UTooltip :text="section.hint">
+                                <span class="flex items-center gap-1.5">
+                                    {{ section.label }}
+                                    <UBadge :label="String(section.files.length)" size="sm" color="neutral" variant="soft"/>
+                                </span>
+                            </UTooltip>
+                            <UTooltip :text="section.bulk.label">
+                                <UButton
+                                    class="ms-auto"
+                                    :icon="section.bulk.icon"
+                                    color="neutral"
+                                    variant="ghost"
+                                    size="xs"
+                                    :aria-label="section.bulk.label"
+                                    :disabled="!idle"
+                                    @click="section.bulk.run()"
+                                />
                             </UTooltip>
                         </div>
-                    </div>
+                    </UContextMenu>
+                    <UContextMenu v-for="file in section.files" :key="file.path" :items="fileMenu(section, file)" size="sm">
+                        <div
+                            :data-git-file="file.path"
+                            :class="['group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm hover:bg-elevated/60 focus-within:bg-elevated/60 data-[state=open]:bg-elevated/60 outline-none', indexed(file) ? 'cursor-pointer' : 'cursor-default']"
+                            tabindex="0"
+                            @click="open(file)"
+                            @keydown.enter.self="open(file)"
+                        >
+                            <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(file.path) }}</span>
+                            <span class="truncate text-xs text-dimmed">{{ dirOf(file.path) }}</span>
+                            <div class="ms-auto flex items-center shrink-0">
+                                <!-- Shown on hover, and while the row or a button in it has focus. -->
+                                <div class="hidden group-hover:flex group-focus-within:flex">
+                                    <UTooltip v-for="action in section.actions" :key="action.id" :text="action.label">
+                                        <UButton
+                                            :icon="action.icon"
+                                            color="neutral"
+                                            variant="ghost"
+                                            size="xs"
+                                            :aria-label="action.label"
+                                            :disabled="!idle || (action.id === 'open' && !indexed(file))"
+                                            @click.stop="action.run(file)"
+                                        />
+                                    </UTooltip>
+                                </div>
+                                <UTooltip :text="t(`app.git.states.${stateOf(section.letter(file)).key}`)">
+                                    <span :class="['w-5 text-center font-mono text-xs', stateOf(section.letter(file)).color]">{{ section.letter(file) }}</span>
+                                </UTooltip>
+                            </div>
+                        </div>
+                    </UContextMenu>
                 </section>
             </div>
             <div class="p-2 flex flex-col gap-1.5">

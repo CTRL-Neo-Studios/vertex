@@ -2,11 +2,12 @@
 import type {MaybeRefOrGetter, ShallowRef} from "vue";
 import type {PanelArea} from "#shared/types/app/settings";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
+import PanelPulse from "~/components/LayoutComponents/PanelPulse.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels, type PanelPaneState} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
-import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
+import {PANEL_ACTIONS, PANEL_BUSY, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
  * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
@@ -28,15 +29,19 @@ const session = useActiveSessions().getSession(computed(() => $route.params.sess
 const panels = usePanels(session)
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 provide(PANEL_ACTIONS, props.actions)
+const busySlot = shallowRef<MaybeRefOrGetter<boolean>>()
+provide(PANEL_BUSY, busySlot)
+const busy = computed(() => !!toValue(busySlot.value))
 
 const strip = computed(() => panels.style.value === 'strip')
 const kbds = computed(() => panels.kbdsOf(props.area))
 const view = computed(() => panelViews.get(props.pane.active))
 const viewComponent = computed(() => panelViewComponent(props.pane.active))
 const actions = computed(() => toValue(props.actions.value) ?? [])
-// Strip: the name always (the strips hold no names). Buttons: only while there are actions, and the name only on the
-// right (the left list already names the view).
-const showBar = computed(() => (strip.value ? !props.inHeader : actions.value.length > 0))
+// Every pane has this row, whatever its view declares, so switching views doesn't move the view up or down: the
+// name (strips hold no names; in buttons style only on the right, the left list already names the view), the
+// pulse line, then the actions. The right side's first pane has it in the panel's header instead.
+const showBar = computed(() => !props.inHeader)
 const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
@@ -59,7 +64,7 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
                 @select="id => panels.select('bottom', id)"
             />
             <span v-if="view" class="ps-1 text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ t(view.label) }}</span>
-            <div class="grow" data-tauri-drag-region/>
+            <PanelPulse :active="busy"/>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'top' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>
@@ -98,7 +103,7 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
         </template>
         <div v-if="area !== 'bottom' && showBar" class="flex items-center gap-0.5 px-1 pb-1 min-h-7" data-tauri-drag-region>
             <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
-            <div class="grow" data-tauri-drag-region/>
+            <PanelPulse :active="busy"/>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>

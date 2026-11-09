@@ -1702,6 +1702,7 @@
 			"stageAll": "Stage all",
 			"unstageAll": "Unstage all",
 			"discard": "Discard changes",
+			"discardAll": "Discard all changes",
 			"openFile": "Open file",
 			"discardConfirm": {
 				"title": "Discard changes?",

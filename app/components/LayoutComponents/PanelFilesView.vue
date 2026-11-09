@@ -9,6 +9,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
+import {usePanelActions} from "~/utils/panelViews";
 
 /** The Files view: the workspace's file tree, with New note/folder/workflow on right-click. */
 const {t} = useI18n()
@@ -34,16 +35,20 @@ async function onClickFile(item: Partial<UITreeNode>) {
     await $navi.toWorkspaceTab(session?.uuid || '', openTab(item.uuid))
 }
 
-const newItem = (label: string, icon: string, options: { asFolder: boolean, fileExt?: string }): ContextMenuItem => ({
-    label: t(label),
-    icon,
-    onSelect: () => void overlay.create(NewFileModal, {destroyOnClose: true}).open({modalTitle: t(label), asLevel: 'same', ...options}),
-})
+type NewOptions = { asFolder: boolean, fileExt?: string }
+const openNew = (label: string, options: NewOptions) =>
+    void overlay.create(NewFileModal, {destroyOnClose: true}).open({modalTitle: t(label), asLevel: 'same', ...options})
+const newItem = (label: string, icon: string, options: NewOptions): ContextMenuItem => ({label: t(label), icon, onSelect: () => openNew(label, options)})
 const contextMenuItems: ContextMenuItem[][] = [[
     newItem('app.editor.ui.filetree.newMarkdownFile', 'i-lucide-file-plus', {asFolder: false, fileExt: 'md'}),
     newItem('app.editor.ui.filetree.newFolder', 'i-lucide-folder-dot', {asFolder: true}),
     newItem('app.editor.ui.filetree.newWorkflow', 'i-lucide-workflow', {asFolder: false, fileExt: 'workflow'}),
 ]]
+// Like Chats' New chat and New folder.
+usePanelActions(() => [
+    {id: 'newNote', label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', onSelect: () => openNew('app.editor.ui.filetree.newMarkdownFile', {asFolder: false, fileExt: 'md'})},
+    {id: 'newFolder', label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-folder-plus', onSelect: () => openNew('app.editor.ui.filetree.newFolder', {asFolder: true})},
+])
 </script>
 
 <template>

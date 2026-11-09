@@ -1702,6 +1702,7 @@
 			"stageAll": "全部暂存",
 			"unstageAll": "全部取消暂存",
 			"discard": "放弃更改",
+			"discardAll": "放弃所有更改",
 			"openFile": "打开文件",
 			"discardConfirm": {
 				"title": "放弃更改？",
