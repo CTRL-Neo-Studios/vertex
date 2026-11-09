@@ -7,6 +7,7 @@ import {sessionScope, StateKey} from "#shared/constants/app";
 import {isBasesFile} from "#shared/utils/fs/filenames";
 import {PANEL_AREAS, addPanelSeparator, addPanelSplit, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
+import {isGitRepo} from "~/composables/git/useGitRepo";
 
 /** What a view's `when` sees: the session window it would show in. */
 export interface PanelViewContext {
@@ -40,6 +41,11 @@ export interface PanelViewDef {
     when?: (ctx: PanelViewContext) => boolean
     /** Wrap it in the panel's fading scroll area (views that don't scroll on their own). */
     scroll?: boolean
+    /**
+     * It may open in a tab of its own (`ActiveTab.kind: 'view'`, id = view id) as well as in its pane, so it must work
+     * mounted twice at once.
+     */
+    tab?: boolean
     /** Keyboard hint on its button. */
     kbds?: (ctx: PanelActionContext) => string[] | undefined
 }
@@ -124,6 +130,12 @@ definePanelView({
     id: 'git', label: 'app.git.label', icon: 'i-lucide-git-branch', defaultArea: 'left',
     when: ctx => ctx.isWorkspace,
     component: () => import('~/components/Git/GitChangesView.vue'),
+})
+definePanelView({
+    id: 'gitHistory', label: 'app.git.history.label', icon: 'i-lucide-git-graph', defaultArea: 'bottom', tab: true,
+    // Only where there's a history, so a workspace without git doesn't get a bottom area for it.
+    when: ctx => ctx.isWorkspace && isGitRepo(ctx.session?.rootPath),
+    component: () => import('~/components/Git/GitHistoryView.vue'),
 })
 definePanelView({
     id: 'forelinks', label: 'app.editor.ui.forelinks', icon: 'i-lucide-square-arrow-out-up-right', defaultArea: 'right',

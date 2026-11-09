@@ -1668,7 +1668,10 @@
 				"right": "右侧",
 				"bottom": "底部",
 				"hidden": "已隐藏"
-			}
+			},
+			"openInTab": "在标签页中打开",
+			"moveToPanel": "移回面板",
+			"viewMissing": "此视图不可用。"
 		},
 		"git": {
 			"label": "Git",
@@ -1781,7 +1784,34 @@
 			"createRepo": "创建仓库",
 			"creating": "正在创建仓库…",
 			"syncChats": "同步聊天",
-			"syncChatsHint": "保存在此工作区的聊天是 git 无法合并的加密文件：两台设备修改同一个聊天时，需要选择保留其中一个版本。"
+			"syncChatsHint": "保存在此工作区的聊天是 git 无法合并的加密文件：两台设备修改同一个聊天时，需要选择保留其中一个版本。",
+			"diff": {
+				"openChanges": "查看更改",
+				"worktree": "工作区",
+				"staged": "已暂存",
+				"tabTitle": "{name}（{side}）",
+				"againstHead": "与上一次提交比较",
+				"againstParent": "与它之前的提交比较",
+				"added": "新文件",
+				"deleted": "已删除",
+				"renamed": "由 {path} 重命名",
+				"binary": "二进制文件",
+				"binaryHint": "没有可以比较的文本行。",
+				"noChanges": "文本没有更改",
+				"unchanged": "{count} 行未更改",
+				"loadFailed": "无法读取此文件的版本"
+			},
+			"history": {
+				"label": "历史",
+				"show": "历史：以图形显示所有提交",
+				"empty": "还没有提交",
+				"emptyHint": "提交你的更改后，这里就会出现历史。",
+				"files": "更改的文件",
+				"noFiles": "没有文件更改",
+				"parents": "父提交",
+				"copyId": "复制提交 ID",
+				"close": "关闭"
+			}
 		}
 	}
 }

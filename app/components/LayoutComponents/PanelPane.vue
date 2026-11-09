@@ -66,6 +66,9 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>
             <div :class="SEPARATOR" data-tauri-drag-region/>
+            <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'top' }">
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" icon="i-lucide-square-arrow-out-up-left" :aria-label="t('app.panels.openInTab')" @click="panels.openInTab(pane.active)"/>
+            </UTooltip>
             <slot name="trailing"/>
         </div>
         <template v-else-if="!strip">
@@ -105,6 +108,9 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
             </UTooltip>
             <div :class="SEPARATOR" data-tauri-drag-region/>
+            <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'bottom' }">
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" icon="i-lucide-square-arrow-out-up-left" :aria-label="t('app.panels.openInTab')" @click="panels.openInTab(pane.active)"/>
+            </UTooltip>
         </div>
         <!-- The view's box: views size themselves to it (`h-full`, `flex-1`). -->
         <div class="relative flex-1 min-h-0 flex flex-col">

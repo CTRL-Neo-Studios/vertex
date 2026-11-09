@@ -14,6 +14,27 @@ const IGNORED = ['.DS_Store', 'Thumbs.db', 'desktop.ini', '.vertex/trash/', '.ve
 /** Chats stored in the workspace: encrypted files git can't merge, so two devices changing one chat conflict. */
 const CHATS = '.vertex/chats/'
 
+/** Workspace roots known to be in a repository (with git to read it), for views that only make sense there. */
+const repoRoots = reactive(new Set<string>())
+export const isGitRepo = (root: string | undefined) => !!root && repoRoots.has(root)
+
+/**
+ * Keeps `isGitRepo` current for a workspace window: checked when it opens, and again when its `.git` folder comes or
+ * goes (a known repository's everyday writes there don't count). The Git view's own status keeps it current too.
+ */
+export function watchGitPresence(session: ActiveSession | undefined) {
+    const root = session?.rootPath
+    if (!root) return
+    const check = () => gitClient.status(root).then(() => void repoRoots.add(root), () => void repoRoots.delete(root))
+    void check()
+    const recheck = useDebounceFn(check, 500)
+    const gitDir = `${root}/.git`
+    onBeforeUnmount(useActiveWorkspaceIndex(session).on(event => {
+        if (event.type !== 'changed') return
+        if (event.paths.some(p => p === gitDir || (!repoRoots.has(root) && p.startsWith(`${gitDir}/`)))) void recheck()
+    }))
+}
+
 /**
  * A workspace's repository for the views that show it: its status, kept fresh from the watcher (the working copy and
  * `.git/` both), window focus and every operation; the operations, one at a time from here, each failure explained
@@ -43,11 +64,13 @@ export function useGitRepo(session: ActiveSession | undefined) {
                 try {
                     status.value = await gitClient.status(root)
                     problem.value = undefined
+                    repoRoots.add(root)
                 } catch (e) {
                     const error = String(e)
                     if (error === GitError.missing || error === GitError.notRepo) {
                         problem.value = error
                         status.value = undefined
+                        repoRoots.delete(root)
                     } else console.error('[git] status', error)
                 }
             } while (stale)

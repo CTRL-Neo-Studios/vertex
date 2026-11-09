@@ -86,30 +86,30 @@ Blocked by G1.
 Blocked by G2.
 
 ### Change
-- A file's diff opens as a tab: working copy vs last commit, staged vs last commit, or a commit vs its parent (G4).
-- Rendering reuses `ChatChanges`' line diff (`diff`), side by side when wide, unified when narrow; read-only.
-- From a Changes row: click opens the diff, a button opens the file.
+- A file's diff opens as a tab (`kind: 'diff'`, `GitDiffView`): working copy vs last commit (Changes rows), staged vs last commit (Staged rows), or a commit vs its first parent (G4). The tab id holds the whole spec (`diffTabId`, URL-safe), so the page renders from the route and the same diff reopens the same tab; diff tabs aren't restored after a relaunch.
+- `lineDiff` / `splitRows` (`shared/utils/textDiff.ts`, on `diff`): numbered lines, unchanged runs folded to 3 lines of context (click to unfold; unfolded stays open across reloads), a missing final newline ignored; side by side from 760 px, one column below; read-only; binary files (a NUL in the first 8000 characters) say so.
+- From a row: click (or Enter) opens the diff, Open file opens the note; a conflicted file opens itself, to fix its markers. Right-click: Open changes. The diff's header has the side, what it compares with, new / deleted / renamed, +/− counts and Open file.
 
 ### Acceptance
-- [ ] Modified, added, deleted and renamed files diff correctly; binary files say so.
-- [ ] The tab follows the file: a new edit updates the diff.
-- [ ] SMOKE row; en + zh-CN strings.
+- [ ] Modified, added, deleted and renamed files diff correctly; binary files say so. (Modified, new, staged and binary checked; deleted and renamed not yet.)
+- [x] The tab follows the file: a new edit updates the diff.
+- [x] SMOKE row; en + zh-CN strings.
 
 ## G4: History ("Git Map") (#52)
 
 Blocked by G1 and G3. Lands P5 (#48).
 
 ### Change
-- `definePanelView({id: 'gitHistory', defaultArea: 'bottom'})`.
-- Commit graph: lanes computed in TypeScript from parent ids; branch and tag labels; local vs remote tips, so ahead/behind is visible.
-- Paging through `git_log(skip, limit)` while scrolling.
-- Selecting a commit: message, author, date, changed files (`git_commit_files`), each opening a G3 diff.
-- P5: History opens as a tab too.
+- `definePanelView({id: 'gitHistory', defaultArea: 'bottom', tab: true})`, available only where the workspace is a git repository (`isGitRepo`, kept by `watchGitPresence`: checked when the window opens and when `.git` comes or goes), so other workspaces get no bottom area for it. The Git view's History button shows it in its panel (moving it out of Hidden if needed) or, failing that, in a tab.
+- Commit graph: `graphRows` (`shared/utils/gitGraph.ts`) lays out lanes from parent ids (a lane waits for the commit it leads to; parents another lane waits for are joined at once; lanes never move sideways); colored per lane, merge commits hollow, HEAD larger; branch, remote branch and tag badges (the current branch solid), so ahead/behind shows as separate tips.
+- Paging: `git_log` 300 at a time as the list nears its end; only the rows on screen are drawn (`useVirtualList`). It reloads (as many rows as are loaded) when the head, branch, upstream or ahead/behind change.
+- Selecting a commit: subject, body, author, date, copyable id, parents (click to select), changed files (`git_commit_files`), each opening a G3 diff against the first parent. Side by side from 720 px, stacked below.
+- P5 (#48): History opens as a tab too (see Concepts → Panels).
 
 ### Acceptance
-- [ ] A repository with merges draws without crossing lanes needlessly; 5 000 commits scroll smoothly.
-- [ ] Graph lane layout has unit tests (linear, branch, merge, octopus).
-- [ ] SMOKE row; Concepts doc; en + zh-CN strings.
+- [ ] A repository with merges draws without crossing lanes needlessly; 5 000 commits scroll smoothly. (Merges and branches checked; 5 000 laid out in 18 ms and 1 200 paged and scrolled; 5 000 not scrolled in the app.)
+- [x] Graph lane layout has unit tests (linear, branch, merge, octopus).
+- [x] SMOKE row; Concepts doc; en + zh-CN strings.
 
 ## G5: Setup and onboarding (#53)
 

@@ -175,6 +175,8 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
         openedChatIds: data?.openedChatIds || [],
         lastFocusedChatId: data?.lastFocusedChatId,
+        openedViewIds: panelViews(data?.openedViewIds, []),
+        lastFocusedViewId: isPanelViewId(data?.lastFocusedViewId) ? data.lastFocusedViewId : undefined,
         shownPanelViews: panelViews(data?.shownPanelViews, [data?.leftPanelView, data?.rightPanelView]),
         leftPanelCollapsed: data?.leftPanelCollapsed === true,
         rightPanelCollapsed: data?.rightPanelCollapsed !== false,

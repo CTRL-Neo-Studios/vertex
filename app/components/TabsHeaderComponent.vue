@@ -10,6 +10,8 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useChats} from "~/composables/ai/useChats";
+import {diffSpecOf, diffTitle} from "~/utils/gitDiff";
+import {panelViews} from "~/utils/panelViews";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -101,11 +103,13 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
     unref(tabs)?.forEach(i => {
         const node = getFileByUuid(i.fileUuid)
         const isChat = i.kind === 'chat'
+        const diff = i.kind === 'diff' ? diffSpecOf(i.fileUuid) : undefined
+        const view = i.kind === 'view' ? panelViews.get(i.fileUuid) : undefined
 
-        if (node || isChat) {
+        if (node || isChat || diff || view) {
             items[1]?.push({
-                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : node?.fileName,
-                icon: isChat ? 'i-lucide-message-square' : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : diff ? diffTitle(diff, t) : view ? t(view.label) : node?.fileName,
+                icon: isChat ? 'i-lucide-message-square' : diff ? 'i-lucide-git-compare' : view ? view.icon : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)

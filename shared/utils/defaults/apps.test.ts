@@ -47,6 +47,12 @@ describe('defaultAppSession', () => {
         expect(defaultAppSessionContext({shownPanelViews: ['files', 'split', 'plugin:view'], leftPanelView: 'chats'}).shownPanelViews).toEqual(['files', 'plugin:view'])
         expect(defaultAppSessionContext({}).shownPanelViews).toEqual([])
     })
+
+    it('keeps only well-formed view ids for view tabs', () => {
+        const context = defaultAppSessionContext({openedViewIds: ['gitHistory', 'split', '../x', 'plugin:view'], lastFocusedViewId: 'separator'})
+        expect([context.openedViewIds, context.lastFocusedViewId]).toEqual([['gitHistory', 'plugin:view'], undefined])
+        expect(defaultAppSessionContext({}).openedViewIds).toEqual([])
+    })
 })
 
 describe('defaultAppWorkflowConfig', () => {

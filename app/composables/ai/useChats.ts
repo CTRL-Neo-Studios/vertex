@@ -246,7 +246,7 @@ export function useChats(session?: ActiveSession) {
         sidePanelChatId.value = chatId
         // With the Chat view hidden the chat keeps its tab, and the note opens beside it.
         const beside = panels.showView('chat')
-        // The note's route first, then the chat's tab goes (see closeChatTab).
+        // The note's route first, then the chat's tab goes (see closeTabElsewhere).
         await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(noteId))
         if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
@@ -746,20 +746,8 @@ export function useChats(session?: ActiveSession) {
         await save(entry)
     }
 
-    /**
-     * Closes the chat's tab; if it was the shown one, shows the next (`closeTab`'s pick). The route moves first: a route
-     * left on a closed tab falls back to SessionTab, which sends the window to the empty page.
-     */
-    async function closeChatTab(id: string) {
-        if (!$tabs.isTabOpened(id)) return
-        if ($tabs.activeTabUuid.value === id) {
-            const list = $tabs.tabs.value
-            const at = list.findIndex(t => t.fileUuid === id)
-            const next = list[at + 1] ?? list[at - 1]
-            await $navi.toWorkspaceTab(session?.uuid, next && $tabs.openTab(next.fileUuid))
-        }
-        $tabs.closeTab(id)
-    }
+    /** Closes the chat's tab; if it was the shown one, shows the next (`closeTabElsewhere`). */
+    const closeChatTab = (id: string) => $tabs.closeTabElsewhere(id)
 
     function drop(ids: string[]) {
         for (const id of ids) {

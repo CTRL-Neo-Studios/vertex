@@ -1668,7 +1668,10 @@
 				"right": "Right side",
 				"bottom": "Bottom",
 				"hidden": "Hidden"
-			}
+			},
+			"openInTab": "Open in tab",
+			"moveToPanel": "Move to panel",
+			"viewMissing": "This view isn't available."
 		},
 		"git": {
 			"label": "Git",
@@ -1781,7 +1784,34 @@
 			"createRepo": "Create repository",
 			"creating": "Creating repository…",
 			"syncChats": "Sync chats",
-			"syncChatsHint": "Chats kept in this workspace are encrypted files git can't merge: when two devices change the same chat, you pick one version."
+			"syncChatsHint": "Chats kept in this workspace are encrypted files git can't merge: when two devices change the same chat, you pick one version.",
+			"diff": {
+				"openChanges": "Open changes",
+				"worktree": "Working tree",
+				"staged": "Staged",
+				"tabTitle": "{name} ({side})",
+				"againstHead": "Compared with the last commit",
+				"againstParent": "Compared with the commit before it",
+				"added": "New file",
+				"deleted": "Deleted",
+				"renamed": "Renamed from {path}",
+				"binary": "Binary file",
+				"binaryHint": "It has no lines to compare.",
+				"noChanges": "No changes in the text",
+				"unchanged": "{count} unchanged line(s)",
+				"loadFailed": "Couldn't read this file's versions"
+			},
+			"history": {
+				"label": "History",
+				"show": "History: every commit, as a graph",
+				"empty": "No commits yet",
+				"emptyHint": "Commit your changes to start the history.",
+				"files": "Changed files",
+				"noFiles": "No file changes",
+				"parents": "Parents",
+				"copyId": "Copy commit id",
+				"close": "Close"
+			}
 		}
 	}
 }

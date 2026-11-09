@@ -9,6 +9,10 @@ export interface AppSessionContext {
     openedChatIds?: string[],
     /** Set instead of `lastFocusedFilePath` when the focused tab was a chat. */
     lastFocusedChatId?: string,
+    /** Panel views open in tabs (`ActiveTab.kind: 'view'`), reopened after the chats. */
+    openedViewIds?: PanelViewId[],
+    /** Set instead of `lastFocusedFilePath` when the focused tab was a view. */
+    lastFocusedViewId?: PanelViewId,
     /** The view each panel pane shows: a pane shows the first of its views listed here, else its first view. */
     shownPanelViews?: PanelViewId[],
     /** Whether each side panel is collapsed (the right one is, unless saved open), and the bottom area (to its header). */

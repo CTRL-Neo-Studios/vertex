@@ -6,6 +6,7 @@ import {panelSlotMenu, panelViews, withRegisteredViews, type PanelActionContext,
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
@@ -50,7 +51,7 @@ export function usePanels(session?: ActiveSession) {
     const settings = useSettingsScope()
     const {config, save: saveSettings} = useAppSettings()
     const layouts = useActiveLayouts(session)
-    const {activeTabUuid} = useActiveTabs(session)
+    const {activeTabUuid, openTab, closeTabElsewhere} = useActiveTabs(session)
     const {getFileByUuid} = useActiveWorkspaceIndex(session)
 
     const panels = computed(() => settings.effective.value?.viewConfig.panels ?? {style: 'buttons' as const, ...DEFAULT_PANEL_LAYOUT})
@@ -139,6 +140,25 @@ export function usePanels(session?: ActiveSession) {
         return true
     }
 
+    /** Like `showView`, but a hidden view first moves to the end of its `defaultArea` (when it has one). */
+    async function placeView(id: PanelViewId) {
+        if (showView(id)) return true
+        const area = panelViews.get(id)?.defaultArea
+        const index = layout.value.hidden.indexOf(id)
+        if (!area || area === 'hidden' || index === -1 || !available(id)) return false
+        await move({list: 'hidden', index}, {list: area, index: layout.value[area].length})
+        await nextTick()
+        return showView(id)
+    }
+
+    /** Opens view `id` (a `tab` view) in a tab of its own; it stays in its pane too. */
+    const openInTab = (id: PanelViewId) => useAppNavigator().toWorkspaceTab(session?.uuid, openTab(id, 'view'))
+
+    /** From its tab back to its panel: shows it there, then closes the tab. Keeps the tab when it can't show here. */
+    async function moveToPanel(id: PanelViewId) {
+        if (await placeView(id)) await closeTabElsewhere(id)
+    }
+
     /** The arrangement as `next`: in the workspace when it already overrides it, else in the global settings. */
     async function save(next: PanelLayout) {
         const patch = {[LAYOUT_PATHS[0]]: next.left, [LAYOUT_PATHS[1]]: next.right, [LAYOUT_PATHS[2]]: next.bottom, [LAYOUT_PATHS[3]]: next.hidden}
@@ -161,5 +181,5 @@ export function usePanels(session?: ActiveSession) {
     const slotMenu = (area: PanelArea, index?: number, pane?: PanelPaneState) =>
         panelSlotMenu({layout: layout.value, list: area, index, shown: areas.value[area].slots.map(s => s.index), splitBefore: pane?.splitBefore, save, reset, t})
 
-    return {style, layout, areas, available, kbdsOf, select, toggle, showView, move, slotMenu}
+    return {style, layout, areas, available, kbdsOf, select, toggle, showView, placeView, openInTab, moveToPanel, move, slotMenu}
 }

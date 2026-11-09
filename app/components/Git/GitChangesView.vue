@@ -12,7 +12,10 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {isStaged, isUnstaged, useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
+import {diffTabId} from "~/utils/gitDiff";
+import {GIT_STATES} from "~/utils/gitStates";
 import {usePanelActions} from "~/utils/panelViews";
+import {usePanels} from "~/composables/active/usePanels";
 
 /** The Git view: the branch, Sync, what changed (staged and not), and the commit box. */
 const {t} = useI18n()
@@ -24,6 +27,12 @@ const {getFileByPath} = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
 const git = useGitRepo(session)
 const {status, problem, busy} = git
+const panels = usePanels(session)
+
+/** History: in its panel (placed there if it was hidden), else in a tab. */
+async function showHistory() {
+    if (!await panels.placeView('gitHistory')) await panels.openInTab('gitHistory')
+}
 
 const staged = computed(() => status.value?.files.filter(isStaged) ?? [])
 const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
@@ -47,21 +56,11 @@ usePanelActions(() => {
         {id: 'pull', label: t('app.git.pull'), icon: 'i-lucide-arrow-down-to-line', onSelect: git.pull, disabled},
         {id: 'push', label: t('app.git.push'), icon: 'i-lucide-arrow-up-from-line', onSelect: git.push, disabled},
         refresh,
+        {id: 'history', label: t('app.git.history.show'), icon: 'i-lucide-git-graph', onSelect: showHistory},
     ]
 })
 
-const STATES: Record<GitState, { key: string, color: string }> = {
-    '.': {key: 'unchanged', color: 'text-muted'},
-    'M': {key: 'modified', color: 'text-warning'},
-    'A': {key: 'added', color: 'text-success'},
-    'D': {key: 'deleted', color: 'text-error'},
-    'R': {key: 'renamed', color: 'text-info'},
-    'C': {key: 'copied', color: 'text-success'},
-    'T': {key: 'typeChanged', color: 'text-warning'},
-    'U': {key: 'conflicted', color: 'text-error'},
-    '?': {key: 'untracked', color: 'text-success'},
-}
-const stateOf = (letter: GitState) => STATES[letter]
+const stateOf = (letter: GitState) => GIT_STATES[letter]
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0))
 
@@ -112,6 +111,16 @@ const sections = computed(() => {
 })
 type Section = (typeof sections.value)[number]
 
+/** A row opens its changes in a diff tab (Staged: the index; Changes: the disk); a conflicted file opens itself, to fix. */
+async function openChanges(section: Section, file: GitFile) {
+    const current = status.value
+    if (file.conflicted) return open(file)
+    if (!current || !session) return
+    const side = section.id === 'staged' ? 'staged' : 'worktree'
+    const spec = {top: current.top, path: file.path, side, ...(file.origPath ? {origPath: file.origPath} : {})}
+    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'diff'))
+}
+
 /** Gone from the disk: nothing to open or reveal. */
 const deleted = (file: GitFile) => file.worktree === 'D' || (file.index === 'D' && file.worktree === '.')
 const fullPathOf = (file: GitFile) => `${status.value?.top}/${file.path}`
@@ -127,6 +136,7 @@ function fileMenu(section: Section, file: GitFile): ContextMenuItem[][] {
         ]
     return [
         [
+            {label: t('app.git.diff.openChanges'), icon: 'i-lucide-git-compare', onSelect: () => void openChanges(section, file)},
             {label: t('app.git.openFile'), icon: 'i-lucide-file-text', disabled: !indexed(file), onSelect: () => void open(file)},
             {label: t('app.editor.ui.openInDefaultApp'), icon: 'i-lucide-square-arrow-out-up-right', disabled: deleted(file), onSelect: () => void openFileWithDefaultApp(fullPathOf(file))},
         ],
@@ -246,7 +256,18 @@ const mergeActions = computed(() => [{
             </template>
         </UEmpty>
         <template v-else-if="status">
-            <div class="px-2 pt-2 pb-1 flex flex-col gap-2">
+            <div class="px-2 pt-2 pb-1 flex flex-col gap-1.5">
+                <UTooltip :text="t('app.git.syncHint')">
+                    <UButton
+                        block
+                        size="sm"
+                        icon="i-lucide-refresh-cw"
+                        :loading="!!busy"
+                        :label="busy ?? t('app.git.sync')"
+                        :disabled="!idle || status.merging"
+                        @click="sync"
+                    />
+                </UTooltip>
                 <div class="flex items-center gap-1 min-w-0">
                     <UPopover v-model:open="branchOpen" :content="{ align: 'start' }">
                         <UButton
@@ -275,9 +296,9 @@ const mergeActions = computed(() => [{
                         v-if="status.upstream"
                         :text="t('app.git.aheadBehind', { ahead: status.ahead, behind: status.behind, upstream: status.upstream })"
                     >
-                        <span class="ms-auto shrink-0 flex items-center gap-1.5 text-xs text-muted tabular-nums">
-                            <span class="flex items-center"><UIcon name="i-lucide-arrow-up" class="size-3.5"/>{{ status.ahead }}</span>
-                            <span class="flex items-center"><UIcon name="i-lucide-arrow-down" class="size-3.5"/>{{ status.behind }}</span>
+                        <span class="ms-auto shrink-0 flex items-center gap-2 pe-1.5 text-xs text-muted tabular-nums">
+                            <span class="flex items-center gap-0.5"><UIcon name="i-lucide-arrow-up" class="size-4"/>{{ status.ahead }}</span>
+                            <span class="flex items-center gap-0.5"><UIcon name="i-lucide-arrow-down" class="size-4"/>{{ status.behind }}</span>
                         </span>
                     </UTooltip>
                 </div>
@@ -290,17 +311,6 @@ const mergeActions = computed(() => [{
                     :description="t('app.git.merging.description')"
                     :actions="mergeActions"
                 />
-                <UTooltip :text="t('app.git.syncHint')">
-                    <UButton
-                        block
-                        size="sm"
-                        icon="i-lucide-refresh-cw"
-                        :loading="!!busy"
-                        :label="busy ?? t('app.git.sync')"
-                        :disabled="!idle || status.merging"
-                        @click="sync"
-                    />
-                </UTooltip>
             </div>
             <div ref="listEl" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]">
                 <UEmpty
@@ -337,10 +347,10 @@ const mergeActions = computed(() => [{
                     <UContextMenu v-for="file in section.files" :key="file.path" :items="fileMenu(section, file)" size="sm">
                         <div
                             :data-git-file="file.path"
-                            :class="['group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm hover:bg-elevated/60 focus-within:bg-elevated/60 data-[state=open]:bg-elevated/60 outline-none', indexed(file) ? 'cursor-pointer' : 'cursor-default']"
+                            class="group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm cursor-pointer hover:bg-elevated/60 focus-within:bg-elevated/60 data-[state=open]:bg-elevated/60 outline-none"
                             tabindex="0"
-                            @click="open(file)"
-                            @keydown.enter.self="open(file)"
+                            @click="openChanges(section, file)"
+                            @keydown.enter.self="openChanges(section, file)"
                         >
                             <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(file.path) }}</span>
                             <span class="truncate text-xs text-dimmed">{{ dirOf(file.path) }}</span>

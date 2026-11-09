@@ -2,6 +2,8 @@
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import ChatView from "~/components/Chat/ChatView.vue";
+import GitDiffView from "~/components/Git/GitDiffView.vue";
+import PanelViewTab from "~/components/LayoutComponents/PanelViewTab.vue";
 
 // Keyed by tab so switching tabs remounts the editor with fresh state.
 definePageMeta({
@@ -11,12 +13,20 @@ definePageMeta({
 const $route = useRoute()
 const tabId = computed(() => $route.params.tabId as string)
 const {getActiveTab} = useActiveTabs(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+// A chat, a diff or a view sits absolutely, so it fills the panel body without adding to its height (it'd grow past
+// the window).
+const kind = computed(() => getActiveTab(tabId.value)?.kind)
 </script>
 
 <template>
-    <div v-if="getActiveTab(tabId)?.kind === 'chat'" class="absolute inset-0 flex flex-col">
-        <!-- Absolute, so the chat fills the panel body without adding to its height (it would grow past the window). -->
+    <div v-if="kind === 'chat'" class="absolute inset-0 flex flex-col">
         <ChatView :key="tabId" :chat-id="tabId"/>
+    </div>
+    <div v-else-if="kind === 'diff'" class="absolute inset-0 flex flex-col">
+        <GitDiffView :key="tabId" :tab-id="tabId"/>
+    </div>
+    <div v-else-if="kind === 'view'" class="absolute inset-0 flex flex-col">
+        <PanelViewTab :key="tabId" :view-id="tabId"/>
     </div>
     <SessionTab v-else :key="tabId"/>
 </template>
