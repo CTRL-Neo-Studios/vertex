@@ -1,55 +1,48 @@
 <script setup lang="ts">
-import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import type {PanelSide} from "#shared/types/app/settings";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import WorkspaceSwitcher from "~/components/WorkspaceSwitcher.vue";
 import SidebarCollapserButton from "~/components/SidebarCollapserButton.vue";
 import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
-import PanelFilesView from "~/components/LayoutComponents/PanelFilesView.vue";
-import ChatsPanel from "~/components/Chat/ChatsPanel.vue";
-import ChatView from "~/components/Chat/ChatView.vue";
-import ReferenceForelinksListComponent from "~/components/ReferenceForelinksListComponent.vue";
-import ReferenceBacklinksListComponent from "~/components/ReferenceBacklinksListComponent.vue";
-import WritersInfoPanelComponent from "~/components/WritersInfoPanelComponent.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
-import {useChats} from "~/composables/ai/useChats";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {PANEL_VIEW_INFO} from "~/utils/panelViews";
+import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
- * One side panel (left or right): the view its side shows (see `usePanels`). With the `buttons` style it holds that
- * side's view buttons (a list on the left, icons in the header on the right); with `strip`, the strip at the window's
- * edge does, and the header shows the view's name. The left one's header holds the workspace switcher.
+ * One side panel (left or right): the view its side shows (see `usePanels`), drawn from the view registry
+ * (`app/utils/panelViews.ts`). With the `buttons` style it holds that side's view buttons (a list on the left, icons
+ * in the header on the right); with `strip`, the strip at the window's edge does, and the header shows the view's
+ * name. The left one's header holds the workspace switcher.
  */
 const props = defineProps<{ side: PanelSide }>()
-const emit = defineEmits<{ 'to-toc': [value: Heading] }>()
 
 const {t} = useI18n()
-const $qt = useQuickToasts()
 const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const panels = usePanels(session)
-const {sidePanelChatId, createChat, showInSidePanel} = useChats(session)
 // One drag state for the window, so a slot can go from one list to another.
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
 
 const state = computed(() => panels.sides.value[props.side])
 const strip = computed(() => panels.style.value === 'strip')
-const searchKbds = computed(() => state.value.active === 'chats' ? undefined : {search: ['meta', 'p']})
+const kbds = computed(() => panels.kbdsOf(props.side))
+const view = computed(() => (state.value.active ? panelViews.get(state.value.active) : undefined))
+const viewComponent = computed(() => panelViewComponent(state.value.active))
+const viewLabel = computed(() => (view.value ? t(view.value.label) : ''))
+
+// The shown view's header actions (`usePanelActions`).
+const actionsSlot = shallowRef<MaybeRefOrGetter<PanelViewAction[]>>()
+provide(PANEL_ACTIONS, actionsSlot)
+const actions = computed(() => toValue(actionsSlot.value) ?? [])
+// A row under the header with the view's name and actions: always for the left strip style (the name has nowhere
+// else to go), otherwise only when there are actions. The left button list already names the view.
+const showBar = computed(() => (props.side === 'left' ? strip.value || actions.value.length > 0 : !strip.value && actions.value.length > 0))
+const barLabel = computed(() => (props.side === 'left' && !strip.value ? '' : viewLabel.value))
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
 const isScrolled = computed(() => scrollY.value > 2)
-
-async function newSidePanelChat() {
-    try {
-        showInSidePanel((await createChat()).id)
-    } catch (e) {
-        $qt.error(t('app.chat.actionFailed'), e instanceof Error ? e.message : String(e))
-    }
-}
 </script>
 
 <template>
@@ -87,8 +80,13 @@ async function newSidePanelChat() {
                 </template>
                 <template v-else>
                     <SidebarCollapserButton v-if="!strip" side="right"/>
-                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ t(PANEL_VIEW_INFO[state.active!].label) }}</span>
+                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ viewLabel }}</span>
                     <div class="grow" data-tauri-drag-region/>
+                    <template v-if="strip">
+                        <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
+                            <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                        </UTooltip>
+                    </template>
                     <PanelButtons
                         v-if="!strip"
                         list="right"
@@ -99,7 +97,7 @@ async function newSidePanelChat() {
                         open
                         :drag
                         :menu="index => panels.slotMenu('right', index)"
-                        :kbds="searchKbds"
+                        :kbds
                         @select="id => panels.select('right', id)"
                     />
                 </template>
@@ -115,43 +113,30 @@ async function newSidePanelChat() {
                 open
                 :drag
                 :menu="index => panels.slotMenu('left', index)"
-                :kbds="searchKbds"
+                :kbds
                 @select="id => panels.select('left', id)"
             />
-            <div v-else-if="side === 'left'" class="px-3 pb-1 text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ t(PANEL_VIEW_INFO[state.active!].label) }}</div>
+            <div v-if="showBar" class="flex items-center gap-0.5 px-3 pb-1 min-h-7" data-tauri-drag-region>
+                <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
+                <div class="grow" data-tauri-drag-region/>
+                <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
+                    <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                </UTooltip>
+            </div>
         </template>
         <template #default>
-            <PanelFilesView v-if="state.active === 'files'"/>
-            <ChatsPanel v-else-if="state.active === 'chats'"/>
-            <template v-else-if="state.active === 'chat'">
-                <!-- `min-h-0` with the chat's `h-full`, so the messages scroll inside the panel and the prompt stays at the bottom. -->
-                <div v-if="sidePanelChatId" class="relative flex-1 min-h-0">
-                    <ChatView :key="sidePanelChatId" :chat-id="sidePanelChatId" in-side-panel/>
-                </div>
-                <UEmpty
-                    v-else
-                    class="my-auto"
-                    variant="naked"
-                    size="sm"
-                    icon="i-lucide-message-square"
-                    :title="$t('app.chat.noSidePanelChat')"
-                    :actions="[{ label: $t('app.chat.newChat'), icon: 'i-lucide-message-square-plus', size: 'sm', onClick: newSidePanelChat }]"
-                />
-            </template>
             <UScrollArea
-                v-else
+                v-if="view?.scroll"
                 ref="scrollAreaRef"
                 orientation="vertical"
                 :class="['no-scrollbar h-full relative scroll-fade', isScrolled && 'is-scrolled']"
                 data-tauri-drag-region
             >
                 <div class="w-full">
-                    <ReferenceForelinksListComponent v-if="state.active === 'forelinks'" class="w-full h-full mt-2"/>
-                    <ReferenceBacklinksListComponent v-else-if="state.active === 'backlinks'" class="w-full h-full mt-2"/>
-                    <WritersInfoPanelComponent v-else-if="state.active === 'writersTools'" class="w-full h-full mt-2"/>
-                    <TableOfContentsPanelComponent v-else-if="state.active === 'toc'" class="w-full h-full mt-2" @to-toc="(entry: Heading) => emit('to-toc', entry)"/>
+                    <component :is="viewComponent" class="w-full h-full mt-2"/>
                 </div>
             </UScrollArea>
+            <component :is="viewComponent" v-else-if="viewComponent"/>
         </template>
     </UDashboardSidebar>
 </template>

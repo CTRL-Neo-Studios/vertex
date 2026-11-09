@@ -1,9 +1,9 @@
-import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, PanelViewId, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
-import {normalizePanelLayout, PANEL_VIEWS} from "#shared/utils/panelLayout";
+import {isPanelViewId, normalizePanelLayout} from "#shared/utils/panelLayout";
 import {sanitizeModelParams} from "#shared/utils/aiParams";
 import type {DeepPartial} from "#shared/types/types";
 
@@ -152,7 +152,7 @@ export function defaultAppSession(data?: LegacySession): AppSession {
     } satisfies AppSession
 }
 
-const panelView = (value: unknown) => PANEL_VIEWS.includes(value as PanelViewId) ? value as PanelViewId : undefined
+const panelView = (value: unknown) => isPanelViewId(value) ? value : undefined
 
 /** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
 export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {

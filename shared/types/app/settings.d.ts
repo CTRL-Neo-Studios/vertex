@@ -75,8 +75,11 @@ export interface AppViewConfig {
 
 export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
 
-/** A view a side panel can show; `search` is an action (it opens a search) rather than a view. */
-export type PanelViewId = 'files' | 'chats' | 'search' | 'forelinks' | 'backlinks' | 'writersTools' | 'toc' | 'chat'
+/**
+ * A view a side panel can show, as registered in `app/utils/panelViews.ts`; `search` is an action (it opens a search)
+ * rather than a view. Any well-formed id is kept in a saved layout (`isPanelViewId`), registered or not.
+ */
+export type PanelViewId = string
 export type PanelSlot = PanelViewId | 'separator'
 export type PanelSide = 'left' | 'right'
 

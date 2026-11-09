@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -80,22 +79,18 @@ onBeforeUnmount(async () => {
     $editorDispatcher.dispatcher.unmount()
     $sesh.removeSession($sessionId)
 })
-
-function toToc({from}: Heading) {
-    $editorDispatcher.emitToTocEntry({from, verticalMargin: 70, verticalScrollStrategy: 'start'})
-}
 </script>
 
 <template>
     <UDashboardGroup class="w-full h-full transition-colors duration-200" unit="rem">
         <PanelStrip v-if="panels.style.value === 'strip'" side="left"/>
-        <DashboardSidePanel side="left" @to-toc="toToc"/>
+        <DashboardSidePanel side="left"/>
         <WorkspaceCommandPalette v-if="isWorkspace"/>
         <UDashboardSearch v-else shortcut="meta_p"/>
         <DashboardCenterPanel>
             <slot/>
         </DashboardCenterPanel>
-        <DashboardSidePanel side="right" @to-toc="toToc"/>
+        <DashboardSidePanel side="right"/>
         <PanelStrip v-if="panels.style.value === 'strip'" side="right"/>
     </UDashboardGroup>
 </template>

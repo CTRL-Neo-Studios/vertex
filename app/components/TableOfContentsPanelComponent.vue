@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useTabOutline} from "~/composables/active/editor/useActiveEditorExtensions";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 
 const {t} = useI18n()
 const $route = useRoute()
 const $sessionId = computed<string>(() => $route.params.sessionId as string), $tabId = computed<string>(() => $route.params.tabId as string)
-const {outline: toc, activeHeading} = useTabOutline(useActiveSessions().getSession($sessionId), $tabId)
-const emit = defineEmits<{
-    (e: 'to-toc', value: Heading): void
-}>()
+const session = useActiveSessions().getSession($sessionId)
+const {outline: toc, activeHeading} = useTabOutline(session, $tabId)
+const {emitToTocEntry} = useActiveEditorDispatcher(session)
 
+const toHeading = ({from}: Heading) => emitToTocEntry({from, verticalMargin: 70, verticalScrollStrategy: 'start'})
 </script>
 
 <template>
@@ -24,7 +25,7 @@ const emit = defineEmits<{
                         size="sm"
                         :label="item.text"
                         :icon="`i-lucide-heading-${item.level}`"
-                        @click="() => emit('to-toc', item)"
+                        @click="toHeading(item)"
                     />
                 </UTooltip>
             </div>

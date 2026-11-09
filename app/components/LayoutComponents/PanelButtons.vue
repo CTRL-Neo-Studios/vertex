@@ -3,13 +3,13 @@ import type {ContextMenuItem} from "@nuxt/ui";
 import type {PanelSlot, PanelViewId} from "#shared/types/app/settings";
 import type {PanelList} from "#shared/utils/panelLayout";
 import type {PanelDrag} from "~/composables/utility/usePanelDrag";
-import {PANEL_VIEW_INFO} from "~/utils/panelViews";
+import {panelViews} from "~/utils/panelViews";
 
 /**
  * One list of panel view buttons, in one of three looks: `list` (labelled rows: the left panel's buttons, and the
  * Settings editor), `pills` (icons in the right panel's header) or `strip` (icons at a window edge). Buttons and
  * separators drag (`drag`, shared by the lists that trade slots) and have a right-click menu (`menu`, by the slot's
- * index in its list; none for the empty space).
+ * index in its list; none for the empty space). `slots` holds registered views only (and separators).
  */
 const props = defineProps<{
     list: PanelList
@@ -40,6 +40,7 @@ const lineBefore = (k: number) => dropIndex.value !== undefined && dropIndex.val
 const lineAtEnd = computed(() => dropIndex.value !== undefined && (!props.slots.length || dropIndex.value > props.slots.at(-1)!.index))
 
 const isActive = (id: PanelViewId) => props.active === id && (props.variant !== 'strip' || props.open)
+const view = (id: PanelViewId) => panelViews.get(id)!
 const tooltipSide = computed(() => props.variant === 'strip' ? (props.list === 'left' ? 'right' : 'left') : 'bottom')
 const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
 </script>
@@ -70,16 +71,16 @@ const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
                 >
                     <div :class="['bg-accented', variant === 'pills' ? 'w-px h-4' : variant === 'strip' ? 'h-px w-6' : 'h-px w-full']"/>
                 </div>
-                <UTooltip v-else :text="t(PANEL_VIEW_INFO[s.slot].label)" :kbds="kbds?.[s.slot]" :content="{ side: tooltipSide }" :disabled="variant === 'list'">
+                <UTooltip v-else :text="t(view(s.slot).label)" :kbds="kbds?.[s.slot]" :content="{ side: tooltipSide }" :disabled="variant === 'list'">
                     <UButton
                         :data-panel-slot="`${list}:${s.index}`"
                         draggable="true"
                         color="neutral"
                         variant="ghost"
                         :size="variant === 'strip' ? 'md' : variant === 'pills' ? 'xs' : 'md'"
-                        :icon="PANEL_VIEW_INFO[s.slot].icon"
-                        :label="variant === 'list' ? t(PANEL_VIEW_INFO[s.slot].label) : undefined"
-                        :aria-label="t(PANEL_VIEW_INFO[s.slot].label)"
+                        :icon="view(s.slot).icon"
+                        :label="variant === 'list' ? t(view(s.slot).label) : undefined"
+                        :aria-label="t(view(s.slot).label)"
                         :aria-pressed="isActive(s.slot)"
                         :block="variant === 'list'"
                         :class="[

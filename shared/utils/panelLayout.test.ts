@@ -1,22 +1,44 @@
 import {describe, expect, it} from "vitest";
-import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, movePanelSlot, normalizePanelLayout} from "./panelLayout";
+import {DEFAULT_PANEL_LAYOUT, addPanelSeparator, isPanelViewId, movePanelSlot, normalizePanelLayout, placeMissingViews} from "./panelLayout";
 
 describe('normalizePanelLayout', () => {
-    it('gives today\'s arrangement for nothing stored', () => {
+    it('gives the stock arrangement for nothing stored', () => {
         expect(normalizePanelLayout()).toEqual(DEFAULT_PANEL_LAYOUT)
     })
 
-    it('drops unknown ids, keeps a view where it first appears (hidden wins), and tidies separators', () => {
+    it('keeps unknown ids in place, drops malformed ones, keeps a view where it first appears (hidden wins), and tidies separators', () => {
         expect(normalizePanelLayout({
-            left: ['separator', 'chat', 'nope', 'separator', 'separator', 'files', 'toc', 'separator'],
-            right: ['files', 'forelinks'],
-            hidden: ['toc', 'toc', 'bogus'],
+            left: ['separator', 'chat', 'plugin:view', 'separator', 'separator', 'files', 'toc', 'separator'],
+            right: ['files', 42, '', 'has space', '../up', 'separator', 'forelinks'],
+            hidden: ['toc', 'toc', 'gone'],
         })).toEqual({
-            // Missing views go back to the end of their default side.
-            left: ['chat', 'separator', 'files', 'chats', 'search'],
+            // Missing built-in views go back to the end of their stock side.
+            left: ['chat', 'plugin:view', 'separator', 'files', 'chats', 'search'],
             right: ['forelinks', 'backlinks', 'writersTools'],
-            hidden: ['toc'],
+            hidden: ['toc', 'gone'],
         })
+    })
+
+    it('never takes a slot keyword as a view id', () => {
+        expect(isPanelViewId('separator')).toBe(false)
+        expect(isPanelViewId('writersTools')).toBe(true)
+    })
+})
+
+describe('placeMissingViews', () => {
+    it('adds views the layout lacks at the end of their default list, in order, and leaves held ones alone', () => {
+        const placed = placeMissingViews(DEFAULT_PANEL_LAYOUT, [
+            {id: 'files', defaultArea: 'right'},
+            {id: 'git', defaultArea: 'left'},
+            {id: 'graph', defaultArea: 'hidden'},
+            {id: 'log', defaultArea: 'left'},
+        ])
+        expect(placed).toEqual({...DEFAULT_PANEL_LAYOUT, left: ['files', 'chats', 'search', 'git', 'log'], hidden: ['graph']})
+    })
+
+    it('counts a hidden view as held', () => {
+        const layout = {...DEFAULT_PANEL_LAYOUT, hidden: ['git']}
+        expect(placeMissingViews(layout, [{id: 'git', defaultArea: 'left'}])).toBe(layout)
     })
 })
 

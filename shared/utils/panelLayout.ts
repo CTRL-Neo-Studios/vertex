@@ -1,8 +1,10 @@
 import type {PanelLayout, PanelSide, PanelSlot, PanelViewId} from "#shared/types/app/settings";
 
-export const PANEL_VIEWS: readonly PanelViewId[] = ['files', 'chats', 'search', 'forelinks', 'backlinks', 'writersTools', 'toc', 'chat']
-
-/** Today's arrangement, and where a view goes back to when it's missing from a saved one. */
+/**
+ * The built-in views' stock arrangement: the settings' default, and where a built-in view goes back to when it's
+ * missing from a saved layout. Views that aren't in it (new ones, plugins later) are placed by their registry
+ * entry's `defaultArea` (`placeMissingViews`).
+ */
 export const DEFAULT_PANEL_LAYOUT: Readonly<PanelLayout> = {
     left: ['files', 'chats', 'search'],
     right: ['forelinks', 'backlinks', 'writersTools', 'toc', 'chat'],
@@ -17,7 +19,9 @@ export interface PanelSlotRef {
     index: number
 }
 
-const isView = (v: unknown): v is PanelViewId => PANEL_VIEWS.includes(v as PanelViewId)
+/** A view id worth keeping in a stored layout: a word, optionally namespaced (`plugin:view`); never a slot keyword. */
+export const isPanelViewId = (v: unknown): v is PanelViewId =>
+    typeof v === 'string' && v !== 'separator' && /^[A-Za-z][\w.:-]{0,63}$/.test(v)
 
 /** No separator at either end or next to another; `slotOf` reads the slot from a wrapped item. */
 export function tidySlots<T>(items: T[], slotOf: (item: T) => PanelSlot = item => item as PanelSlot): T[] {
@@ -28,21 +32,31 @@ export function tidySlots<T>(items: T[], slotOf: (item: T) => PanelSlot = item =
 }
 
 /**
- * A stored layout as a valid one: unknown entries go; each view is kept where it first appears (hidden first, then
- * left, then right); separators are tidied; views missing from it (new ones) go to the end of their default side.
+ * A stored layout as a valid one: malformed entries go; each view is kept where it first appears (hidden first, then
+ * left, then right), whether or not it's registered, so a view missing for a while keeps its place; separators are
+ * tidied; built-in views missing from it go to the end of their stock side.
  */
 export function normalizePanelLayout(data?: Partial<Record<keyof PanelLayout, unknown>>): PanelLayout {
     const seen = new Set<PanelViewId>()
-    const take = (v: unknown): v is PanelViewId => isView(v) && !seen.has(v) && !!seen.add(v)
+    const take = (v: unknown): v is PanelViewId => isPanelViewId(v) && !seen.has(v) && !!seen.add(v)
     const list = (value: unknown) => Array.isArray(value) ? value : []
     const hidden = list(data?.hidden).filter(take)
     const side = (value: unknown) => tidySlots(list(value).filter((v): v is PanelSlot => v === 'separator' || take(v)))
     const layout: PanelLayout = {left: side(data?.left), right: side(data?.right), hidden}
-    for (const id of PANEL_VIEWS) {
-        if (seen.has(id)) continue
-        layout[DEFAULT_PANEL_LAYOUT.left.includes(id) ? 'left' : 'right'].push(id)
+    for (const list of ['left', 'right'] as const) {
+        for (const id of DEFAULT_PANEL_LAYOUT[list]) if (id !== 'separator' && !seen.has(id)) layout[list].push(id)
     }
     return {left: tidySlots(layout.left), right: tidySlots(layout.right), hidden}
+}
+
+/** `layout` with each of `views` it doesn't hold, at the end of the view's default list; unchanged when it holds them all. */
+export function placeMissingViews(layout: PanelLayout, views: Iterable<{ id: PanelViewId, defaultArea: PanelList }>): PanelLayout {
+    const has = new Set([...layout.left, ...layout.right, ...layout.hidden])
+    const missing = [...views].filter(v => !has.has(v.id))
+    if (!missing.length) return layout
+    const next: PanelLayout = {left: [...layout.left], right: [...layout.right], hidden: [...layout.hidden]}
+    for (const view of missing) next[view.defaultArea].push(view.id)
+    return next
 }
 
 /** Moves a slot (a view or a separator) to another place, in its list or another; a separator dropped on `hidden` goes. */
