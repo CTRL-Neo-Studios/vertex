@@ -10,14 +10,14 @@ export function useActiveTabs(session?: ActiveSession) {
     const activeTabUuid = useState<string | null>(StateKey.activeTab(scope), () => null);
 
     /**
-     * Opens a new tab for a given file UUID.
+     * Opens a new tab for a given file UUID (or chat id, with `kind` `'chat'`).
      * If the tab is already open, it just makes it active.
      */
-    function openTab(fileUuidRef: PossiblyRef<string>) {
+    function openTab(fileUuidRef: PossiblyRef<string>, kind?: ActiveTab['kind']) {
         const fileUuid = unref(fileUuidRef)
         const existingTab = unref(tabs).find(t => t.fileUuid === fileUuid);
         if (!existingTab) {
-            tabs.value.push(defaultActiveTab({ fileUuid: fileUuid, changesSaved: true }));
+            tabs.value.push(defaultActiveTab({ fileUuid: fileUuid, changesSaved: true, kind }));
         }
         activeTabUuid.value = fileUuid;
 

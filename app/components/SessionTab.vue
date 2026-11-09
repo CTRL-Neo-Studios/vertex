@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {convertFileSrc} from "@tauri-apps/api/core"
 import {readTextFile} from "@tauri-apps/plugin-fs"
-import type {InternalLink, InternalLinkClickDetail, TocEntry} from "#codemirror-rich-obsidian-editor/editor-types"
+import {EditorView} from "@codemirror/view"
+import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit"
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {SessionMode} from "#shared/constants/app";
 import {fileNameFromPath, getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
@@ -10,6 +12,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
+import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEditorExtensions";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
@@ -40,6 +43,7 @@ const {content} = useActiveEditorContent(session, getActiveTab(tabId))
 const {dispatcher: editorDispatcher} = useActiveEditorDispatcher(session)
 const codeblockMappings = useActiveEditorCodeblockMappings()
 
+const editorExtensions = useActiveEditorExtensions(session, tabId)
 const file = computed(() => $index.getFileByUuid(tabId.value))
 const fullFilePath = computed(() => file.value?.fullPath)
 const displayPath = computed(() => mode === 'workspace' ? file.value?.relativePath : file.value?.fullPath)
@@ -52,7 +56,6 @@ const isContentLoaded = ref(false)
 const renaming = ref(false)
 const fileName = ref(fileNameFromPath(fullFilePath.value ?? '', true))
 const editorRef = ref()
-const $eu = useEditorUtils(editorRef)
 const INVALID_CHARS = /[\\/:*?"<>|]/
 
 watch(isContentSaved, v => setTabSavedState(tabId, v))
@@ -88,6 +91,7 @@ const viewerProps = computed(() => {
         }
         else if (extra === 'internalLinks') props.internalLinkList = internalLinkList.value
         else if (extra === 'codeBlocks') props.specialCodeBlockMapping = codeblockMappings
+        else if (extra === 'extensions') props.extensions = editorExtensions.value
         else if (extra === 'sessionId') props.sessionId = sessionId.value
         else if (extra === 'imageSrc') props.imageSrc = convertFileSrc(fullFilePath.value ?? '')
     }
@@ -166,8 +170,11 @@ async function onRename(oldValue: string) {
     }
 }
 
-function toTocEntry(props: ToTocEntryProps) {
-    $eu.scrollToNode(props.node.node, props.verticalScrollStrategy, props.verticalMargin)
+function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryProps) {
+    const view = unref(editorRef.value?.view) as EditorView | undefined
+    if (!view) return
+    view.dispatch({selection: {anchor: from}, effects: EditorView.scrollIntoView(from, {y: verticalScrollStrategy ?? 'start', yMargin: verticalMargin ?? 70})})
+    view.focus()
 }
 
 editorDispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
@@ -193,7 +200,7 @@ editorDispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
             <MinimalLineToc
                 v-if="viewer?.id === 'markdown'"
                 class="absolute right-8 top-1/2 -translate-y-1/2 z-10"
-                @to-toc="(node: TocEntry) => $eu.scrollToNode(node.node, 'start', 70)"
+                @to-toc="(heading: Heading) => toTocEntry({from: heading.from})"
             />
         </template>
         <div v-else class="h-full w-full flex items-center justify-center text-muted text-sm">

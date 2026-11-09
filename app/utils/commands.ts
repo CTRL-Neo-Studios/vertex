@@ -30,6 +30,8 @@ export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, labe
     {id: 'file.newFile', section: 'file', group: 0, label: 'app.commands.newFile', accelerator: 'CmdOrCtrl+N'},
     {id: 'file.newFolder', section: 'file', group: 0, label: 'app.commands.newFolder', accelerator: 'CmdOrCtrl+Shift+N'},
     {id: 'file.newWorkflow', section: 'file', group: 0, label: 'app.commands.newWorkflow'},
+    {id: 'file.newChat', section: 'file', group: 0, label: 'app.commands.newChat', accelerator: 'CmdOrCtrl+Shift+L'},
+    {id: 'file.newWorkspace', section: 'file', group: 1, label: 'app.commands.newWorkspace'},
     {id: 'file.openFile', section: 'file', group: 1, label: 'app.commands.openFile', accelerator: 'CmdOrCtrl+O'},
     {id: 'file.openFolder', section: 'file', group: 1, label: 'app.commands.openFolder', accelerator: 'CmdOrCtrl+Shift+O'},
     {id: 'file.save', section: 'file', group: 2, label: 'app.commands.save', accelerator: 'CmdOrCtrl+S'},

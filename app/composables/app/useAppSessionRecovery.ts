@@ -6,6 +6,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 
 /**
  * Brings a freshly created session window back to its persisted state:
@@ -27,20 +28,29 @@ export function useAppSessionRecovery() {
         return result
     }
 
-    /** Restore tabs, focused tab and expanded folders after the workspace index is built. */
+    /** Restore tabs (files, then chats), focused tab, expanded folders and the left sidebar's view after the workspace index is built. */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
-        const {getFilesByPaths, getFileByPath} = useActiveWorkspaceIndex(activeSession)
-        const {openTabs, getActiveTab} = useActiveTabs(activeSession)
+        const {getFilteredFiles} = useActiveWorkspaceIndex(activeSession)
+        const {openTab, openTabs, getActiveTab} = useActiveTabs(activeSession)
         const expandedFolders = useState<string[]>(StateKey.expandedFolders(activeSession.uuid), () => [])
         const context = appSession.context
+        const byPath = new Map(getFilteredFiles(() => true).map(f => [f.relativePath, f.uuid]))
+        const uuids = (paths: string[]) => paths.map(p => byPath.get(p)).filter((u): u is string => !!u)
 
-        expandedFolders.value = getFilesByPaths(context?.openedAbsoluteFolderPaths ?? []).map(f => f.uuid)
+        expandedFolders.value = uuids(context.openedFolderPaths)
+        const layouts = useActiveLayouts(activeSession)
+        layouts.leftPanelView.value = context.leftPanelView
+        layouts.rightPanelView.value = context.rightPanelView
+        layouts.leftPanelCollapsed.value = context.leftPanelCollapsed ?? false
+        layouts.rightPanelCollapsed.value = context.rightPanelCollapsed ?? true
 
-        const fileUuids = getFilesByPaths(context?.openedAbsoluteFilePaths ?? []).map(f => f.uuid)
-        if (fileUuids.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
+        const fileUuids = uuids(context.openedFilePaths)
+        const chatIds = context.openedChatIds ?? []
+        if (fileUuids.length === 0 && chatIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
 
-        const lastOpened = openTabs(fileUuids)
-        const focused = getActiveTab(getFileByPath(context.lastFocusedAbsoluteFilePath ?? '')?.uuid)
+        let lastOpened = openTabs(fileUuids)
+        for (const id of chatIds) lastOpened = openTab(id, 'chat')
+        const focused = getActiveTab(context.lastFocusedChatId ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0])
         await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
     }
 

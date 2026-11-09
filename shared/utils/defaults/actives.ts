@@ -41,7 +41,8 @@ export function defaultUITreeNode(data?: Partial<UITreeNode>): UITreeNode {
 export function defaultActiveTab(data?: Partial<ActiveTab>): ActiveTab {
     return {
         changesSaved: data?.changesSaved ?? false,
-        fileUuid: data?.fileUuid ?? crypto.randomUUID()
+        fileUuid: data?.fileUuid ?? crypto.randomUUID(),
+        ...(data?.kind && {kind: data.kind}),
     } satisfies ActiveTab
 }
 

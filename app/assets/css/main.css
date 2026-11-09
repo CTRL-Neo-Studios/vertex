@@ -10,6 +10,29 @@
     @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
 
+/* Top fade on a scroll area once it's scrolled; toggle `is-scrolled` from the scroll position. */
+@property --fade-size {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+.scroll-fade {
+    --fade-size: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+    mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
+    transition: --fade-size 200ms ease;
+}
+
+.scroll-fade.is-scrolled {
+    --fade-size: 2rem;
+}
+
+/* Highlighted code (Comark's rangi in chat replies) carries its dark color in `--shiki-dark`. */
+.dark .shiki span[style*="--shiki-dark"] {
+    color: var(--shiki-dark) !important;
+}
+
 @theme {
     --font-sans: 'Geist', 'Inter', sans-serif;
 
@@ -73,6 +96,19 @@
     --ncm-text-muted: var(--ui-text-muted);
     --ncm-text-xmuted: var(--ui-text-muted);
     --ncm-overlay-bg: rgba(var(--ui-bg), 0.98);
+
+    --pele-bg: var(--ui-bg);
+    --pele-fg: var(--ui-text);
+    --pele-muted: var(--ui-text-muted);
+    --pele-line: var(--ui-text-toned);
+    --pele-surface: var(--ui-bg-elevated);
+    --pele-surface-alt: var(--ui-bg-accented);
+    --pele-border: var(--ui-border-accented);
+    --pele-accent: var(--ui-primary);
+    --pele-critical: var(--ui-error);
+    --pele-error: var(--ui-error);
+    --pele-font: var(--font-sans);
+    --pele-font-mono: var(--font-mono);
 
     div[data-tauri-decorum-tb] {
         pointer-events: none;

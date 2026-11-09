@@ -1,7 +1,7 @@
 # Vertex
 ![screenshot](alpha-screenshot.png)
 
-A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nuxt UI v4 + Tauri v2.
+An OFM-compliant Markdown Editor built with Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
 > [!WARNING]
 > Since the app is in ***EARLY ACCESS***, I highly suggest you to **NOT USE IT ON IMPORTANT VAULTS**. I've warned you here and I won't be responsible for any loss caused by the software.
@@ -19,6 +19,7 @@ A Markdown Editor using `@type32/codemirror-rich-obsidian-editor` + Nuxt v4 + Nu
 - https://github.com/CTRL-Neo-Studios/dispatcher
 - https://github.com/CTRL-Neo-Studios/nuxt-predicates
 - https://github.com/Type-32/tauri-sqlite-orm
+- https://github.com/CTRL-Neo-Studios/workflows
 
 ## Learning
 
@@ -55,3 +56,40 @@ bun i
 bun pm trust --all
 bun run tauri:build
 ```
+
+## Use of AI Disclaimer
+
+Areas where AI are used:
+- AI-related coworking features
+- Test Scripts & Bugfixing
+
+Areas where no AI are used:
+- Application Architecture
+- UI Design
+- UX Provisioning
+- Application features
+- Features Architecture
+
+Used AI Models during Development (via OpenRouter):
+- DeepSeek V4 Pro 0813
+- DeepSeek V4.1 Flash 1017
+- Claude Opus 5.5
+- Claude Sonnet 5.5
+- GPT-5.6 Sol
+
+Used AI Harnesses:
+- OpenCode
+
+## Inspirations
+- Obsidian (Cupertino Theme, Minimal Theme)
+- Nuxt UI UEditor Slash Menu and Text Hover Menus
+- Nuxt UI Chat Template
+- JetBrains WebStorm
+- DeepSeek Harness
+- Tiptap AI Extensions
+- tldraw
+- OpenCode
+
+---
+
+**May this tool aid in your venture towards the unknown.**

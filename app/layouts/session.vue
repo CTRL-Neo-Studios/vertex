@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type {TocEntry} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -8,9 +8,12 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 import {useAppSessionPersistence} from "~/composables/app/useAppSessionPersistence";
 import {useSessionCommands} from "~/composables/app/useSessionCommands";
-import DashboardLeftPanelSidebar from "~/components/LayoutComponents/DashboardLeftPanelSidebar.vue";
+import {usePanels} from "~/composables/active/usePanels";
+import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
+import {useChats} from "~/composables/ai/useChats";
+import DashboardSidePanel from "~/components/LayoutComponents/DashboardSidePanel.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
-import DashboardRightPanelSidebar from "~/components/LayoutComponents/DashboardRightPanelSidebar.vue";
+import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
 import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import {Routes} from "#shared/constants/app";
 
@@ -32,6 +35,25 @@ const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
 const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
 useSessionCommands(activeSesh)
+const panels = usePanels(activeSesh)
+// One drag state for the window's panel buttons, so a view can go from one side's list to the other's.
+provide(PANEL_DRAG, usePanelDrag(panels.move))
+
+// Chats synced in from elsewhere: one refresh per burst of watcher events.
+if (isWorkspace) {
+    const {syncExternal} = useChats(activeSesh)
+    const changedChats = new Set<string>()
+    const flushChats = useDebounceFn(() => {
+        const paths = [...changedChats]
+        changedChats.clear()
+        return syncExternal(paths)
+    }, 500)
+    onBeforeUnmount(index.on(event => {
+        if (event.type !== 'chats') return
+        changedChats.add(event.path)
+        void flushChats()
+    }))
+}
 
 let unregisterClose: (() => void) | undefined
 
@@ -59,22 +81,22 @@ onBeforeUnmount(async () => {
     $sesh.removeSession($sessionId)
 })
 
-function toToc(node: TocEntry) {
-    $editorDispatcher.emitToTocEntry({node, verticalMargin: 70, verticalScrollStrategy: 'start'})
+function toToc({from}: Heading) {
+    $editorDispatcher.emitToTocEntry({from, verticalMargin: 70, verticalScrollStrategy: 'start'})
 }
 </script>
 
 <template>
     <UDashboardGroup class="w-full h-full transition-colors duration-200" unit="rem">
-        <template v-if="isWorkspace">
-            <DashboardLeftPanelSidebar/>
-            <WorkspaceCommandPalette/>
-        </template>
+        <PanelStrip v-if="panels.style.value === 'strip'" side="left"/>
+        <DashboardSidePanel side="left" @to-toc="toToc"/>
+        <WorkspaceCommandPalette v-if="isWorkspace"/>
         <UDashboardSearch v-else shortcut="meta_p"/>
         <DashboardCenterPanel>
             <slot/>
         </DashboardCenterPanel>
-        <DashboardRightPanelSidebar @to-toc="toToc"/>
+        <DashboardSidePanel side="right" @to-toc="toToc"/>
+        <PanelStrip v-if="panels.style.value === 'strip'" side="right"/>
     </UDashboardGroup>
 </template>
 

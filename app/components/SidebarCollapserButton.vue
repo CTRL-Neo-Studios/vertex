@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import {usePanels} from "~/composables/active/usePanels";
 
 const props = withDefaults(defineProps<{
     side: "left" | "right",
@@ -12,21 +12,11 @@ const props = withDefaults(defineProps<{
 const $route = useRoute()
 const $sesh = useActiveSessions()
 const $sessionId = computed<string>(() => $route.params.sessionId as string)
-const {
-    leftPanelCollapsed,
-    rightPanelCollapsed
-} = useActiveLayouts($sesh.getSession($sessionId))
-
-function toggleSidebar() {
-    if(props.side == "left")
-        leftPanelCollapsed.value = !leftPanelCollapsed.value
-    else
-        rightPanelCollapsed.value = !rightPanelCollapsed.value
-}
+const {toggle} = usePanels($sesh.getSession($sessionId))
 </script>
 
 <template>
-    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" size="sm" @click="toggleSidebar"/>
+    <UButton :icon="`i-lucide-panel-${props.side}`" :disabled="props.disabled" variant="ghost" color="neutral" class="text-muted shrink-0" size="sm" @click="toggle(props.side)"/>
 </template>
 
 <style scoped>

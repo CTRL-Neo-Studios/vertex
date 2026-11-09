@@ -28,6 +28,8 @@ export type WorkspaceIndexEvent =
     | { type: 'create'; path: string; }
     | { type: 'remove'; path: string; removedNodes: ActiveWorkspaceFileIndex[] }
     | { type: 'rename'; oldPath: string; newPath: string; }
-    | { type: 'modify'; path: string; };
+    | { type: 'modify'; path: string; }
+    /** Something under `.vertex/chats/` changed (sync, another device); the index itself ignores dot paths. */
+    | { type: 'chats'; path: string; };
 
 export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;

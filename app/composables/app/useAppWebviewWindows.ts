@@ -25,6 +25,9 @@ export function useAppWebviewWindows() {
             hiddenTitle: true,
             titleBarStyle: 'overlay',
             trafficLightPosition: new LogicalPosition(14, 21),
+            // As tauri.conf.json does for `main` (which only covers that window): Tauri's own file-drop handler
+            // would take every drop, so the page's HTML5 drag and drop (chat list, editor) would never get one.
+            dragDropEnabled: false,
         })
     }
 

@@ -69,7 +69,8 @@ export function useWorkflowRunner(session: ActiveSession) {
     const vault = useWorkspaceVault(session)
     const {config} = useAppSettings()
     const trusted = useWorkflowTrust()
-    const {t} = useI18n()
+    // Not `useI18n`: chats run workflows outside a component's setup.
+    const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()
     const $toast = useToast()
     const $index = useActiveWorkspaceIndex(session)
@@ -252,5 +253,7 @@ export function useWorkflowRunner(session: ActiveSession) {
         }
     }
 
-    return {dryRun, trust, followEdit, run, runFile, undo, canUndo: computed(() => undoable.value.length > 0)}
+    return {dryRun, trust, followEdit, run, runFile, report, undo, canUndo: computed(() => undoable.value.length > 0)}
 }
+
+export type WorkflowRunner = ReturnType<typeof useWorkflowRunner>
