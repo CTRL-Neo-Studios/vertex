@@ -69,16 +69,16 @@ Blocked by G1.
 ### Change
 - `definePanelView({id: 'git', defaultArea: 'left', when: workspace windows})`.
 - Top: branch with ahead/behind; **Sync** (stage all, commit with a default or generated message, pull, push), with progress and errors explained in plain words.
-- Changed files in two lists, Staged and Changes: stage, unstage, discard (asks first), open the file; tooltips explain staging.
-- Commit box: message, Commit, Commit and Push.
-- Header actions (`usePanelActions`): Fetch, Pull, Push, Refresh; branch menu (switch, create).
-- Refresh: `.git/HEAD`, `index` and `refs` events, caught before the dot-path filter in `useActiveWorkspaceIndex.ts`, debounced; and on window focus.
+- Changed files in two lists, Staged and Changes: stage, unstage, discard (asks first), open the file; tooltips explain staging and each status letter.
+- Commit box: message, Commit (with nothing staged it commits every change), Commit and Push; ⌘↩ commits.
+- Header actions (`usePanelActions`): Fetch, Pull, Push, Refresh. Branch picker on the branch name: switch, check out a remote branch, type a new name to create one.
+- Refresh: every watcher event under the workspace (`.git/` and the app's own saves included), debounced; and on window focus (a repository above the workspace isn't watched).
 
 ### Acceptance
 - [ ] Edit, stage, commit and push from the view against a real remote; Sync does it in one click.
 - [ ] A commit or branch switch made in a terminal shows within a second.
-- [ ] Errors from G1 show as explanations with a next step (sign in, pull first, set your name).
-- [ ] SMOKE row; Concepts doc; en + zh-CN strings.
+- [x] Errors from G1 show as explanations with a next step (sign in, pull first, set your name).
+- [x] SMOKE row; Concepts doc; en + zh-CN strings.
 
 ## G3: Diff tabs (#51)
 

@@ -11,6 +11,8 @@ export interface GitVersion {
 export interface GitStatus {
     /** The repository's top folder, which may sit above the workspace. */
     top: string,
+    /** The workspace's folder inside the repository (`notes/`), `''` when it is the top folder. */
+    prefix: string,
     /** `null` when detached. */
     branch: string | null,
     /** `null` before the first commit. */

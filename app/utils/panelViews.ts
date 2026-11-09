@@ -121,6 +121,11 @@ definePanelView({
     kbds: ({shown}) => (shown === 'chats' ? undefined : ['meta', 'p']),
 })
 definePanelView({
+    id: 'git', label: 'app.git.label', icon: 'i-lucide-git-branch', defaultArea: 'left',
+    when: ctx => ctx.isWorkspace,
+    component: () => import('~/components/Git/GitChangesView.vue'),
+})
+definePanelView({
     id: 'forelinks', label: 'app.editor.ui.forelinks', icon: 'i-lucide-square-arrow-out-up-right', defaultArea: 'right',
     when: noteView, scroll: true,
     component: () => import('~/components/ReferenceForelinksListComponent.vue'),

@@ -317,6 +317,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (typeof type !== 'object' || type === null) return
         if (event.paths.length === 0 || 'access' in type || 'metadata' in type) return
         const rt = runtime()
+        if (rt.wholeFolder) broadcast({type: 'changed', paths: event.paths})
         // The workspace's own settings changed on disk (an editor, git, sync): Rust re-reads and broadcasts them.
         if (rt.wholeFolder && event.paths.includes(`${rt.root}/.vertex/settings.json`)) {
             void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))

@@ -1669,6 +1669,114 @@
 				"bottom": "Bottom",
 				"hidden": "Hidden"
 			}
+		},
+		"git": {
+			"label": "Git",
+			"sync": "Sync",
+			"syncHint": "Commit every change, pull the remote's new commits, then push yours.",
+			"syncMessage": "Update {count} file(s)",
+			"committing": "Committing…",
+			"pulling": "Pulling…",
+			"pushing": "Pushing…",
+			"fetching": "Fetching…",
+			"switching": "Switching branch…",
+			"working": "Working…",
+			"fetch": "Fetch: check the remote for new commits",
+			"pull": "Pull: bring in the remote's new commits",
+			"push": "Push: send your commits to the remote",
+			"pullAction": "Pull",
+			"refresh": "Refresh",
+			"aheadBehind": "{ahead} commit(s) to push, {behind} to pull ({upstream})",
+			"detached": "Detached at {id}",
+			"branches": "Branches",
+			"remoteBranches": "Remote branches",
+			"current": "current",
+			"createBranch": "Create branch “{name}”",
+			"branchPlaceholder": "Switch to or create a branch…",
+			"staged": "Staged",
+			"stagedHint": "Staged changes go into the next commit.",
+			"changes": "Changes",
+			"changesHint": "Changes not staged yet. Stage them to put them in the next commit.",
+			"stage": "Stage",
+			"unstage": "Unstage",
+			"stageAll": "Stage all",
+			"unstageAll": "Unstage all",
+			"discard": "Discard changes",
+			"openFile": "Open file",
+			"discardConfirm": {
+				"title": "Discard changes?",
+				"description": "{count} file(s) go back to how they were in the last commit, and new files are deleted. This can't be undone.",
+				"confirm": "Discard"
+			},
+			"clean": "No changes",
+			"cleanHint": "Everything is committed.",
+			"message": "Commit message (⌘↩ to commit)",
+			"commit": "Commit",
+			"commitHint": "Save the staged changes as a commit: a snapshot in the history.",
+			"commitAllHint": "Nothing is staged, so this commits every change.",
+			"commitPush": "Commit and Push",
+			"commitPushHint": "Commit, then send it to the remote.",
+			"merging": {
+				"title": "Merging",
+				"description": "Fix the conflicting parts git marked in the files, stage them, then commit to finish. Or abort to go back.",
+				"abort": "Abort merge"
+			},
+			"states": {
+				"unchanged": "Unchanged",
+				"modified": "Modified",
+				"added": "Added",
+				"deleted": "Deleted",
+				"renamed": "Renamed",
+				"copied": "Copied",
+				"typeChanged": "Type changed",
+				"conflicted": "Conflicted",
+				"untracked": "Untracked (new)"
+			},
+			"missing": {
+				"title": "Git isn't installed",
+				"description": "Vertex uses git to track and sync this workspace. Install it, then check again."
+			},
+			"notRepo": {
+				"title": "Not a git repository",
+				"description": "This workspace isn't tracked by git."
+			},
+			"install": "Install git",
+			"checkAgain": "Check again",
+			"errors": {
+				"failed": "Git failed",
+				"missing": {
+					"title": "Git isn't installed",
+					"description": "Install git, then try again."
+				},
+				"notRepo": {
+					"title": "Not a git repository",
+					"description": "This workspace isn't tracked by git."
+				},
+				"auth": {
+					"title": "Couldn't sign in to the remote",
+					"description": "Git has no working credentials for this remote. Set up a credential helper or an SSH key, then try again."
+				},
+				"conflict": {
+					"title": "Merge conflicts",
+					"description": "Some files changed both here and on the remote. Fix the conflicting parts, stage the files and commit, or abort the merge."
+				},
+				"rejected": {
+					"title": "The remote has newer commits",
+					"description": "Pull them in first, then push again."
+				},
+				"noRemote": {
+					"title": "No remote to sync with",
+					"description": "This repository isn't connected to a remote yet. Add one with `git remote add origin` and the remote's URL."
+				},
+				"noUpstream": {
+					"title": "This branch has no remote branch",
+					"description": "It doesn't track a branch on a remote, and there's no `origin` to push it to. Push it once with `git push -u` and the remote's name."
+				},
+				"identity": {
+					"title": "Git needs your name and email",
+					"description": "Commits record who made them. Set them with `git config --global user.name` and `git config --global user.email`."
+				}
+			}
 		}
 	}
 }

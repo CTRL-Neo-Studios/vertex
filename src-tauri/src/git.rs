@@ -52,6 +52,8 @@ pub struct GitVersion {
 pub struct GitStatus {
     /// The repository's top folder, as git prints it.
     top: String,
+    /// The workspace's folder inside the repository (`notes/`), `""` when it is the top folder.
+    prefix: String,
     /// `None` when detached.
     branch: Option<String>,
     /// `None` before the first commit.
@@ -391,14 +393,19 @@ struct Repo {
     bin: PathBuf,
     top: PathBuf,
     git_dir: PathBuf,
+    /// The workspace's folder relative to `top` (`notes/`, or `""`).
+    prefix: String,
 }
 
 impl Repo {
     fn open(bin: PathBuf, root: &Path) -> Result<Self, String> {
-        let out = run(&bin, root, &["rev-parse", "--show-toplevel", "--absolute-git-dir"])?;
+        let out = run(&bin, root, &["rev-parse", "--show-toplevel", "--absolute-git-dir", "--show-prefix"])?;
         let mut lines = out.lines();
         match (lines.next(), lines.next()) {
-            (Some(top), Some(git_dir)) => Ok(Self { top: top.into(), git_dir: git_dir.into(), bin }),
+            (Some(top), Some(git_dir)) => {
+                let prefix = lines.next().unwrap_or_default().to_owned();
+                Ok(Self { top: top.into(), git_dir: git_dir.into(), prefix, bin })
+            }
             _ => Err(NOT_REPO.to_owned()),
         }
     }
@@ -425,6 +432,7 @@ impl Repo {
         let out = self.git(&["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"])?;
         let mut status = parse_status(&out);
         status.top = self.top.to_string_lossy().into_owned();
+        status.prefix = self.prefix.clone();
         status.merging = self.git_dir.join("MERGE_HEAD").exists();
         Ok(status)
     }
@@ -855,6 +863,10 @@ mod tests {
         assert_eq!(Repo::open(bin.clone(), &a).err().as_deref(), Some(NOT_REPO));
         init(&bin, &a).unwrap();
         let repo = Repo::open(bin.clone(), &a).unwrap();
+        // A workspace in a subfolder of the repository knows where it sits.
+        fs::create_dir(a.join("sub")).unwrap();
+        assert_eq!(Repo::open(bin.clone(), &a.join("sub")).unwrap().status().unwrap().prefix, "sub/");
+        assert_eq!(repo.status().unwrap().prefix, "");
         let files = |r: &Repo| -> Vec<(String, char, char)> {
             r.status().unwrap().files.into_iter().map(|f| (f.path, f.index, f.worktree)).collect()
         };

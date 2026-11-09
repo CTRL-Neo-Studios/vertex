@@ -30,6 +30,11 @@ export type WorkspaceIndexEvent =
     | { type: 'rename'; oldPath: string; newPath: string; }
     | { type: 'modify'; path: string; }
     /** Something under `.vertex/chats/` changed (sync, another device); the index itself ignores dot paths. */
-    | { type: 'chats'; path: string; };
+    | { type: 'chats'; path: string; }
+    /**
+     * Anything under the root changed on disk, dot paths (`.git/`) and the app's own writes included; whole-folder
+     * watches only. For views that re-read their state from disk, like git's status.
+     */
+    | { type: 'changed'; paths: string[]; };
 
 export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;
