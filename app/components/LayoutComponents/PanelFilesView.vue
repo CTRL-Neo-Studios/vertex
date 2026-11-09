@@ -8,6 +8,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 
 /** The Files view: the workspace's file tree, with New note/folder/workflow on right-click. */
 const {t} = useI18n()
@@ -21,8 +22,7 @@ const {openTab, activeTabUuid} = useActiveTabs(session)
 const overlay = useOverlay()
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
-const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
-const isScrolled = computed(() => scrollY.value > 2)
+const fade = useScrollFade(() => scrollAreaRef.value?.$el)
 
 const activeTreeItem = useState<string>(StateKey.activeTreeItem(sessionId.value), () => '')
 watch(activeTabUuid, uuid => {
@@ -51,7 +51,7 @@ const contextMenuItems: ContextMenuItem[][] = [[
         <UScrollArea
             ref="scrollAreaRef"
             orientation="vertical"
-            :class="['no-scrollbar h-full relative scroll-fade', isScrolled && 'is-scrolled']"
+            :class="['no-scrollbar h-full relative', fade]"
             data-tauri-drag-region
         >
             <FileTreeComponent class="py-2.5" :session-id="sessionId" v-model="activeTreeItem" :nodes="fileTree" @file-click="onClickFile"/>

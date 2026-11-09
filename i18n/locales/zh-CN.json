@@ -1738,7 +1738,7 @@
 			},
 			"notRepo": {
 				"title": "不是 git 仓库",
-				"description": "此工作区尚未由 git 跟踪。"
+				"description": "此工作区尚未由 git 跟踪。创建仓库后会开始跟踪它的更改，并添加 .gitignore 来排除系统文件和 Vertex 的回收站。"
 			},
 			"install": "安装 git",
 			"checkAgain": "重新检查",
@@ -1776,7 +1776,11 @@
 					"title": "Git 需要你的姓名和邮箱",
 					"description": "每次提交都会记录作者。请用 `git config --global user.name` 和 `git config --global user.email` 设置。"
 				}
-			}
+			},
+			"createRepo": "创建仓库",
+			"creating": "正在创建仓库…",
+			"syncChats": "同步聊天",
+			"syncChatsHint": "保存在此工作区的聊天是 git 无法合并的加密文件：两台设备修改同一个聊天时，需要选择保留其中一个版本。"
 		}
 	}
 }

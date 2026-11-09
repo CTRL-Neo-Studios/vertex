@@ -7,6 +7,8 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {isStaged, isUnstaged, useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
 import {usePanelActions} from "~/utils/panelViews";
@@ -26,6 +28,13 @@ const staged = computed(() => status.value?.files.filter(isStaged) ?? [])
 const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
 const idle = computed(() => !busy.value && !!status.value)
 const message = ref('')
+// The list fades where it meets the commit box, and at the top once scrolled.
+const fade = useScrollFade(useTemplateRef<HTMLElement>('listEl'), {bottom: true})
+// Only chats kept in the workspace end up in its repository; the user decides whether they do.
+const settings = useSettingsScope()
+const chatsInWorkspace = computed(() => settings.effective.value?.aiConfig.chatStorage === 'workspace')
+const syncChats = ref(true)
+const createRepo = () => git.init(syncChats.value)
 const canCommit = computed(() => idle.value && !!message.value.trim() && !!status.value?.files.length)
 
 usePanelActions(() => {
@@ -176,7 +185,26 @@ const mergeActions = computed(() => [{
             class="flex-1"
             :title="t('app.git.notRepo.title')"
             :description="t('app.git.notRepo.description')"
-        />
+        >
+            <template #actions>
+                <div class="flex flex-col items-center gap-3">
+                    <UCheckbox
+                        v-if="chatsInWorkspace"
+                        v-model="syncChats"
+                        size="sm"
+                        :label="t('app.git.syncChats')"
+                        :description="t('app.git.syncChatsHint')"
+                    />
+                    <UButton
+                        :label="t('app.git.createRepo')"
+                        icon="i-lucide-git-branch-plus"
+                        size="sm"
+                        :loading="!!busy"
+                        @click="createRepo"
+                    />
+                </div>
+            </template>
+        </UEmpty>
         <template v-else-if="status">
             <div class="px-2 pt-2 pb-1 flex flex-col gap-2">
                 <div class="flex items-center gap-1 min-w-0">
@@ -234,7 +262,7 @@ const mergeActions = computed(() => [{
                     />
                 </UTooltip>
             </div>
-            <div class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-2">
+            <div ref="listEl" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]">
                 <UEmpty
                     v-if="!sections.length"
                     variant="naked"
@@ -297,7 +325,7 @@ const mergeActions = computed(() => [{
                     </div>
                 </section>
             </div>
-            <div class="p-2 flex flex-col gap-1.5 border-t border-default">
+            <div class="p-2 flex flex-col gap-1.5">
                 <UTextarea
                     v-model="message"
                     :placeholder="t('app.git.message')"

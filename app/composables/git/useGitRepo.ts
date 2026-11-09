@@ -9,6 +9,11 @@ export type GitProblem = typeof GitError.missing | typeof GitError.notRepo
 
 const errorKey = (error: string) => (Object.keys(GitError) as GitErrorKey[]).find(k => GitError[k] === error)
 
+/** What a new repository leaves out: system clutter, Vertex's trash and its temp files. */
+const IGNORED = ['.DS_Store', 'Thumbs.db', 'desktop.ini', '.vertex/trash/', '.vertex/**/*.tmp']
+/** Chats stored in the workspace: encrypted files git can't merge, so two devices changing one chat conflict. */
+const CHATS = '.vertex/chats/'
+
 /**
  * A workspace's repository for the views that show it: its status, kept fresh from the watcher (the working copy and
  * `.git/` both), window focus and every operation; the operations, one at a time from here, each failure explained
@@ -105,6 +110,8 @@ export function useGitRepo(session: ActiveSession | undefined) {
     const push = () => run(t('app.git.pushing'), gitClient.push)
     const mergeAbort = () => run(t('app.git.working'), gitClient.mergeAbort)
     const switchBranch = (name: string, create: boolean) => run(t('app.git.switching'), r => gitClient.switch(r, name, create))
+    /** Makes the workspace a repository with a `.gitignore`; `syncChats` keeps workspace-stored chats in it. */
+    const init = (syncChats: boolean) => run(t('app.git.creating'), r => gitClient.init(r, syncChats ? IGNORED : [...IGNORED, CHATS]))
     /** Commits what's staged, or every change when nothing is. */
     const commit = (message: string) => {
         const all = !status.value?.files.some(isStaged)
@@ -127,7 +134,7 @@ export function useGitRepo(session: ActiveSession | undefined) {
         return push()
     }
 
-    return {status, problem, busy, refresh, stage, unstage, discard, commit, fetch, pull, push, sync, mergeAbort, switchBranch}
+    return {status, problem, busy, refresh, init, stage, unstage, discard, commit, fetch, pull, push, sync, mergeAbort, switchBranch}
 }
 
 /** Whether a file has changes staged for the next commit. */

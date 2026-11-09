@@ -73,6 +73,7 @@ Blocked by G1.
 - Commit box: message, Commit (with nothing staged it commits every change), Commit and Push; ⌘↩ commits.
 - Header actions (`usePanelActions`): Fetch, Pull, Push, Refresh. Branch picker on the branch name: switch, check out a remote branch, type a new name to create one.
 - Refresh: every watcher event under the workspace (`.git/` and the app's own saves included), debounced; and on window focus (a repository above the workspace isn't watched).
+- Not a repository: **Create repository** (`git_init` with `.gitignore` lines: `.DS_Store`, `Thumbs.db`, `desktop.ini`, `.vertex/trash/`, `.vertex/**/*.tmp`; with chats stored in the workspace, a **Sync chats** checkbox, unticked adds `.vertex/chats/`). G5's wizard builds on it.
 
 ### Acceptance
 - [ ] Edit, stage, commit and push from the view against a real remote; Sync does it in one click.

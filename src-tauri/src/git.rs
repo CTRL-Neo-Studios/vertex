@@ -374,13 +374,42 @@ fn parse_remotes(out: &str) -> Vec<GitRemote> {
         .collect()
 }
 
-/// Creates a repository in `root`, on `main` unless the user set `init.defaultBranch`.
-fn init(bin: &Path, root: &Path) -> Result<(), String> {
+/// Creates a repository in `root`, on `main` unless the user set `init.defaultBranch`, and adds the `ignore` lines
+/// its `.gitignore` doesn't have yet.
+fn init(bin: &Path, root: &Path, ignore: &[String]) -> Result<(), String> {
     let mut args = vec!["init", "-q"];
     if !command(bin, root, &["config", "--get", "init.defaultBranch"]).output().is_ok_and(|o| o.status.success()) {
         args.push("--initial-branch=main");
     }
-    run(bin, root, &args).map(drop)
+    run(bin, root, &args)?;
+    add_ignores(root, ignore)
+}
+
+/// Appends the patterns `root/.gitignore` doesn't list yet, keeping what's there.
+fn add_ignores(root: &Path, patterns: &[String]) -> Result<(), String> {
+    let path = root.join(".gitignore");
+    let mut text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e.to_string()),
+    };
+    let have: HashSet<&str> = text.lines().map(str::trim).collect();
+    let missing: Vec<&str> = patterns
+        .iter()
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty() && !p.contains('\n') && !have.contains(p))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        text.push('\n');
+    }
+    for pattern in missing {
+        text.push_str(pattern);
+        text.push('\n');
+    }
+    fs::write(&path, text).map_err(|e| e.to_string())
 }
 
 /// Clones `url` into `dest`, a new or empty folder whose parent exists.
@@ -717,8 +746,8 @@ pub async fn git_merge_abort<R: Runtime>(app: AppHandle<R>, root: String) -> Res
 }
 
 #[tauri::command]
-pub async fn git_init<R: Runtime>(app: AppHandle<R>, root: String) -> Result<(), String> {
-    with_git(app, move |_, bin| init(&bin, workspace_root(&root)?)).await
+pub async fn git_init<R: Runtime>(app: AppHandle<R>, root: String, ignore: Vec<String>) -> Result<(), String> {
+    with_git(app, move |_, bin| init(&bin, workspace_root(&root)?, &ignore)).await
 }
 
 #[tauri::command]
@@ -843,6 +872,19 @@ mod tests {
         assert!(arg("--upload-pack=x").is_err() && arg("").is_err());
     }
 
+    #[test]
+    fn adds_only_the_ignore_lines_missing() {
+        let root = temp("ignore");
+        let lines = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        add_ignores(&root, &lines(&[".DS_Store", ".vertex/trash/"])).unwrap();
+        assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), ".DS_Store\n.vertex/trash/\n");
+        // An existing file keeps its lines, gets a newline before the new ones, and nothing twice.
+        fs::write(root.join(".gitignore"), "node_modules\n.DS_Store").unwrap();
+        add_ignores(&root, &lines(&[".DS_Store", "", "Thumbs.db"])).unwrap();
+        assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), "node_modules\n.DS_Store\nThumbs.db\n");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     fn temp(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("vertex-{name}-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
@@ -861,7 +903,7 @@ mod tests {
         let a = base.join("a");
         fs::create_dir(&a).unwrap();
         assert_eq!(Repo::open(bin.clone(), &a).err().as_deref(), Some(NOT_REPO));
-        init(&bin, &a).unwrap();
+        init(&bin, &a, &[]).unwrap();
         let repo = Repo::open(bin.clone(), &a).unwrap();
         // A workspace in a subfolder of the repository knows where it sits.
         fs::create_dir(a.join("sub")).unwrap();

@@ -7,6 +7,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {usePanelActions} from "~/utils/panelViews";
 
 /**
@@ -26,8 +27,7 @@ watch(storage, () => refresh(), {immediate: true})
 const expanded = useState<string[]>(StateKey.chatsExpanded(sessionId.value), () => [])
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
-const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
-const isScrolled = computed(() => scrollY.value > 2)
+const fade = useScrollFade(() => scrollAreaRef.value?.$el)
 
 const locked = computed(() => vault.value === 'none' || vault.value === 'locked')
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -234,7 +234,7 @@ const searchGroups = computed<CommandPaletteGroup[]>(() => {
                 <UScrollArea
                     ref="scrollAreaRef"
                     orientation="vertical"
-                    :class="['no-scrollbar flex-1 min-h-0 relative scroll-fade', isScrolled && 'is-scrolled', dropTarget === '' && `rounded-md ${DROP_TARGET}`]"
+                    :class="['no-scrollbar flex-1 min-h-0 relative', fade, dropTarget === '' && `rounded-md ${DROP_TARGET}`]"
                     data-tauri-drag-region
                     @dragstart="onDragStart"
                     @dragover="onDragOver"

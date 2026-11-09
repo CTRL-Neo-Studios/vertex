@@ -12,6 +12,7 @@ import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {ASK_USER, hostnameOf, toolsUnsupported, type AskUserOutput} from "~/utils/chatTools";
 import ChatMarkdown from "~/components/Chat/ChatMarkdown.vue";
 import ChatLink from "~/components/Chat/ChatLink.vue";
@@ -113,8 +114,7 @@ function errorText(e: unknown) {
 }
 
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
-const {y: scrollY} = useScroll(scrollEl)
-const isScrolled = computed(() => scrollY.value > 2)
+const fade = useScrollFade(scrollEl)
 // The prompt floats over the messages (glass: they scroll on under its blur); the list keeps its height as room.
 const promptArea = useTemplateRef<HTMLElement>('promptArea')
 const {height: promptHeight} = useElementSize(promptArea, undefined, {box: 'border-box'})
@@ -463,7 +463,7 @@ const MENU = 'w-max min-w-48 max-w-80'
 
 		<template v-else-if="chat">
 			<div ref="scrollEl"
-			     :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar', inSidePanel ? ['scroll-fade', isScrolled && 'is-scrolled'] : 'pt-10']"
+			     :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar', inSidePanel ? fade : 'pt-10']"
 			     :style="{ paddingBottom: `${promptHeight}px` }">
 				<UChatMessages
 					:messages="chat.messages"

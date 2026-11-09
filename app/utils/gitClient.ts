@@ -75,8 +75,8 @@ export const gitClient = {
     /** Adds the remote, or points it at `url` when it exists. */
     remoteSet: (root: string, name: string, url: string) => invoke(GitCommand.remoteSet, {root, name, url}),
     mergeAbort: (root: string) => invoke(GitCommand.mergeAbort, {root}),
-    /** On `main` unless the user set `init.defaultBranch`. */
-    init: (root: string) => invoke(GitCommand.init, {root}),
+    /** On `main` unless the user set `init.defaultBranch`; adds the `ignore` lines `.gitignore` doesn't have yet. */
+    init: (root: string, ignore: string[]) => invoke(GitCommand.init, {root, ignore}),
     /** Into `dest`, a new or empty folder whose parent exists. */
     clone: (url: string, dest: string) => invoke(GitCommand.clone, {url, dest}),
 }

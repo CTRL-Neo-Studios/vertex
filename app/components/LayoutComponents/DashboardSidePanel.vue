@@ -66,18 +66,20 @@ const firstLabel = computed(() => {
             />
         </template>
         <template #header>
-            <UDashboardNavbar :toggle="false" :ui="{ root: 'border-none h-(--ui-header-height) px-2 sm:px-2 gap-0 w-full', center: 'flex flex-1 min-w-0 items-center gap-1', left: 'hidden', right: 'hidden' }" data-tauri-drag-region>
+            <!-- `deep`: Tauri drags from anywhere inside, the navbar's own slot wrappers and gaps too (it can't mark
+            those); buttons and other controls still click. -->
+            <UDashboardNavbar :toggle="false" :ui="{ root: 'border-none h-(--ui-header-height) px-2 sm:px-2 gap-0 w-full', center: 'flex flex-1 min-w-0 items-center gap-1', left: 'hidden', right: 'hidden' }" data-tauri-drag-region="deep">
                 <template v-if="side === 'left'">
                     <!-- The traffic lights; a strip already covers part of them. -->
-                    <SpaceOnOs detect-os="macos" :show-on-os="true" :class="strip ? 'w-6' : ''" data-tauri-drag-region/>
+                    <SpaceOnOs detect-os="macos" :show-on-os="true" :class="strip ? 'w-6' : ''"/>
                     <WorkspaceSwitcher />
-                    <div class="grow" data-tauri-drag-region/>
+                    <div class="grow"/>
                     <SidebarCollapserButton v-if="!strip" side="left"/>
                 </template>
                 <template v-else-if="first">
                     <SidebarCollapserButton v-if="!strip" side="right"/>
-                    <span v-else class="ps-1 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ firstLabel }}</span>
-                    <div class="grow" data-tauri-drag-region/>
+                    <span v-else class="ps-1 text-sm font-medium text-muted truncate">{{ firstLabel }}</span>
+                    <div class="grow"/>
                     <template v-if="strip">
                         <UTooltip v-for="action in firstActions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
                             <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>

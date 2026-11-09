@@ -5,6 +5,7 @@ import PanelButtons from "~/components/LayoutComponents/PanelButtons.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels, type PanelPaneState} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
 
 /**
@@ -39,8 +40,7 @@ const showBar = computed(() => (strip.value ? !props.inHeader : actions.value.le
 const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
-const {y: scrollY} = useScroll(() => scrollAreaRef.value?.$el)
-const isScrolled = computed(() => scrollY.value > 2)
+const fade = useScrollFade(() => scrollAreaRef.value?.$el)
 </script>
 
 <template>
@@ -109,7 +109,7 @@ const isScrolled = computed(() => scrollY.value > 2)
                 v-if="view?.scroll"
                 ref="scrollAreaRef"
                 orientation="vertical"
-                :class="['no-scrollbar h-full relative scroll-fade', isScrolled && 'is-scrolled']"
+                :class="['no-scrollbar h-full relative', fade]"
                 data-tauri-drag-region
             >
                 <div class="w-full">

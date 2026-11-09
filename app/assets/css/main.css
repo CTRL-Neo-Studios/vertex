@@ -10,22 +10,33 @@
     @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
 
-/* Top fade on a scroll area once it's scrolled; toggle `is-scrolled` from the scroll position. */
-@property --fade-size {
+/* A scroll area's fading edges; `useScrollFade` sets `fade-top` once it's scrolled and `fade-bottom` while there's more below. */
+@property --fade-top {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+@property --fade-bottom {
     syntax: '<length>';
     inherits: false;
     initial-value: 0px;
 }
 
 .scroll-fade {
-    --fade-size: 0px;
-    -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
-    mask-image: linear-gradient(to bottom, transparent, black var(--fade-size));
-    transition: --fade-size 200ms ease;
+    --fade-top: 0px;
+    --fade-bottom: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent);
+    mask-image: linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent);
+    transition: --fade-top 200ms ease, --fade-bottom 200ms ease;
 }
 
-.scroll-fade.is-scrolled {
-    --fade-size: 2rem;
+.scroll-fade.fade-top {
+    --fade-top: 2rem;
+}
+
+.scroll-fade.fade-bottom {
+    --fade-bottom: 2rem;
 }
 
 /* Highlighted code (Comark's rangi in chat replies) carries its dark color in `--shiki-dark`. */

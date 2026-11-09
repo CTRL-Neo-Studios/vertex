@@ -1738,7 +1738,7 @@
 			},
 			"notRepo": {
 				"title": "Not a git repository",
-				"description": "This workspace isn't tracked by git."
+				"description": "This workspace isn't tracked by git yet. Creating a repository starts tracking its changes, with a .gitignore that leaves out system files and Vertex's trash."
 			},
 			"install": "Install git",
 			"checkAgain": "Check again",
@@ -1776,7 +1776,11 @@
 					"title": "Git needs your name and email",
 					"description": "Commits record who made them. Set them with `git config --global user.name` and `git config --global user.email`."
 				}
-			}
+			},
+			"createRepo": "Create repository",
+			"creating": "Creating repository…",
+			"syncChats": "Sync chats",
+			"syncChatsHint": "Chats kept in this workspace are encrypted files git can't merge: when two devices change the same chat, you pick one version."
 		}
 	}
 }
