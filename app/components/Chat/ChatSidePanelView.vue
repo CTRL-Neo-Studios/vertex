@@ -3,6 +3,7 @@ import ChatView from "~/components/Chat/ChatView.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {usePanelActions} from "~/utils/panelViews";
 
 /** The Chat panel view: the side panel's chat, or a way to start one. */
 const {t} = useI18n()
@@ -18,6 +19,8 @@ async function newSidePanelChat() {
         $qt.error(t('app.chat.actionFailed'), e instanceof Error ? e.message : String(e))
     }
 }
+
+usePanelActions(() => [{id: 'newChat', label: t('app.chat.newChat'), icon: 'i-lucide-message-square-plus', onSelect: newSidePanelChat}])
 </script>
 
 <template>

@@ -7,10 +7,11 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
+import {usePanelActions} from "~/utils/panelViews";
 
 /**
- * The left sidebar's Chats view, after the Nuxt UI chat template: a New chat item, then the list (folders first,
- * then loose chats grouped by date) with a hover menu per item, and the chat search.
+ * The left sidebar's Chats view, after the Nuxt UI chat template: New chat and New folder in the panel's header, the
+ * list (folders first, then loose chats grouped by date) with a hover menu per item, and the chat search.
  */
 const {t, locale} = useI18n()
 const $route = useRoute()
@@ -18,7 +19,7 @@ const sessionId = computed(() => $route.params.sessionId as string)
 const session = useActiveSessions().getSession(sessionId)
 const {activeTabUuid} = useActiveTabs(session)
 const {storage, vault, index, error, refresh, search, moveChat, showInSidePanel, openInTab} = useChats(session)
-const {run, chatTitle, newChat, moveFolderTo, panelMenu, chatActions, folderActions} = useChatActions(session)
+const {run, chatTitle, newChat, newFolder, moveFolderTo, panelMenu, chatActions, folderActions} = useChatActions(session)
 
 watch(storage, () => refresh(), {immediate: true})
 
@@ -77,8 +78,10 @@ const chatItem = (chat: ChatSummary): ChatNavItem => ({
     onSelect: (e: Event) => onChatSelect(chat, e),
 })
 
-const newChatItems = computed<NavigationMenuItem[]>(() => [
-    {label: t('app.chat.newChat'), icon: 'i-lucide-circle-plus', onSelect: () => newChat()},
+// Not while the encrypted store is locked or unset: the unlock form is all there is then.
+usePanelActions(() => locked.value ? [] : [
+    {id: 'newChat', label: t('app.chat.newChat'), icon: 'i-lucide-circle-plus', onSelect: () => newChat()},
+    {id: 'newFolder', label: t('app.chat.newFolder'), icon: 'i-lucide-folder-plus', onSelect: () => newFolder()},
 ])
 
 /** Folders first (by name; each holds its subfolders, then its chats newest first), then loose chats by date. */
@@ -227,7 +230,6 @@ const searchGroups = computed<CommandPaletteGroup[]>(() => {
             <ChatVaultForm/>
         </div>
         <template v-else>
-            <UNavigationMenu :items="newChatItems" orientation="vertical" class="pb-2"/>
             <UContextMenu :items="panelMenu" size="sm">
                 <UScrollArea
                     ref="scrollAreaRef"
