@@ -16,11 +16,12 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
+import {useScrollFade} from "~/composables/utility/useScrollFade";
 
 const {t} = useI18n()
 
-const props = defineProps<{ nodes: UITreeNode[], sessionId: string }>()
-const modelValue = defineModel<string | null>()
+/** `emptyMenu`: the right-click menu outside any row (the tree fills its panel, so it's the panel's too). */
+const props = defineProps<{ nodes: UITreeNode[], sessionId: string, emptyMenu?: ContextMenuItem[][] }>()
 const emit = defineEmits<{ (e: 'file-click', value: UITreeNode): void }>()
 
 const $ovl = useOverlay()
@@ -67,8 +68,38 @@ const formattedTreeData = computed<TreeItem[]>(() => {
 function onItemClick(item: TreeItem) {
     const node = item.originalNodeData as UITreeNode
     if (!node.isFolder) emit('file-click', node)
-    modelValue.value = item.id
 }
+
+// One menu for the whole tree (a menu per row gave every row a menu root, and a virtual list remounts rows as it
+// scrolls): the right-clicked row (`data-id`, `data-level`) picks its items before the menu opens.
+const menuRow = shallowRef<{ item: TreeItem, level: number }>()
+function findItem(items: TreeItem[], id: string): TreeItem | undefined {
+    for (const item of items) {
+        const found = item.id === id ? item : item.children && findItem(item.children, id)
+        if (found) return found
+    }
+}
+function onContextMenu(event: MouseEvent) {
+    const row = (event.target as Element | null)?.closest('li')?.querySelector<HTMLElement>('[data-id]')
+    const item = row?.dataset.id ? findItem(formattedTreeData.value, row.dataset.id) : undefined
+    menuRow.value = item && {item, level: Number(row!.dataset.level)}
+}
+const fileIcon = (item: TreeItem) => {
+    const tree = config.value?.viewConfig.fileTree
+    const custom = tree?.allowCustomFileIcons && item.icon
+    return custom || (tree?.showDefaultFileIcons ? 'i-lucide-file' : '')
+}
+const menuItems = computed(() => {
+    const row = menuRow.value
+    return row ? getItemContextMenu(row.item, row.level, (row.item.originalNodeData as UITreeNode).isFolder) : props.emptyMenu ?? []
+})
+
+const treeRef = useTemplateRef<{ $el: HTMLElement }>('treeRef')
+const fade = useScrollFade(() => treeRef.value?.$el)
+// The virtual tree draws rows flat: indents and the nesting guides (at each parent's icon) come from the level, as
+// Nuxt UI's flat rows do for its own link (`sm`: 2.5 + 6 per level, in spacing units).
+const indent = (level: number, extra = 0) => `calc(var(--spacing) * ${(level - 1) * 6 + 2.5 + extra})`
+const guide = (parentLevel: number) => `calc(var(--spacing) * ${(parentLevel - 1) * 6 + 4.5})`
 
 async function openInTab(uuid: string) {
     await $navi.toWorkspaceTab(props.sessionId, openTab(uuid))
@@ -150,47 +181,52 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
 </script>
 
 <template>
-    <UTree
-        :items="formattedTreeData"
-        expanded-icon="i-lucide-folder-open"
-        collapsed-icon="i-lucide-folder-closed"
-        v-model:expanded="expandedFolders"
-        :get-key="(i: TreeItem) => i.id as string"
-        :ui="{
-            itemWithChildren: 'ps-0',
-            listWithChildren: `ms-4.5 pl-2 border-muted border-dotted`
-        }"
-        size="sm"
-    >
-        <template #file-wrapper="{item, level}: {item: TreeItem, level: number}">
-            <UContextMenu :items="getItemContextMenu(item, level, false)" size="sm">
+    <UContextMenu :items="menuItems" size="sm">
+        <UTree
+            ref="treeRef"
+            :items="formattedTreeData"
+            virtualize
+            expanded-icon="i-lucide-folder-open"
+            collapsed-icon="i-lucide-folder-closed"
+            v-model:expanded="expandedFolders"
+            :get-key="(i: TreeItem) => i.id as string"
+            :class="['no-scrollbar h-full py-2.5', fade]"
+            data-tauri-drag-region
+            size="sm"
+            @contextmenu.capture="onContextMenu"
+        >
+            <template #file-wrapper="{item, level}: {item: TreeItem, level: number}">
                 <UButton
                     size="sm"
+                    :data-id="item.id"
+                    :data-level="level"
                     :label="config?.viewConfig.fileTree.showFileExtInName ? item.label : fileNameFromPath(item.label ?? '', true)"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
-                    :class="['select-none relative align-middle items-center justify-start text-left transition-all duration-300 after:transition-all after:duration-300 after:h-0 after:w-0 after:border-0 after:border-primary/0 after:left-0 after:absolute', item.id == activeTabUuid ? ' transition-all duration-300 pl-4 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
+                    :class="['select-none relative align-middle items-center justify-start text-left transition-all duration-300 after:transition-all after:duration-300 after:h-0 after:w-0 after:border-0 after:border-primary/0 after:left-0 after:absolute', item.id == activeTabUuid ? ' transition-all duration-300 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
+                    :style="{paddingInlineStart: indent(level, item.id == activeTabUuid ? 1.5 : 0)}"
                     block
                     @click="onItemClick(item)"
-                    :key="`${item.id}-file-tree-item`"
-                    :icon="`${(config?.viewConfig.fileTree.showDefaultFileIcons) ? (config?.viewConfig.fileTree.allowCustomFileIcons && item.icon) ? item.icon : 'i-lucide-file' : (config?.viewConfig.fileTree.allowCustomFileIcons && item.icon) ? item.icon : '' }`"
                 >
+                    <template #leading>
+                        <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
+                        <UIcon v-if="fileIcon(item)" :name="fileIcon(item)" class="size-4 shrink-0"/>
+                    </template>
                     <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
                         <div class="grow"/>
                         <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${getFileExtensionFromPath(item.label ?? '')}`"/>
                     </template>
                 </UButton>
-            </UContextMenu>
-        </template>
-        <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
-            <UContextMenu :items="getItemContextMenu(item, level, true)" size="sm">
-                <div :key="`${item.id}-file-tree-item`" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
+            </template>
+            <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
+                <div :data-id="item.id" :data-level="level" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
+                    <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
                     <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
                     <span class="truncate text-xs overflow-ellipsis">{{ item.label }}</span>
                     <span class="grow"/>
                     <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
                 </div>
-            </UContextMenu>
-        </template>
-    </UTree>
+            </template>
+        </UTree>
+    </UContextMenu>
 </template>

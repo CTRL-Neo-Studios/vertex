@@ -96,13 +96,24 @@ Checked in the browser: a modify event that adds `icon:` to a note's properties 
 ## O2: File tree
 
 ### Change
-- One `UContextMenu` around the tree; the row's `data-id` on `contextmenu` picks its items.
-- The active row through `UTree`'s `v-model` / `data-selected` instead of each row reading `activeTabUuid`, so a tab switch doesn't re-render every row.
-- `UTree :virtualize`: the tree is the scroll container (replacing `PanelFilesView`'s `UScrollArea`; the scroll fade on the tree), indentation from the row's `level` (flat rows lose the nested guide line; a per-level CSS guide replaces it), keys stay uuids, keyboard navigation from reka.
-- Revealing the active file scrolls with the virtualizer (`scrollToIndex`), as the tab header does.
+- Done: one `UContextMenu` around the tree. Rows carry `data-id` and `data-level`; a capture `contextmenu` listener picks the row's items before the menu opens, and outside any row it shows the panel's New items (`emptyMenu`, which `PanelFilesView` passes; its own menu and `UScrollArea` are gone).
+- Kept: the active row still reads `activeTabUuid`. With about 40 rows drawn, a tab switch re-renders only those, so `v-model` / `data-selected` wasn't needed. The unused `v-model` (`activeTreeItem`, `StateKey.activeTreeItem`) is removed.
+- Done: `UTree virtualize`. The tree is the scroll container (with the scroll fade). File rows get the indent from their level (flat mode only indents Nuxt UI's own link, which the folder rows keep). The nesting guides are a dotted line per parent level at that parent's icon. Keys stay uuids; keyboard navigation comes from reka.
+- Dropped: revealing the active file. Nothing scrolls the tree to it today; adding it would be new behaviour.
 
 ### Acceptance
 - A 3k-note folder expands, scrolls and switches tabs without long tasks; right-click, rename, keyboard arrows and expand/collapse work as before.
+
+### Results (after)
+| Scenario | After O1 | After O2 |
+|---|---|---|
+| Switch tabs ×10, Files (`F00` open) | 0.57 s, longest 71 ms | none |
+| Open the 3000-note folder (10 003 files) | 2.0 s | none |
+| Switch tabs ×10 with it open | 28 s, 2.8 s each | none |
+| Scroll it (20 steps of 600 px) | not measured | none |
+| Open 5000 files with it open | 2.1 s | one task, 96 ms |
+
+Checked in the browser: indents and guides three levels deep (screenshot), the active row's bar and badge, right-click on a note (Run workflow on this note …), a folder, a workflow (Run, Dry run) and empty space (New note, folder, workflow), clicking a folder open, ArrowDown, End (to the last of 3000+ rows) and Home, the top fade after scrolling.
 
 ## O3: File tree drag & drop
 

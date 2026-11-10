@@ -61,7 +61,6 @@ export const StateKey = {
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,
-    activeTreeItem: (s: string) => `active.workspace.active-tree-item-${s}`,
 } as const
 
 /**

@@ -109,6 +109,8 @@ The frontend wrapper is `app/utils/stateClient.ts`. It has no Vue lifecycle, so 
 
 `useActiveWorkspaceIndex` keeps one reactive entry per file (`fileIndex`, by path) and a non-reactive `LinkGraph`. What reads the index re-renders whenever what it read changes, and an autosave runs `updateIndex` about once a second while typing. So writes that change nothing are skipped: `applyProperties` and `syncLinks` compare first. `fileTree` copies only what the tree shows (`UITreeNode`: uuid, name, relative path, folder, `icon`). A note's save then re-renders neither the Files tree nor the backlink lists. Link targets resolve through the graph (`resolveLink`, used by chat links), not by scanning every file.
 
+The Files view (`FileTreeComponent`) is a virtual `UTree`: only the rows on screen exist, so a folder of thousands of notes opens and scrolls like a small one. Its rows are flat. Each file row's indent and the dotted nesting guides come from the row's level. There is one right-click menu for the whole tree: the clicked row's `data-id` picks its items, and outside any row it shows the panel's New items.
+
 ### AI requests
 
 Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys never reach the webview:
