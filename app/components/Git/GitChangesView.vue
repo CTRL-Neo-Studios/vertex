@@ -377,7 +377,7 @@ const mergeActions = computed(() => [{
                     </UContextMenu>
                 </section>
             </div>
-            <div class="p-2 flex flex-col gap-1.5">
+            <div class="p-2 flex flex-col gap-1.5 pb-4">
                 <UTextarea
                     v-model="message"
                     :placeholder="t('app.git.message')"
