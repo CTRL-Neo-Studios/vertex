@@ -70,9 +70,16 @@ describe('chatTools', () => {
         expect(await run(chatTools(deps(), new Set()).readNote, {})).toEqual({error: expect.stringContaining('No note is open')})
     })
 
-    it('fetchUrl asks before fetching, except from the sites allowed in the chat', () => {
-        const asks = chatTools(deps({allowedHost: host => host === 'docs.example.com'}), new Set()).fetchUrl!.needsApproval as (input: unknown) => boolean
-        expect([asks({url: 'https://docs.example.com/a'}), asks({url: 'https://evil.example/?q=x'}), asks({url: 'not a url'})]).toEqual([false, true, true])
+    it('fetchUrl asks before fetching, except from the sites allowed in the chat and the URLs the user wrote', () => {
+        const asks = chatTools(deps({allowedHost: host => host === 'docs.example.com'}), new Set()).fetchUrl!.needsApproval as (input: unknown, options: unknown) => boolean
+        const messages = [
+            {role: 'user', content: [{type: 'text', text: 'Summarize https://blog.example/post#intro, please.'}]},
+            {role: 'assistant', content: 'Fetching https://evil.example/steal?q=secret'},
+        ]
+        const ask = (url: string) => asks({url}, {messages})
+        expect([ask('https://docs.example.com/a'), ask('https://evil.example/?q=x'), ask('not a url')]).toEqual([false, true, true])
+        // Written by the user (fragment and trailing comma aside), not by the model.
+        expect([ask('https://blog.example/post'), ask('https://BLOG.example/post#top'), ask('https://evil.example/steal?q=secret')]).toEqual([false, false, true])
     })
 
     it('findFiles filters by folder, name and kind, and reports what it left out', async () => {

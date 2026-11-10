@@ -132,6 +132,10 @@ export default defineNuxtConfig({
                 "diff",
                 // The chat's `bash` tool (app/utils/chatBash.ts), imported on its first command; same reason.
                 "just-bash",
+                // fetchUrl (app/utils/webPage.ts); the tool imports linkedom and defuddle on the first HTML page.
+                "@ai-sdk/tool-web-fetch",
+                "linkedom",
+                "defuddle/node",
             ],
             // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
             // exclude: ["@type32/workflows"]

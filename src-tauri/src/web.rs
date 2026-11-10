@@ -1,15 +1,16 @@
-//! `web_fetch`, behind the chat's `fetchUrl` tool: a GET of any public http(s) page, returned as text. No cookies, no
-//! keys, no proxy. Hosts on this machine or the local network are refused, at every hop: the resolver drops their
-//! addresses (so a public name pointing at 192.168.x.x fails too) and URLs naming such an address are rejected before
-//! the request and at each redirect.
+//! `web_fetch`, the transport under the chat's `fetchUrl` tool (the AI SDK's web fetch, `app/utils/webPage.ts`): one
+//! GET of a public http(s) URL, without following redirects (the tool follows them, each hop another call), returned
+//! raw. No cookies, no keys, no proxy. Hosts on this machine or the local network are refused at every hop: the
+//! resolver drops their addresses (so a public name pointing at 192.168.x.x fails too) and URLs naming such an address
+//! are rejected before the request.
 
 use std::error::Error;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
+/// The tool's `maxBytes`; one byte more is read, so its own size check sees an over-long body.
 const MAX_BODY: usize = 2 * 1024 * 1024;
-const MAX_REDIRECTS: usize = 5;
 const LOCAL: &str = "refused: the address is on this computer or its local network";
 
 /// Whether `ip` is on the public internet: not loopback, private, link-local, shared (CGNAT), unspecified,
@@ -75,15 +76,7 @@ static CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
         .no_proxy()
         .dns_resolver(Arc::new(PublicOnly))
         .user_agent(concat!("Vertex/", env!("CARGO_PKG_VERSION")))
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() > MAX_REDIRECTS {
-                attempt.error("too many redirects")
-            } else if !allowed_url(attempt.url()) {
-                attempt.error(LOCAL)
-            } else {
-                attempt.follow()
-            }
-        }))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| e.to_string())
 });
@@ -100,61 +93,56 @@ fn describe(error: &dyn Error) -> String {
     text
 }
 
-/// Text types the webview can read; anything else comes back without its body.
-fn is_text(content_type: &str) -> bool {
-    let kind = content_type.split(';').next().unwrap_or_default().trim().to_ascii_lowercase();
-    kind.is_empty() || kind.starts_with("text/") || kind.ends_with("json") || kind.ends_with("xml")
-}
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebPage {
-    /// After redirects.
-    url: String,
+struct Head {
     status: u16,
-    content_type: String,
-    /// `None` for types that aren't text (see [`is_text`]); invalid UTF-8 is replaced.
-    body: Option<String>,
-    /// The body was cut at 2 MB.
-    truncated: bool,
+    status_text: String,
+    headers: Vec<(String, String)>,
+}
+
+/// The response as bytes: the head's JSON length (u32, big-endian), the head, then the body (raw, not JSON: a page
+/// can be megabytes).
+fn frame(head: &Head, body: &[u8]) -> Result<Vec<u8>, String> {
+    let head = serde_json::to_vec(head).map_err(|e| e.to_string())?;
+    let len = u32::try_from(head.len()).map_err(|e| e.to_string())?;
+    Ok([&len.to_be_bytes()[..], &head, body].concat())
 }
 
 #[tauri::command]
-pub async fn web_fetch(url: String) -> Result<WebPage, String> {
+pub async fn web_fetch(url: String, accept: Option<String>) -> Result<tauri::ipc::Response, String> {
     let url = reqwest::Url::parse(&url).map_err(|e| format!("invalid url: {e}"))?;
     if !allowed_url(&url) {
         return Err(if matches!(url.scheme(), "http" | "https") { LOCAL.into() } else { "only http and https URLs can be fetched".into() });
     }
     let client = CLIENT.as_ref().map_err(Clone::clone)?;
-    let mut response = client
-        .get(url)
-        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5")
-        .send()
-        .await
-        .map_err(|e| describe(&e))?;
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
-    let mut page = WebPage { url: response.url().to_string(), status: response.status().as_u16(), content_type, body: None, truncated: false };
-    if !is_text(&page.content_type) {
-        return Ok(page);
+    let mut request = client.get(url);
+    if let Some(accept) = accept {
+        request = request.header(reqwest::header::ACCEPT, accept);
     }
-    let mut bytes = Vec::new();
-    // ponytail: bytes as UTF-8 (lossy), ignoring the page's charset; decode with encoding_rs if non-UTF-8 pages matter.
-    while let Some(chunk) = response.chunk().await.map_err(|e| describe(&e))? {
-        let room = MAX_BODY - bytes.len();
-        if chunk.len() > room {
-            bytes.extend_from_slice(&chunk[..room]);
-            page.truncated = true;
-            break;
+    let fail = |e: reqwest::Error| {
+        let text = describe(&e);
+        if text.contains(LOCAL) { LOCAL.to_owned() } else { text }
+    };
+    let mut response = request.send().await.map_err(fail)?;
+    let status = response.status();
+    let head = Head {
+        status: status.as_u16(),
+        status_text: status.canonical_reason().unwrap_or_default().to_owned(),
+        headers: response.headers().iter().filter_map(|(k, v)| Some((k.to_string(), v.to_str().ok()?.to_owned()))).collect(),
+    };
+    let mut body = Vec::new();
+    // A declared length over the limit is refused by the tool from the header alone.
+    if response.content_length().is_none_or(|n| n <= MAX_BODY as u64) {
+        while let Some(chunk) = response.chunk().await.map_err(fail)? {
+            body.extend_from_slice(&chunk);
+            if body.len() > MAX_BODY {
+                body.truncate(MAX_BODY + 1);
+                break;
+            }
         }
-        bytes.extend_from_slice(&chunk);
     }
-    page.body = Some(String::from_utf8_lossy(&bytes).into_owned());
-    Ok(page)
+    Ok(tauri::ipc::Response::new(frame(&head, &body)?))
 }
 
 #[cfg(test)]
@@ -172,15 +160,5 @@ mod tests {
         let ok = |u: &str| allowed_url(&reqwest::Url::parse(u).unwrap());
         assert!(ok("https://example.com/a") && ok("http://1.1.1.1/"));
         assert!(!ok("http://127.0.0.1:3000/") && !ok("http://[::1]/") && !ok("file:///etc/passwd") && !ok("ftp://example.com/"));
-    }
-
-    #[test]
-    fn text_types_are_read_and_others_are_not() {
-        for t in ["text/html; charset=utf-8", "application/json", "application/ld+json", "application/xhtml+xml", ""] {
-            assert!(is_text(t), "{t}");
-        }
-        for t in ["image/png", "application/pdf", "application/octet-stream"] {
-            assert!(!is_text(t), "{t}");
-        }
     }
 }

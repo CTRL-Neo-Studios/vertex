@@ -1,6 +1,7 @@
-import {getToolName, isToolUIPart, jsonSchema, tool, toolSearch, type Tool, type ToolSet} from "ai";
+import {getToolName, isToolUIPart, jsonSchema, tool, toolSearch, type ModelMessage, type Tool, type ToolSet} from "ai";
 import {editorTools} from "@type32/codemirror-rich-obsidian-editor/ext/ai/tools";
 import type {ChatMode, ChatScope, VertexChatMessage} from "#shared/types/app/chats";
+import {webFetch} from "~/utils/webPage";
 
 /** A file or folder in the workspace, workspace-relative; `kind` is its extension (lowercase) or `folder`. */
 export interface WorkspaceEntry {
@@ -18,8 +19,6 @@ export interface NoteToolDeps {
     openNote?: () => string | undefined
     /** Shows the note at `path` (or by name) in an editor tab beside the chat; returns what the model gets back. */
     openInEditor?: (path: string) => Promise<object>
-    /** `url` fetched (Rust `web_fetch`) as text from `offset` (see `fetchPage`); returns what the model gets back. */
-    fetchUrl?: (url: string, offset: number) => Promise<object>
     /** Sites (`hostname`s) the user allowed `fetchUrl` for in this chat: no approval asked. */
     allowedHost?: (host: string) => boolean
     /** Workspace-relative paths of the notes under `folder` (`''` = all). */
@@ -220,6 +219,29 @@ export const hostnameOf = (url: string) => {
     }
 }
 
+/** `url` without its `#fragment` (never sent), normalized; `undefined` when it doesn't parse. */
+function bareUrl(url: string) {
+    try {
+        const parsed = new URL(url)
+        parsed.hash = ''
+        return parsed.href
+    } catch {
+        return undefined
+    }
+}
+
+/**
+ * Whether the user wrote `url` in one of their messages (trailing punctuation aside): then fetching it is their ask,
+ * not the model's. Only user messages count, as the model writes everything else.
+ */
+export function urlInUserMessages(url: string, messages: ModelMessage[]): boolean {
+    const wanted = bareUrl(url)
+    if (!wanted) return false
+    const texts = messages.flatMap(m => m.role !== 'user' ? [] : typeof m.content === 'string' ? [m.content] : m.content.flatMap(p => p.type === 'text' ? [p.text] : []))
+    return texts.some(text => [...text.matchAll(/https?:\/\/[^\s<>"'`]+/gi)]
+        .some(([found]) => bareUrl(found) === wanted || bareUrl(found.replace(/[.,;:!?)\]}]+$/, '')) === wanted))
+}
+
 /**
  * The editor package's tools, the proposals also taking the note to change (`path`; it opens beside the chat, where
  * the user decides). They have no `execute`: `useChats` runs them in the editor, after {@link modeError}.
@@ -396,21 +418,12 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
             execute: ({path}) => deps.openInEditor ? deps.openInEditor(path) : {error: 'Notes can\'t be opened from this chat.'},
         }),
         fetchUrl: tool({
-            description: 'Fetch a web page (http or https) and read it as text: HTML comes back as Markdown-like text (links kept), '
-                + 'JSON and plain text as they are. The user approves the first fetch from each site. A long page comes in parts: '
-                + 'when the result says `truncated`, fetch it again with `offset` = its nextOffset. Addresses on the user\'s computer '
-                + 'or local network are refused.',
-            inputSchema: jsonSchema<{ url: string, offset?: number }>({
-                type: 'object',
-                properties: {
-                    url: {type: 'string', description: 'The full URL, e.g. "https://example.com/page".'},
-                    offset: {type: 'integer', minimum: 0, description: 'Where to start reading, in characters of the text. Default 0.'},
-                },
-                required: ['url'],
-                additionalProperties: false,
-            }),
-            needsApproval: ({url}) => !deps.allowedHost?.(hostnameOf(url)),
-            execute: ({url, offset}) => deps.fetchUrl ? deps.fetchUrl(url, offset ?? 0) : {error: 'Web pages can\'t be fetched in this chat.'},
+            description: `${webFetch.description} The user approves the first fetch from each site, unless they wrote the URL `
+                + 'in a message. Addresses on the user\'s computer or local network are refused.',
+            inputSchema: webFetch.inputSchema,
+            needsApproval: ({url}, {messages}) => !deps.allowedHost?.(hostnameOf(url)) && !urlInUserMessages(url, messages),
+            execute: webFetch.execute,
+            toModelOutput: webFetch.toModelOutput,
         }),
         findFiles: tool({
             description: 'Find files and folders in the workspace by name, of any type (notes, images, PDFs, bases, canvases, workflows), or list a folder. Returns workspace-relative paths with their kind (the extension, or "folder"). To search the text of notes, use searchNotes.',

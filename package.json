@@ -19,8 +19,9 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
-		"@ai-sdk/openai-compatible": "^3.0.85",
-		"@ai-sdk/vue": "^4.0.163",
+		"@ai-sdk/openai-compatible": "^3.0.87",
+		"@ai-sdk/tool-web-fetch": "^1.0.16",
+		"@ai-sdk/vue": "^4.0.166",
 		"@catppuccin/codemirror": "^1.0.3",
 		"@comark/nuxt": "^0.8.1",
 		"@iconify-json/lucide": "^1.2.151",
@@ -48,7 +49,7 @@
 		"@type32/yaml-editor-form": "0.2.4",
 		"@vue-flow/core": "^1.48.2",
 		"@vueuse/nuxt": "15.0.0",
-		"ai": "^7.0.163",
+		"ai": "^7.0.166",
 		"compromise": "^14.19.0",
 		"diff": "^9.0.0",
 		"just-bash": "^3.6.0",

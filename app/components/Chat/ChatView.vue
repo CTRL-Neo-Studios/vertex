@@ -248,10 +248,12 @@ function toolView(part: ToolPart) {
 	const output = part.state === 'output-available' ? part.output as {
 		status?: string,
 		error?: string,
-		declined?: boolean
+		declined?: boolean,
+		// The AI SDK's tools (fetchUrl) answer failures as `{type: 'error', message}`.
+		type?: string
 	} | undefined : undefined
 	const pending = part.state === 'input-streaming' || part.state === 'input-available'
-	const suffix = part.state === 'output-error' || output?.error ? t('app.chat.tools.failed')
+	const suffix = part.state === 'output-error' || output?.error || output?.type === 'error' ? t('app.chat.tools.failed')
 		: part.state === 'output-denied' || output?.declined ? t('app.chat.tools.declined')
 			: output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
 				: part.state === 'approval-requested' ? t(name === 'fetchUrl' ? 'app.chat.tools.asksToFetch' : 'app.chat.tools.asksToRun')

@@ -12,7 +12,6 @@ import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
-import {fetchPage} from "~/utils/webPage";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
 import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "~/utils/chatBash";
@@ -559,7 +558,6 @@ export function useChats(session?: ActiveSession) {
                 return file ? slashed(file.relativePath) : undefined
             },
             openInEditor: path => openInEditor(entry.meta.id, path),
-            fetchUrl: fetchPage,
             allowedHost: host => !!entry.meta.allowedHosts?.includes(host),
             list,
             files: workspaceFiles,
