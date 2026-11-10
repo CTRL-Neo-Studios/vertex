@@ -15,6 +15,7 @@ import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToo
 import {fetchPage} from "~/utils/webPage";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
+import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "~/utils/chatBash";
 import {TRASH_DIR} from "#shared/workflows/vault";
 import type {Op} from "#shared/workflows/effects";
 import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
@@ -45,6 +46,8 @@ interface LiveChat {
     retryProfileId?: string
     /** Write mode: what the reply being written has staged so far, by path; kept on the reply when it ends. */
     staging?: Map<string, ChatChange>
+    /** The reply's `bash` sandbox, made on its first command; a new reply starts a fresh one (notes may have changed). */
+    sandbox?: Promise<Sandbox>
 }
 
 /**
@@ -405,7 +408,7 @@ export function useChats(session?: ActiveSession) {
     }
 
     /** Stages `markdown` as a note's new text (`create`: a new note). Results and errors are worded for the model. */
-    async function stage(entry: LiveChat, path: string, markdown: string, create: boolean): Promise<object> {
+    async function stage(entry: LiveChat, path: string, markdown: string, create: boolean): Promise<{ error: string } | { status: 'staged', path: string }> {
         const staged = entry.staging ??= new Map()
         const known = stagedKey(entry, path)
         let at: string
@@ -434,6 +437,27 @@ export function useChats(session?: ActiveSession) {
         if (!allowed) return {error: `"${at}" is outside this chat's scope, which allows ${scopeText(entry.meta.scope, named)}. Ask the user to widen the scope or attach the note.`}
         staged.set(at, {path: at, before, after: markdown, state: 'pending'})
         return {status: 'staged', path: at}
+    }
+
+    /**
+     * `bash`: `command` in the reply's sandbox over the workspace's text files (as `read` gives them). In Write mode the
+     * files it wrote that differ from the notes are staged; new files only as `.md` notes. Worded for the model.
+     */
+    async function runBash(entry: LiveChat, command: string, read: (path: string) => Promise<string | null>, signal?: AbortSignal): Promise<object> {
+        const paths = () => noteFiles().map(f => slashed(f.relativePath)).filter(p => !p.split('/').some(part => part.startsWith('.')))
+        const box = await (entry.sandbox ??= createSandbox(paths(), read))
+        const result = await runCommand(box, command, signal)
+        if (modeOf(entry) !== 'write') return result
+        const staged: string[] = []
+        const notStaged: { path: string, error: string }[] = []
+        for (const w of await sandboxWrites(box, read)) {
+            const done = w.create && !/\.md$/i.test(w.path)
+                ? {error: 'Only Markdown notes (.md) are staged; other new files stay in the sandbox.'}
+                : await stage(entry, w.path, w.text, w.create)
+            if ('error' in done) notStaged.push({path: w.path, error: done.error})
+            else staged.push(done.path)
+        }
+        return {...result, ...(staged.length && {staged}), ...(notStaged.length && {notStaged})}
     }
 
     const updateMessage = (entry: LiveChat, messageId: string | undefined, change: (m: VertexChatMessage) => VertexChatMessage) => {
@@ -515,16 +539,20 @@ export function useChats(session?: ActiveSession) {
         const pinned = last?.role === 'assistant' ? last.metadata?.profileId ?? entry.meta.profileId : entry.retryProfileId ?? entry.meta.profileId
         entry.retryProfileId = undefined
         // A new reply stages from scratch; a tool round goes on with what its reply staged.
-        if (last?.role !== 'assistant') entry.staging = undefined
+        if (last?.role !== 'assistant') {
+            entry.staging = undefined
+            entry.sandbox = undefined
+        }
         const {profile, provider} = resolveModel(pinned)
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
         const mode = modeOf(entry)
         const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
+        const read = mode === 'write' ? (path: string) => readStaged(entry, path) : readNote
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
-            read: mode === 'write' ? path => readStaged(entry, path) : readNote,
+            read,
             openNote: () => {
                 const shown = editTarget()
                 const file = shown && $index.getFileByUuid(shown)
@@ -536,8 +564,14 @@ export function useChats(session?: ActiveSession) {
             list,
             files: workspaceFiles,
             mode,
-            stage: (path, markdown, create) => stage(entry, path, markdown, create),
+            stage: async (path, markdown, create) => {
+                const done = await stage(entry, path, markdown, create)
+                // A file the sandbox already read would otherwise give `bash` the text from before this change.
+                if ('path' in done) await (await entry.sandbox)?.fs.writeFile(`${WORKSPACE}/${done.path}`, markdown)
+                return done
+            },
             runWorkflow,
+            bash: (command, signal) => runBash(entry, command, read, signal),
         }, usedToolNames(messages)) : undefined
         const named = namedNotes(messages, entry.staging)
         const open = toolsOn ? editTarget() : undefined

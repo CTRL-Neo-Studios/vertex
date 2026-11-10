@@ -238,12 +238,13 @@ const TOOL_ICONS: Record<string, string> = {
 	writeNote: 'i-lucide-file-pen',
 	editNote: 'i-lucide-file-pen-line',
 	runWorkflow: 'i-lucide-workflow',
+	bash: 'i-lucide-square-terminal',
 }
 const TOOL_DETAIL_CHARS = 4000
 
 function toolView(part: ToolPart) {
 	const name = getToolName(part)
-	const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string, url?: string }
+	const input = (part.input ?? {}) as { query?: string, path?: string, folder?: string, url?: string, command?: string }
 	const output = part.state === 'output-available' ? part.output as {
 		status?: string,
 		error?: string,
@@ -255,7 +256,7 @@ function toolView(part: ToolPart) {
 			: output?.status === 'accepted' || output?.status === 'rejected' ? t(`app.chat.tools.${output.status}`)
 				: part.state === 'approval-requested' ? t(name === 'fetchUrl' ? 'app.chat.tools.asksToFetch' : 'app.chat.tools.asksToRun')
 					: pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('app.chat.tools.waiting')
-						: input.query ?? input.path ?? input.folder ?? input.url
+						: input.query ?? input.path ?? input.folder ?? input.url ?? input.command
 	return {
 		text: te(`app.chat.tools.names.${name}`) ? t(`app.chat.tools.names.${name}`) : name,
 		suffix,
@@ -264,8 +265,21 @@ function toolView(part: ToolPart) {
 	}
 }
 
+/** A `bash` call's result as a terminal shows it: the command, its output and exit code, then what it staged. */
+function shellDetail(part: ToolPart, output: ShellOutput) {
+	const input = part.input as { command?: string } | undefined
+	const {stdout, stderr, exitCode, ...staging} = output
+	const rest = Object.keys(staging).length ? JSON.stringify(staging, null, 2) : ''
+	return [`$ ${input?.command ?? ''}`, stdout, stderr, t('app.chat.tools.exitCode', {code: exitCode}), rest].filter(Boolean).join('\n')
+}
+
+type ShellOutput = { stdout?: string, stderr?: string, exitCode?: number }
+
 function toolDetail(part: ToolPart) {
-	const text = part.state === 'output-error' ? part.errorText : part.state === 'output-available' ? JSON.stringify(part.output, null, 2) : ''
+	const output = part.state === 'output-available' ? part.output as ShellOutput | undefined : undefined
+	const text = part.state === 'output-error' ? part.errorText
+		: getToolName(part) === 'bash' && typeof output?.exitCode === 'number' ? shellDetail(part, output)
+			: part.state === 'output-available' ? JSON.stringify(part.output, null, 2) : ''
 	return text.length > TOOL_DETAIL_CHARS ? `${text.slice(0, TOOL_DETAIL_CHARS)}…` : text
 }
 

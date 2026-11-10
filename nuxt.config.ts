@@ -128,8 +128,10 @@ export default defineNuxtConfig({
                 "zod",
                 "@vue-flow/core",
                 "alfaaz",
-                // Write mode's change view (ChatChanges.vue); found at runtime otherwise, which reloads the window.
+                // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
+                // The chat's `bash` tool (app/utils/chatBash.ts), imported on its first command; same reason.
+                "just-bash",
             ],
             // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
             // exclude: ["@type32/workflows"]

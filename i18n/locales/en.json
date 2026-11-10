@@ -1570,12 +1570,14 @@
 					"runWorkflow": "Run a workflow",
 					"askUser": "Ask you",
 					"openInEditorTab": "Open in an editor tab",
-					"fetchUrl": "Fetch a web page"
+					"fetchUrl": "Fetch a web page",
+					"bash": "Run a command"
 				},
 				"asksToFetch": "asks to fetch",
 				"fetch": "Fetch",
 				"dontFetch": "Don't fetch",
-				"allowSite": "Always for {host}"
+				"allowSite": "Always for {host}",
+				"exitCode": "exit code {code}"
 			},
 			"edit": "Edit",
 			"send": "Send",

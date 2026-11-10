@@ -151,6 +151,10 @@ describe('rankTools', () => {
         expect(rankTools({query: 'edit a note', tools: both}, 'write')).toEqual(['editNote', 'proposeEdit'])
         expect(rankTools({query: 'edit a note', tools: both}, 'suggest')).toEqual(['proposeEdit', 'editNote'])
     })
+    it('puts bash after every other match, even one made for another mode', () => {
+        const all = [{name: 'bash', description: 'Run a command to search notes and edit many files.'}, {name: 'searchNotes', description: 'Search the notes.'}, {name: 'proposeEdit', description: 'Suggest mode: edit a note.'}]
+        expect(rankTools({query: 'search notes and edit', tools: all}, 'write')).toEqual(['searchNotes', 'proposeEdit', 'bash'])
+    })
 })
 
 describe('markModeSwitches', () => {

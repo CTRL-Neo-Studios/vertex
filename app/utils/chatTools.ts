@@ -35,6 +35,11 @@ export interface NoteToolDeps {
     stage?: (path: string, markdown: string, create: boolean) => Promise<object>
     /** Runs the workflow at `path` (or by name) on `note`, for real or `dry`; returns what the model gets back. */
     runWorkflow?: (path: string, note: string | undefined, dry: boolean) => Promise<object>
+    /**
+     * Runs a command in the reply's sandbox (`chatBash.ts`); in Write mode, also stages what it wrote. Returns what the
+     * model gets back.
+     */
+    bash?: (command: string, signal?: AbortSignal) => Promise<object>
 }
 
 /** `askUser`'s questions; see the tool's schema. */
@@ -57,6 +62,8 @@ const LIST_LIMIT = 200
 const FIND_TOOLS = 'findTools'
 /** Always sent loaded: a question shouldn't cost a tool search first. */
 export const ASK_USER = 'askUser'
+/** Listed after every other match: the note tools do most things better. */
+const BASH = 'bash'
 
 const MODE_NAMES: Record<ChatMode, string> = {read: 'Read', suggest: 'Suggest', write: 'Write'}
 
@@ -118,8 +125,10 @@ export function toolsPrompt(mode: ChatMode, scope: string, tools: boolean): stri
     // Tools first: small models lose the tool search behind the mode's wording and call made-up tools.
     return [
         'You can use tools on the user\'s notes. They load on demand: first call `findTools` with what you want to do (for '
-        + 'example "search notes", "find files", "read note", "edit a note", "run a workflow" or "fetch a web page"), then call the tools it '
-        + `returns. Only \`findTools\` and \`${ASK_USER}\` can be called without searching first.`,
+        + 'example "search notes", "find files", "read note", "edit a note", "run a workflow", "fetch a web page" or "run a bash '
+        + `command"), then call the tools it returns. Only \`findTools\` and \`${ASK_USER}\` can be called without searching first. `
+        + 'Prefer the note tools: the sandboxed shell over the workspace (search "run a bash command") is for what they can\'t '
+        + 'do, like counting across many notes or changing many files at once.',
         current,
         rule,
         `${MODES} A tool whose description names a mode only works in that mode.`,
@@ -154,7 +163,7 @@ export function scopeText(scope: ChatScope | undefined, named: NamedNotes): stri
 
 /**
  * Tools whose name or description share a word with `query`, best first, the ones made for another mode than `mode`
- * last; every tool when none match. There are only a few, and a model that searched with the wrong words should still
+ * after them and `bash` last; every tool when none match. There are only a few, and a model that searched with the wrong words should still
  * find them.
  */
 export function rankTools({query, tools}: { query: string, tools: { name: string, description?: string }[] }, mode?: ChatMode): string[] {
@@ -169,11 +178,12 @@ export function rankTools({query, tools}: { query: string, tools: { name: string
         return {
             name: t.name,
             score: asked.reduce((sum, w) => sum + (name.includes(w) ? 2 : 0) + (description.includes(w) ? 1 : 0), 0),
-            elsewhere: Number(!!mode && !!MODE_OF[t.name] && MODE_OF[t.name] !== mode),
+            // Another mode's tools after this mode's, and bash after both.
+            later: Number(!!mode && !!MODE_OF[t.name] && MODE_OF[t.name] !== mode) + Number(t.name === BASH) * 2,
         }
     })
     const matched = scored.filter(s => s.score > 0)
-    return (matched.length ? matched : scored).sort((a, b) => a.elsewhere - b.elsewhere || b.score - a.score).map(s => s.name)
+    return (matched.length ? matched : scored).sort((a, b) => a.later - b.later || b.score - a.score).map(s => s.name)
 }
 
 const pathInput = (description: string) => jsonSchema<{ path: string }>({
@@ -443,6 +453,20 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
                 }
                 return deps.runWorkflow ? deps.runWorkflow(path, note, !!dryRun) : {error: 'Workflows can\'t run in this chat.'}
             },
+        }),
+        [BASH]: tool({
+            description: 'Run a bash command in a sandbox, for what the other tools can\'t do: counting or aggregating across many '
+                + 'notes, regex searches with context, transforming many files at once, jq or awk on data. Prefer searchNotes, '
+                + 'readNote, findFiles and the edit tools otherwise. The workspace\'s text files are at /workspace, the working '
+                + 'directory (hidden folders left out); /tmp is scratch space. grep, sed, awk, jq, find, sort, uniq, wc, diff, '
+                + 'xargs and other common commands are built in; there is no network, no python or node, and a command stops after '
+                + '10 s. Files stay between commands of the same reply. In Write mode, the files a command changes or creates under '
+                + '/workspace (new ones must end in .md) are staged like writeNote, for the user to review; a deletion isn\'t staged, '
+                + 'and a move stages only the new file. In Read and Suggest mode nothing reaches the notes.',
+            inputSchema: jsonSchema<{ command: string }>({
+                type: 'object', properties: {command: {type: 'string', description: 'The bash command or script.'}}, required: ['command'], additionalProperties: false,
+            }),
+            execute: ({command}, {abortSignal}) => deps.bash ? deps.bash(command, abortSignal) : {error: 'Commands can\'t run in this chat.'},
         }),
     }
     const deferred = Object.entries(tools).map(([name, t]) => [name, used.has(name) ? gated(name, t, deps.mode) : {...gated(name, t, deps.mode), deferLoading: true}])
