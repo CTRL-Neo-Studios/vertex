@@ -211,7 +211,7 @@ const viewportClasses = computed(() => {
 			<!-- Actual status bar -->
 			<div
 				:class="[
-					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300',
+					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300 backdrop-blur-lg',
 					statusBarDisplayMode == 'show-on-hover'
 					? 'opacity-0 translate-y-1 group-hover/sb:h-fit scale-0 group-hover/sb:opacity-100 group-hover/sb:translate-y-0 group-hover/sb:scale-100'
 					: ''

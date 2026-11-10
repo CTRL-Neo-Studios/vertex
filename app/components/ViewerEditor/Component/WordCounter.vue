@@ -18,7 +18,7 @@ const paragraphCount = computed(() => $du.getParagraphs(unref(content) || ''))
 </script>
 
 <template>
-    <div class="text-center flex justify-center items-center gap-3 text-dimmed text-xs select-none">
+    <div class="text-center flex justify-center items-center gap-3 text-default text-xs select-none">
         <template v-if="words">
             <div class="font-mono!">{{ wordCount }} {{ $t('app.generic.words') }}</div>
             <USeparator orientation="vertical" class="h-3 w-fit last:hidden"/>
