@@ -37,15 +37,11 @@ async function showHistory() {
 const staged = computed(() => status.value?.files.filter(isStaged) ?? [])
 const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
 const idle = computed(() => !busy.value && !!status.value)
-const message = ref('')
-// The list fades where it meets the commit box, and at the top once scrolled.
-const fade = useScrollFade(useTemplateRef<HTMLElement>('listEl'), {bottom: true})
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
 const settings = useSettingsScope()
 const chatsInWorkspace = computed(() => settings.effective.value?.aiConfig.chatStorage === 'workspace')
 const syncChats = ref(true)
 const createRepo = () => git.init(syncChats.value)
-const canCommit = computed(() => idle.value && !!message.value.trim() && !!status.value?.files.length)
 
 usePanelActions(() => {
     const refresh = {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
@@ -111,6 +107,18 @@ const sections = computed(() => {
 })
 type Section = (typeof sections.value)[number]
 
+/** Section headers and file rows in one list, so only the rows on screen are drawn (a new repository lists everything). */
+const ROW = 28
+const HEADER = 32
+type Row = {key: string, section: Section, file?: GitFile}
+const rows = computed(() => sections.value.flatMap((section): Row[] => [
+    {key: section.id, section},
+    ...section.files.map(file => ({key: `${section.id}:${file.path}`, section, file})),
+]))
+const {list, containerProps, wrapperProps} = useVirtualList(rows, {itemHeight: i => (rows.value[i]?.file ? ROW : HEADER), overscan: 10})
+// The list fades where it meets the commit box, and at the top once scrolled.
+const fade = useScrollFade(containerProps.ref, {bottom: true})
+
 /** A row opens its changes in a diff tab (Staged: the index; Changes: the disk); a conflicted file opens itself, to fix. */
 async function openChanges(section: Section, file: GitFile) {
     const current = status.value
@@ -160,16 +168,18 @@ function sectionMenu(section: Section): ContextMenuItem[][] {
     ]]
 }
 
-async function commit(andPush: boolean) {
-    if (!canCommit.value || !await git.commit(message.value.trim())) return
-    message.value = ''
+const commitBox = useTemplateRef<{message: string}>('commitBox')
+async function commit(message: string, andPush: boolean) {
+    if (!await git.commit(message)) return false
     if (andPush) await git.push()
+    return true
 }
 
 async function sync() {
-    await git.sync(message.value.trim())
+    const box = commitBox.value
+    await git.sync(box?.message.trim() ?? '')
     // Committed, even if the pull or push after it failed: the message is in the history now.
-    if (!status.value?.files.length) message.value = ''
+    if (box && !status.value?.files.length) box.message = ''
 }
 
 // Branches: switch to one, or type a new name to create it.
@@ -312,91 +322,75 @@ const mergeActions = computed(() => [{
                     :actions="mergeActions"
                 />
             </div>
-            <div ref="listEl" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]">
+            <div v-bind="containerProps" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]">
                 <UEmpty
-                    v-if="!sections.length"
+                    v-if="!rows.length"
                     variant="naked"
                     size="sm"
                     icon="i-lucide-circle-check"
                     :title="t('app.git.clean')"
                     :description="t('app.git.cleanHint')"
                 />
-                <section v-for="section in sections" :key="section.id" :data-git-section="section.id" class="mt-1">
-                    <UContextMenu :items="sectionMenu(section)" size="sm">
-                        <div class="flex items-center gap-1 ps-1.5 h-7 text-xs font-medium text-muted">
-                            <UTooltip :text="section.hint">
-                                <span class="flex items-center gap-1.5">
-                                    {{ section.label }}
-                                    <UBadge :label="String(section.files.length)" size="sm" color="neutral" variant="soft"/>
-                                </span>
-                            </UTooltip>
-                            <UTooltip :text="section.bulk.label">
-                                <UButton
-                                    class="ms-auto"
-                                    :icon="section.bulk.icon"
-                                    color="neutral"
-                                    variant="ghost"
-                                    size="xs"
-                                    :aria-label="section.bulk.label"
-                                    :disabled="!idle"
-                                    @click="section.bulk.run()"
-                                />
-                            </UTooltip>
-                        </div>
-                    </UContextMenu>
-                    <UContextMenu v-for="file in section.files" :key="file.path" :items="fileMenu(section, file)" size="sm">
-                        <div
-                            :data-git-file="file.path"
-                            class="group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm cursor-pointer hover:bg-elevated/60 focus-within:bg-elevated/60 data-[state=open]:bg-elevated/60 outline-none"
-                            tabindex="0"
-                            @click="openChanges(section, file)"
-                            @keydown.enter.self="openChanges(section, file)"
-                        >
-                            <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(file.path) }}</span>
-                            <span class="truncate text-xs text-dimmed">{{ dirOf(file.path) }}</span>
-                            <div class="ms-auto flex items-center shrink-0">
-                                <!-- Shown on hover, and while the row or a button in it has focus. -->
-                                <div class="hidden group-hover:flex group-focus-within:flex">
-                                    <UTooltip v-for="action in section.actions" :key="action.id" :text="action.label">
-                                        <UButton
-                                            :icon="action.icon"
-                                            color="neutral"
-                                            variant="ghost"
-                                            size="xs"
-                                            :aria-label="action.label"
-                                            :disabled="!idle || (action.id === 'open' && !indexed(file))"
-                                            @click.stop="action.run(file)"
-                                        />
+                <div v-bind="wrapperProps">
+                    <template v-for="{data: {key, section, file}} in list" :key="key">
+                        <UContextMenu v-if="file" :items="fileMenu(section, file)" size="sm">
+                            <div
+                                :data-git-file="file.path"
+                                :data-git-section="section.id"
+                                class="group flex items-center gap-1.5 ps-1.5 pe-0.5 h-7 rounded-md text-sm cursor-pointer hover:bg-elevated/60 focus-within:bg-elevated/60 data-[state=open]:bg-elevated/60 outline-none"
+                                tabindex="0"
+                                @click="openChanges(section, file)"
+                                @keydown.enter.self="openChanges(section, file)"
+                            >
+                                <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(file.path) }}</span>
+                                <span class="truncate text-xs text-dimmed">{{ dirOf(file.path) }}</span>
+                                <div class="ms-auto flex items-center shrink-0">
+                                    <!-- Shown on hover, and while the row or a button in it has focus. -->
+                                    <div class="hidden group-hover:flex group-focus-within:flex">
+                                        <UTooltip v-for="action in section.actions" :key="action.id" :text="action.label">
+                                            <UButton
+                                                :icon="action.icon"
+                                                color="neutral"
+                                                variant="ghost"
+                                                size="xs"
+                                                :aria-label="action.label"
+                                                :disabled="!idle || (action.id === 'open' && !indexed(file))"
+                                                @click.stop="action.run(file)"
+                                            />
+                                        </UTooltip>
+                                    </div>
+                                    <UTooltip :text="t(`app.git.states.${stateOf(section.letter(file)).key}`)">
+                                        <span :class="['w-5 text-center font-mono text-xs', stateOf(section.letter(file)).color]">{{ section.letter(file) }}</span>
                                     </UTooltip>
                                 </div>
-                                <UTooltip :text="t(`app.git.states.${stateOf(section.letter(file)).key}`)">
-                                    <span :class="['w-5 text-center font-mono text-xs', stateOf(section.letter(file)).color]">{{ section.letter(file) }}</span>
+                            </div>
+                        </UContextMenu>
+                        <UContextMenu v-else :items="sectionMenu(section)" size="sm">
+                            <div :data-git-section-header="section.id" class="flex items-center gap-1 ps-1.5 pt-1 h-8 text-xs font-medium text-muted">
+                                <UTooltip :text="section.hint">
+                                    <span class="flex items-center gap-1.5">
+                                        {{ section.label }}
+                                        <UBadge :label="String(section.files.length)" size="sm" color="neutral" variant="soft"/>
+                                    </span>
+                                </UTooltip>
+                                <UTooltip :text="section.bulk.label">
+                                    <UButton
+                                        class="ms-auto"
+                                        :icon="section.bulk.icon"
+                                        color="neutral"
+                                        variant="ghost"
+                                        size="xs"
+                                        :aria-label="section.bulk.label"
+                                        :disabled="!idle"
+                                        @click="section.bulk.run()"
+                                    />
                                 </UTooltip>
                             </div>
-                        </div>
-                    </UContextMenu>
-                </section>
-            </div>
-            <div class="p-2 flex flex-col gap-1.5 pb-4">
-                <UTextarea
-                    v-model="message"
-                    :placeholder="t('app.git.message')"
-                    :rows="2"
-                    :maxrows="8"
-                    autoresize
-                    size="sm"
-                    @keydown.meta.enter.prevent="commit(false)"
-                    @keydown.ctrl.enter.prevent="commit(false)"
-                />
-                <div class="flex gap-1.5">
-                    <UTooltip :text="staged.length ? t('app.git.commitHint') : t('app.git.commitAllHint')">
-                        <UButton class="flex-1" block size="sm" :label="t('app.git.commit')" :disabled="!canCommit" @click="commit(false)"/>
-                    </UTooltip>
-                    <UTooltip :text="t('app.git.commitPushHint')">
-                        <UButton size="sm" color="neutral" variant="outline" :label="t('app.git.commitPush')" :disabled="!canCommit" @click="commit(true)"/>
-                    </UTooltip>
+                        </UContextMenu>
+                    </template>
                 </div>
             </div>
+            <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit/>
         </template>
     </div>
 </template>
