@@ -10,7 +10,8 @@ import TextDiff from "~/components/Diff/TextDiff.vue";
 
 /**
  * A git diff tab: one file's two versions from git, drawn by `TextDiff`. The working tree and staged sides reload
- * whenever the workspace changes on disk (an edit, a commit, a checkout); a commit's never change.
+ * when the file or the repository's git folder changes on disk (an edit, a commit, a checkout), not on every save in
+ * the workspace; a commit's never change.
  */
 const props = defineProps<{ tabId: string }>()
 
@@ -37,13 +38,15 @@ async function load() {
                 : [show(`${spec.side}^`, old), show(spec.side, spec.path)],
     )
     failed.value = before === undefined && after === undefined
-    sides.value = {before, after}
+    // Unchanged text keeps the same object, so `TextDiff` doesn't diff and draw it again.
+    if (!sides.value || sides.value.before !== before || sides.value.after !== after) sides.value = {before, after}
 }
 onMounted(load)
 if (spec?.side === 'worktree' || spec?.side === 'staged') {
     const reload = useDebounceFn(load, 300)
+    const file = `${spec.top}/${spec.path}`, git = `${spec.top}/.git/`
     onBeforeUnmount(index.on(event => {
-        if (event.type === 'changed') void reload()
+        if (event.type === 'changed' && event.paths.some(p => p === file || p.startsWith(git))) void reload()
     }))
 }
 

@@ -49,7 +49,7 @@ const showBottom = computed(() => t('app.panels.showBottom', {
                     <UTooltip v-if="bottomHidden" :text="showBottom" :content="{ side: 'left' }">
                         <SidebarCollapserButton
                             side="bottom"
-                            class="absolute z-20 right-2 bottom-2 bg-submuted/80 backdrop-blur-lg"
+                            class="absolute z-20 right-2 bottom-2"
                             :aria-label="showBottom"
                             data-bottom-toggle
                         />

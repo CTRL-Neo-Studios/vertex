@@ -150,13 +150,24 @@ Checked in the browser (stubbed fs with rename and write, and workspace settings
 ## O4: While typing
 
 ### Change
-- Outline (`TableOfContentsPanelComponent`, `MinimalLineToc`): rows keyed by index (typing above a heading no longer remounts every heading below it); `sync()` stores `markRaw` headings, throttled to about 100 ms.
-- `WordCounter` reads a debounced copy of the text.
-- `GitDiffView` reloads only when its own file (or the index, for staged) changed, and skips re-diffing identical text, instead of on every save anywhere.
-- `WorkflowViewer`'s deep document watch is debounced.
+- Done: Outline (`TableOfContentsPanelComponent`, `MinimalLineToc`): rows keyed by position, so typing above a heading no longer remounts every heading below it. `sync()` stores the headings raw (`markRaw`) and runs at most every 100 ms (leading and trailing), the active heading in the same write.
+- Done: `WordCounter` counts a copy of the text that settles 250 ms after typing (`refDebounced`).
+- Done: `GitDiffView` reloads only when its own file or something under the repository's `.git/` changes, not on every save in the workspace. It keeps the same `sides` object when both texts are unchanged, so `TextDiff` doesn't diff and draw again.
+- Dropped: debouncing `WorkflowViewer`'s document watch. A pending write-back is lost when the tab closes: `SessionTab`'s autosave watcher stops before the viewer unmounts. The cost was never measured. If a large workflow shows typing lag, make the write-back flush through the tab's save first.
 
 ### Acceptance
 - Typing above 300 headings with the Outline open: no long tasks; an open diff tab doesn't re-render while another note is typed in.
+
+### Results (after)
+| Scenario | Before | After |
+|---|---|---|
+| Type 60 characters above 300 headings, Outline open | 60 long tasks, 5.8 s (about 97 ms per key) | 1 long task, 57 ms |
+| … with Files open too | 61 long tasks, 6.6 s | 1 long task, 55 ms |
+| Switch tabs ×10 between the 300-heading note and another, Outline open | about 120 ms each on top of Files | 1.1 s, 110 ms each: the Outline mounting 300 rows with tooltips (not virtualized) |
+| An open 20 000-line diff while 10 other notes save | a reload and full re-diff per save (≈1 s each, as when it opens) | no reload, no long task |
+| The diffed file itself, or `.git/`, changes | reload | reload; identical text isn't diffed again |
+
+Checked: the Outline still lists the last headings (Section 298, 299) after typing; the word count goes from 1804 to 1806 after typing pauses.
 
 ## O5: Large lists
 

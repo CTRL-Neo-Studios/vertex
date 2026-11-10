@@ -18,7 +18,8 @@ const toHeading = ({from}: Heading) => emitToTocEntry({from, verticalMargin: 70,
     <div class="w-full h-full">
         <template v-if="$tabId && $sessionId">
             <div class="w-full grid grid-cols-1 gap-1.5">
-                <UTooltip :text="t('app.editor.ui.jumpToHeading', {level: item.level})" v-for="item in toc" :key="item.from">
+                <!-- By position: typing above a heading shifts every `from` below it, and a `from` key remounted those rows. -->
+                <UTooltip :text="t('app.editor.ui.jumpToHeading', {level: item.level})" v-for="(item, i) in toc" :key="i">
                     <UButton
                         :variant="item.from === activeHeading ? 'subtle' : 'soft'"
                         :color="item.from === activeHeading ? 'primary' : 'neutral'"
