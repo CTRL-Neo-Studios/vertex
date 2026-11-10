@@ -152,7 +152,7 @@ Blocked by G2.
 ### Change
 - `commitMessage` entry in `AI_FEATURES` (its model picker and switch in Settings → Assistive AI → Features; on by default with AI, like the others; its description says the diff goes to the model).
 - `generateCommitMessage` beside `generateChatTitle` (`useCommitMessage` gathers it): the files with their status letters, the diff of what the commit takes (the index, plus the working copy when it takes everything; new files only listed), cut at 16 000 characters and saying so (`commitPrompt`), and the 10 latest subjects, so it follows the repository's style. `cleanCommitMessage` drops reasoning, a code fence and quotes.
-- ✨ button in the commit box (for what Commit would take: the staged changes, or every change when none are staged); Sync uses it for every change when the feature is on and the box is empty ("Writing message…"), falling back to "Update N file(s)" when the model fails.
+- ✨ button in the commit box (for what Commit would take: the staged changes, or every change when none are staged). `aiConfig.commitMessages` (Settings → Assistive AI → Features, under Commit messages; per workspace too): `whenEmpty` (on by default) has the model write the message when Commit or Sync goes with an empty box ("Writing message…"; off, or when the model fails, "Update N file(s)"; Commit works with an empty box either way), `autoSync` (off by default) for auto-sync's commits.
 
 ### Acceptance
 - [x] The button fills the box from the staged diff; turned off, the button hides. (Browser, stubbed `ai_request`: the staged diff and recent subjects sent, the reply filling the box; off: no button and Sync makes no AI call.)
@@ -164,9 +164,9 @@ Blocked by G2.
 Blocked by G2.
 
 ### Change
-- A pull that conflicts lists the conflicted files first (Conflicts): keep mine, keep theirs (`git_resolve`; a side that deleted the file deletes it), or open the file to edit the conflict markers; Mark resolved (asks when `git_conflict_markers` still finds markers); Finish merge (`git_merge_continue`, enabled once none are left); Abort merge always available. Merge only: with the user's own `pull.rebase`, a rebase's conflicts show in the list but finish in a terminal.
-- `gitConfig.autoSync` (`useGitAutoSync`, in every workspace window, with or without the Git view): every N minutes (5, 15, 30, 60), when the workspace opens, pull when the window gets focus (at most once a minute). All off by default; Settings → Git. It commits as "Update N file(s)" (no AI).
-- Auto-sync never runs during a merge or after the remote refused to sign in (until an operation from the Git view succeeds); failures show once, not every interval.
+- A pull that conflicts lists the conflicted files first (Conflicts): keep mine, keep theirs (`git_resolve(remote)`; a side that deleted the file deletes it), or open the file to edit the conflict markers; Mark resolved (asks when `git_conflict_markers` still finds markers); Finish merge (`git_merge_continue`, enabled once none are left); Abort merge always available. With the user's own `pull.rebase`, the same list for a rebase (`GitStatus.rebasing`): mine and theirs swapped back to the user's meaning, Continue rebase (`rebase --continue`, or `--skip` for a commit left with nothing to apply; it may stop again), Abort rebase; the pull sets local changes aside (`--autostash`).
+- `gitConfig.autoSync` (`useGitAutoSync`, in every workspace window, with or without the Git view): every N minutes (5, 15, 30, 60), when the workspace opens, pull when the window gets focus (at most once a minute). All off by default; Settings → Git, global or a trusted workspace's own (`gitConfig.path` stays global). Its commits are "Update N file(s)", or the model's with `aiConfig.commitMessages.autoSync` (see G7).
+- Auto-sync never runs during a merge or rebase, or after the remote refused to sign in (until an operation from the Git view succeeds); failures show once, not every interval.
 
 ### Acceptance
 - [x] Two clones editing the same note: the conflict resolves each way and both clones end up equal. (Rust round trip with real git: one clone keeps its own side and pushes, the other takes theirs; both files equal; a side that deleted a file removes it.)
