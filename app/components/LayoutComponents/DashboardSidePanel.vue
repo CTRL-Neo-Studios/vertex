@@ -82,7 +82,7 @@ const firstLabel = computed(() => {
                     <div class="grow"/>
                     <template v-if="strip">
                         <UTooltip v-for="action in firstActions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
-                            <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                            <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
                         </UTooltip>
                     </template>
                     <PanelButtons

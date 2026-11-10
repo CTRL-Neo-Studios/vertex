@@ -298,6 +298,9 @@ pub fn run() {
             git::git_clone,
             git::git_tokens,
             git::git_token_set,
+            git::git_identity,
+            git::git_identity_set,
+            git::git_install_tools,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

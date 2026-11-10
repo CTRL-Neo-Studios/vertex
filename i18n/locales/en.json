@@ -69,7 +69,8 @@
 			"recoveryMissing": "{count} window(s) from your last session couldn't be reopened: their folder or file is gone.",
 			"newWorkspaceDialog": "Create a Workspace Folder",
 			"newWorkspaceName": "New Workspace",
-			"folderExists": "Something already exists at that path."
+			"folderExists": "Something already exists at that path.",
+			"cloneWorkspace": "Clone Workspace…"
 		},
 		"settings": {
 			"title": "Settings",
@@ -1748,7 +1749,14 @@
 			},
 			"missing": {
 				"title": "Git isn't installed",
-				"description": "Vertex uses git to track and sync this workspace. Install it, then check again."
+				"description": "Vertex uses git to track and sync this workspace. Install it, then check again.",
+				"macos": "Vertex uses git to track and sync this workspace. Apple's developer tools include it: install them, then check again.",
+				"configured": "Vertex is set to use {path}, which isn't a working git. Locate another, or let Vertex find one.",
+				"installTools": "Install developer tools",
+				"locate": "Locate git…",
+				"locateTitle": "Choose the git program",
+				"automatic": "Find git automatically",
+				"toolsFailed": "Couldn't open the developer tools installer"
 			},
 			"notRepo": {
 				"title": "Not a git repository",
@@ -1780,7 +1788,7 @@
 				},
 				"noRemote": {
 					"title": "No remote to sync with",
-					"description": "This repository isn't connected to a remote yet. Add one with `git remote add origin` and the remote's URL."
+					"description": "This repository isn't connected to a remote yet: connect one to push."
 				},
 				"noUpstream": {
 					"title": "This branch has no remote branch",
@@ -1788,7 +1796,7 @@
 				},
 				"identity": {
 					"title": "Git needs your name and email",
-					"description": "Commits record who made them. Set them with `git config --global user.name` and `git config --global user.email`."
+					"description": "Commits record who made them. Set your name and email to commit."
 				}
 			},
 			"createRepo": "Create repository",
@@ -1836,7 +1844,91 @@
 				"usernameHelp": "Only if your host wants your username with tokens.",
 				"kept": "Vertex keeps it in your system keychain and hands it to git only while it talks to {host}. Remove it in Settings → Git.",
 				"save": "Save and try again"
+			},
+			"setup": {
+				"steps": {
+					"create": "Create",
+					"identity": "You",
+					"remote": "Remote",
+					"push": "Push"
+				},
+				"continue": "Continue",
+				"later": "Later",
+				"firstCommit": "First commit",
+				"identityAction": "Set your name",
+				"remoteAction": "Connect a remote",
+				"identity": {
+					"title": "Your name and email",
+					"description": "Every commit records who made it. These are kept in this repository only.",
+					"name": "Name",
+					"email": "Email",
+					"emailHint": "Shown in the history"
+				},
+				"remote": {
+					"title": "Connect a remote",
+					"description": "A remote is a copy of this repository on a server, like GitHub. Your devices sync through it: each pushes its commits there and pulls the others'.",
+					"github": "Create a repository on GitHub",
+					"empty": "Make it private, and leave it empty: no README, .gitignore or license, so the first push goes straight in. Then copy its HTTPS URL here.",
+					"url": "Remote URL",
+					"connect": "Connect"
+				},
+				"push": {
+					"title": "Push your notes",
+					"description": "Vertex commits every file and pushes the commit to the remote. If the remote asks you to sign in, Vertex helps you make a token.",
+					"action": "Commit and push"
+				}
+			},
+			"tour": {
+				"start": "Tour",
+				"sync": {
+					"title": "Sync",
+					"description": "One click keeps your devices in step: it commits every change, pulls the remote's new commits, then pushes yours."
+				},
+				"branch": {
+					"title": "Branch",
+					"description": "A branch is a line of work. Switch branches here, or type a name to start a new one."
+				},
+				"aheadBehind": {
+					"title": "Ahead and behind",
+					"description": "Commits of yours the remote doesn't have yet (up arrow), and commits on the remote you haven't pulled (down arrow)."
+				},
+				"remoteActions": {
+					"title": "Fetch, pull and push",
+					"description": "Fetch checks the remote for new commits, pull brings them into your files, push sends your commits to the remote."
+				},
+				"list": {
+					"title": "Changes and staged",
+					"description": "Changes lists the files you edited since the last commit. Stage (plus) the ones that go into the next commit: they move to Staged. Click a file to see what changed."
+				},
+				"commit": {
+					"title": "Commit",
+					"description": "A commit saves the staged changes (or every change, when nothing is staged) as one step in the history, with a message saying what changed."
+				},
+				"history": {
+					"title": "History",
+					"description": "Every commit, branch by branch: select one to see what it changed."
+				}
+			},
+			"clone": {
+				"title": "Clone a workspace",
+				"description": "Copy a repository from a remote into a new folder and open it as a workspace.",
+				"url": "Repository URL",
+				"parent": "Put it in",
+				"parentTitle": "Choose where the folder goes",
+				"choose": "Choose…",
+				"name": "Folder name",
+				"badName": "A folder name without slashes",
+				"exists": "{path} exists already: choose another name.",
+				"action": "Clone and open",
+				"cloning": "Cloning…"
 			}
+		},
+		"tour": {
+			"progress": "{step} of {count}",
+			"skip": "Skip",
+			"back": "Back",
+			"next": "Next",
+			"done": "Done"
 		}
 	}
 }

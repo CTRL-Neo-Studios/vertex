@@ -66,6 +66,12 @@ export interface GitRemote {
     url: string,
 }
 
+/** The name and email commits get; `''` when git has none. */
+export interface GitIdentity {
+    name: string,
+    email: string,
+}
+
 /** A host with a personal access token saved in the keychain (the token itself never leaves Rust). */
 export interface GitToken {
     /** `github.com`, or `host:port`. */

@@ -117,17 +117,17 @@ Blocked by G2 and G6.
 
 ### Change
 - The Changes view shows a setup card when:
-  - git is missing: install links per OS (Xcode tools on macOS), a "Locate git…" button (`gitConfig.path`), Check again;
+  - git is missing: on macOS **Install developer tools** (`git_install_tools`: `xcode-select --install`), then **Install git** (git-scm.com's page for the OS), a **Locate git…** button (`gitConfig.path`; once set, the card says it isn't a working git and offers **Find git automatically**), Check again;
   - the workspace isn't a repository: the wizard.
-- Wizard: create the repository → `.gitignore` (`.vertex/trash/`, `*.tmp`, `.DS_Store`; a **Sync chats** checkbox explaining the conflict risk, adding `.vertex/chats/` when off) → your name and email (repository config) → connect a remote (paste a URL; a link to create a repository on GitHub) → sign in (G6) → first push.
-- Home page: "Clone a workspace" (URL + folder, like `newWorkspaceAction`), then opens it.
-- `useTour` tour of the Changes view after setup and from a help button; terms explained once.
+- Wizard (`GitSetup`, a stepper): create the repository → `.gitignore` (system files, `.vertex/trash/`, `.vertex/**/*.tmp`; the **Sync chats** checkbox explaining the conflict risk, adding `.vertex/chats/` when off) → your name and email (`git_identity` / `git_identity_set`, repository config; prefilled from what git uses) → connect a remote (paste a URL; a link to create a repository on GitHub, kept empty) → first push (`sync`; sign-in from G6 on the way). Remote and push can wait (Later). A failed commit (`identity`) or push (`no-remote`) offers that step from its toast.
+- Home page: **Clone Workspace…** (URL, a folder to put it in, the new folder's name from the URL; sign-in from G6), then opens it.
+- `useTour` tour of the Changes view (Sync, Branch, ahead/behind, Fetch/Pull/Push, the lists and staging, Commit, History), once after setup and from a Tour button; terms explained once.
 
 ### Acceptance
-- [ ] A user with git installed and a GitHub account goes from a plain folder to a pushed repository without a terminal.
-- [ ] Cloning opens the new workspace.
-- [ ] The tour reaches every part of the view.
-- [ ] SMOKE row; Concepts doc; en + zh-CN strings.
+- [ ] A user with git installed and a GitHub account goes from a plain folder to a pushed repository without a terminal. (Browser, stubbed: create → name and email → GitHub's new-repository page → connect → commit and push → token → pushed; the pieces' Rust side is tested (identity round trip; push with a token against GitHub in G6); not yet in Vertex.)
+- [ ] Cloning opens the new workspace. (Browser, stubbed: clone, token, clone again, a new workspace window; not yet in Vertex.)
+- [x] The tour reaches every part of the view. (All 7 steps outlined their targets; Back, Skip and the Tour button.)
+- [x] SMOKE row; Concepts doc; en + zh-CN strings.
 
 ## G6: Sign-in (#54)
 

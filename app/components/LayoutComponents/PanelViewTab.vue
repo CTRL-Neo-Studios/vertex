@@ -27,7 +27,7 @@ const actions = computed(() => toValue(slot.value) ?? [])
             <UIcon v-if="view" :name="view.icon" class="size-4 shrink-0 text-muted"/>
             <span class="ps-1 text-sm font-medium truncate">{{ view ? t(view.label) : viewId }}</span>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
-                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
             </UTooltip>
             <div class="flex-1"/>
             <UTooltip :text="t('app.panels.moveToPanel')" :content="{ side: 'bottom' }">

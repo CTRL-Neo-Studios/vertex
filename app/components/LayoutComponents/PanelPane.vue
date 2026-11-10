@@ -63,7 +63,7 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
             />
             <span v-if="view" class="ps-1 text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ t(view.label) }}</span>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'top' }">
-                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
             </UTooltip>
             <div :class="SEPARATOR" data-tauri-drag-region/>
             <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'top' }">
@@ -105,7 +105,7 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
         <div v-if="area !== 'bottom' && showBar" class="flex items-center gap-0.5 px-1 pb-1 min-h-7" data-tauri-drag-region>
             <span v-if="barLabel" class="text-xs font-medium text-muted truncate select-none" data-tauri-drag-region>{{ barLabel }}</span>
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
-                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" @click="action.onSelect()"/>
+                <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
             </UTooltip>
             <div :class="SEPARATOR" data-tauri-drag-region/>
             <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'bottom' }">

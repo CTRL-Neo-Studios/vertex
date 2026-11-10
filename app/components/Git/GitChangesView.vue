@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import {ask} from "@tauri-apps/plugin-dialog";
+import {ask, open as openDialog} from "@tauri-apps/plugin-dialog";
+import {platform} from "@tauri-apps/plugin-os";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {CommandPaletteGroup, ContextMenuItem} from "@nuxt/ui";
 import type {GitBranch, GitFile, GitState} from "#shared/types/app/git";
@@ -8,9 +9,12 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
+import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
-import {isStaged, isUnstaged, useGitRepo} from "~/composables/git/useGitRepo";
+import {useTour} from "~/composables/utility/useTour";
+import {isStaged, isUnstaged, useGitRepo, type GitSetupStep} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
 import {diffTabId} from "~/utils/gitDiff";
 import {GIT_STATES} from "~/utils/gitStates";
@@ -25,9 +29,12 @@ const {openUrlInBrowser, openFileWithDefaultApp, revealFilesInFileManager} = use
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {getFileByPath} = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
-const git = useGitRepo(session)
+/** The setup wizard while it runs: from Create repository to the first push, or the one step a failure sent the user to. */
+const setup = ref<{step: GitSetupStep, single?: boolean}>()
+const git = useGitRepo(session, {setup: step => void (setup.value = {step, single: true})})
 const {status, problem, busy} = git
 const panels = usePanels(session)
+const setupStep = computed(() => (problem.value === 'not-repo' ? 'create' : status.value ? setup.value?.step : undefined))
 
 /** History: in its panel (placed there if it was hidden), else in a tab. */
 async function showHistory() {
@@ -40,12 +47,60 @@ const idle = computed(() => !busy.value && !!status.value)
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
 const settings = useSettingsScope()
 const chatsInWorkspace = computed(() => settings.effective.value?.aiConfig.chatStorage === 'workspace')
-const syncChats = ref(true)
-const createRepo = () => git.init(syncChats.value)
+
+// No git: install it (macOS: Apple's developer tools), or point Vertex at one (`gitConfig.path`, global only).
+const $qt = useQuickToasts()
+const os = platform()
+const downloadUrl = `https://git-scm.com/downloads/${os === 'macos' ? 'mac' : os === 'windows' ? 'win' : 'linux'}`
+const appSettings = useAppSettings()
+onMounted(appSettings.load)
+const gitPath = computed(() => appSettings.config.value?.gitConfig.path ?? '')
+async function setGitPath(path: string) {
+    await appSettings.load()
+    await appSettings.save({gitConfig: {path}})
+    await git.refresh()
+}
+async function locateGit() {
+    const path = await openDialog({multiple: false, directory: false, title: t('app.git.missing.locateTitle')})
+    if (path) await setGitPath(path)
+}
+async function installTools() {
+    try {
+        await gitClient.installTools()
+    } catch (e) {
+        $qt.error(t('app.git.missing.toolsFailed'), String(e))
+    }
+}
+
+// The tour: once after setup, then from its button. It explains the git terms the view uses.
+const tourSeen = useLocalStorage('vertex-git-tour-seen', false)
+const tour = useTour(() => (['sync', 'branch', 'aheadBehind', 'remoteActions', 'list', 'commit', 'history'] as const).map(id => ({
+    target: {
+        sync: '[data-git-sync]',
+        branch: '[data-git-branch]',
+        aheadBehind: '[data-git-ahead-behind]',
+        remoteActions: '[data-panel-action="fetch"]',
+        list: '[data-git-list]',
+        commit: '[data-git-commit-box]',
+        history: '[data-panel-action="history"]',
+    }[id],
+    title: t(`app.git.tour.${id}.title`),
+    description: t(`app.git.tour.${id}.description`),
+})))
+function startTour() {
+    tourSeen.value = true
+    tour.start()
+}
+async function finishSetup() {
+    setup.value = undefined
+    if (tourSeen.value) return
+    await nextTick()
+    startTour()
+}
 
 usePanelActions(() => {
     const refresh = {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
-    if (!status.value) return [refresh]
+    if (!status.value || setupStep.value) return [refresh]
     const disabled = !idle.value
     return [
         {id: 'fetch', label: t('app.git.fetch'), icon: 'i-lucide-cloud-download', onSelect: git.fetch, disabled},
@@ -53,6 +108,7 @@ usePanelActions(() => {
         {id: 'push', label: t('app.git.push'), icon: 'i-lucide-arrow-up-from-line', onSelect: git.push, disabled},
         refresh,
         {id: 'history', label: t('app.git.history.show'), icon: 'i-lucide-git-graph', onSelect: showHistory},
+        {id: 'tour', label: t('app.git.tour.start'), icon: 'i-lucide-circle-help', onSelect: startTour},
     ]
 })
 
@@ -231,40 +287,37 @@ const mergeActions = computed(() => [{
             icon="i-lucide-git-branch"
             class="flex-1"
             :title="t('app.git.missing.title')"
-            :description="t('app.git.missing.description')"
-            :actions="[
-                { label: t('app.git.install'), icon: 'i-lucide-external-link', size: 'sm', onClick: () => void openUrlInBrowser('https://git-scm.com/downloads') },
-                { label: t('app.git.checkAgain'), color: 'neutral', variant: 'outline', size: 'sm', onClick: () => void git.refresh() },
-            ]"
-        />
-        <UEmpty
-            v-else-if="problem === 'not-repo'"
-            variant="naked"
-            size="sm"
-            icon="i-lucide-git-branch"
-            class="flex-1"
-            :title="t('app.git.notRepo.title')"
-            :description="t('app.git.notRepo.description')"
+            :description="gitPath ? t('app.git.missing.configured', {path: gitPath}) : t(`app.git.missing.${os === 'macos' ? 'macos' : 'description'}`)"
+            data-git-missing
         >
             <template #actions>
-                <div class="flex flex-col items-center gap-3">
-                    <UCheckbox
-                        v-if="chatsInWorkspace"
-                        v-model="syncChats"
-                        size="sm"
-                        :label="t('app.git.syncChats')"
-                        :description="t('app.git.syncChatsHint')"
-                    />
+                <div class="flex flex-col items-stretch gap-1.5 w-56">
+                    <UButton v-if="os === 'macos'" block size="sm" icon="i-lucide-download" :label="t('app.git.missing.installTools')" @click="installTools"/>
                     <UButton
-                        :label="t('app.git.createRepo')"
-                        icon="i-lucide-git-branch-plus"
+                        block
                         size="sm"
-                        :loading="!!busy"
-                        @click="createRepo"
+                        icon="i-lucide-external-link"
+                        :color="os === 'macos' ? 'neutral' : 'primary'"
+                        :variant="os === 'macos' ? 'outline' : 'solid'"
+                        :label="t('app.git.install')"
+                        @click="openUrlInBrowser(downloadUrl)"
                     />
+                    <UButton block size="sm" color="neutral" variant="outline" icon="i-lucide-folder-search" :label="t('app.git.missing.locate')" @click="locateGit"/>
+                    <UButton v-if="gitPath" block size="sm" color="neutral" variant="outline" icon="i-lucide-search" :label="t('app.git.missing.automatic')" @click="setGitPath('')"/>
+                    <UButton block size="sm" color="neutral" variant="ghost" icon="i-lucide-rotate-cw" :label="t('app.git.checkAgain')" @click="git.refresh()"/>
                 </div>
             </template>
         </UEmpty>
+        <GitSetup
+            v-else-if="setupStep && session?.rootPath"
+            :step="setupStep"
+            :single="setup?.single"
+            :git
+            :root="session.rootPath"
+            :chats-in-workspace="chatsInWorkspace"
+            @next="step => setup = {step}"
+            @done="finishSetup"
+        />
         <template v-else-if="status">
             <div class="px-2 pt-2 pb-1 flex flex-col gap-1.5">
                 <UTooltip :text="t('app.git.syncHint')">
@@ -275,6 +328,7 @@ const mergeActions = computed(() => [{
                         :loading="!!busy"
                         :label="busy ?? t('app.git.sync')"
                         :disabled="!idle || status.merging"
+                        data-git-sync
                         @click="sync"
                     />
                 </UTooltip>
@@ -291,6 +345,7 @@ const mergeActions = computed(() => [{
                             :ui="{ label: 'truncate' }"
                             :disabled="!idle"
                             :aria-label="t('app.git.branches')"
+                            data-git-branch
                         />
                         <template #content>
                             <UCommandPalette
@@ -306,7 +361,7 @@ const mergeActions = computed(() => [{
                         v-if="status.upstream"
                         :text="t('app.git.aheadBehind', { ahead: status.ahead, behind: status.behind, upstream: status.upstream })"
                     >
-                        <span class="ms-auto shrink-0 flex items-center gap-2 pe-1.5 text-xs text-muted tabular-nums">
+                        <span class="ms-auto shrink-0 flex items-center gap-2 pe-1.5 text-xs text-muted tabular-nums" data-git-ahead-behind>
                             <span class="flex items-center gap-0.5"><UIcon name="i-lucide-arrow-up" class="size-4"/>{{ status.ahead }}</span>
                             <span class="flex items-center gap-0.5"><UIcon name="i-lucide-arrow-down" class="size-4"/>{{ status.behind }}</span>
                         </span>
@@ -322,7 +377,7 @@ const mergeActions = computed(() => [{
                     :actions="mergeActions"
                 />
             </div>
-            <div v-bind="containerProps" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]">
+            <div v-bind="containerProps" :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar px-1.5 pb-2', fade]" data-git-list>
                 <UEmpty
                     v-if="!rows.length"
                     variant="naked"
@@ -390,7 +445,8 @@ const mergeActions = computed(() => [{
                     </template>
                 </div>
             </div>
-            <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit/>
+            <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit data-git-commit-box/>
         </template>
+        <TourPopover :tour/>
     </div>
 </template>

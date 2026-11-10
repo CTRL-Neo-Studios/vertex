@@ -1,14 +1,19 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {GitFile, GitRemote, GitStatus, GitToken} from "#shared/types/app/git";
-import GitSignInModal from "~/components/Git/GitSignInModal.vue";
+import type {GitFile, GitStatus} from "#shared/types/app/git";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useGitSignIn} from "~/composables/git/useGitSignIn";
 import {GitError, gitClient} from "~/utils/gitClient";
 
 type GitErrorKey = keyof typeof GitError
 /** Why there's no status to show: no git, or the workspace isn't in a repository. */
 export type GitProblem = typeof GitError.missing | typeof GitError.notRepo
+/** The setup wizard's steps (`GitSetup`), in order. */
+export type GitSetupStep = 'create' | 'identity' | 'remote' | 'push'
+/** Setup steps a failure can send the user back to: the name and email, or a remote. */
+export type GitSetupFix = Extract<GitSetupStep, 'identity' | 'remote'>
 
-const errorKey = (error: string) => (Object.keys(GitError) as GitErrorKey[]).find(k => GitError[k] === error)
+/** The `GitError` key of an error (its toast strings are `app.git.errors.<key>`), `undefined` for git's own messages. */
+export const errorKey = (error: string) => (Object.keys(GitError) as GitErrorKey[]).find(k => GitError[k] === error)
 
 /** What a new repository leaves out: system clutter, Vertex's trash and its temp files. */
 const IGNORED = ['.DS_Store', 'Thumbs.db', 'desktop.ini', '.vertex/trash/', '.vertex/**/*.tmp']
@@ -41,7 +46,7 @@ export function watchGitPresence(session: ActiveSession | undefined) {
  * `.git/` both), window focus and every operation; the operations, one at a time from here, each failure explained
  * in a toast with the next step.
  */
-export function useGitRepo(session: ActiveSession | undefined) {
+export function useGitRepo(session: ActiveSession | undefined, options: { setup?: (step: GitSetupFix) => void } = {}) {
     const {t} = useI18n()
     const toast = useToast()
     const root = session?.rootPath
@@ -93,11 +98,13 @@ export function useGitRepo(session: ActiveSession | undefined) {
 
     function explain(error: string) {
         const key = errorKey(error)
-        const actions = key === 'rejected'
-            ? [{label: t('app.git.pullAction'), color: 'neutral' as const, variant: 'outline' as const, onClick: () => void pull()}]
-            : key === 'conflict' && status.value?.merging
-                ? [{label: t('app.git.merging.abort'), color: 'neutral' as const, variant: 'outline' as const, onClick: () => void mergeAbort()}]
-                : undefined
+        const action = (label: string, onClick: () => void) => [{label, color: 'neutral' as const, variant: 'outline' as const, onClick}]
+        const {setup} = options
+        const actions = key === 'rejected' ? action(t('app.git.pullAction'), () => void pull())
+            : key === 'conflict' && status.value?.merging ? action(t('app.git.merging.abort'), () => void mergeAbort())
+                : key === 'identity' && setup ? action(t('app.git.setup.identityAction'), () => setup('identity'))
+                    : key === 'noRemote' && setup ? action(t('app.git.setup.remoteAction'), () => setup('remote'))
+                        : undefined
         toast.add({
             title: key ? t(`app.git.errors.${key}.title`) : t('app.git.errors.failed'),
             description: key ? t(`app.git.errors.${key}.description`) : error,
@@ -107,14 +114,8 @@ export function useGitRepo(session: ActiveSession | undefined) {
         })
     }
 
-    const overlay = useOverlay()
-    /** After a remote refused to sign in: asks for a token for its https host; true once one is saved, to retry. */
-    async function signIn(root: string) {
-        const [remotes, saved] = await Promise.all([gitClient.remotes(root), gitClient.tokens()]).catch(() => [[], []])
-        const hosts = httpsHosts(remotes)
-        // ssh remotes sign in with keys: the toast says so. A new modal each time, so no token is left from the last.
-        return !!hosts.length && !!await overlay.create(GitSignInModal, {destroyOnClose: true}).open({hosts, saved}).result
-    }
+    const askToken = useGitSignIn()
+    const signIn = async (root: string) => askToken((await gitClient.remotes(root).catch(() => [])).map(r => r.url))
 
     /**
      * Runs `op` as `label`, then refreshes; false (after explaining why, from the fresh status) when it failed. A remote
@@ -156,6 +157,10 @@ export function useGitRepo(session: ActiveSession | undefined) {
         const all = !status.value?.files.some(isStaged)
         return run(t('app.git.committing'), r => gitClient.commit(r, message, all))
     }
+    /** The name and email this repository's commits get. */
+    const setIdentity = (name: string, email: string) => run(t('app.git.working'), r => gitClient.identitySet(r, name, email))
+    /** Points `origin` at `url` (adding it when there's none). */
+    const connect = (url: string) => run(t('app.git.working'), r => gitClient.remoteSet(r, 'origin', url))
 
     /** Commit every change (with `message`, or a default), pull, push: the one button for keeping devices in step. */
     async function sync(message: string) {
@@ -173,7 +178,7 @@ export function useGitRepo(session: ActiveSession | undefined) {
         return push()
     }
 
-    return {status, problem, busy, refresh, init, stage, unstage, discard, commit, fetch, pull, push, sync, mergeAbort, switchBranch}
+    return {status, problem, busy, refresh, init, stage, unstage, discard, commit, setIdentity, connect, fetch, pull, push, sync, mergeAbort, switchBranch}
 }
 
 /** Whether a file has changes staged for the next commit. */
@@ -181,18 +186,3 @@ export const isStaged = (f: GitFile) => f.index !== '.' && f.index !== '?' && !f
 /** Whether a file has changes not staged yet (new files and conflicts included). */
 export const isUnstaged = (f: GitFile) => f.worktree !== '.' || f.conflicted
 
-/** The https hosts of `remotes` (what a token is saved for), with the username a URL names. */
-function httpsHosts(remotes: readonly GitRemote[]): GitToken[] {
-    const hosts = new Map<string, string>()
-    for (const remote of remotes) {
-        // scp-like ssh addresses (`git@host:repo`) and folders don't parse.
-        let url: URL
-        try {
-            url = new URL(remote.url)
-        } catch {
-            continue
-        }
-        if (url.protocol === 'https:' && !hosts.has(url.host)) hosts.set(url.host, decodeURIComponent(url.username))
-    }
-    return [...hosts].map(([host, username]) => ({host, username}))
-}

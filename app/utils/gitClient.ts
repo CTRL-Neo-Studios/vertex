@@ -1,5 +1,5 @@
 import {invoke} from "@tauri-apps/api/core";
-import type {GitBranch, GitChange, GitCommit, GitRemote, GitStatus, GitToken, GitVersion} from "#shared/types/app/git";
+import type {GitBranch, GitChange, GitCommit, GitIdentity, GitRemote, GitStatus, GitToken, GitVersion} from "#shared/types/app/git";
 
 /**
  * Thin client for the git backend (src-tauri/src/git.rs), which runs the installed `git`. `root` is the workspace
@@ -29,6 +29,9 @@ export const GitCommand = {
     clone: 'git_clone',
     tokens: 'git_tokens',
     tokenSet: 'git_token_set',
+    identity: 'git_identity',
+    identitySet: 'git_identity_set',
+    installTools: 'git_install_tools',
 } as const
 
 /** Error strings Rust returns for expected failures; anything else is git's own message. */
@@ -88,4 +91,10 @@ export const gitClient = {
      * removes it. Fetch, pull, push and clone hand it to git for that host only, for that run only.
      */
     tokenSet: (host: string, username: string, token: string) => invoke(GitCommand.tokenSet, {host, username, token}),
+    /** The name and email commits get, from whichever config sets them. */
+    identity: (root: string) => invoke<GitIdentity>(GitCommand.identity, {root}),
+    /** Sets them in this repository's own config. */
+    identitySet: (root: string, name: string, email: string) => invoke(GitCommand.identitySet, {root, name, email}),
+    /** macOS: opens Apple's installer for the developer tools, which bring git. */
+    installTools: () => invoke(GitCommand.installTools),
 }

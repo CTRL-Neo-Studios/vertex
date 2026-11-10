@@ -69,7 +69,8 @@
 			"recoveryMissing": "上次会话中有 {count} 个窗口无法重新打开：其文件夹或文件已不存在。",
 			"newWorkspaceDialog": "创建工作区文件夹",
 			"newWorkspaceName": "新工作区",
-			"folderExists": "该路径已存在内容。"
+			"folderExists": "该路径已存在内容。",
+			"cloneWorkspace": "克隆工作区…"
 		},
 		"settings": {
 			"title": "设置",
@@ -1748,7 +1749,14 @@
 			},
 			"missing": {
 				"title": "未安装 Git",
-				"description": "Vertex 使用 git 跟踪和同步此工作区。请先安装，然后重新检查。"
+				"description": "Vertex 使用 git 跟踪和同步此工作区。请先安装，然后重新检查。",
+				"macos": "Vertex 使用 git 跟踪和同步此工作区。Apple 的开发者工具包含 git：请安装后再检查。",
+				"configured": "Vertex 被设置为使用 {path}，但它不是可用的 git。请指定其他 git，或让 Vertex 自动查找。",
+				"installTools": "安装开发者工具",
+				"locate": "指定 git…",
+				"locateTitle": "选择 git 程序",
+				"automatic": "自动查找 git",
+				"toolsFailed": "无法打开开发者工具安装程序"
 			},
 			"notRepo": {
 				"title": "不是 git 仓库",
@@ -1780,7 +1788,7 @@
 				},
 				"noRemote": {
 					"title": "没有可同步的远程",
-					"description": "此仓库尚未连接远程。请用 `git remote add origin` 加上远程的 URL 添加一个。"
+					"description": "此仓库尚未连接远程：请连接一个以推送。"
 				},
 				"noUpstream": {
 					"title": "此分支没有远程分支",
@@ -1788,7 +1796,7 @@
 				},
 				"identity": {
 					"title": "Git 需要你的姓名和邮箱",
-					"description": "每次提交都会记录作者。请用 `git config --global user.name` 和 `git config --global user.email` 设置。"
+					"description": "提交会记录作者。请设置你的姓名和邮箱后再提交。"
 				}
 			},
 			"createRepo": "创建仓库",
@@ -1836,7 +1844,91 @@
 				"usernameHelp": "仅当你的主机要求令牌搭配用户名时填写。",
 				"kept": "Vertex 将它保存在系统钥匙串中，仅在 git 与 {host} 通信时交给 git。可在 设置 → Git 中移除。",
 				"save": "保存并重试"
+			},
+			"setup": {
+				"steps": {
+					"create": "创建",
+					"identity": "身份",
+					"remote": "远程",
+					"push": "推送"
+				},
+				"continue": "继续",
+				"later": "稍后",
+				"firstCommit": "首次提交",
+				"identityAction": "设置姓名",
+				"remoteAction": "连接远程",
+				"identity": {
+					"title": "你的姓名和邮箱",
+					"description": "每个提交都会记录作者。它们只保存在此仓库中。",
+					"name": "姓名",
+					"email": "邮箱",
+					"emailHint": "显示在历史中"
+				},
+				"remote": {
+					"title": "连接远程",
+					"description": "远程是此仓库在服务器（如 GitHub）上的副本。你的设备通过它同步：各自推送提交，并拉取其他设备的提交。",
+					"github": "在 GitHub 上创建仓库",
+					"empty": "设为私有并保持为空：不要 README、.gitignore 或许可证，这样首次推送可以直接完成。然后把它的 HTTPS 地址复制到这里。",
+					"url": "远程地址",
+					"connect": "连接"
+				},
+				"push": {
+					"title": "推送你的笔记",
+					"description": "Vertex 会提交所有文件并推送到远程。如果远程要求登录，Vertex 会帮你创建令牌。",
+					"action": "提交并推送"
+				}
+			},
+			"tour": {
+				"start": "导览",
+				"sync": {
+					"title": "同步",
+					"description": "一键让各设备保持一致：提交所有更改，拉取远程的新提交，再推送你的提交。"
+				},
+				"branch": {
+					"title": "分支",
+					"description": "分支是一条工作线。在此切换分支，或输入名称新建分支。"
+				},
+				"aheadBehind": {
+					"title": "领先与落后",
+					"description": "远程还没有的你的提交（上箭头），以及你还没拉取的远程提交（下箭头）。"
+				},
+				"remoteActions": {
+					"title": "抓取、拉取和推送",
+					"description": "抓取检查远程是否有新提交，拉取把它们合入你的文件，推送把你的提交发送到远程。"
+				},
+				"list": {
+					"title": "更改与已暂存",
+					"description": "更改列出自上次提交以来编辑过的文件。暂存（加号）要放进下次提交的文件：它们会移到已暂存。点击文件查看改了什么。"
+				},
+				"commit": {
+					"title": "提交",
+					"description": "提交会把已暂存的更改（未暂存任何文件时为所有更改）保存为历史中的一步，并附上说明改了什么的信息。"
+				},
+				"history": {
+					"title": "历史",
+					"description": "按分支列出的所有提交：选择一个查看它改了什么。"
+				}
+			},
+			"clone": {
+				"title": "克隆工作区",
+				"description": "把远程仓库复制到新文件夹，并作为工作区打开。",
+				"url": "仓库地址",
+				"parent": "放在",
+				"parentTitle": "选择文件夹的位置",
+				"choose": "选择…",
+				"name": "文件夹名称",
+				"badName": "文件夹名称不能包含斜杠",
+				"exists": "{path} 已存在：请换一个名称。",
+				"action": "克隆并打开",
+				"cloning": "正在克隆…"
 			}
+		},
+		"tour": {
+			"progress": "{step} / {count}",
+			"skip": "跳过",
+			"back": "上一步",
+			"next": "下一步",
+			"done": "完成"
 		}
 	}
 }

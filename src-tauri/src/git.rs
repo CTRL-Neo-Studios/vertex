@@ -124,6 +124,13 @@ pub struct GitRemote {
     url: String,
 }
 
+#[derive(Serialize, Debug, PartialEq)]
+pub struct GitIdentity {
+    /// `""` when git has none (from any config).
+    name: String,
+    email: String,
+}
+
 fn command(bin: &Path, cwd: &Path, args: &[&str]) -> Command {
     let mut cmd = Command::new(bin);
     cmd.args(args)
@@ -699,6 +706,34 @@ impl Repo {
     fn merge_abort(&self) -> Result<(), String> {
         self.git(&["merge", "--abort"]).map(drop)
     }
+
+    /// The name and email commits get, from whichever config sets them.
+    fn identity(&self) -> GitIdentity {
+        let get = |key: &str| {
+            command(&self.bin, &self.top, &["config", "--get", key])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+                .unwrap_or_default()
+        };
+        GitIdentity { name: get("user.name"), email: get("user.email") }
+    }
+
+    /// Sets the name and email in this repository's own config, so other repositories keep theirs.
+    fn identity_set(&self, name: &str, email: &str) -> Result<(), String> {
+        let line = |value: &str| -> Result<String, String> {
+            let value = arg(value.trim())?;
+            if value.contains(['\n', '\r']) {
+                return Err(format!("{value:?} can't span lines"));
+            }
+            Ok(value.to_owned())
+        };
+        // Both checked before either is written.
+        let (name, email) = (line(name)?, line(email)?);
+        self.git(&["config", "user.name", &name])?;
+        self.git(&["config", "user.email", &email]).map(drop)
+    }
 }
 
 fn git_bin<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -838,6 +873,34 @@ pub async fn git_remote_set<R: Runtime>(app: AppHandle<R>, root: String, name: S
 #[tauri::command]
 pub async fn git_merge_abort<R: Runtime>(app: AppHandle<R>, root: String) -> Result<(), String> {
     with_repo(app, root, true, Repo::merge_abort).await
+}
+
+#[tauri::command]
+pub async fn git_identity<R: Runtime>(app: AppHandle<R>, root: String) -> Result<GitIdentity, String> {
+    with_repo(app, root, false, |r| Ok(r.identity())).await
+}
+
+#[tauri::command]
+pub async fn git_identity_set<R: Runtime>(app: AppHandle<R>, root: String, name: String, email: String) -> Result<(), String> {
+    with_repo(app, root, true, move |r| r.identity_set(&name, &email)).await
+}
+
+/// macOS: opens Apple's installer for the developer tools, which include git (`xcode-select --install`).
+#[tauri::command]
+pub async fn git_install_tools() -> Result<(), String> {
+    if !cfg!(target_os = "macos") {
+        return Err("only macOS installs git with its developer tools".into());
+    }
+    blocking(|| {
+        let out = Command::new("/usr/bin/xcode-select").arg("--install").stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
+        // Already installed, for one: xcode-select's own message says so.
+        if out.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1102,6 +1165,13 @@ mod tests {
         assert_eq!(files(&repo)[0], ("[n].md".into(), '?', '?'));
         repo.discard(&["[n].md".into(), "n.md".into()]).unwrap();
         assert!(!a.join("[n].md").exists() && !a.join("n.md").exists());
+
+        // The name and email: the user's config first, then this repository's own.
+        let id = |r: &Repo| r.identity();
+        assert_eq!(id(&repo), GitIdentity { name: "T".into(), email: "t@example.org".into() });
+        repo.identity_set(" Ann ", "ann@example.org").unwrap();
+        assert_eq!(id(&repo), GitIdentity { name: "Ann".into(), email: "ann@example.org".into() });
+        assert!(repo.identity_set("-x", "a@b").is_err() && repo.identity_set("A\nB", "a@b").is_err());
 
         let first = repo.commit("First", true).unwrap();
         let log = repo.log(0, 10).unwrap();

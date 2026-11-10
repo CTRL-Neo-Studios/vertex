@@ -39,6 +39,13 @@
     --fade-bottom: 2rem;
 }
 
+/* The element a tour step points at (`TourPopover`). */
+.tour-target {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+    border-radius: var(--ui-radius);
+}
+
 /* Highlighted code (Comark's rangi in chat replies) carries its dark color in `--shiki-dark`. */
 .dark .shiki span[style*="--shiki-dark"] {
     color: var(--shiki-dark) !important;
