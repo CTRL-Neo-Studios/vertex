@@ -31,7 +31,37 @@ flowchart LR
 
 ### Change
 - A browser harness on the stubbed Tauri setup (as in the Git smokes): a 10k-file vault, a 300-heading note with 1k backlinks, a 500-message chat, a 20k-line diff, 2k branches. Measures `PerformanceObserver('longtask')` and keystroke-to-paint while typing in a note with Files, Outline and Backlinks open; opening and streaming in the long chat; opening the diff, Bases, the branch picker.
-- Numbers go in this file (before / after per phase). Throwaway: not committed.
+- Numbers go in this file (before / after per phase). Throwaway: not committed (the harness lives in the eval session, `/tmp/vertex-perf-harness.js`).
+
+### Results (before)
+Production build (`nuxt generate`) served statically, headless Chromium on an Apple Silicon Mac, CPU unthrottled, Tauri stubbed. Workspace: 10 003 files (`Big/` with 3000 notes, 70 folders of 100), 1000 notes linking to `Hub.md` (300 headings, 1200 lines), 500 changes plus a 20 000-line untracked file, 2001 branches, 2000 chats, one with 500 messages (a tool call in every third reply). Long tasks are main-thread tasks over 50 ms; "per key" is keydown to the next frame. The key floor is about 80 ms here with nothing open (headless frame pacing), so compare long tasks first.
+
+| Scenario | Long tasks | Longest | Total | Note |
+|---|---|---|---|---|
+| Type 60 characters above the headings: Files (`F00` open, 100 rows) and Outline | 61 | 744 ms | 6.6 s | per key p50 4.0 s: input queues up |
+| … Outline only | 60 | 186 ms | 5.8 s | about 97 ms per keystroke |
+| … Files only | 1 | 778 ms | 0.8 s | one freeze per autosave |
+| … Backlinks only (1000) | 1 | 130 ms | 0.1 s | |
+| … nothing open | 0 | | 0 | |
+| Switch tabs ×10: Files and Outline | 21 | 756 ms | 8.3 s | |
+| … Files only | 10 | 731 ms | 7.1 s | about 700 ms per switch |
+| … Chats (2000) only | 9 | 2169 ms | 19.2 s | about 2 s per switch |
+| … nothing open | 0 | | 0 | |
+| Open a workspace of 10 003 files, folders closed | 4 | 233 ms | | the index itself is fine |
+| Open a workspace of 5000 files with the 3000-note folder open | 6 | 9759 ms | | grows with rows × files |
+| Open the 3000-note folder in the 10 003-file workspace | | | | the renderer crashed (twice) |
+| Open the 20 000-line new-file diff | 2 | 1012 ms | 1.1 s | 180 701 DOM nodes |
+| Open Bases (10 004 rows) | 2 | 692 ms | 0.9 s | |
+| Type 3 characters in Bases' search | 3 | 571 ms | 0.8 s | up to 846 ms per key |
+| Open the branch picker (2001 branches) | 2 | 202 ms | 0.3 s | 13 rows drawn (capped); search typing fine |
+| Open the 500-message chat (from load, with Chats) | 6 | 1745 ms | 4.7 s | |
+| Type 3 characters in the chat prompt, 500 messages, Chats open | 3 | 1790 ms | 5.3 s | about 1.8 s per key |
+| … 500 messages, Chats closed | 3 | 255 ms | 0.7 s | about 250 ms per key |
+| … 40 messages, Chats open or closed | 0 | | 0 | |
+| Stream 300 chunks (20 ms apart, 6.1 s) into the 500-message chat | 4 | 716 ms | 1.2 s | took 8.0 s; the request held all 586 model messages |
+| … into a 40-message chat | 2 | 81 ms | 0.2 s | took 7.2 s |
+
+Findings the surveys missed: typing in the chat prompt is the commit-box bug again (it grows with the messages and is worse with the Chats list open), and switching tabs with the Chats list open costs about 2 s. Both go into O6. Not measured yet: the font and vault pickers (O5), a burst of watcher events (O1; the stub has no watcher).
 
 ### Acceptance
 - Each later phase shows its number before and after.
@@ -39,14 +69,29 @@ flowchart LR
 ## O1: Workspace index churn
 
 ### Change
-- `fileTree` copies only what the tree shows (`uuid`, `fileName`, `isFolder`, `relativePath`, `children`, `properties.icon`), so a save no longer rebuilds it.
-- `applyProperties` and `syncLinks` skip the write when the value is equal: a save that changes no property or link triggers nothing (backlinks and forelinks panels included).
-- `FileTreeComponent`: the workflow list is one `computed`, not a scan of the whole index per `.md` row.
-- `ChatLink` resolves through `LinkGraph.resolveTarget` instead of scanning every file per link.
-- A burst of watcher events (a pull touching 500 files) rebuilds once, not per event (measure first; only if O0 shows it).
+- Done: `fileTree` copies only what the tree shows (`UITreeNode` is now `uuid`, `fileName`, `relativePath`, `isFolder`, `icon`, `children`; `defaultUITreeNode` removed), so a save no longer rebuilds it.
+- Done: `applyProperties` and `syncLinks` skip the write when the value is equal: a save that changes no property or link triggers nothing (backlinks and forelinks panels included).
+- Done: `FileTreeComponent`: the workflow list is one `computed`, not a scan of the whole index per `.md` row.
+- Done: `ChatLink` resolves through the link graph (`resolveLink` in `useActiveWorkspaceIndex`, reactive to files added, removed or renamed) instead of scanning every file per link.
+- Dropped: batching watcher events. 500 modify events in a row, each changing the note's links, made no long task.
 
 ### Acceptance
 - Typing in a note with Files and Backlinks open: no tree or backlinks render after an autosave that changed no link or property.
+
+### Results (after)
+| Scenario | Before | After |
+|---|---|---|
+| Type 60 characters, Files open | 1 long task, 778 ms | none |
+| Type 60 characters, Backlinks (1000) open | 1 long task, 130 ms | none |
+| Switch tabs ×10, Files open (`F00`, 100 rows) | 7.1 s, 731 ms each | 0.57 s, longest 71 ms |
+| Open 5000 files with the 3000-note folder open | 9.8 s | 2.1 s |
+| Open the 3000-note folder in the 10 003-file workspace | renderer crashed | 2.0 s |
+| Switch tabs ×10 with that folder open | (crashed before) | 28 s, 2.8 s each: every row re-renders (O2) |
+| Type 60 characters with that folder open | (crashed before) | none |
+| Open the 500-message chat (from load, with Chats) | 4.7 s, longest 1745 ms | 2.9 s, longest 1401 ms |
+| 500 watcher modify events (same text, or new links) | not measured | none |
+
+Checked in the browser: a modify event that adds `icon:` to a note's properties shows the icon on its row, and chat `[[Hub]]` links resolve and open the note.
 
 ## O2: File tree
 
@@ -101,6 +146,7 @@ flowchart LR
 ## O6: Chat
 
 ### Change
+- The prompt: find what a keystroke re-renders (O0: 250 ms per key with 500 messages, 1.8 s with the Chats list open too; none with 40) and cut it off, as `GitCommitBox` did: the prompt in its own component if the messages share its render. Profile on a dev build first; the survey's guess (isolated by `createReusableTemplate`) is wrong.
 - `ChatMarkdown` parses a throttled copy (about 100 ms) while streaming; complete messages as before.
 - Tool cards: `unmount-on-hide`; whether a card has a body from its state, not by serializing its output twice per render.
 - A message's body in its own component (`ChatMessageBody`), so a streamed chunk re-renders the streaming message, not all 500 (`UChatMessages`' dynamic slots force every message to update).
@@ -116,6 +162,7 @@ flowchart LR
   - A chat open in a tab and in the side panel: each view has its own window.
   - Find in page only reaches loaded messages; accepted.
 - Chats list: a row's menu built when opened, folders sorted once, one date formatter, the drop highlight off the items (as in O3); the `@` note list sorted with one `Intl.Collator`; the scope picker `virtualize`.
+- Chats list on a tab switch: find why it costs about 2 s with 2000 chats (`activeTabUuid` in `items`, each row's `chatActions`) and stop it re-rendering every row. If it still costs over 100 ms after the row fixes, virtualizing the list comes back as a question.
 - Not now: a custom chat state with throttled, shallow messages (replacing `new Chat()`); only if the above leaves streaming slow. Virtualizing the Chats list: row fixes only, decided.
 
 ### Acceptance

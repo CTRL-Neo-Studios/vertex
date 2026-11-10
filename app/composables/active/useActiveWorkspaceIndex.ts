@@ -3,7 +3,7 @@ import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, Workspac
 import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path"
 import {invoke} from "@tauri-apps/api/core"
-import {defaultActiveWorkspaceFileIndex, defaultUITreeNode} from "#shared/utils/defaults/actives";
+import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
@@ -52,6 +52,8 @@ function fileExtOf(fileName: string) {
     return dot > 0 ? fileName.slice(dot + 1) : ''
 }
 
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+
 /**
  * The file index of one session, in both modes. A workspace scans its folder (`buildIndex`); a singlespace
  * session is a workspace rooted at the file's folder that indexes and watches only that file (`openFile`).
@@ -72,14 +74,15 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     const relativeOf = (path: string) => path.slice(runtime().root.length).replace(/^\//, '')
 
-    /** Copy the graph's view of these files' links into the reactive index. */
+    /** Copy the graph's view of these files' links into the reactive index; unchanged lists aren't written. */
     function syncLinks(uuids: Iterable<string>) {
         const g = runtime().graph
         for (const uuid of uuids) {
             const node = getFileByUuid(uuid)
             if (!node) continue
-            node.forelinks = g.forelinks(uuid)
-            node.backlinks = g.backlinks(uuid)
+            const forelinks = g.forelinks(uuid), backlinks = g.backlinks(uuid)
+            if (!sameList(node.forelinks, forelinks)) node.forelinks = forelinks
+            if (!sameList(node.backlinks, backlinks)) node.backlinks = backlinks
         }
     }
 
@@ -91,11 +94,21 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     const fileTree = computed<UITreeNode[]>(() => {
         const index = unref(fileIndex)
-        const toNode = (path: string): UITreeNode => {
-            const file = index[path]
-            return defaultUITreeNode({...file, children: file?.children.map(toNode) ?? []})
+        const toNode = (file: ActiveWorkspaceFileIndex): UITreeNode => {
+            const icon = file.properties.icon
+            return {
+                uuid: file.uuid,
+                fileName: file.fileName,
+                relativePath: file.relativePath,
+                isFolder: file.isFolder,
+                icon: typeof icon === 'string' && icon ? icon : undefined,
+                children: file.children.flatMap(path => {
+                    const child = index[path]
+                    return child ? [toNode(child)] : []
+                }),
+            }
         }
-        return Object.keys(index).filter(p => !index[parentPathOf(p)]).map(toNode)
+        return Object.keys(index).filter(p => !index[parentPathOf(p)]).map(p => toNode(index[p]!))
     })
 
     function applyProperties(path: string, content: string) {
@@ -103,8 +116,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (!node || node.isFolder) return
         const {properties, error} = parseProperties(path, content, parsers)
         if (error) console.warn(`[index] could not parse properties of ${path}:`, error)
-        node.properties = properties
-        if (isPropertiesFile(node.fileName)) {
+        // An autosave that changed no property mustn't re-render what reads them (the tree, Bases).
+        const changed = JSON.stringify(properties) !== JSON.stringify(node.properties)
+        if (changed) node.properties = properties
+        if (changed && isPropertiesFile(node.fileName)) {
             const parent = unref(fileIndex)[parentPathOf(path)]
             if (parent?.isFolder) parent.properties = properties
         }
@@ -434,6 +449,16 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return Object.values(unref(fileIndex)).filter(filter)
     }
 
+    /**
+     * The file a link target (`[[target]]` without `#heading`) points at, as the link graph resolves it. Reactive to
+     * files being added, removed or renamed (the uuid map), so a link to a note that appears later resolves then.
+     */
+    function resolveLink(target: string): ActiveWorkspaceFileIndex | undefined {
+        void unref(uuidToFilePathIndex).size
+        const id = runtime().graph.resolveTarget(target)
+        return id ? getFileByUuid(id) ?? undefined : undefined
+    }
+
     function getPropertiesFile(uuidRef: PossiblyRef<string | undefined>): string | undefined {
         const node = getFileByUuid(uuidRef)
         if (!node) return
@@ -468,6 +493,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFileByPath,
         getFilesByPaths,
         getFilteredFiles,
+        resolveLink,
         getPropertiesFile,
     }
 }

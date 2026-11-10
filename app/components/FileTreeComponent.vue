@@ -39,12 +39,14 @@ const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
 const renameFileModal = $ovl.create(RenameFileModal)
 const expandedFolders = useState<string[]>(StateKey.expandedFolders(props.sessionId), () => [])
+// Once per index change, not per note row each time the tree renders.
+const workflows = computed(() => getFilteredFiles(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName))))
 
 const formattedTreeData = computed<TreeItem[]>(() => {
     const build = (nodes: UITreeNode[]): TreeItem[] => nodes.map(node => {
         const icon = isPropertiesFile(node.fileName) ? 'i-lucide-file-cog'
             : isWorkflowFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-workflow'
-            : typeof node.properties.icon === 'string' && node.properties.icon ? node.properties.icon : undefined
+            : node.icon
         const item: TreeItem = {
             id: node.uuid,
             label: node.fileName,
@@ -96,12 +98,11 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.workflow.dryRun'), icon: 'i-lucide-flask-conical', onSelect: () => runner.runFile(node.relativePath, true)},
         ]
         if (ext.toLowerCase() !== 'md') return []
-        const workflows = getFilteredFiles(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName)))
         return [{
             label: t('app.editor.ui.workflow.runOnNote'),
             icon: 'i-lucide-workflow',
-            disabled: !workflows.length,
-            children: workflows.map(w => ({
+            disabled: !workflows.value.length,
+            children: workflows.value.map(w => ({
                 label: fileNameFromPath(w.fileName, true),
                 description: w.relativePath,
                 icon: 'i-lucide-workflow',

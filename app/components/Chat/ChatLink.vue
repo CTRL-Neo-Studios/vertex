@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {linkKeys} from "#shared/utils/index/linkGraph";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -14,15 +13,15 @@ const props = defineProps<{ href?: string, note?: string }>()
 
 const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {getFilteredFiles} = useActiveWorkspaceIndex(session)
+const {resolveLink} = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
 const $navi = useAppNavigator()
 const {openUrlInBrowser} = useAppOpener()
 
-// Resolves like the link graph: base name, relative path without extension, or relative path.
+// Resolves like a note's links (the link graph): base name, relative path without extension, or relative path.
 const file = computed(() => {
     const key = props.note?.split('#')[0]?.trim()
-    return key ? getFilteredFiles(f => !f.isFolder && linkKeys(f.relativePath).includes(key))[0] : undefined
+    return key ? resolveLink(key) : undefined
 })
 
 async function onClick() {

@@ -19,7 +19,10 @@ export interface ActiveWorkspaceFileIndex {
     modifiedTime: Date,
 }
 
-export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
+/** What the file tree shows of an index entry: nothing a save changes, so saving doesn't rebuild the tree. */
+export interface UITreeNode extends Pick<ActiveWorkspaceFileIndex, 'uuid' | 'fileName' | 'relativePath' | 'isFolder'> {
+    /** The entry's `icon` property, when it's a non-empty string. */
+    icon?: string
     children: UITreeNode[]
 }
 
