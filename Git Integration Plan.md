@@ -150,14 +150,14 @@ Blocked by G1.
 Blocked by G2.
 
 ### Change
-- `commitMessage` entry in `AI_FEATURES` (its model picker in Settings → Assistive AI → Features).
-- `generateCommitMessage` beside `generateChatTitle`: the staged diff (capped) and recent subjects, so it follows the repository's style.
-- ✨ button in the commit box; Sync uses it when the feature is on and the box is empty.
+- `commitMessage` entry in `AI_FEATURES` (its model picker and switch in Settings → Assistive AI → Features; on by default with AI, like the others; its description says the diff goes to the model).
+- `generateCommitMessage` beside `generateChatTitle` (`useCommitMessage` gathers it): the files with their status letters, the diff of what the commit takes (the index, plus the working copy when it takes everything; new files only listed), cut at 16 000 characters and saying so (`commitPrompt`), and the 10 latest subjects, so it follows the repository's style. `cleanCommitMessage` drops reasoning, a code fence and quotes.
+- ✨ button in the commit box (for what Commit would take: the staged changes, or every change when none are staged); Sync uses it for every change when the feature is on and the box is empty ("Writing message…"), falling back to "Update N file(s)" when the model fails.
 
 ### Acceptance
-- [ ] The button fills the box from the staged diff; turned off, the button hides.
-- [ ] Large diffs are trimmed, not rejected.
-- [ ] SMOKE row; en + zh-CN strings.
+- [x] The button fills the box from the staged diff; turned off, the button hides. (Browser, stubbed `ai_request`: the staged diff and recent subjects sent, the reply filling the box; off: no button and Sync makes no AI call.)
+- [x] Large diffs are trimmed, not rejected. (`commitPrompt` test; browser: a 50 101-character diff sent as its first 16 000 with the note.)
+- [x] SMOKE row; en + zh-CN strings.
 
 ## G8: Conflicts and auto-sync (#56)
 

@@ -15,6 +15,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {useTour} from "~/composables/utility/useTour";
 import {isStaged, isUnstaged, useGitRepo, type GitSetupStep} from "~/composables/git/useGitRepo";
+import {useCommitMessage} from "~/composables/git/useCommitMessage";
 import {gitClient} from "~/utils/gitClient";
 import {diffTabId} from "~/utils/gitDiff";
 import {GIT_STATES} from "~/utils/gitStates";
@@ -43,7 +44,9 @@ async function showHistory() {
 
 const staged = computed(() => status.value?.files.filter(isStaged) ?? [])
 const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
-const idle = computed(() => !busy.value && !!status.value)
+/** Sync is writing its commit message with AI. */
+const drafting = ref(false)
+const idle = computed(() => !busy.value && !!status.value && !drafting.value)
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
 const settings = useSettingsScope()
 const chatsInWorkspace = computed(() => settings.effective.value?.aiConfig.chatStorage === 'workspace')
@@ -231,9 +234,32 @@ async function commit(message: string, andPush: boolean) {
     return true
 }
 
+// AI commit messages (feature `commitMessage`): the box's button, and Sync when the box is empty.
+const commitMessage = useCommitMessage(session?.rootPath)
+/** A message for what the commit takes (`all`: every change); `''` after explaining a failure. */
+async function writeMessage(all: boolean) {
+    const current = status.value
+    if (!current) return ''
+    try {
+        return await commitMessage.generate(current, all)
+    } catch (e) {
+        $qt.error(t('app.git.ai.failed'), String(e))
+        return ''
+    }
+}
+const writeForBox = computed(() => (commitMessage.available.value ? () => writeMessage(!staged.value.length) : undefined))
+
 async function sync() {
     const box = commitBox.value
-    await git.sync(box?.message.trim() ?? '')
+    let message = box?.message.trim() ?? ''
+    if (!message && commitMessage.available.value) {
+        drafting.value = true
+        await git.refresh()
+        // Nothing to commit needs no message; a failed one falls back to "Update N file(s)".
+        if (status.value?.files.length) message = await writeMessage(true)
+        drafting.value = false
+    }
+    await git.sync(message)
     // Committed, even if the pull or push after it failed: the message is in the history now.
     if (box && !status.value?.files.length) box.message = ''
 }
@@ -325,8 +351,8 @@ const mergeActions = computed(() => [{
                         block
                         size="sm"
                         icon="i-lucide-refresh-cw"
-                        :loading="!!busy"
-                        :label="busy ?? t('app.git.sync')"
+                        :loading="!!busy || drafting"
+                        :label="busy ?? (drafting ? t('app.git.ai.writing') : t('app.git.sync'))"
                         :disabled="!idle || status.merging"
                         data-git-sync
                         @click="sync"
@@ -445,7 +471,7 @@ const mergeActions = computed(() => [{
                     </template>
                 </div>
             </div>
-            <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit data-git-commit-box/>
+            <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit :write="writeForBox" data-git-commit-box/>
         </template>
         <TourPopover :tour/>
     </div>

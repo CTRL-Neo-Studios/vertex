@@ -10,6 +10,8 @@ const props = defineProps<{
     staged: boolean,
     /** Commits (and pushes, with `andPush`); true once committed, which clears the box. */
     commit: (message: string, andPush: boolean) => Promise<boolean>,
+    /** Writes a message with AI (`''` when it couldn't); absent when the feature is off, which hides its button. */
+    write?: () => Promise<string>,
 }>()
 const {t} = useI18n()
 
@@ -17,6 +19,18 @@ const message = ref('')
 const canCommit = computed(() => props.ready && !!message.value.trim())
 async function run(andPush: boolean) {
     if (canCommit.value && await props.commit(message.value.trim(), andPush)) message.value = ''
+}
+
+const writing = ref(false)
+async function draft() {
+    if (!props.write || writing.value) return
+    writing.value = true
+    try {
+        const written = await props.write()
+        if (written) message.value = written
+    } finally {
+        writing.value = false
+    }
 }
 defineExpose({message})
 </script>
@@ -34,6 +48,19 @@ defineExpose({message})
             @keydown.ctrl.enter.prevent="run(false)"
         />
         <div class="flex gap-1.5">
+            <UTooltip v-if="props.write" :text="t('app.git.ai.write')">
+                <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-sparkles"
+                    :loading="writing"
+                    :disabled="!props.ready"
+                    :aria-label="t('app.git.ai.write')"
+                    data-git-ai-message
+                    @click="draft"
+                />
+            </UTooltip>
             <UTooltip :text="props.staged ? t('app.git.commitHint') : t('app.git.commitAllHint')">
                 <UButton class="flex-1" block size="sm" :label="t('app.git.commit')" :disabled="!canCommit" @click="run(false)"/>
             </UTooltip>

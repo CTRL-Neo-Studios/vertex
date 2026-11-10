@@ -399,6 +399,8 @@
 					"editorAssistantDescription": "在编辑器中使用 AI：改写、修正、续写等。",
 					"chat": "聊天",
 					"chatDescription": "围绕笔记的聊天。单个聊天可以固定自己的配置。关闭后会隐藏聊天相关视图、“在聊天中提问”和“新建聊天”。",
+					"commitMessage": "提交信息",
+					"commitMessageDescription": "根据更改并按仓库近期提交的风格撰写提交信息：Git 视图中的星光按钮，以及在信息框为空时同步。差异会发送给模型。",
 					"chatStorage": "聊天存储位置",
 					"chatStorageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
 					"chatStorageApp": "应用数据",
@@ -1921,6 +1923,11 @@
 				"exists": "{path} 已存在：请换一个名称。",
 				"action": "克隆并打开",
 				"cloning": "正在克隆…"
+			},
+			"ai": {
+				"write": "用 AI 撰写信息",
+				"writing": "正在撰写信息…",
+				"failed": "无法撰写提交信息"
 			}
 		},
 		"tour": {

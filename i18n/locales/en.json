@@ -399,6 +399,8 @@
 					"editorAssistantDescription": "Ask AI in the editor: rewrite, fix, continue and more.",
 					"chat": "Chat",
 					"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat.",
+					"commitMessage": "Commit messages",
+					"commitMessageDescription": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and Sync with an empty message box. The diff is sent to the model.",
 					"chatStorage": "Chat storage",
 					"chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
 					"chatStorageApp": "App data",
@@ -1921,6 +1923,11 @@
 				"exists": "{path} exists already: choose another name.",
 				"action": "Clone and open",
 				"cloning": "Cloning…"
+			},
+			"ai": {
+				"write": "Write a message with AI",
+				"writing": "Writing message…",
+				"failed": "Couldn't write a commit message"
 			}
 		},
 		"tour": {
