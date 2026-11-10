@@ -7,7 +7,8 @@ import {gitClient} from "~/utils/gitClient";
 
 /**
  * AI commit messages (feature `commitMessage`, this window's effective settings): whether there's a model for them,
- * and a message for what the next commit takes, written from its diff and the repository's recent subjects.
+ * whether it writes one by itself for an empty box or auto-sync (`aiConfig.commitMessages`), and a message for what
+ * the next commit takes, written from its diff and the repository's recent subjects.
  */
 export function useCommitMessage(root: string | undefined) {
     const {effective} = useSettingsScope()
@@ -15,6 +16,7 @@ export function useCommitMessage(root: string | undefined) {
         const ai = effective.value?.aiConfig
         return ai ? resolveAiFeature(ai, 'commitMessage') : null
     })
+    const when = computed(() => effective.value?.aiConfig.commitMessages)
 
     /** `all`: the commit takes every change (nothing is staged, or Sync); else only what's staged. */
     async function generate(status: GitStatus, all: boolean): Promise<string> {
@@ -34,5 +36,12 @@ export function useCommitMessage(root: string | undefined) {
         })
     }
 
-    return {available: computed(() => !!model.value), generate}
+    return {
+        available: computed(() => !!model.value),
+        /** Commit or Sync with an empty box asks the model. */
+        whenEmpty: computed(() => !!model.value && !!when.value?.whenEmpty),
+        /** Auto-sync's commits ask the model. */
+        onAutoSync: computed(() => !!model.value && !!when.value?.autoSync),
+        generate,
+    }
 }

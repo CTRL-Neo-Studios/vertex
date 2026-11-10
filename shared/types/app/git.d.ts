@@ -20,8 +20,10 @@ export interface GitStatus {
     upstream: string | null,
     ahead: number,
     behind: number,
-    /** A merge is in progress, whether or not its conflicts are resolved. */
+    /** A merge or a rebase is in progress, whether or not its conflicts are resolved. */
     merging: boolean,
+    /** It's a rebase (the user's `pull.rebase`): finishing continues it, and may stop again at a later commit. */
+    rebasing: boolean,
     files: GitFile[],
 }
 

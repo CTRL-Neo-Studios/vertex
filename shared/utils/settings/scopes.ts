@@ -36,6 +36,9 @@ export const WORKSPACE_OVERRIDABLE = {
     'aiConfig.chatMode': 'workspace',
     'aiConfig.chatTitles': 'workspace',
     'aiConfig.editorAssistant': 'workspace',
+    'aiConfig.commitMessages': 'workspace',
+    // A shared vault's settings mustn't start committing and pushing a user's edits on their own.
+    'gitConfig.autoSync': 'trustedWorkspace',
 } as const satisfies Partial<Record<AppSettingPath, 'workspace' | 'trustedWorkspace'>>
 
 type Overridable = keyof typeof WORKSPACE_OVERRIDABLE

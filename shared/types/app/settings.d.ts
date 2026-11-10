@@ -24,6 +24,15 @@ export interface AppSettings {
 export interface AppGitConfig {
     /** The git executable; `''` finds it (src-tauri/src/git.rs `find_git`). */
     path: string,
+    /** Keeping workspaces in step without the Sync button (`useGitAutoSync`); everything off by default. */
+    autoSync: {
+        /** Commit, pull and push every this many minutes; 0 is off. */
+        interval: number,
+        /** Sync once when a workspace window opens. */
+        onOpen: boolean,
+        /** Pull when the window gets focus. */
+        pullOnFocus: boolean,
+    },
 }
 
 /** Trusted folders and files aren't settings: they live in `trust.json` (`shared/workflows/trust.ts`). */

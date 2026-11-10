@@ -142,10 +142,35 @@ async function discard(files: GitFile[]) {
     if (confirmed) await git.discard(files)
 }
 
+// A conflict's sides, as a pull leaves them: mine is this device's version, theirs the remote's.
+const conflicted = computed(() => status.value?.files.filter(f => f.conflicted) ?? [])
+/** Stages files whose conflicts were fixed by hand, after asking when some still have conflict markers. */
+async function markResolved(files: GitFile[]) {
+    const marked = session?.rootPath ? await gitClient.conflictMarkers(session.rootPath, files.map(f => f.path)).catch(() => []) : []
+    if (marked.length && !await ask(t('app.git.conflicts.markersConfirm', {count: marked.length, files: marked.join(', ')}), {
+        title: t('app.git.conflicts.markResolved'),
+        kind: 'warning',
+        okLabel: t('app.git.conflicts.markResolved'),
+        cancelLabel: t('app.generic.cancel'),
+    })) return
+    await git.stage(files)
+}
+
 interface RowAction { id: string, label: string, icon: string, run: (file: GitFile) => unknown }
 const sections = computed(() => {
     const openAction: RowAction = {id: 'open', label: t('app.git.openFile'), icon: 'i-lucide-file-text', run: open}
     return [
+        {
+            id: 'conflicts', label: t('app.git.conflicts.label'), hint: t('app.git.conflicts.hint'), files: conflicted.value,
+            letter: (): GitState => 'U',
+            bulk: {label: t('app.git.conflicts.markAllResolved'), icon: 'i-lucide-check-check', run: () => markResolved(conflicted.value)},
+            actions: [
+                openAction,
+                {id: 'mine', label: t('app.git.conflicts.keepMine'), icon: 'i-lucide-monitor', run: (f: GitFile) => git.resolve([f], false)},
+                {id: 'theirs', label: t('app.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', run: (f: GitFile) => git.resolve([f], true)},
+                {id: 'resolved', label: t('app.git.conflicts.markResolved'), icon: 'i-lucide-check', run: (f: GitFile) => markResolved([f])},
+            ],
+        },
         {
             id: 'staged', label: t('app.git.staged'), hint: t('app.git.stagedHint'), files: staged.value,
             letter: (f: GitFile) => f.index,
@@ -154,7 +179,7 @@ const sections = computed(() => {
         },
         {
             id: 'changes', label: t('app.git.changes'), hint: t('app.git.changesHint'), files: unstaged.value,
-            letter: (f: GitFile): GitState => (f.conflicted ? 'U' : f.worktree),
+            letter: (f: GitFile): GitState => f.worktree,
             bulk: {label: t('app.git.stageAll'), icon: 'i-lucide-plus', run: () => git.stage(unstaged.value)},
             actions: [
                 openAction,
@@ -195,12 +220,18 @@ const fullPathOf = (file: GitFile) => `${status.value?.top}/${file.path}`
 /** A file row's right-click menu: open it, stage or unstage it (or discard it), copy its path, reveal it. */
 function fileMenu(section: Section, file: GitFile): ContextMenuItem[][] {
     const disabled = !idle.value
-    const changes: ContextMenuItem[] = section.id === 'staged'
-        ? [{label: t('app.git.unstage'), icon: 'i-lucide-minus', disabled, onSelect: () => void git.unstage([file])}]
-        : [
-            {label: t('app.git.stage'), icon: 'i-lucide-plus', disabled, onSelect: () => void git.stage([file])},
-            {label: t('app.git.discard'), icon: 'i-lucide-undo-2', color: 'error', disabled, onSelect: () => void discard([file])},
+    const changes: ContextMenuItem[] = section.id === 'conflicts'
+        ? [
+            {label: t('app.git.conflicts.keepMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve([file], false)},
+            {label: t('app.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve([file], true)},
+            {label: t('app.git.conflicts.markResolved'), icon: 'i-lucide-check', disabled, onSelect: () => void markResolved([file])},
         ]
+        : section.id === 'staged'
+            ? [{label: t('app.git.unstage'), icon: 'i-lucide-minus', disabled, onSelect: () => void git.unstage([file])}]
+            : [
+                {label: t('app.git.stage'), icon: 'i-lucide-plus', disabled, onSelect: () => void git.stage([file])},
+                {label: t('app.git.discard'), icon: 'i-lucide-undo-2', color: 'error', disabled, onSelect: () => void discard([file])},
+            ]
     return [
         [
             {label: t('app.git.diff.openChanges'), icon: 'i-lucide-git-compare', onSelect: () => void openChanges(section, file)},
@@ -216,11 +247,17 @@ function fileMenu(section: Section, file: GitFile): ContextMenuItem[][] {
     ]
 }
 
-/** A section header's right-click menu: the bulk action, and for Changes, discarding them all (asks first). */
+/** A section header's right-click menu: the bulk action; Conflicts adds keeping every file's one side, Changes discarding them all (asks first). */
 function sectionMenu(section: Section): ContextMenuItem[][] {
     const disabled = !idle.value
     return [[
         {label: section.bulk.label, icon: section.bulk.icon, disabled, onSelect: () => void section.bulk.run()},
+        ...(section.id === 'conflicts'
+            ? [
+                {label: t('app.git.conflicts.keepAllMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve(section.files, false)},
+                {label: t('app.git.conflicts.keepAllTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve(section.files, true)},
+            ]
+            : []),
         ...(section.id === 'changes'
             ? [{label: t('app.git.discardAll'), icon: 'i-lucide-undo-2', color: 'error' as const, disabled, onSelect: () => void discard(section.files)}]
             : []),
@@ -229,7 +266,7 @@ function sectionMenu(section: Section): ContextMenuItem[][] {
 
 const commitBox = useTemplateRef<{message: string}>('commitBox')
 async function commit(message: string, andPush: boolean) {
-    if (!await git.commit(message)) return false
+    if (!await git.commit(message || await emptyBoxMessage(!staged.value.length))) return false
     if (andPush) await git.push()
     return true
 }
@@ -248,17 +285,25 @@ async function writeMessage(all: boolean) {
     }
 }
 const writeForBox = computed(() => (commitMessage.available.value ? () => writeMessage(!staged.value.length) : undefined))
+/**
+ * The message for an empty box: the model's when `aiConfig.commitMessages.whenEmpty` is on, else (or when it fails)
+ * `''`, which `useGitRepo` commits as "Update N file(s)".
+ */
+async function emptyBoxMessage(all: boolean) {
+    if (!commitMessage.whenEmpty.value) return ''
+    drafting.value = true
+    try {
+        await git.refresh()
+        // Nothing to commit needs no message.
+        return status.value?.files.length ? await writeMessage(all) : ''
+    } finally {
+        drafting.value = false
+    }
+}
 
 async function sync() {
     const box = commitBox.value
-    let message = box?.message.trim() ?? ''
-    if (!message && commitMessage.available.value) {
-        drafting.value = true
-        await git.refresh()
-        // Nothing to commit needs no message; a failed one falls back to "Update N file(s)".
-        if (status.value?.files.length) message = await writeMessage(true)
-        drafting.value = false
-    }
+    const message = box?.message.trim() || await emptyBoxMessage(true)
     await git.sync(message)
     // Committed, even if the pull or push after it failed: the message is in the history now.
     if (box && !status.value?.files.length) box.message = ''
@@ -298,10 +343,18 @@ const branchGroups = computed<CommandPaletteGroup[]>(() => {
     ]
 })
 const branchLabel = computed(() => status.value?.branch ?? t('app.git.detached', {id: status.value?.head?.slice(0, 7) ?? ''}))
-const mergeActions = computed(() => [{
-    label: t('app.git.merging.abort'), color: 'neutral' as const, variant: 'outline' as const, size: 'xs' as const,
-    disabled: !idle.value, onClick: () => void git.mergeAbort(),
-}])
+// Finish (a merge's commit, a rebase's next step) once nothing is left to resolve; Abort is always there.
+const mergeKey = computed(() => (status.value?.rebasing ? 'app.git.rebasing' : 'app.git.merging'))
+const mergeActions = computed(() => [
+    {
+        label: t(`${mergeKey.value}.finish`), color: 'primary' as const, size: 'xs' as const,
+        disabled: !idle.value || conflicted.value.length > 0, onClick: (): void => void git.finishMerge(),
+    },
+    {
+        label: t(`${mergeKey.value}.abort`), color: 'neutral' as const, variant: 'outline' as const, size: 'xs' as const,
+        disabled: !idle.value, onClick: (): void => void git.mergeAbort(),
+    },
+])
 </script>
 
 <template>
@@ -398,8 +451,8 @@ const mergeActions = computed(() => [{
                     color="warning"
                     variant="subtle"
                     icon="i-lucide-git-merge"
-                    :title="t('app.git.merging.title')"
-                    :description="t('app.git.merging.description')"
+                    :title="t(`${mergeKey}.title`)"
+                    :description="t(`${mergeKey}.description`)"
                     :actions="mergeActions"
                 />
             </div>

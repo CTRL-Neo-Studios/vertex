@@ -400,7 +400,13 @@
 					"chat": "Chat",
 					"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat.",
 					"commitMessage": "Commit messages",
-					"commitMessageDescription": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and Sync with an empty message box. The diff is sent to the model.",
+					"commitMessageDescription": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and when you set it below, an empty message box and auto-sync. The diff is sent to the model.",
+					"commitMessages": {
+						"whenEmpty": "Write a message for an empty box",
+						"whenEmptyDescription": "Commit or Sync with nothing typed asks the model for a message. Off, they commit as \"Update N file(s)\".",
+						"autoSync": "Write auto-sync's messages",
+						"autoSyncDescription": "Auto-sync's commits get a message from the model (sending the diff on every sync). Off, they're \"Update N file(s)\"."
+					},
 					"chatStorage": "Chat storage",
 					"chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
 					"chatStorageApp": "App data",
@@ -450,7 +456,20 @@
 				"noTokens": "No saved tokens. Vertex asks for one when a remote refuses to sign in.",
 				"username": "Username: {username}",
 				"remove": "Remove",
-				"failed": "Couldn't read or change the saved tokens"
+				"failed": "Couldn't read or change the saved tokens",
+				"autoSync": {
+					"title": "Auto-sync",
+					"description": "Keeps this computer's workspaces in step without pressing Sync: commits every change, pulls and pushes. It waits during a merge or rebase and pauses after a sign-in failure until a sync from the Git view works. A trusted workspace can have its own.",
+					"interval": "Sync automatically",
+					"intervalDescription": "How often a workspace window syncs while it's open.",
+					"never": "Never",
+					"every": "Every {minutes} min",
+					"onOpen": "Sync when a workspace opens",
+					"onOpenDescription": "Once, when its window opens.",
+					"pullOnFocus": "Pull when the window gets focus",
+					"pullOnFocusDescription": "Brings in the remote's new commits when you come back to the window (at most once a minute).",
+					"untrusted": "This workspace's auto-sync applies once its folder is trusted."
+				}
 			}
 		},
 		"editor": {
@@ -1727,7 +1746,7 @@
 			},
 			"clean": "No changes",
 			"cleanHint": "Everything is committed.",
-			"message": "Commit message (⌘↩ to commit)",
+			"message": "Commit message (optional; ⌘↩ to commit)",
 			"commit": "Commit",
 			"commitHint": "Save the staged changes as a commit: a snapshot in the history.",
 			"commitAllHint": "Nothing is staged, so this commits every change.",
@@ -1735,8 +1754,9 @@
 			"commitPushHint": "Commit, then send it to the remote.",
 			"merging": {
 				"title": "Merging",
-				"description": "Fix the conflicting parts git marked in the files, stage them, then commit to finish. Or abort to go back.",
-				"abort": "Abort merge"
+				"description": "Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then finish the merge, or abort to go back.",
+				"abort": "Abort merge",
+				"finish": "Finish merge"
 			},
 			"states": {
 				"unchanged": "Unchanged",
@@ -1782,7 +1802,7 @@
 				},
 				"conflict": {
 					"title": "Merge conflicts",
-					"description": "Some files changed both here and on the remote. Fix the conflicting parts, stage the files and commit, or abort the merge."
+					"description": "Some files changed both here and on the remote. Resolve them in the Git view's Conflicts list, then finish the merge, or abort it."
 				},
 				"rejected": {
 					"title": "The remote has newer commits",
@@ -1928,6 +1948,28 @@
 				"write": "Write a message with AI",
 				"writing": "Writing message…",
 				"failed": "Couldn't write a commit message"
+			},
+			"conflicts": {
+				"label": "Conflicts",
+				"hint": "Files changed both here and on the remote. Keep one side, or open the file, fix the parts git marked and mark it resolved.",
+				"keepMine": "Keep mine",
+				"keepTheirs": "Keep theirs",
+				"keepAllMine": "Keep all mine",
+				"keepAllTheirs": "Keep all theirs",
+				"markResolved": "Mark resolved",
+				"markAllResolved": "Mark all resolved",
+				"markersConfirm": "{count} file(s) still have conflict markers: {files}. Mark them resolved anyway?"
+			},
+			"autoSync": {
+				"failed": "Auto-sync couldn't sync",
+				"paused": "Auto-sync paused",
+				"open": "Open Git"
+			},
+			"rebasing": {
+				"title": "Rebasing",
+				"description": "Your commits are being replayed onto the remote's. Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then continue; a later commit may stop again. Or abort to go back.",
+				"finish": "Continue rebase",
+				"abort": "Abort rebase"
 			}
 		},
 		"tour": {

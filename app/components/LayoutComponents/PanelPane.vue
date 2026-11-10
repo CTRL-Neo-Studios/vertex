@@ -37,8 +37,9 @@ const viewComponent = computed(() => panelViewComponent(props.pane.active))
 const actions = computed(() => toValue(props.actions.value) ?? [])
 // Every pane has this row, whatever its view declares, so switching views doesn't move the view up or down: the
 // name (strips hold no names; in buttons style only on the right, the left list already names the view), the
-// actions, then a separator line. The right side's first pane has it in the panel's header instead.
-const showBar = computed(() => !props.inHeader)
+// actions, then a separator line. The right side's first pane has it in the panel's header instead, in the strips
+// only: In the panels, that header holds its pills and collapse button, so the row stays under it.
+const showBar = computed(() => !props.inHeader || !strip.value)
 const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
 /** The rest of the row: a hairline across its middle, the full height a drag region. */
 const SEPARATOR = 'relative flex-1 self-stretch ms-1 after:absolute after:inset-x-0 after:top-1/2 after:border-t after:border-default'

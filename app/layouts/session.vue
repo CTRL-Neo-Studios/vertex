@@ -11,6 +11,7 @@ import {usePanels} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {useChats} from "~/composables/ai/useChats";
 import {watchGitPresence} from "~/composables/git/useGitRepo";
+import {useGitAutoSync} from "~/composables/git/useGitAutoSync";
 import DashboardSidePanel from "~/components/LayoutComponents/DashboardSidePanel.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
@@ -39,8 +40,11 @@ const panels = usePanels(activeSesh)
 // One drag state for the window's panel buttons, so a view can go from one side's list to the other's.
 provide(PANEL_DRAG, usePanelDrag(panels.move))
 
-// Whether the workspace is a git repository, for the views that need one (History).
-if (isWorkspace) watchGitPresence(activeSesh)
+// Whether the workspace is a git repository, for the views that need one (History), and auto-sync when it's on.
+if (isWorkspace) {
+    watchGitPresence(activeSesh)
+    useGitAutoSync(activeSesh)
+}
 
 // Chats synced in from elsewhere: one refresh per burst of watcher events.
 if (isWorkspace) {

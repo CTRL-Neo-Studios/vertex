@@ -23,6 +23,8 @@ const CHATS = '.vertex/chats/'
 /** Workspace roots known to be in a repository (with git to read it), for views that only make sense there. */
 const repoRoots = reactive(new Set<string>())
 export const isGitRepo = (root: string | undefined) => !!root && repoRoots.has(root)
+/** Workspace roots whose auto-sync stopped after the remote refused to sign in; an operation that works resumes it. */
+export const autoSyncPaused = reactive(new Set<string>())
 
 /**
  * Keeps `isGitRepo` current for a workspace window: checked when it opens, and again when its `.git` folder comes or
@@ -101,7 +103,7 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
         const action = (label: string, onClick: () => void) => [{label, color: 'neutral' as const, variant: 'outline' as const, onClick}]
         const {setup} = options
         const actions = key === 'rejected' ? action(t('app.git.pullAction'), () => void pull())
-            : key === 'conflict' && status.value?.merging ? action(t('app.git.merging.abort'), () => void mergeAbort())
+            : key === 'conflict' && status.value?.merging ? action(t(status.value.rebasing ? 'app.git.rebasing.abort' : 'app.git.merging.abort'), () => void mergeAbort())
                 : key === 'identity' && setup ? action(t('app.git.setup.identityAction'), () => setup('identity'))
                     : key === 'noRemote' && setup ? action(t('app.git.setup.remoteAction'), () => setup('remote'))
                         : undefined
@@ -134,6 +136,7 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
             }
         } while (error === GitError.auth && await signIn(root))
         busy.value = undefined
+        if (!error) autoSyncPaused.delete(root)
         await refresh()
         if (error) explain(error)
         return !error
@@ -152,15 +155,20 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
     const switchBranch = (name: string, create: boolean) => run(t('app.git.switching'), r => gitClient.switch(r, name, create))
     /** Makes the workspace a repository with a `.gitignore`; `syncChats` keeps workspace-stored chats in it. */
     const init = (syncChats: boolean) => run(t('app.git.creating'), r => gitClient.init(r, syncChats ? IGNORED : [...IGNORED, CHATS]))
-    /** Commits what's staged, or every change when nothing is. */
+    /** Commits what's staged, or every change when nothing is; an empty message is "Update N file(s)". */
     const commit = (message: string) => {
         const all = !status.value?.files.some(isStaged)
-        return run(t('app.git.committing'), r => gitClient.commit(r, message, all))
+        const count = status.value?.files.filter(f => all || isStaged(f)).length ?? 0
+        return run(t('app.git.committing'), r => gitClient.commit(r, message || t('app.git.syncMessage', {count}), all))
     }
     /** The name and email this repository's commits get. */
     const setIdentity = (name: string, email: string) => run(t('app.git.working'), r => gitClient.identitySet(r, name, email))
     /** Points `origin` at `url` (adding it when there's none). */
     const connect = (url: string) => run(t('app.git.working'), r => gitClient.remoteSet(r, 'origin', url))
+    /** Takes one side of conflicted files: `remote` (the side being brought in) or this device's. */
+    const resolve = (files: readonly GitFile[], remote: boolean) => run(t('app.git.working'), r => gitClient.resolve(r, files.map(f => f.path), remote))
+    /** Commits the merge, or continues the rebase, once every conflict is resolved. */
+    const finishMerge = () => run(t('app.git.committing'), gitClient.mergeContinue)
 
     /** Commit every change (with `message`, or a default), pull, push: the one button for keeping devices in step. */
     async function sync(message: string) {
@@ -178,11 +186,11 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
         return push()
     }
 
-    return {status, problem, busy, refresh, init, stage, unstage, discard, commit, setIdentity, connect, fetch, pull, push, sync, mergeAbort, switchBranch}
+    return {status, problem, busy, refresh, init, stage, unstage, discard, commit, setIdentity, connect, resolve, finishMerge, fetch, pull, push, sync, mergeAbort, switchBranch}
 }
 
 /** Whether a file has changes staged for the next commit. */
 export const isStaged = (f: GitFile) => f.index !== '.' && f.index !== '?' && !f.conflicted
-/** Whether a file has changes not staged yet (new files and conflicts included). */
-export const isUnstaged = (f: GitFile) => f.worktree !== '.' || f.conflicted
+/** Whether a file has changes not staged yet (new files included; conflicts have their own list). */
+export const isUnstaged = (f: GitFile) => f.worktree !== '.' && !f.conflicted
 

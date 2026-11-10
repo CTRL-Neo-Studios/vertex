@@ -81,6 +81,7 @@ const AI_SEED: AppAiConfig = {
     chatMode: 'suggest',
     chatTitles: true,
     editorAssistant: {toolbar: true, slash: true, shortcut: true},
+    commitMessages: {autoSync: false, whenEmpty: true},
 }
 
 /** A stored chat mode (settings or a chat file) as a mode: `ask` is Read's old name; anything unknown is Suggest. */
@@ -112,12 +113,15 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
     const entries: Loose = isLoose(ai.editorAssistant) ? ai.editorAssistant : {}
+    const commits: Loose = isLoose(ai.commitMessages) ? ai.commitMessages : {}
     return {
         enabled: ai.enabled !== false,
         providers, modelProfiles, defaultModelProfile, features, chatStorage,
         chatMode: toChatMode(ai.chatMode),
         chatTitles: ai.chatTitles !== false,
         editorAssistant: {toolbar: entries.toolbar !== false, slash: entries.slash !== false, shortcut: entries.shortcut !== false},
+        // A timer sending diffs to a model is opt-in; an empty box asking for one is G7's default.
+        commitMessages: {autoSync: commits.autoSync === true, whenEmpty: commits.whenEmpty !== false},
     }
 }
 
@@ -132,7 +136,15 @@ export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>):
 }
 
 export function defaultAppGitConfig(data?: DeepPartial<AppGitConfig>): AppGitConfig {
-    return {path: typeof data?.path === 'string' ? data.path : ''}
+    const interval = data?.autoSync?.interval
+    return {
+        path: typeof data?.path === 'string' ? data.path : '',
+        autoSync: {
+            interval: typeof interval === 'number' && Number.isFinite(interval) && interval > 0 ? interval : 0,
+            onOpen: data?.autoSync?.onOpen === true,
+            pullOnFocus: data?.autoSync?.pullOnFocus === true,
+        },
+    }
 }
 
 /** Old sessions kept absolute paths (Rust migrates the rest, see `sanitize_sessions`); read them too. */

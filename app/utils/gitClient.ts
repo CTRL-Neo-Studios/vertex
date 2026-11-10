@@ -32,6 +32,9 @@ export const GitCommand = {
     identity: 'git_identity',
     identitySet: 'git_identity_set',
     installTools: 'git_install_tools',
+    resolve: 'git_resolve',
+    conflictMarkers: 'git_conflict_markers',
+    mergeContinue: 'git_merge_continue',
 } as const
 
 /** Error strings Rust returns for expected failures; anything else is git's own message. */
@@ -97,4 +100,10 @@ export const gitClient = {
     identitySet: (root: string, name: string, email: string) => invoke(GitCommand.identitySet, {root, name, email}),
     /** macOS: opens Apple's installer for the developer tools, which bring git. */
     installTools: () => invoke(GitCommand.installTools),
+    /** Takes one side of each conflicted file (`remote`: the side being brought in, else this device's) and marks it resolved. */
+    resolve: (root: string, paths: string[], remote: boolean) => invoke(GitCommand.resolve, {root, paths, remote}),
+    /** Of `paths`, those whose file still has conflict markers. */
+    conflictMarkers: (root: string, paths: string[]) => invoke<string[]>(GitCommand.conflictMarkers, {root, paths}),
+    /** Commits the merge, or continues the rebase, once every conflict is resolved. */
+    mergeContinue: (root: string) => invoke(GitCommand.mergeContinue, {root}),
 }

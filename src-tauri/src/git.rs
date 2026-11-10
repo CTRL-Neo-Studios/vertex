@@ -69,8 +69,10 @@ pub struct GitStatus {
     upstream: Option<String>,
     ahead: u32,
     behind: u32,
-    /// A merge is in progress (`MERGE_HEAD`), whether or not its conflicts are resolved.
+    /// A merge (`MERGE_HEAD`) or a rebase is in progress, whether or not its conflicts are resolved.
     merging: bool,
+    /// It's a rebase (`pull.rebase`): finishing continues it, and "ours" is the remote's side.
+    rebasing: bool,
     files: Vec<GitFile>,
 }
 
@@ -141,6 +143,8 @@ fn command(bin: &Path, cwd: &Path, args: &[&str]) -> Command {
         .env("GIT_OPTIONAL_LOCKS", "0")
         // English messages, so `classify` can read them.
         .env("LC_ALL", "C")
+        // Never open an editor nobody can see (`rebase --continue` would, for the message).
+        .env("GIT_EDITOR", "true")
         .stdin(Stdio::null());
     #[cfg(windows)]
     {
@@ -262,7 +266,7 @@ fn classify(output: &str) -> String {
         AUTH
     } else if has(&["please tell me who you are", "unable to auto-detect email address", "empty ident name"]) {
         IDENTITY
-    } else if has(&["conflict (", "automatic merge failed", "unmerged files", "fix conflicts"]) {
+    } else if has(&["conflict (", "automatic merge failed", "unmerged files", "fix conflicts", "mark them as resolved"]) {
         CONFLICT
     } else if has(&["! [rejected]", "(fetch first)", "(non-fast-forward)"]) {
         REJECTED
@@ -557,7 +561,8 @@ impl Repo {
         let mut status = parse_status(&out);
         status.top = self.top.to_string_lossy().into_owned();
         status.prefix = self.prefix.clone();
-        status.merging = self.git_dir.join("MERGE_HEAD").exists();
+        status.rebasing = self.rebasing();
+        status.merging = status.rebasing || self.git_dir.join("MERGE_HEAD").exists();
         Ok(status)
     }
 
@@ -649,10 +654,13 @@ impl Repo {
         self.net(&["fetch", "-q"]).map(drop)
     }
 
-    /// Merges the upstream in, unless the user configured `pull.rebase` (either way).
+    /// Merges the upstream in, unless the user configured `pull.rebase` (either way); a rebase sets local changes
+    /// aside meanwhile (`--autostash`), since it refuses to start with any.
     fn pull(&self) -> Result<(), String> {
         let mut args = vec!["pull", "-q", "--no-edit"];
-        if !self.ok(&["config", "--get", "pull.rebase"]) {
+        if self.ok(&["config", "--get", "pull.rebase"]) {
+            args.push("--autostash");
+        } else {
             args.push("--no-rebase");
         }
         self.net(&args).map(drop)
@@ -703,8 +711,65 @@ impl Repo {
         self.git(&["remote", verb, name, url]).map(drop)
     }
 
+    fn rebasing(&self) -> bool {
+        self.git_dir.join("rebase-merge").exists() || self.git_dir.join("rebase-apply").exists()
+    }
+
     fn merge_abort(&self) -> Result<(), String> {
-        self.git(&["merge", "--abort"]).map(drop)
+        let what = if self.rebasing() { "rebase" } else { "merge" };
+        self.git(&[what, "--abort"]).map(drop)
+    }
+
+    /// Takes one side of each conflicted file (`remote`: the side being brought in, else this device's) and marks it
+    /// resolved; when that side deleted the file, it's deleted. Paths without a conflict are left alone. A rebase
+    /// replays this device's commits onto the remote's, so there git's "ours" is the remote's side.
+    fn resolve(&self, paths: &[String], remote: bool) -> Result<(), String> {
+        let paths = checked(paths)?;
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let theirs = remote != self.rebasing();
+        // `mode id stage\tpath` per unmerged stage: 1 the common base, 2 ours, 3 theirs.
+        let out = self.git_paths(&["ls-files", "-u", "-z"], &paths)?;
+        let stages: Vec<(&str, &str)> = out
+            .split('\0')
+            .filter_map(|line| {
+                let (meta, path) = line.split_once('\t')?;
+                Some((meta.split(' ').nth(2)?, path))
+            })
+            .collect();
+        let side = if theirs { "3" } else { "2" };
+        let unmerged: HashSet<&str> = stages.iter().map(|(_, path)| *path).collect();
+        let present: HashSet<&str> = stages.iter().filter(|(stage, _)| *stage == side).map(|(_, path)| *path).collect();
+        let (keep, gone): (Vec<&str>, Vec<&str>) = paths.into_iter().filter(|p| unmerged.contains(p)).partition(|p| present.contains(p));
+        if !keep.is_empty() {
+            self.git_paths(&["checkout", if theirs { "--theirs" } else { "--ours" }], &keep)?;
+            self.git_paths(&["add"], &keep)?;
+        }
+        if !gone.is_empty() {
+            self.git_paths(&["rm", "-q", "--ignore-unmatch"], &gone)?;
+        }
+        Ok(())
+    }
+
+    /// Of `paths`, those whose file still has conflict markers (a line starting `<<<<<<< ` or `>>>>>>> `).
+    fn conflict_markers(&self, paths: &[String]) -> Result<Vec<String>, String> {
+        let marked = |text: String| text.lines().any(|l| l.starts_with("<<<<<<< ") || l.starts_with(">>>>>>> "));
+        Ok(checked(paths)?
+            .into_iter()
+            .filter(|p| fs::read_to_string(self.top.join(p)).is_ok_and(marked))
+            .map(str::to_owned)
+            .collect())
+    }
+
+    /// Once every conflict is resolved: commits the merge with git's message, or continues the rebase (which may stop
+    /// again at a later commit). A commit that the resolution left with nothing to apply is skipped.
+    fn merge_continue(&self) -> Result<(), String> {
+        if !self.rebasing() {
+            return self.git(&["commit", "-q", "--no-edit"]).map(drop);
+        }
+        let empty = self.ok(&["diff", "--cached", "--quiet"]) && self.git(&["ls-files", "-u"])?.is_empty();
+        self.git(&["rebase", if empty { "--skip" } else { "--continue" }]).map(drop)
     }
 
     /// The name and email commits get, from whichever config sets them.
@@ -873,6 +938,21 @@ pub async fn git_remote_set<R: Runtime>(app: AppHandle<R>, root: String, name: S
 #[tauri::command]
 pub async fn git_merge_abort<R: Runtime>(app: AppHandle<R>, root: String) -> Result<(), String> {
     with_repo(app, root, true, Repo::merge_abort).await
+}
+
+#[tauri::command]
+pub async fn git_resolve<R: Runtime>(app: AppHandle<R>, root: String, paths: Vec<String>, remote: bool) -> Result<(), String> {
+    with_repo(app, root, true, move |r| r.resolve(&paths, remote)).await
+}
+
+#[tauri::command]
+pub async fn git_conflict_markers<R: Runtime>(app: AppHandle<R>, root: String, paths: Vec<String>) -> Result<Vec<String>, String> {
+    with_repo(app, root, false, move |r| r.conflict_markers(&paths)).await
+}
+
+#[tauri::command]
+pub async fn git_merge_continue<R: Runtime>(app: AppHandle<R>, root: String) -> Result<(), String> {
+    with_repo(app, root, true, Repo::merge_continue).await
 }
 
 #[tauri::command]
@@ -1217,6 +1297,78 @@ mod tests {
         assert!(status.merging && status.files.iter().any(|f| f.path == "a.md" && f.conflicted));
         repo.merge_abort().unwrap();
         assert!(!repo.status().unwrap().merging);
+
+        // Resolved each way: this clone keeps its own line, pushes; the other takes it as theirs; both end up equal.
+        assert_eq!(repo.pull().err().as_deref(), Some(CONFLICT));
+        assert_eq!(repo.conflict_markers(&one("a.md")).unwrap(), ["a.md"]);
+        assert_eq!(repo.merge_continue().err().as_deref(), Some(CONFLICT));
+        repo.resolve(&one("a.md"), false).unwrap();
+        assert_eq!(fs::read_to_string(a.join("a.md")).unwrap(), "one\nfrom a\n");
+        assert!(repo.conflict_markers(&one("a.md")).unwrap().is_empty());
+        repo.merge_continue().unwrap();
+        assert!(!repo.status().unwrap().merging && repo.log(0, 1).unwrap()[0].parents.len() == 2);
+        repo.push().unwrap();
+        fs::write(b.join("a.md"), "one\nfrom b again\n").unwrap();
+        other.commit("From b again", true).unwrap();
+        assert_eq!(other.pull().err().as_deref(), Some(CONFLICT));
+        other.resolve(&one("a.md"), true).unwrap();
+        other.merge_continue().unwrap();
+        other.push().unwrap();
+        repo.pull().unwrap();
+        assert_eq!(fs::read_to_string(b.join("a.md")).unwrap(), "one\nfrom a\n");
+        assert_eq!(fs::read_to_string(a.join("a.md")).unwrap(), fs::read_to_string(b.join("a.md")).unwrap());
+        // A file the other side deleted goes when its side is taken.
+        fs::write(a.join("gone.md"), "x\n").unwrap();
+        repo.commit("Add gone", true).unwrap();
+        repo.push().unwrap();
+        other.pull().unwrap();
+        fs::remove_file(b.join("gone.md")).unwrap();
+        other.commit("Remove gone", true).unwrap();
+        other.push().unwrap();
+        fs::write(a.join("gone.md"), "y\n").unwrap();
+        repo.commit("Edit gone", true).unwrap();
+        assert_eq!(repo.pull().err().as_deref(), Some(CONFLICT));
+        repo.resolve(&["gone.md".into(), "a.md".into()], true).unwrap();
+        assert!(!a.join("gone.md").exists() && fs::read_to_string(a.join("a.md")).unwrap() == "one\nfrom a\n");
+        repo.merge_continue().unwrap();
+
+        repo.push().unwrap();
+        other.pull().unwrap();
+        // With `pull.rebase`: this clone's commit is replayed onto the remote's. Keeping mine continues it (one
+        // parent, no merge commit); on the other clone keeping theirs leaves nothing to apply, so it's skipped.
+        for r in [&repo, &other] {
+            r.git(&["config", "pull.rebase", "true"]).unwrap();
+        }
+        fs::write(b.join("a.md"), "one\nb rebased\n").unwrap();
+        other.commit("B rebased", true).unwrap();
+        other.push().unwrap();
+        fs::write(a.join("a.md"), "one\na rebased\n").unwrap();
+        repo.commit("A rebased", true).unwrap();
+        fs::write(a.join("loose.md"), "not committed\n").unwrap();
+        assert_eq!(repo.pull().err().as_deref(), Some(CONFLICT));
+        let status = repo.status().unwrap();
+        assert!(status.merging && status.rebasing && status.files.iter().any(|f| f.path == "a.md" && f.conflicted));
+        repo.merge_abort().unwrap();
+        assert!(!repo.status().unwrap().merging && a.join("loose.md").exists());
+        assert_eq!(repo.pull().err().as_deref(), Some(CONFLICT));
+        repo.resolve(&one("a.md"), false).unwrap();
+        assert_eq!(fs::read_to_string(a.join("a.md")).unwrap(), "one\na rebased\n");
+        repo.merge_continue().unwrap();
+        let status = repo.status().unwrap();
+        assert!(!status.merging && !status.rebasing);
+        let head = &repo.log(0, 1).unwrap()[0];
+        assert_eq!((head.subject.as_str(), head.parents.len()), ("A rebased", 1));
+        // The change set aside for the pull is back.
+        assert_eq!(fs::read_to_string(a.join("loose.md")).unwrap(), "not committed\n");
+        fs::remove_file(a.join("loose.md")).unwrap();
+        repo.push().unwrap();
+        fs::write(b.join("a.md"), "one\nb again\n").unwrap();
+        other.commit("B again", true).unwrap();
+        assert_eq!(other.pull().err().as_deref(), Some(CONFLICT));
+        other.resolve(&one("a.md"), true).unwrap();
+        other.merge_continue().unwrap();
+        assert!(!other.status().unwrap().rebasing);
+        assert_eq!(fs::read_to_string(b.join("a.md")).unwrap(), "one\na rebased\n");
 
         // Branches: a new one becomes current; main keeps tracking origin.
         repo.switch("topic", true).unwrap();

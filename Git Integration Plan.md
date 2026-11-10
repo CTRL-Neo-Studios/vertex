@@ -164,14 +164,14 @@ Blocked by G2.
 Blocked by G2.
 
 ### Change
-- A pull that conflicts lists the conflicted files: keep mine, keep theirs, or open the file to edit the conflict markers; Mark resolved; Finish merge; Abort merge always available.
-- `gitConfig` auto-sync: every N minutes, when the workspace opens, pull when the window gets focus. All off by default; Settings → Git.
-- Auto-sync never runs during a merge or while sign-in is needed; failures show once, not every interval.
+- A pull that conflicts lists the conflicted files first (Conflicts): keep mine, keep theirs (`git_resolve`; a side that deleted the file deletes it), or open the file to edit the conflict markers; Mark resolved (asks when `git_conflict_markers` still finds markers); Finish merge (`git_merge_continue`, enabled once none are left); Abort merge always available. Merge only: with the user's own `pull.rebase`, a rebase's conflicts show in the list but finish in a terminal.
+- `gitConfig.autoSync` (`useGitAutoSync`, in every workspace window, with or without the Git view): every N minutes (5, 15, 30, 60), when the workspace opens, pull when the window gets focus (at most once a minute). All off by default; Settings → Git. It commits as "Update N file(s)" (no AI).
+- Auto-sync never runs during a merge or after the remote refused to sign in (until an operation from the Git view succeeds); failures show once, not every interval.
 
 ### Acceptance
-- [ ] Two clones editing the same note: the conflict resolves each way and both clones end up equal.
-- [ ] Auto-sync runs on its schedule and stops on a conflict.
-- [ ] SMOKE row; Concepts doc; en + zh-CN strings.
+- [x] Two clones editing the same note: the conflict resolves each way and both clones end up equal. (Rust round trip with real git: one clone keeps its own side and pushes, the other takes theirs; both files equal; a side that deleted a file removes it.)
+- [x] Auto-sync runs on its schedule and stops on a conflict. (Browser, stubbed with a 3-second interval: sync on open and on each interval; no calls and one toast during a merge, running again after; after a sign-in failure, no more runs until a manual Push worked.)
+- [x] SMOKE row; Concepts doc; en + zh-CN strings.
 
 ## Follow-up: 3-way merge editor (#57)
 

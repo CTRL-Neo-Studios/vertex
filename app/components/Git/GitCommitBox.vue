@@ -16,7 +16,8 @@ const props = defineProps<{
 const {t} = useI18n()
 
 const message = ref('')
-const canCommit = computed(() => props.ready && !!message.value.trim())
+// An empty box commits too: the view fills in the AI's message or "Update N file(s)".
+const canCommit = computed(() => props.ready)
 async function run(andPush: boolean) {
     if (canCommit.value && await props.commit(message.value.trim(), andPush)) message.value = ''
 }

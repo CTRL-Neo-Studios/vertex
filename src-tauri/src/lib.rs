@@ -301,6 +301,9 @@ pub fn run() {
             git::git_identity,
             git::git_identity_set,
             git::git_install_tools,
+            git::git_resolve,
+            git::git_conflict_markers,
+            git::git_merge_continue,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

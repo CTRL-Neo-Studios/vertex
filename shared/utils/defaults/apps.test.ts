@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppAiConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
+import { defaultAppAiConfig, defaultAppGitConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -69,12 +69,22 @@ describe('defaultAppWorkflowConfig', () => {
     })
 })
 
+describe('defaultAppGitConfig', () => {
+    it('keeps auto-sync off unless each part is turned on, with a positive interval', () => {
+        expect(defaultAppSettings().gitConfig).toEqual({path: '', autoSync: {interval: 0, onOpen: false, pullOnFocus: false}})
+        expect(defaultAppGitConfig({autoSync: {interval: 15, onOpen: true, pullOnFocus: true}}).autoSync).toEqual({interval: 15, onOpen: true, pullOnFocus: true})
+        for (const interval of [-5, Number.NaN, Infinity, '15'] as never[]) {
+            expect(defaultAppGitConfig({autoSync: {interval, onOpen: 'yes' as never}}).autoSync).toEqual({interval: 0, onOpen: false, pullOnFocus: false})
+        }
+    })
+})
+
 describe('defaultAppAiConfig', () => {
     it('seeds Local Ollama only when aiConfig is absent, so removing it sticks', () => {
         expect(defaultAppSettings().aiConfig.providers.map(p => p.id)).toEqual(['local-ollama'])
         expect(defaultAppAiConfig({providers: [], modelProfiles: []})).toEqual({
             enabled: true, providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest',
-            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true},
+            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true}, commitMessages: {autoSync: false, whenEmpty: true},
         })
         expect(defaultAppAiConfig({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
         expect(defaultAppAiConfig({chatStorage: 'cloud'}).chatStorage).toBe('app')
@@ -103,10 +113,11 @@ describe('defaultAppAiConfig', () => {
         expect(c.features).toEqual({editorAssistant: ''})
     })
 
-    it('keeps the switches on unless they are explicitly off', () => {
-        const off = defaultAppAiConfig({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}})
-        expect([off.enabled, off.chatTitles, off.editorAssistant]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}])
-        const junk = defaultAppAiConfig({enabled: 0, chatTitles: null, editorAssistant: 'none'})
-        expect([junk.enabled, junk.chatTitles, junk.editorAssistant]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}])
+    it('keeps the switches on unless they are explicitly off (AI auto-sync messages: off unless on)', () => {
+        const off = defaultAppAiConfig({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}, commitMessages: {whenEmpty: false}})
+        expect([off.enabled, off.chatTitles, off.editorAssistant, off.commitMessages]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}, {autoSync: false, whenEmpty: false}])
+        const junk = defaultAppAiConfig({enabled: 0, chatTitles: null, editorAssistant: 'none', commitMessages: {autoSync: 'yes'}})
+        expect([junk.enabled, junk.chatTitles, junk.editorAssistant, junk.commitMessages]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}, {autoSync: false, whenEmpty: true}])
+        expect(defaultAppAiConfig({commitMessages: {autoSync: true}}).commitMessages.autoSync).toBe(true)
     })
 })
