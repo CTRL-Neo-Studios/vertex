@@ -1,5 +1,6 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
-import type {GitFile, GitStatus} from "#shared/types/app/git";
+import type {GitFile, GitRemote, GitStatus, GitToken} from "#shared/types/app/git";
+import GitSignInModal from "~/components/Git/GitSignInModal.vue";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {GitError, gitClient} from "~/utils/gitClient";
 
@@ -106,16 +107,31 @@ export function useGitRepo(session: ActiveSession | undefined) {
         })
     }
 
-    /** Runs `op` as `label`, then refreshes; false (after explaining why, from the fresh status) when it failed. */
+    const overlay = useOverlay()
+    /** After a remote refused to sign in: asks for a token for its https host; true once one is saved, to retry. */
+    async function signIn(root: string) {
+        const [remotes, saved] = await Promise.all([gitClient.remotes(root), gitClient.tokens()]).catch(() => [[], []])
+        const hosts = httpsHosts(remotes)
+        // ssh remotes sign in with keys: the toast says so. A new modal each time, so no token is left from the last.
+        return !!hosts.length && !!await overlay.create(GitSignInModal, {destroyOnClose: true}).open({hosts, saved}).result
+    }
+
+    /**
+     * Runs `op` as `label`, then refreshes; false (after explaining why, from the fresh status) when it failed. A remote
+     * that refuses to sign in asks for a token, and `op` runs again once one is saved.
+     */
     async function run(label: string, op: (root: string) => Promise<unknown>): Promise<boolean> {
         if (!root) return false
         busy.value = label
         let error: string | undefined
-        try {
-            await op(root)
-        } catch (e) {
-            error = String(e)
-        }
+        do {
+            try {
+                await op(root)
+                error = undefined
+            } catch (e) {
+                error = String(e)
+            }
+        } while (error === GitError.auth && await signIn(root))
         busy.value = undefined
         await refresh()
         if (error) explain(error)
@@ -164,3 +180,19 @@ export function useGitRepo(session: ActiveSession | undefined) {
 export const isStaged = (f: GitFile) => f.index !== '.' && f.index !== '?' && !f.conflicted
 /** Whether a file has changes not staged yet (new files and conflicts included). */
 export const isUnstaged = (f: GitFile) => f.worktree !== '.' || f.conflicted
+
+/** The https hosts of `remotes` (what a token is saved for), with the username a URL names. */
+function httpsHosts(remotes: readonly GitRemote[]): GitToken[] {
+    const hosts = new Map<string, string>()
+    for (const remote of remotes) {
+        // scp-like ssh addresses (`git@host:repo`) and folders don't parse.
+        let url: URL
+        try {
+            url = new URL(remote.url)
+        } catch {
+            continue
+        }
+        if (url.protocol === 'https:' && !hosts.has(url.host)) hosts.set(url.host, decodeURIComponent(url.username))
+    }
+    return [...hosts].map(([host, username]) => ({host, username}))
+}

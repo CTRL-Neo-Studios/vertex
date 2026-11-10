@@ -135,15 +135,15 @@ Blocked by G1.
 
 ### Change
 - git's credential helpers are used as configured (Git Credential Manager on Windows opens a browser login).
-- When a network operation fails with `auth`: a dialog explains personal access tokens (link to the host's token page), takes one, stores it in the keychain per host (`keyring`), and retries.
-- A stored token is handed to git for that run only (`-c credential.helper=…` reading it from an environment variable); it never reaches the repository's config or the disk.
-- Settings: list stored hosts, remove a token.
+- When a fetch, pull, push or clone fails with `auth`: `GitSignInModal` explains personal access tokens (a button to the token page of github.com, gitlab.com or codeberg.org, scopes filled in; other hosts are told where), takes a token and an optional username, saves it in the keychain per host (`keyring`, one `git-tokens` entry), and the operation runs again. A host whose saved token was refused says so; ssh-only repositories get the toast instead (add the key to the agent).
+- A stored token is handed to git for that run only: `-c credential.helper=` (the user's helpers off for that run, so none stores it) `-c credential.helper=<a shell function>` that reads `VERTEX_GIT_CREDENTIALS` and answers only https requests for that host. It never reaches the repository's config, the arguments or the disk; hooks of that run do inherit the variable.
+- Settings → Git: list stored hosts, remove a token.
 
 ### Acceptance
-- [ ] Push to a private HTTPS remote with no helper configured works after entering a token once, and again after a relaunch.
-- [ ] A wrong token asks again; removing it from Settings makes git ask again.
-- [ ] The token doesn't appear in `.git/config`, the process list or logs.
-- [ ] SMOKE row; en + zh-CN strings.
+- [ ] Push to a private HTTPS remote with no helper configured works after entering a token once, and again after a relaunch. (The Rust path checked against GitHub with a real token from the keychain: refused without one, refused with a wrong one, accepted with the right one; the modal and retry checked in the browser; not yet in Vertex.)
+- [ ] A wrong token asks again; removing it from Settings makes git ask again. (Browser, stubbed; Rust: removed token → `auth`.)
+- [ ] The token doesn't appear in `.git/config`, the process list or logs. (Not in `.git/config`, the arguments or `GIT_TRACE`, which shows only Vertex's helper running; but the environment of that git process, hooks included, is readable by the same user while it runs, e.g. `ps eww`.)
+- [x] SMOKE row; en + zh-CN strings.
 
 ## G7: AI commit messages (#55)
 

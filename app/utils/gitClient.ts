@@ -1,5 +1,5 @@
 import {invoke} from "@tauri-apps/api/core";
-import type {GitBranch, GitChange, GitCommit, GitRemote, GitStatus, GitVersion} from "#shared/types/app/git";
+import type {GitBranch, GitChange, GitCommit, GitRemote, GitStatus, GitToken, GitVersion} from "#shared/types/app/git";
 
 /**
  * Thin client for the git backend (src-tauri/src/git.rs), which runs the installed `git`. `root` is the workspace
@@ -27,6 +27,8 @@ export const GitCommand = {
     mergeAbort: 'git_merge_abort',
     init: 'git_init',
     clone: 'git_clone',
+    tokens: 'git_tokens',
+    tokenSet: 'git_token_set',
 } as const
 
 /** Error strings Rust returns for expected failures; anything else is git's own message. */
@@ -34,7 +36,7 @@ export const GitError = {
     /** No usable git (or `gitConfig.path` isn't one). */
     missing: 'missing',
     notRepo: 'not-repo',
-    /** The remote refused the credentials, or there were none to give. */
+    /** The remote refused the credentials, or there were none to give (a saved token for its host included). */
     auth: 'auth',
     /** A pull stopped on conflicts, or one is waiting to be resolved. */
     conflict: 'conflict',
@@ -79,4 +81,11 @@ export const gitClient = {
     init: (root: string, ignore: string[]) => invoke(GitCommand.init, {root, ignore}),
     /** Into `dest`, a new or empty folder whose parent exists. */
     clone: (url: string, dest: string) => invoke(GitCommand.clone, {url, dest}),
+    /** Hosts with a saved personal access token. */
+    tokens: () => invoke<GitToken[]>(GitCommand.tokens),
+    /**
+     * Saves a personal access token for an https host (`github.com`, `host:port`) in the keychain; an empty token
+     * removes it. Fetch, pull, push and clone hand it to git for that host only, for that run only.
+     */
+    tokenSet: (host: string, username: string, token: string) => invoke(GitCommand.tokenSet, {host, username, token}),
 }

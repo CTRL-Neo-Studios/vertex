@@ -80,6 +80,7 @@
 				"theme": "Theme",
 				"view": "View",
 				"workflows": "Workflows",
+				"git": "Git",
 				"ai": "Assistive AI",
 				"aiProviders": "Providers",
 				"aiModels": "Model profiles",
@@ -438,6 +439,15 @@
 				"useGlobalAll": "Use global theme",
 				"globalOnlyPage": "A workspace can't change these settings; they apply everywhere.",
 				"editUser": "Edit User settings"
+			},
+			"git": {
+				"title": "Git",
+				"tokens": "Sign-in tokens",
+				"tokensDescription": "Personal access tokens for HTTPS remotes, saved when a remote refused to sign in. They stay in your system keychain; git gets one only while it talks to its host, and your own credential helpers aren't asked then.",
+				"noTokens": "No saved tokens. Vertex asks for one when a remote refuses to sign in.",
+				"username": "Username: {username}",
+				"remove": "Remove",
+				"failed": "Couldn't read or change the saved tokens"
 			}
 		},
 		"editor": {
@@ -1758,7 +1768,7 @@
 				},
 				"auth": {
 					"title": "Couldn't sign in to the remote",
-					"description": "Git has no working credentials for this remote. Set up a credential helper or an SSH key, then try again."
+					"description": "The remote refused to sign in. For an HTTPS remote, try again and enter a personal access token; for SSH, add your key to the SSH agent."
 				},
 				"conflict": {
 					"title": "Merge conflicts",
@@ -1811,6 +1821,21 @@
 				"parents": "Parents",
 				"copyId": "Copy commit id",
 				"close": "Close"
+			},
+			"signIn": {
+				"title": "Sign in to {host}",
+				"description": "Git couldn't sign in to {host}. A personal access token lets it.",
+				"refused": "{host} refused the saved token. It may have expired or lost access: enter a new one.",
+				"explain": "A personal access token is a password for apps, made in your account settings on the host. Give it read and write access to your repositories.",
+				"create": "Create a token on {host}",
+				"createElsewhere": "Create one in your account settings on {host}.",
+				"host": "Host",
+				"token": "Token",
+				"username": "Username",
+				"optional": "Optional",
+				"usernameHelp": "Only if your host wants your username with tokens.",
+				"kept": "Vertex keeps it in your system keychain and hands it to git only while it talks to {host}. Remove it in Settings → Git.",
+				"save": "Save and try again"
 			}
 		}
 	}

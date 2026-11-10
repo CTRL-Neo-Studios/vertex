@@ -80,6 +80,7 @@
 				"theme": "主题",
 				"view": "视图",
 				"workflows": "工作流",
+				"git": "Git",
 				"ai": "辅助 AI",
 				"aiProviders": "服务商",
 				"aiModels": "模型配置",
@@ -438,6 +439,15 @@
 				"useGlobalAll": "使用全局主题",
 				"globalOnlyPage": "工作区无法更改这些设置；它们在所有地方生效。",
 				"editUser": "编辑用户设置"
+			},
+			"git": {
+				"title": "Git",
+				"tokens": "登录令牌",
+				"tokensDescription": "用于 HTTPS 远程的个人访问令牌，在远程拒绝登录时保存。它们保存在系统钥匙串中；git 仅在与对应主机通信时获得令牌，此时不会询问你自己的凭据助手。",
+				"noTokens": "没有已保存的令牌。远程拒绝登录时，Vertex 会请你输入。",
+				"username": "用户名：{username}",
+				"remove": "移除",
+				"failed": "无法读取或更改已保存的令牌"
 			}
 		},
 		"editor": {
@@ -1758,7 +1768,7 @@
 				},
 				"auth": {
 					"title": "无法登录远程",
-					"description": "Git 没有可用于此远程的凭据。请设置凭据助手或 SSH 密钥后重试。"
+					"description": "远程拒绝了登录。HTTPS 远程请重试并输入个人访问令牌；SSH 远程请将密钥添加到 SSH 代理。"
 				},
 				"conflict": {
 					"title": "合并冲突",
@@ -1811,6 +1821,21 @@
 				"parents": "父提交",
 				"copyId": "复制提交 ID",
 				"close": "关闭"
+			},
+			"signIn": {
+				"title": "登录 {host}",
+				"description": "Git 无法登录 {host}。使用个人访问令牌即可登录。",
+				"refused": "{host} 拒绝了已保存的令牌。它可能已过期或失去权限：请输入新的令牌。",
+				"explain": "个人访问令牌是供应用使用的密码，在该站点的账户设置中创建。请授予它对仓库的读写权限。",
+				"create": "在 {host} 上创建令牌",
+				"createElsewhere": "请在 {host} 的账户设置中创建。",
+				"host": "主机",
+				"token": "令牌",
+				"username": "用户名",
+				"optional": "可选",
+				"usernameHelp": "仅当你的主机要求令牌搭配用户名时填写。",
+				"kept": "Vertex 将它保存在系统钥匙串中，仅在 git 与 {host} 通信时交给 git。可在 设置 → Git 中移除。",
+				"save": "保存并重试"
 			}
 		}
 	}

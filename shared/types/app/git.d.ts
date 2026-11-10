@@ -65,3 +65,11 @@ export interface GitRemote {
     name: string,
     url: string,
 }
+
+/** A host with a personal access token saved in the keychain (the token itself never leaves Rust). */
+export interface GitToken {
+    /** `github.com`, or `host:port`. */
+    host: string,
+    /** `''` when saved without one. */
+    username: string,
+}

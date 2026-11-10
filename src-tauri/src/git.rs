@@ -2,10 +2,10 @@
 //! user's config, credential helpers, SSH agent, hooks and LFS apply as in their terminal. Commands run in the
 //! repository's top folder (which may sit above the workspace), and paths are relative to it, `/`-separated.
 
-use crate::ai::blocking;
+use crate::ai::{blocking, KEYRING_SERVICE};
 use crate::state::{workspace_root, AppState};
-use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
@@ -26,6 +26,14 @@ const IDENTITY: &str = "identity";
 /// Field and record separators in `log` / `for-each-ref` formats: never in names or messages.
 const UNIT: char = '\x1f';
 const RECORD: char = '\x1e';
+
+/// The environment variable `HELPER` reads a run's tokens from, a `host username token` line each.
+const CREDENTIALS: &str = "VERTEX_GIT_CREDENTIALS";
+/// A credential helper for one run (git appends `get`, `store` or `erase`): answers `get` for an https host it has a
+/// token for, and nothing else, so a token never goes to another host or over plain http.
+const HELPER: &str = r#"credential.helper=!f() { test "$1" = get || return 0; p= h= u=; while IFS= read -r l && test -n "$l"; do case "$l" in protocol=*) p=${l#protocol=};; host=*) h=$(printf %s "${l#host=}" | tr A-Z a-z);; username=*) u=1;; esac; done; test "$p" = https || return 0; printf '%s\n' "$VERTEX_GIT_CREDENTIALS" | while read -r ch cu ct; do test "$ch" = "$h" || continue; test -n "$u" || printf 'username=%s\n' "$cu"; printf 'password=%s\n' "$ct"; done; }; f"#;
+/// The username sent with a token saved without one: GitHub wants this, other hosts take any.
+const TOKEN_USERNAME: &str = "x-access-token";
 
 #[derive(Default)]
 pub struct Git {
@@ -138,15 +146,95 @@ fn command(bin: &Path, cwd: &Path, args: &[&str]) -> Command {
 
 /// git's stdout, or the failure as a `GitError` code or git's message.
 fn run(bin: &Path, cwd: &Path, args: &[&str]) -> Result<String, String> {
-    let out = command(bin, cwd, args)
-        .output()
-        .map_err(|e| if e.kind() == ErrorKind::NotFound { MISSING.to_owned() } else { e.to_string() })?;
+    output(command(bin, cwd, args))
+}
+
+fn output(mut cmd: Command) -> Result<String, String> {
+    let out = cmd.output().map_err(|e| if e.kind() == ErrorKind::NotFound { MISSING.to_owned() } else { e.to_string() })?;
     if out.status.success() {
         return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
     }
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
     Err(classify(&format!("{stderr}\n{stdout}")))
+}
+
+/// A personal access token saved for a host.
+#[derive(Serialize, Deserialize)]
+struct Token {
+    /// `""` sends `TOKEN_USERNAME`.
+    username: String,
+    token: String,
+}
+
+/// Saved tokens by host (`github.com`, `git.example.org:8443`), in one keychain entry, since keychains can't list
+/// theirs. Changes wait for each other; reads don't.
+type Tokens = BTreeMap<String, Token>;
+static TOKENS: Mutex<()> = Mutex::new(());
+
+fn tokens_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, "git-tokens").map_err(|e| format!("system keychain unavailable: {e}"))
+}
+
+fn read_tokens() -> Result<Tokens, String> {
+    match tokens_entry()?.get_password() {
+        Ok(json) => serde_json::from_str(&json).map_err(|e| e.to_string()),
+        Err(keyring::Error::NoEntry) => Ok(Tokens::new()),
+        Err(e) => Err(format!("system keychain unavailable: {e}")),
+    }
+}
+
+fn write_tokens(tokens: &Tokens) -> Result<(), String> {
+    let entry = tokens_entry()?;
+    let done = if tokens.is_empty() {
+        match entry.delete_credential() {
+            Err(keyring::Error::NoEntry) => Ok(()),
+            other => other,
+        }
+    } else {
+        entry.set_password(&serde_json::to_string(tokens).map_err(|e| e.to_string())?)
+    };
+    done.map_err(|e| format!("system keychain unavailable: {e}"))
+}
+
+/// `host[:port]` of an https URL, lowercase; `None` for anything else (ssh, plain http, a folder).
+fn https_host(url: &str) -> Option<String> {
+    let url = reqwest::Url::parse(url).ok().filter(|u| u.scheme() == "https")?;
+    let host = url.host_str()?;
+    Some(url.port().map_or_else(|| host.to_owned(), |port| format!("{host}:{port}")))
+}
+
+/// The `CREDENTIALS` lines for a run that may reach `urls`: the saved tokens of their https hosts only.
+fn credential_lines(tokens: &Tokens, urls: &[&str]) -> String {
+    let hosts: HashSet<String> = urls.iter().filter_map(|url| https_host(url)).collect();
+    tokens
+        .iter()
+        .filter(|(host, _)| hosts.contains(*host))
+        .map(|(host, t)| {
+            let username = if t.username.is_empty() { TOKEN_USERNAME } else { &t.username };
+            format!("{host} {username} {}\n", t.token)
+        })
+        .collect()
+}
+
+/// `run` for commands that reach the remotes at `urls`. With a saved token for one of their hosts, this run's only
+/// credential helper is `HELPER` (so no other helper stores the token); otherwise the user's helpers apply as
+/// configured. The token is in this git's environment only, never in its arguments or on disk.
+fn run_signed(bin: &Path, cwd: &Path, args: &[&str], urls: &[&str]) -> Result<String, String> {
+    // ssh-only repositories never touch the keychain; an unavailable keychain leaves git to its own helpers.
+    let lines = if urls.iter().any(|url| https_host(url).is_some()) {
+        read_tokens().map(|tokens| credential_lines(&tokens, urls)).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if lines.is_empty() {
+        return run(bin, cwd, args);
+    }
+    let mut all = vec!["-c", "credential.helper=", "-c", HELPER];
+    all.extend_from_slice(args);
+    let mut cmd = command(bin, cwd, &all);
+    cmd.env(CREDENTIALS, lines);
+    output(cmd)
 }
 
 fn classify(output: &str) -> String {
@@ -415,7 +503,7 @@ fn add_ignores(root: &Path, patterns: &[String]) -> Result<(), String> {
 /// Clones `url` into `dest`, a new or empty folder whose parent exists.
 fn clone(bin: &Path, url: &str, dest: &Path) -> Result<(), String> {
     let parent = dest.parent().filter(|_| dest.is_absolute()).ok_or_else(|| format!("{dest:?} is not an absolute path"))?;
-    run(bin, parent, &["clone", "-q", "--", url, &dest.to_string_lossy()]).map(drop)
+    run_signed(bin, parent, &["clone", "-q", "--", url, &dest.to_string_lossy()], &[url]).map(drop)
 }
 
 struct Repo {
@@ -551,7 +639,7 @@ impl Repo {
     }
 
     fn fetch(&self) -> Result<(), String> {
-        self.git(&["fetch", "-q"]).map(drop)
+        self.net(&["fetch", "-q"]).map(drop)
     }
 
     /// Merges the upstream in, unless the user configured `pull.rebase` (either way).
@@ -560,13 +648,13 @@ impl Repo {
         if !self.ok(&["config", "--get", "pull.rebase"]) {
             args.push("--no-rebase");
         }
-        self.git(&args).map(drop)
+        self.net(&args).map(drop)
     }
 
     /// Pushes to the upstream; a branch without one goes to `origin`, or the only remote, and tracks it.
     fn push(&self) -> Result<(), String> {
         if self.ok(&["rev-parse", "-q", "--verify", "@{upstream}"]) {
-            return self.git(&["push", "-q"]).map(drop);
+            return self.net(&["push", "-q"]).map(drop);
         }
         let remotes = self.remotes()?;
         let remote = match remotes.iter().find(|r| r.name == "origin") {
@@ -575,7 +663,7 @@ impl Repo {
             None if remotes.is_empty() => return Err(NO_REMOTE.to_owned()),
             None => return Err(NO_UPSTREAM.to_owned()),
         };
-        self.git(&["push", "-q", "-u", &remote.name, "HEAD"]).map(drop)
+        self.net(&["push", "-q", "-u", &remote.name, "HEAD"]).map(drop)
     }
 
     fn branches(&self) -> Result<Vec<GitBranch>, String> {
@@ -588,6 +676,13 @@ impl Repo {
         let name = arg(name)?;
         let args = if create { vec!["switch", "-q", "-c", name] } else { vec!["switch", "-q", name] };
         self.git(&args).map(drop)
+    }
+
+    /// `git` for commands that reach a remote, with the saved tokens of every remote's fetch and push hosts.
+    fn net(&self, args: &[&str]) -> Result<String, String> {
+        let out = self.git(&["remote", "-v"])?;
+        let urls: Vec<&str> = out.lines().filter_map(|l| Some(l.split_once('\t')?.1.rsplit_once(' ')?.0)).collect();
+        run_signed(&self.bin, &self.top, args, &urls)
     }
 
     fn remotes(&self) -> Result<Vec<GitRemote>, String> {
@@ -755,6 +850,44 @@ pub async fn git_clone<R: Runtime>(app: AppHandle<R>, url: String, dest: String)
     with_git(app, move |_, bin| clone(&bin, &url, Path::new(&dest))).await
 }
 
+#[derive(Serialize, Debug, PartialEq)]
+pub struct GitToken {
+    host: String,
+    /// `""` when saved without one.
+    username: String,
+}
+
+/// The hosts with a saved token, never the tokens.
+#[tauri::command]
+pub async fn git_tokens() -> Result<Vec<GitToken>, String> {
+    blocking(|| Ok(read_tokens()?.into_iter().map(|(host, t)| GitToken { host, username: t.username }).collect())).await
+}
+
+/// Saves `token` for `host` (`github.com`, `host:port`), replacing any; an empty token removes it.
+#[tauri::command]
+pub async fn git_token_set(host: String, username: String, token: String) -> Result<(), String> {
+    blocking(move || {
+        let (username, token) = (username.trim(), token.trim());
+        // Whole host only: what `https_host` reads from a remote's URL.
+        let host = https_host(&format!("https://{}/", host.trim()))
+            .filter(|_| !host.contains(['/', '@', '?', '#']))
+            .ok_or_else(|| format!("{host:?} is not a host name"))?;
+        // `HELPER` reads space-separated lines.
+        if format!("{username}{token}").chars().any(|c| c.is_whitespace() || c.is_control()) {
+            return Err("A username or token can't contain spaces".into());
+        }
+        let _held = TOKENS.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut tokens = read_tokens()?;
+        if token.is_empty() {
+            tokens.remove(&host);
+        } else {
+            tokens.insert(host, Token { username: username.to_owned(), token: token.to_owned() });
+        }
+        write_tokens(&tokens)
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -883,6 +1016,48 @@ mod tests {
         add_ignores(&root, &lines(&[".DS_Store", "", "Thumbs.db"])).unwrap();
         assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), "node_modules\n.DS_Store\nThumbs.db\n");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reads_the_host_of_https_urls_only() {
+        assert_eq!(https_host("https://me:pw@GitHub.com:8443/a/b.git").as_deref(), Some("github.com:8443"));
+        assert_eq!(https_host("https://github.com:443/a").as_deref(), Some("github.com"));
+        for other in ["http://github.com/a", "git@github.com:a/b.git", "ssh://git@github.com/a", "/srv/remote.git"] {
+            assert_eq!(https_host(other), None, "{other}");
+        }
+    }
+
+    #[test]
+    fn hands_a_token_only_to_its_https_host() {
+        let Some(bin) = find_git("") else { return }; // no git on this machine
+        let token = |username: &str, token: &str| Token { username: username.into(), token: token.into() };
+        let tokens = Tokens::from([
+            ("github.com".into(), token("", "t1")),
+            ("git.example.org:8443".into(), token("me", "t2")),
+            ("other.org".into(), token("", "t3")),
+        ]);
+        // Only the hosts this run's remotes reach over https.
+        let urls = ["https://GitHub.com/a/b.git", "https://git.example.org:8443/x", "git@other.org:x.git", "http://other.org/x"];
+        let lines = credential_lines(&tokens, &urls);
+        assert_eq!(lines, "git.example.org:8443 me t2\ngithub.com x-access-token t1\n");
+
+        // What git gets from `HELPER` when it asks for a host's credentials.
+        let fill = |request: &str| {
+            let mut cmd = command(&bin, &std::env::temp_dir(), &["-c", "credential.helper=", "-c", HELPER, "credential", "fill"]);
+            cmd.env(CREDENTIALS, &lines).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+            let mut child = cmd.spawn().unwrap();
+            std::io::Write::write_all(&mut child.stdin.take().unwrap(), request.as_bytes()).unwrap();
+            let out = child.wait_with_output().unwrap();
+            out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+        };
+        let github = fill("protocol=https\nhost=GitHub.com\n\n").unwrap();
+        assert!(github.contains("username=x-access-token\npassword=t1\n"), "{github}");
+        // A username from the URL stays.
+        let named = fill("protocol=https\nhost=git.example.org:8443\nusername=you\n\n").unwrap();
+        assert!(named.contains("username=you\npassword=t2\n"), "{named}");
+        // Other hosts and plain http get nothing, and with prompts off git gives up.
+        assert_eq!(fill("protocol=https\nhost=other.org\n\n"), None);
+        assert_eq!(fill("protocol=http\nhost=github.com\n\n"), None);
     }
 
     fn temp(name: &str) -> PathBuf {

@@ -18,6 +18,7 @@ const links = computed(() => [
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
     {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
+    {label: t('app.settings.nav.git'), icon: 'i-lucide-git-branch', to: `${Routes.settings}/git`},
     {
         label: t('app.settings.nav.ai'),
         icon: 'i-lucide-sparkles',
