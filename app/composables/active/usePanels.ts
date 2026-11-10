@@ -33,7 +33,7 @@ export interface PanelAreaState {
     panes: PanelPaneState[]
     /** One per pane. */
     active: PanelViewId[]
-    /** Shows its views: it has a pane and isn't collapsed. (A collapsed bottom area still shows its header.) */
+    /** Shows its views: it has a pane and isn't collapsed. */
     open: boolean
 }
 
@@ -110,15 +110,15 @@ export function usePanels(session?: ActiveSession) {
     }
 
     /**
-     * A view's button: shows it in its pane and opens the area; an action runs. In a side's strip, the shown view's
-     * button collapses the side instead (the bottom area has its own collapse button).
+     * A view's button: shows it in its pane and opens the area; an action runs. In the strips, the shown view's button
+     * collapses its area instead.
      */
     function select(area: PanelArea, id: PanelViewId) {
         const action = panelViews.get(id)?.action
         if (action) return void nuxtApp.runWithContext(() => action(actionContext(area, id)))
         const pane = paneOf(area, id)
         if (!pane) return
-        if (area !== 'bottom' && style.value === 'strip' && areas.value[area].open && pane.active === id) {
+        if (style.value === 'strip' && areas.value[area].open && pane.active === id) {
             collapsedOf[area].value = true
             return
         }

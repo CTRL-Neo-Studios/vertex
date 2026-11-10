@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type {PanelArea} from "#shared/types/app/settings";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels} from "~/composables/active/usePanels";
 
+/** Collapses or expands a panel area (`i-lucide-panel-left`, `-right`, `-bottom`). */
 const props = withDefaults(defineProps<{
-    side: "left" | "right",
+    side: PanelArea,
     disabled?: boolean
 }>(), {
     disabled: false

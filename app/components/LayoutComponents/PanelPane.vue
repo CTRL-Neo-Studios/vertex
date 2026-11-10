@@ -12,7 +12,8 @@ import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} fro
  * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
  * list on the left, pills on the right (the strips hold them in the `strip` style), and the right side's first pane
  * has its buttons, name and actions in the panel's header instead (`inHeader`), drawn by `DashboardSidePanel`. At the
- * bottom: one compact row with the pills, name, actions and `#trailing` (the area's collapse button), in every style.
+ * bottom: one compact row with the pills (the left strip holds them in the `strip` style), name, actions and
+ * `#trailing` (the area's collapse button).
  */
 const props = defineProps<{
     area: PanelArea
@@ -50,6 +51,7 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
     <div class="h-full min-h-0 flex flex-col" data-tauri-drag-region>
         <div v-if="area === 'bottom'" class="flex items-center gap-1 h-8 shrink-0" data-tauri-drag-region>
             <PanelButtons
+                v-if="!strip"
                 list="bottom"
                 variant="pills"
                 :slots="pane.slots"

@@ -36,7 +36,7 @@ defineExpose({message})
 </script>
 
 <template>
-    <div class="p-2 flex flex-col gap-1.5 pb-4">
+    <div class="px-2 pb-4 pt-2 flex flex-col gap-1.5">
         <UTextarea
             v-model="message"
             :placeholder="t('app.git.message')"

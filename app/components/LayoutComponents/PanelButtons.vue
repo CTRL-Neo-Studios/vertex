@@ -43,7 +43,8 @@ const lineAtEnd = computed(() => dropIndex.value !== undefined && (!props.slots.
 
 const isActive = (id: PanelViewId) => !!props.active?.includes(id) && (props.variant !== 'strip' || props.open)
 const view = (id: PanelViewId) => panelViews.get(id)!
-const tooltipSide = computed(() => props.variant === 'strip' ? (props.list === 'left' ? 'right' : 'left') : 'bottom')
+// A strip's tooltips point away from its window edge; the bottom area's buttons sit in the left strip.
+const tooltipSide = computed(() => props.variant === 'strip' ? (props.list === 'right' ? 'left' : 'right') : 'bottom')
 const LINE = {list: 'h-0.5 w-full', pills: 'w-0.5 h-5', strip: 'h-0.5 w-6'}
 </script>
 

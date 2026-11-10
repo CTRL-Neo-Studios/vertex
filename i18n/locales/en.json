@@ -1675,7 +1675,7 @@
 			"mergeUp": "Merge with the pane above",
 			"mergeLeft": "Merge with the pane on the left",
 			"collapseBottom": "Collapse bottom panel",
-			"expandBottom": "Expand bottom panel",
+			"showBottom": "Show the bottom panel: {views}",
 			"lists": {
 				"left": "Left side",
 				"right": "Right side",

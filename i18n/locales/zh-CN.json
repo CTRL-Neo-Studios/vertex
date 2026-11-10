@@ -1675,7 +1675,7 @@
 			"mergeUp": "与上方窗格合并",
 			"mergeLeft": "与左侧窗格合并",
 			"collapseBottom": "折叠底部面板",
-			"expandBottom": "展开底部面板",
+			"showBottom": "显示底部面板：{views}",
 			"lists": {
 				"left": "左侧",
 				"right": "右侧",
