@@ -88,6 +88,8 @@ const models = computed(() => provider.value?.models ?? [])
 const modelQuery = ref('')
 const removeModels = (ids: string[]) => provider.value && updateProvider(provider.value.id, {models: provider.value.models.filter(m => !ids.includes(m.id))})
 const modelText = (m: AiModelInfo) => `${m.name ?? ''} ${m.id}`
+// Not inline: a new function on every render made each keystroke in Name, Base URL or the key redraw the model list.
+const removeConfirm = (count: number) => t('app.settings.ai.providers.removeModelsConfirm', {count})
 </script>
 
 <template>
@@ -142,7 +144,7 @@ const modelText = (m: AiModelInfo) => `${m.name ?? ''} ${m.id}`
                 :text="modelText"
                 :placeholder="t('app.settings.ai.providers.searchModels')"
                 :empty="t('app.settings.ai.providers.noEnabledModels')"
-                :confirm="count => t('app.settings.ai.providers.removeModelsConfirm', {count})"
+                :confirm="removeConfirm"
                 @remove="removeModels"
             >
                 <template #row="{item}">

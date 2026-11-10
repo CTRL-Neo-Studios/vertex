@@ -66,6 +66,22 @@ const {
 const $tab = useActiveTabs(unref($session))
 const $navi = useAppNavigator()
 
+// Every file under its path and each shorter path it ends with (`a/b.png`, `b.png`): a cell's link finds its file in
+// one lookup instead of scanning the whole list per cell.
+const linksBySuffix = computed(() => {
+    const map = new Map<string, InternalLink[]>()
+    for (const link of props.internalLinkList) {
+        const parts = (link.filePath ?? '').split('/')
+        for (let i = 0; i < parts.length; i++) {
+            const key = parts.slice(i).join('/')
+            const list = map.get(key)
+            if (list) list.push(link)
+            else map.set(key, [link])
+        }
+    }
+    return map
+})
+
 function getHeader(column: HeaderColumn<BaseSource<YamlFormData>>, label: string) {
     const isSorted = column.getIsSorted()
 
@@ -260,7 +276,7 @@ function propogateDisplayDataColumns(): TableColumn<Row>[] {
 					else if (links.length == 1) {
 						const [link]: InternalLinkNode[] = links
 						if (!link) return text;
-						const internalLink = props.internalLinkList.find(value => value.filePath?.endsWith(link.path))
+						const internalLink = linksBySuffix.value.get(link.path)?.[0]
 						if (!internalLink) return text;
 						if (isImage(getFileExtensionFromPath(`${internalLink.filePath}`)))
 							return h(UPopover, {}, {
@@ -280,7 +296,7 @@ function propogateDisplayDataColumns(): TableColumn<Row>[] {
 					} else {
 						const [link]: InternalLinkNode[] = links
 						if (!link) return text;
-						const internalLinkIds = props.internalLinkList.filter(value => value.filePath?.endsWith(link.path)).map(value => value.referenceId)
+						const internalLinkIds = linksBySuffix.value.get(link.path)?.map(value => value.referenceId) ?? []
 						return internalLinkIds.length ? getFileLinkBadgeList(internalLinkIds) : text
 					}
 				} else {
@@ -352,6 +368,17 @@ watch($base.hasChanges, (newValue) => {
 watch(activeView, loadColumnsVisibilityFromBase)
 
 const searchTerm = ref('')
+// TanStack filters every row on each change: once typing pauses.
+const filterTerm = refDebounced(searchTerm, 200)
+// Stable objects: a new one on each render (inline in the template) re-renders the table, and its virtualizer then
+// re-estimates every row (Nuxt UI recomputes its options per row).
+const TABLE_VIRTUALIZE = {estimateSize: 37}
+const TABLE_WATCH = {deep: false}
+const TABLE_UI = {
+    thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
+    td: 'py-1',
+    th: 'py-2 pt-0 text-xs',
+}
 const table = useTemplateRef('table')
 const currentViewResults = computed(() => unref($base.query.getViewResults(unref(activeView))).items)
 const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
@@ -515,8 +542,9 @@ const sorting = ref<{ id: string, desc: boolean }[]>([])
                         </UDropdownMenu>
                     </div>
                 </div>
-                <!-- Hidden, not unmounted, while loading: onMounted waits on the table's ref. v-show needs an element root, which UTable doesn't have. -->
-                <div v-show="!loadingData" class="flex-1 min-h-0 flex flex-col">
+                <!-- Hidden, not unmounted, while loading: onMounted waits on the table's ref. Invisible rather than
+                     `display: none`, which gave every row a height of 0, so the virtual table drew thousands of them. -->
+                <div :class="['flex-1 min-h-0 flex flex-col', loadingData && 'invisible']">
                     <UTable
                         v-model:sorting="sorting"
                         :columns="columns"
@@ -524,12 +552,10 @@ const sorting = ref<{ id: string, desc: boolean }[]>([])
                         sticky
                         :data="currentViewResults"
                         class="flex-1 min-h-0"
-                        v-model:global-filter="searchTerm"
-                        :ui="{
-                            thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
-                            td: 'py-1',
-                            th: 'py-2 pt-0 text-xs',
-                        }"
+                        :global-filter="filterTerm"
+                        :virtualize="TABLE_VIRTUALIZE"
+                        :watch-options="TABLE_WATCH"
+                        :ui="TABLE_UI"
                     />
                 </div>
             </div>

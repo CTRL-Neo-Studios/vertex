@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {GitChange, GitCommit} from "#shared/types/app/git";
 import {graphRows, type GraphLine} from "#shared/utils/gitGraph";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
@@ -8,7 +7,6 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
 import {diffTabId} from "~/utils/gitDiff";
-import {GIT_STATES} from "~/utils/gitStates";
 import {usePanelActions} from "~/utils/panelViews";
 
 /**
@@ -107,15 +105,8 @@ function ago(time: number) {
 }
 const fullDate = (time: number) => new Date(time * 1000).toLocaleString(locale.value)
 
-// The selected commit and its files.
+// The selected commit; its details and files are `GitCommitDetails`'.
 const selected = shallowRef<GitCommit>()
-const files = shallowRef<GitChange[]>()
-watch(selected, async commit => {
-    files.value = undefined
-    if (!commit || !root) return
-    const changes = await gitClient.commitFiles(root, commit.id).catch(() => [])
-    if (selected.value === commit) files.value = changes
-})
 const selectById = (id: string) => (selected.value = commits.value.find(c => c.id === id) ?? selected.value)
 
 async function openDiff(change: GitChange) {
@@ -128,8 +119,6 @@ async function openDiff(change: GitChange) {
 const box = useTemplateRef<HTMLElement>('box')
 const {width} = useElementSize(box)
 const wide = computed(() => width.value >= 720)
-const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1)
-const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0))
 </script>
 
 <template>
@@ -200,63 +189,15 @@ const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0)
                     </div>
                 </div>
             </div>
-            <div
-                v-if="selected"
-                :class="['shrink-0 flex flex-col min-h-0 overflow-y-auto border-default', wide ? 'w-88 border-s' : 'max-h-1/2 border-t']"
-                data-git-commit
-            >
-                <div class="flex items-start gap-2 px-3 pt-2.5">
-                    <p class="flex-1 font-medium text-sm text-highlighted break-words">{{ selected.subject }}</p>
-                    <UButton icon="i-lucide-x" color="neutral" variant="ghost" size="xs" :aria-label="t('app.git.history.close')" @click="selected = undefined"/>
-                </div>
-                <p v-if="selected.body" class="px-3 pt-1 text-sm text-muted whitespace-pre-wrap break-words">{{ selected.body }}</p>
-                <div class="px-3 pt-2 flex flex-col gap-1 text-xs text-muted">
-                    <span>{{ selected.author }} · {{ fullDate(selected.time) }}</span>
-                    <span class="flex items-center gap-1 flex-wrap">
-                        <UButton
-                            :label="selected.id.slice(0, 7)"
-                            icon="i-lucide-copy"
-                            color="neutral"
-                            variant="soft"
-                            size="xs"
-                            class="font-mono"
-                            :aria-label="t('app.git.history.copyId')"
-                            @click="writeText(selected.id)"
-                        />
-                        <template v-if="selected.parents.length">
-                            <span class="ps-1">{{ t('app.git.history.parents') }}</span>
-                            <UButton
-                                v-for="parent in selected.parents"
-                                :key="parent"
-                                :label="parent.slice(0, 7)"
-                                color="neutral"
-                                variant="link"
-                                size="xs"
-                                class="font-mono px-0.5"
-                                @click="selectById(parent)"
-                            />
-                        </template>
-                    </span>
-                </div>
-                <p class="px-3 pt-3 pb-1 text-xs font-medium text-muted">{{ t('app.git.history.files') }}</p>
-                <div class="px-1.5 pb-2">
-                    <p v-if="files && !files.length" class="px-1.5 text-xs text-dimmed">{{ t('app.git.history.noFiles') }}</p>
-                    <button
-                        v-for="change in files"
-                        :key="change.path"
-                        type="button"
-                        :data-commit-file="change.path"
-                        class="w-full flex items-center gap-1.5 ps-1.5 pe-1 h-7 rounded-md text-sm text-start hover:bg-elevated/60"
-                        @click="openDiff(change)"
-                    >
-                        <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(change.path) }}</span>
-                        <span class="truncate text-xs text-dimmed">{{ dirOf(change.path) }}</span>
-                        <UTooltip :text="t(`app.git.states.${GIT_STATES[change.status].key}`)">
-                            <span :class="['ms-auto w-5 text-center font-mono text-xs', GIT_STATES[change.status].color]">{{ change.status }}</span>
-                        </UTooltip>
-                    </button>
-                </div>
-            </div>
+            <GitCommitDetails
+                v-if="selected && root"
+                :root
+                :commit="selected"
+                :wide
+                @close="selected = undefined"
+                @select="selectById"
+                @open="openDiff"
+            />
         </div>
     </div>
 </template>

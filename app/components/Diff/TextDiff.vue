@@ -20,6 +20,8 @@ const foldKey = (fold: DiffFold) => fold.lines[0]?.old ?? 0
 const shown = computed(() => items.value.flatMap(i => (i.kind === 'fold' && opened.value.has(foldKey(i)) ? i.lines : [i])))
 const rows = computed(() => splitRows(shown.value))
 const unfold = (fold: DiffFold) => (opened.value = new Set([...opened.value, foldKey(fold)]))
+type SplitRow = (typeof rows.value)[number]
+type UnifiedRow = (typeof shown.value)[number]
 
 const box = useTemplateRef<HTMLElement>('box')
 const {width} = useElementSize(box)
@@ -34,7 +36,7 @@ const signClass = (line?: DiffLine) => (line?.kind === 'add' ? 'text-success' : 
 <template>
     <div class="h-full min-h-0 flex flex-col">
         <slot name="header" :added="counts.added" :removed="counts.removed" :binary/>
-        <div ref="box" class="flex-1 min-h-0 overflow-y-auto">
+        <div ref="box" class="flex-1 min-h-0">
             <UEmpty
                 v-if="failed"
                 variant="naked"
@@ -60,45 +62,59 @@ const signClass = (line?: DiffLine) => (line?.kind === 'add' ? 'text-success' : 
                 class="h-full"
                 :title="t('app.diff.noChanges')"
             />
-            <div v-else-if="sides" class="py-2 font-mono text-xs leading-5" :data-diff-layout="sideBySide ? 'split' : 'unified'">
-                <template v-if="sideBySide">
-                    <template v-for="(row, i) in rows" :key="i">
-                        <button
-                            v-if="'fold' in row"
-                            type="button"
-                            class="w-full py-0.5 bg-elevated/60 hover:bg-elevated text-center text-muted font-sans"
-                            @click="unfold(row.fold)"
-                        >
-                            {{ t('app.diff.unchanged', {count: row.fold.lines.length}) }}
-                        </button>
-                        <div v-else class="grid grid-cols-2 divide-x divide-default">
-                            <div v-for="(line, side) in [row.left, row.right]" :key="side" :class="['flex min-w-0', lineClass(line)]">
-                                <span class="w-12 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ side === 0 ? line?.old : line?.new }}</span>
-                                <span :class="['w-4 shrink-0 select-none', signClass(line)]">{{ sign(line) }}</span>
-                                <span class="flex-1 min-w-0 pe-3 whitespace-pre-wrap break-words">{{ line?.text }}</span>
-                            </div>
+            <!-- Only the rows on screen exist (a new 20 000-line file is otherwise 160 000 elements); rows wrap, so each is
+                 measured. Find in page reaches only the drawn rows. -->
+            <UScrollArea
+                v-else-if="sides && sideBySide"
+                key="split"
+                :items="rows"
+                :virtualize="{estimateSize: 20, paddingStart: 8, paddingEnd: 8}"
+                class="h-full font-mono text-xs leading-5"
+                data-diff-layout="split"
+            >
+                <template #default="{item: row}: {item: SplitRow}">
+                    <button
+                        v-if="'fold' in row"
+                        type="button"
+                        class="w-full py-0.5 bg-elevated/60 hover:bg-elevated text-center text-muted font-sans"
+                        @click="unfold(row.fold)"
+                    >
+                        {{ t('app.diff.unchanged', {count: row.fold.lines.length}) }}
+                    </button>
+                    <div v-else class="grid grid-cols-2 divide-x divide-default">
+                        <div v-for="(line, side) in [row.left, row.right]" :key="side" :class="['flex min-w-0', lineClass(line)]">
+                            <span class="w-12 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ side === 0 ? line?.old : line?.new }}</span>
+                            <span :class="['w-4 shrink-0 select-none', signClass(line)]">{{ sign(line) }}</span>
+                            <span class="flex-1 min-w-0 pe-3 whitespace-pre-wrap break-words">{{ line?.text }}</span>
                         </div>
-                    </template>
+                    </div>
                 </template>
-                <template v-else>
-                    <template v-for="(item, i) in shown" :key="i">
-                        <button
-                            v-if="item.kind === 'fold'"
-                            type="button"
-                            class="w-full py-0.5 bg-elevated/60 hover:bg-elevated text-center text-muted font-sans"
-                            @click="unfold(item)"
-                        >
-                            {{ t('app.diff.unchanged', {count: item.lines.length}) }}
-                        </button>
-                        <div v-else :class="['flex min-w-0', lineClass(item)]">
-                            <span class="w-10 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ item.old }}</span>
-                            <span class="w-10 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ item.new }}</span>
-                            <span :class="['w-4 shrink-0 select-none', signClass(item)]">{{ sign(item) }}</span>
-                            <span class="flex-1 min-w-0 pe-3 whitespace-pre-wrap break-words">{{ item.text }}</span>
-                        </div>
-                    </template>
+            </UScrollArea>
+            <UScrollArea
+                v-else-if="sides"
+                key="unified"
+                :items="shown"
+                :virtualize="{estimateSize: 20, paddingStart: 8, paddingEnd: 8}"
+                class="h-full font-mono text-xs leading-5"
+                data-diff-layout="unified"
+            >
+                <template #default="{item}: {item: UnifiedRow}">
+                    <button
+                        v-if="item.kind === 'fold'"
+                        type="button"
+                        class="w-full py-0.5 bg-elevated/60 hover:bg-elevated text-center text-muted font-sans"
+                        @click="unfold(item)"
+                    >
+                        {{ t('app.diff.unchanged', {count: item.lines.length}) }}
+                    </button>
+                    <div v-else :class="['flex min-w-0', lineClass(item)]">
+                        <span class="w-10 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ item.old }}</span>
+                        <span class="w-10 shrink-0 pe-2 text-right text-dimmed tabular-nums select-none">{{ item.new }}</span>
+                        <span :class="['w-4 shrink-0 select-none', signClass(item)]">{{ sign(item) }}</span>
+                        <span class="flex-1 min-w-0 pe-3 whitespace-pre-wrap break-words">{{ item.text }}</span>
+                    </div>
                 </template>
-            </div>
+            </UScrollArea>
         </div>
     </div>
 </template>

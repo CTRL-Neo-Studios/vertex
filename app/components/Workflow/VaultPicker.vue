@@ -20,6 +20,8 @@ const {t} = useI18n()
 const {fileTree} = useActiveWorkspaceIndex(useActiveSessions().getSession(props.sessionId))
 
 const query = ref('')
+// Each search walks the whole vault: once typing pauses.
+const term = refDebounced(query, 150)
 const expanded = ref<string[]>([])
 const wanted = computed(() => props.extensions.split(/[\s,]+/).map(e => e.replace(/^\./, '').toLowerCase()).filter(Boolean))
 const pickable = (node: UITreeNode) => props.kind === 'any' || (props.kind === 'folder') === node.isFolder
@@ -44,7 +46,7 @@ const item = (path: string, label: string, isFolder: boolean, canPick: boolean, 
 })
 
 const items = computed<TreeItem[]>(() => {
-    const q = query.value.trim().toLowerCase()
+    const q = term.value.trim().toLowerCase()
     if (q) {
         const found: TreeItem[] = []
         const walk = (nodes: UITreeNode[]) => nodes.forEach(n => {
@@ -64,13 +66,12 @@ const items = computed<TreeItem[]>(() => {
 <template>
     <div class="flex flex-col gap-2">
         <UInput v-model="query" icon="i-lucide-search" size="sm" :placeholder="t('app.editor.ui.vaultPicker.search')" autofocus/>
-        <div class="max-h-72 overflow-y-auto">
-            <UTree v-model:expanded="expanded" :items="items" :get-key="(i: TreeItem) => i.id as string" size="sm">
-                <template #item-trailing="{item: i}">
-                    <UIcon v-if="model.includes(i.path)" name="i-lucide-check" class="size-4 shrink-0 text-primary"/>
-                </template>
-            </UTree>
-            <p v-if="!items.length" class="p-2 text-sm text-muted">{{ t('app.editor.ui.vaultPicker.nothing') }}</p>
-        </div>
+        <!-- Virtual: only the rows on screen are drawn (a vault's tree or a one-letter search can be thousands). -->
+        <UTree v-model:expanded="expanded" :items="items" :get-key="(i: TreeItem) => i.id as string" size="sm" virtualize class="max-h-72">
+            <template #item-trailing="{item: i}">
+                <UIcon v-if="model.includes(i.path)" name="i-lucide-check" class="size-4 shrink-0 text-primary"/>
+            </template>
+        </UTree>
+        <p v-if="!items.length" class="p-2 text-sm text-muted">{{ t('app.editor.ui.vaultPicker.nothing') }}</p>
     </div>
 </template>

@@ -172,16 +172,41 @@ Checked: the Outline still lists the last headings (Section 298, 299) after typi
 ## O5: Large lists
 
 ### Change
-- `TextDiff`: `UScrollArea :virtualize` (measured rows; wrapped lines vary). Find in page only reaches drawn lines; accepted.
-- `BasesViewer`: `UTable` `virtualize` and `:watch-options="{deep: false}"`, one link lookup map instead of a scan per cell, the search through `refDebounced`.
-- `VaultPicker`: `UTree :virtualize`, search debounced.
-- `FontPicker`: `USelectMenu virtualize`.
-- `GitHistoryView`: the selected commit's file list in its own component (it re-renders on every scroll step today).
-- `GitChangesView`: the branch picker in its own component (`GitBranchPicker`, its search no longer re-renders the file rows), `virtualize` for 2k branches; one context menu for the list, as in O2.
-- Settings → provider page: the inline `:confirm` arrow hoisted, so typing in Name, Base URL or key doesn't re-render the model list.
+- Done: `TextDiff` draws through `UScrollArea virtualize`, one item list per layout (split rows or unified lines). Rows are measured, so wrapped lines work. Find in page reaches only the drawn lines; accepted.
+- Done: `BasesViewer`:
+  - `UTable` runs with `virtualize` and `watch-options` `{deep: false}`.
+  - A link cell finds its file in one map lookup by path suffix (`linksBySuffix`), instead of scanning the list per cell.
+  - The global filter reads a 200 ms-debounced copy of the search.
+  - The table's option objects are constants. Inline, each render re-rendered the table, and Nuxt UI then re-estimates every row.
+  - While loading, the table is `invisible`, not `display: none` (`v-show`). Hidden that way, every row measured 0 px and the "virtual" table drew 5000 of them.
+- Done: `VaultPicker`: `UTree virtualize` (the tree is its own `max-h-72` scroller), search debounced 150 ms.
+- Done: `FontPicker`: `USelectMenu virtualize` (group labels still show).
+- Done: `GitHistoryView`: the selected commit's panel is its own component (`GitCommitDetails`: message, id, parents, files), so scrolling the list no longer redraws its files.
+- Dropped: splitting out a `GitBranchPicker`, virtualizing it, and one context menu for the Git list. O0 measured the picker opening in 202 ms with 13 rows (the palette caps its groups) and its search typing without long tasks. Scrolling 500 changes made one task of 65–74 ms.
+- Done: Settings → provider page: the inline `:confirm` arrow is hoisted.
 
 ### Acceptance
 - Opening a 20k-line new-file diff, Bases over 10k notes, the branch picker with 2k branches and the font picker: each without a long task over 100 ms; typing in their searches stays under one frame per keystroke.
+
+### Results (after)
+Before and after on the same production build. For Bases, the font picker and History, "before" is the build with only that file reverted.
+
+| Scenario | Before | After |
+|---|---|---|
+| Open the 20 000-line new-file diff | 1012 ms, 180 701 elements | no long task, 1102 elements; scrolled to line 20 000 without one |
+| Open a 2000-line diff with two changes and wrapped lines, open its middle fold | not measured | one 68 ms task; folds, wrapping and the opened run drawn right (screenshot) |
+| Open Bases, 10 004 rows × 5 columns | longest 3459 ms (4.3 s), 162 567 elements | longest 168 ms (0.3 s), 2705 elements |
+| Type 3 characters in Bases' search | up to 460 ms per key | one 75 ms task |
+| Open the font picker, 800 installed fonts | 286 ms, 806 options drawn | 56 ms, 17 drawn |
+| Type 8 characters in its search | 7 long tasks, 0.5 s | none |
+| Scroll History (20 steps) with a 3000-file commit selected | 21 long tasks, 2.9 s | one 82 ms task |
+| Select that commit | 473 ms (its 3000 rows with tooltips) | the same; not virtualized |
+| Vault picker on 10 003 files: mount, then search "M" (matches every file) | not measured | 23 rows drawn; one 170–190 ms task each (dev build) |
+
+Checked in the browser:
+- The diff's last line reached by scrolling, and the Bases rows, columns and search.
+- The font picker's "Proportional" label with the matches.
+- History: selecting a commit, clicking its parent, and opening a file's diff.
 
 ## O6: Chat
 
