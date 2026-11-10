@@ -1649,7 +1649,15 @@
 					"discarded": "已丢弃",
 					"conflict": "未应用：笔记在暂存后已被改动",
 					"undone": "已被回退撤销"
-				}
+				},
+				"tabTitle": "{name}（AI 修改）",
+				"openNote": "打开笔记",
+				"openChat": "打开聊天",
+				"open": "查看修改",
+				"gone": "此修改已不在聊天中。",
+				"chatFailed": "无法打开此修改所属的聊天。",
+				"conflictNote": "暂存后笔记已被修改；这里显示的是 AI 针对它读到的文本提出的修改。",
+				"from": "来自 {chat}"
 			},
 			"questions": {
 				"title": "问题（{count}）",
@@ -1834,12 +1842,7 @@
 				"againstParent": "与它之前的提交比较",
 				"added": "新文件",
 				"deleted": "已删除",
-				"renamed": "由 {path} 重命名",
-				"binary": "二进制文件",
-				"binaryHint": "没有可以比较的文本行。",
-				"noChanges": "文本没有更改",
-				"unchanged": "{count} 行未更改",
-				"loadFailed": "无法读取此文件的版本"
+				"renamed": "由 {path} 重命名"
 			},
 			"history": {
 				"label": "历史",
@@ -1978,6 +1981,13 @@
 			"back": "上一步",
 			"next": "下一步",
 			"done": "完成"
+		},
+		"diff": {
+			"binary": "二进制文件",
+			"binaryHint": "没有可以比较的文本行。",
+			"noChanges": "文本没有更改",
+			"unchanged": "{count} 行未更改",
+			"loadFailed": "无法读取此文件的版本"
 		}
 	}
 }

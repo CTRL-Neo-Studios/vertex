@@ -3,6 +3,8 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import ChatView from "~/components/Chat/ChatView.vue";
 import GitDiffView from "~/components/Git/GitDiffView.vue";
+import ChatChangeView from "~/components/Chat/ChatChangeView.vue";
+import {chatChangeOf} from "~/utils/chatChanges";
 import PanelViewTab from "~/components/LayoutComponents/PanelViewTab.vue";
 
 // Keyed by tab so switching tabs remounts the editor with fresh state.
@@ -23,7 +25,9 @@ const kind = computed(() => getActiveTab(tabId.value)?.kind)
         <ChatView :key="tabId" :chat-id="tabId"/>
     </div>
     <div v-else-if="kind === 'diff'" class="absolute inset-0 flex flex-col">
-        <GitDiffView :key="tabId" :tab-id="tabId"/>
+        <!-- A diff tab is a chat's staged change or git's; its id says which. -->
+        <ChatChangeView v-if="chatChangeOf(tabId)" :key="tabId" :tab-id="tabId"/>
+        <GitDiffView v-else :key="tabId" :tab-id="tabId"/>
     </div>
     <div v-else-if="kind === 'view'" class="absolute inset-0 flex flex-col">
         <PanelViewTab :key="tabId" :view-id="tabId"/>

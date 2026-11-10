@@ -1649,7 +1649,15 @@
 					"discarded": "Discarded",
 					"conflict": "Not applied: the note changed after it was staged",
 					"undone": "Undone by a rewind"
-				}
+				},
+				"tabTitle": "{name} (AI change)",
+				"openNote": "Open note",
+				"openChat": "Open chat",
+				"open": "Show the change",
+				"gone": "This change isn't in the chat any more.",
+				"chatFailed": "Couldn't open the chat this change belongs to.",
+				"conflictNote": "The note changed after this was staged; this is what the AI proposed against the text it read.",
+				"from": "From {chat}"
 			},
 			"questions": {
 				"title": "Question(s) ({count})",
@@ -1834,12 +1842,7 @@
 				"againstParent": "Compared with the commit before it",
 				"added": "New file",
 				"deleted": "Deleted",
-				"renamed": "Renamed from {path}",
-				"binary": "Binary file",
-				"binaryHint": "It has no lines to compare.",
-				"noChanges": "No changes in the text",
-				"unchanged": "{count} unchanged line(s)",
-				"loadFailed": "Couldn't read this file's versions"
+				"renamed": "Renamed from {path}"
 			},
 			"history": {
 				"label": "History",
@@ -1978,6 +1981,13 @@
 			"back": "Back",
 			"next": "Next",
 			"done": "Done"
+		},
+		"diff": {
+			"binary": "Binary file",
+			"binaryHint": "It has no lines to compare.",
+			"noChanges": "No changes in the text",
+			"unchanged": "{count} unchanged line(s)",
+			"loadFailed": "Couldn't read this file's versions"
 		}
 	}
 }

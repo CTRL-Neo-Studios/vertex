@@ -11,6 +11,7 @@ import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useChats} from "~/composables/ai/useChats";
 import {diffSpecOf, diffTitle} from "~/utils/gitDiff";
+import {chatChangeOf} from "~/utils/chatChanges";
 import {panelViews} from "~/utils/panelViews";
 
 const $route = useRoute()
@@ -104,12 +105,16 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
         const node = getFileByUuid(i.fileUuid)
         const isChat = i.kind === 'chat'
         const diff = i.kind === 'diff' ? diffSpecOf(i.fileUuid) : undefined
+        const aiChange = i.kind === 'diff' ? chatChangeOf(i.fileUuid) : undefined
         const view = i.kind === 'view' ? panelViews.get(i.fileUuid) : undefined
 
-        if (node || isChat || diff || view) {
+        if (node || isChat || diff || aiChange || view) {
             items[1]?.push({
-                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled') : diff ? diffTitle(diff, t) : view ? t(view.label) : node?.fileName,
-                icon: isChat ? 'i-lucide-message-square' : diff ? 'i-lucide-git-compare' : view ? view.icon : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled')
+                    : diff ? diffTitle(diff, t)
+                        : aiChange ? t('app.chat.changes.tabTitle', {name: aiChange.path.slice(aiChange.path.lastIndexOf('/') + 1)})
+                            : view ? t(view.label) : node?.fileName,
+                icon: isChat ? 'i-lucide-message-square' : diff ? 'i-lucide-git-compare' : aiChange ? 'i-lucide-sparkles' : view ? view.icon : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)

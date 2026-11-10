@@ -86,5 +86,16 @@ export function splitRows(items: DiffItem[]): SplitRow[] {
     return rows
 }
 
+/** Lines added and removed in a diff (folds hold only unchanged lines). */
+export function diffCounts(items: DiffItem[]) {
+    let added = 0
+    let removed = 0
+    for (const item of items) {
+        if (item.kind === 'add') added++
+        else if (item.kind === 'del') removed++
+    }
+    return {added, removed}
+}
+
 /** Whether a text looks binary (a NUL in its first 8000 characters, git's own test). */
 export const isBinaryText = (text: string) => text.slice(0, 8000).includes('\0')

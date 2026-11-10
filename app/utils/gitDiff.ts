@@ -1,3 +1,5 @@
+import {fromBase64Url, toBase64Url} from "#shared/utils/base64url";
+
 /** What a diff tab shows: `path` in the repository at `top`, on one side. */
 export interface GitDiffSpec {
     /** The repository's top folder (`GitStatus.top`). */
@@ -14,11 +16,6 @@ export interface GitDiffSpec {
 }
 
 const PREFIX = 'diff-'
-
-const toBase64Url = (text: string) =>
-    btoa(String.fromCharCode(...new TextEncoder().encode(text))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
-const fromBase64Url = (text: string) =>
-    new TextDecoder().decode(Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0)))
 
 /**
  * A diff tab's id, which is also its route segment: the whole spec, URL-safe, so the page can show it from the route

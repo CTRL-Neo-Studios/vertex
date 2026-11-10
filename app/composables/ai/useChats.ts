@@ -4,6 +4,7 @@ import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/cod
 import {CompileError} from "@type32/workflows/core";
 import {invoke} from "@tauri-apps/api/core";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {fileNameFromPath, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
@@ -13,7 +14,7 @@ import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/util
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
 import {fetchPage} from "~/utils/webPage";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
-import {changesSummary, newNotePath, textChange} from "~/utils/chatChanges";
+import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
 import {TRASH_DIR} from "#shared/workflows/vault";
 import type {Op} from "#shared/workflows/effects";
 import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
@@ -237,20 +238,31 @@ export function useChats(session?: ActiveSession) {
     }
 
     /**
-     * The note's editor, shown with the chat beside it: a chat in a tab moves to the side panel and the note's tab
-     * opens, so its proposals can be seen and decided. Waits for the editor to mount; `undefined` if it doesn't.
+     * Shows `tab` with the chat beside it: a chat in a tab moves to the side panel (with the Chat view hidden it keeps
+     * its tab), and `tab` shows in the editor area.
+     */
+    async function showBeside(chatId: string, tab: ActiveTab) {
+        sidePanelChatId.value = chatId
+        const beside = panels.showView('chat')
+        // The tab's route first, then the chat's tab goes (see closeTabElsewhere).
+        await $navi.toWorkspaceTab(session?.uuid, tab)
+        if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+    }
+
+    /**
+     * The note's editor, shown with the chat beside it (`showBeside`), so its proposals can be seen and decided. Waits
+     * for the editor to mount; `undefined` if it doesn't.
      */
     async function editorFor(chatId: string, noteId: string) {
         const shown = editorViewOf(session, noteId)
         if (shown && $tabs.activeTabUuid.value === noteId) return shown
-        sidePanelChatId.value = chatId
-        // With the Chat view hidden the chat keeps its tab, and the note opens beside it.
-        const beside = panels.showView('chat')
-        // The note's route first, then the chat's tab goes (see closeTabElsewhere).
-        await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(noteId))
-        if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+        await showBeside(chatId, $tabs.openTab(noteId))
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
+
+    /** A Write-mode change's diff tab (`ChatChangeView`), with the chat beside it. */
+    const openChange = (chatId: string, messageId: string, path: string) =>
+        showBeside(chatId, $tabs.openTab(chatChangeTabId({chatId, messageId, path}), 'diff'))
 
     /** A note by workspace-relative path or, as models often pass, by name (like a wikilink: any case, `.md` optional). */
     function findNote(path: string) {
@@ -855,6 +867,7 @@ export function useChats(session?: ActiveSession) {
         showBranch,
         applyChanges,
         discardChanges,
+        openChange,
         appliedAfter,
         /** Which branch shows at `messageId`, of how many; undefined where nothing forks. */
         branchOf: (id: string, messageId: string) => {
