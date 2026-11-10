@@ -16,9 +16,19 @@ export interface AppSettings {
     aiConfig: AppAiConfig,
     /** Global only: a workspace mustn't choose which program runs as git. */
     gitConfig: AppGitConfig,
+    /** Moving and renaming files; workspace-overridable. */
+    fileConfig: AppFileConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
+}
+
+export interface AppFileConfig {
+    /**
+     * After a move or rename changes links to a note (or to the notes in a folder): ask each time, update them, or
+     * keep them as written. The link dialog's "Remember my decision" sets it for the workspace.
+     */
+    updateLinks: 'ask' | 'update' | 'keep',
 }
 
 export interface AppGitConfig {

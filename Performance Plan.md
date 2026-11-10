@@ -118,16 +118,34 @@ Checked in the browser: indents and guides three levels deep (screenshot), the a
 ## O3: File tree drag & drop
 
 ### Change
-- Rows are `draggable` with `data-drag` (uuid); delegated listeners on the tree (ChatsPanel's pattern without its `MutationObserver`).
-- Targets: a folder row → into it; a file row → its folder; empty space → the workspace root. Refused (no highlight, no drop): the item itself, its descendants, its current folder.
-- The highlight is a DOM attribute on the target row, not part of the tree's items (rebuilding 10k items per `dragover` is the trap ChatsPanel's list falls into).
-- Hovering a closed folder for about 600 ms opens it; near the top or bottom edge the tree scrolls; Escape or a drop outside cancels; state also clears on a window `dragend`, since a virtualized source row can unmount mid-drag.
-- `moveFile(uuid, destDir)` in `useActiveWorkspaceTools`, taken out of `renameFile` (which then uses it): `markSelfWrite` both paths, `movePath`, `moveFileInIndex`, then the link update. A folder move gathers the links to every file inside it (today's rename does files only, so path-style links into a moved folder break). A name already taken in the target refuses with a toast.
-- Link update choice: `UpdateLinksModal` asks on every move or rename that changes links, with a **Remember my decision for this workspace** checkbox. Ticked, Update or Keep is saved as the workspace's `fileConfig.updateLinks` (`'ask' | 'update' | 'keep'`, default `'ask'`; a new settings section, `'fileConfig': 'workspace'` in `WORKSPACE_OVERRIDABLE`, so it lands in `.vertex/settings.json`). Afterwards that workspace moves without the dialog. Settings → View gets a Files section with the same choice per scope, the only way back to Ask.
+- Done: rows are `draggable` and carry `data-id`; the listeners sit on the tree (ChatsPanel's pattern without its `MutationObserver`). Folder rows are their slot's element edge to edge (the link's vertical and end padding moved onto it), so the whole row drags.
+- Done: targets are a folder row (into it), a file row (its folder) or empty space (the top level). Refused, with no highlight and no drop: the item itself, its descendants, and its current folder.
+- Done: the highlight is the row's own overlay, read in the slot (`dropDir`), not part of the tree's items. The target folder's row and the rows directly in it light up; the top level rings the tree.
+- Done: a closed folder held under the pointer for 600 ms opens; near the top or bottom edge the tree scrolls; state also clears on a window `dragend`. After a drop into a folder, that folder opens.
+- Done: `relocateFile` in `useActiveWorkspaceTools` backs both `renameFile` and the new `moveFile(uuid, destDir)`: `markSelfWrite` on both paths, then `renamePath`/`movePath`, then `moveFileInIndex`, then the link update.
+  - A folder gathers the links to every note inside it, so folder renames now update links too.
+  - Only targets whose text changes count, so a note moved by `[[Name]]` needs nothing.
+  - Linking notes are re-read by uuid, so ones that moved along still get rewritten.
+  - A taken name refuses with a toast ("Could not move …").
+- Done: link update choice. `UpdateLinksModal` closes with `{update, remember}`, and offers **Remember my decision for this workspace** in workspace windows. Ticked, the answer goes to the workspace's `fileConfig.updateLinks` (`'ask' | 'update' | 'keep'`, default `'ask'`, `'fileConfig': 'workspace'`). Settings → View → Files has the same choice per scope.
+- Added: the tree's top level is sorted like every folder's children (`fileTree`). Before, a note moved or renamed to the top level showed up last until the next scan.
 
 ### Acceptance
 - Drag a note into a folder, a folder into another folder, a file to the root; open tabs, the active tab and expanded folders follow; links to moved notes (including ones inside a moved folder) are offered for update and resolve after; dropping a folder into itself or its child does nothing.
 - Remember ticked with Update: the next move in that workspace updates links without asking, another workspace still asks; setting it back to Ask in Settings brings the dialog back.
+
+### Results
+Checked in the browser (stubbed fs with rename and write, and workspace settings):
+- `M0_1` dragged to the top level: the dialog listed `Links.md` with 1 link. Remember plus Update wrote `fileConfig.updateLinks: update`, and `[[F00/M0_1]]` and `[[F00/M0_1#Top|alias]]` became `[[M0_1]]` / `[[M0_1#Top|alias]]`. The open tab stayed.
+- Folder `F01` dropped on `F02`: renamed to `F02/F01` without a dialog (remembered). `[[F01/M1_2.md]]` became `[[F02/F01/M1_2.md]]`, and `F02` opened to show it.
+- Refused, with nothing lit: a note onto its own folder's note, `F01` onto its child, `F02` onto itself, and a top-level note onto empty space.
+- `M1_2` held 900 ms over closed `F00`: `F00` opened and it and its rows lit. Keep (not remembered) left `Links.md` alone and wrote no setting.
+- A note dropped onto `Hub.md`, and onto empty space, went to the top level, in sorted order.
+- Folder `F00` renamed to `Archive` from the menu: the dialog offered its 1 link. Remember plus Keep wrote `keep`, and the next move that changed links didn't ask.
+- Settings → View → Files in the workspace scope: "Changed in this workspace" and "Keep as written".
+- Ten drag-overs at the bottom edge scrolled the tree 120 px.
+- 10k-file workspace with the 3000-note folder open: tab switches and typing still made no long task.
+- Not covered: real WebKit pointer drags (the events were dispatched).
 
 ## O4: While typing
 

@@ -111,6 +111,12 @@ The frontend wrapper is `app/utils/stateClient.ts`. It has no Vue lifecycle, so 
 
 The Files view (`FileTreeComponent`) is a virtual `UTree`: only the rows on screen exist, so a folder of thousands of notes opens and scrolls like a small one. Its rows are flat. Each file row's indent and the dotted nesting guides come from the row's level. There is one right-click menu for the whole tree: the clicked row's `data-id` picks its items, and outside any row it shows the panel's New items.
 
+Rows drag like a file manager's:
+- Where a drop lands: onto a folder, into it; onto a file, into its folder; onto empty space, the top level. Never into the item itself, its subfolders or its current folder.
+- While dragging: a closed folder held for 600 ms opens, and the edges scroll.
+- Renaming and moving share `relocateFile` (`useActiveWorkspaceTools`: `renameFile`, `moveFile`). It moves on disk and in the index (uuids stay, so tabs and open folders follow), then updates the links whose text changes, to the item or to any note inside a moved folder.
+- Whether links are updated comes from `fileConfig.updateLinks`, overridable per workspace (Settings → View → Files): ask (the default), update, or keep. The dialog's "Remember my decision for this workspace" writes it.
+
 ### AI requests
 
 Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys never reach the webview:

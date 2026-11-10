@@ -2,7 +2,7 @@
 import {StateKey} from "#shared/constants/app";
 import type {TreeItem, ContextMenuItem} from '@nuxt/ui';
 import type {UITreeNode} from '#shared/types/active/workspace';
-import {isPropertiesFile, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
+import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
 import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
@@ -17,6 +17,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
+import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 const {t} = useI18n()
 
@@ -29,8 +30,9 @@ const $navi = useAppNavigator()
 const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, activeTabUuid} = useActiveTabs(session)
-const {getFileByUuid, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
-const {createFile} = useActiveWorkspaceTools(session)
+const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
+const {createFile, moveFile} = useActiveWorkspaceTools(session)
+const $qt = useQuickToasts()
 // The workspace's own view settings, when it overrides them.
 const config = useSettingsScope().effective
 // Workflows run on a workspace folder; a session without one gets no run items.
@@ -58,6 +60,8 @@ const formattedTreeData = computed<TreeItem[]>(() => {
                 onItemClick(item)
             },
             slot: node.isFolder ? 'folder' as const : 'file' as const,
+            // A folder's row is its slot's element edge to edge, so all of it can be dragged and highlighted.
+            ui: node.isFolder ? {link: 'py-0 pe-0'} : undefined,
             originalNodeData: node,
         }
         return item
@@ -100,6 +104,93 @@ const fade = useScrollFade(() => treeRef.value?.$el)
 // Nuxt UI's flat rows do for its own link (`sm`: 2.5 + 6 per level, in spacing units).
 const indent = (level: number, extra = 0) => `calc(var(--spacing) * ${(level - 1) * 6 + 2.5 + extra})`
 const guide = (parentLevel: number) => `calc(var(--spacing) * ${(parentLevel - 1) * 6 + 4.5})`
+
+// Drag and drop, as in a file manager: onto a folder, into it; onto a file, into its folder; onto empty space, the
+// workspace's top level. Rows carry `data-id`; the listeners sit on the tree, since a virtual list remounts rows.
+const dragged = shallowRef<string | null>(null)
+/** Where the dragged row would land, relative: a folder, `''` for the top level, `null` for nowhere. */
+const dropDir = shallowRef<string | null>(null)
+const DROP_ROW = 'bg-primary/10'
+const rowId = (event: Event) => (event.target as Element | null)?.closest('li')?.querySelector<HTMLElement>('[data-id]')?.dataset.id
+function destOf(event: DragEvent) {
+    const node = getFileByUuid(rowId(event))
+    return !node ? '' : node.isFolder ? node.relativePath : parentPathOf(node.relativePath)
+}
+/** Not where it already is, and a folder not into itself or below it. */
+function canDrop(uuid: string, dest: string) {
+    const node = getFileByUuid(uuid)
+    if (!node || parentPathOf(node.relativePath) === dest) return false
+    return !node.isFolder || (dest !== node.relativePath && !dest.startsWith(`${node.relativePath}/`))
+}
+/** The target folder's row and the rows directly in it light up, like a file manager's drop area. */
+const dropHere = (node: UITreeNode) => !!dropDir.value && (node.relativePath === dropDir.value || parentPathOf(node.relativePath) === dropDir.value)
+
+let opening: {id: string, timer: ReturnType<typeof setTimeout>} | undefined
+/** A closed folder held under the pointer opens after a moment, so a drop can reach inside it. */
+function openLater(id: string | undefined) {
+    if (opening?.id === id) return
+    clearTimeout(opening?.timer)
+    opening = undefined
+    if (!id || !getFileByUuid(id)?.isFolder || expandedFolders.value.includes(id)) return
+    opening = {id, timer: setTimeout(() => { expandedFolders.value = [...expandedFolders.value, id] }, 600)}
+}
+
+function onDragStart(event: DragEvent) {
+    const id = rowId(event)
+    if (!id || !event.dataTransfer) return
+    dragged.value = id
+    event.dataTransfer.effectAllowed = 'move'
+    // WebKit starts a drag only with some data set.
+    event.dataTransfer.setData('text/plain', getFileByUuid(id)?.relativePath ?? id)
+}
+
+function onDragOver(event: DragEvent) {
+    if (!dragged.value) return
+    // The tree hides its scrollbar and a drag doesn't scroll it: near an edge, scroll.
+    const el = treeRef.value?.$el
+    if (el) {
+        const {top, bottom} = el.getBoundingClientRect()
+        if (event.clientY < top + 40) el.scrollTop -= 12
+        else if (event.clientY > bottom - 40) el.scrollTop += 12
+    }
+    openLater(rowId(event))
+    const dest = destOf(event)
+    dropDir.value = canDrop(dragged.value, dest) ? dest : null
+    if (dropDir.value === null) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+
+function onDragLeave(event: DragEvent) {
+    if (!treeRef.value?.$el.contains(event.relatedTarget as Node | null)) {
+        dropDir.value = null
+        openLater(undefined)
+    }
+}
+
+function onDragEnd() {
+    dragged.value = null
+    dropDir.value = null
+    openLater(undefined)
+}
+// The dragged row can scroll out of the virtual list and unmount, and then its `dragend` never reaches the tree.
+useEventListener(window, 'dragend', onDragEnd)
+
+async function onDrop(event: DragEvent) {
+    const uuid = dragged.value, dest = dropDir.value
+    onDragEnd()
+    if (!uuid || dest === null || !session?.rootPath) return
+    event.preventDefault()
+    const name = getFileByUuid(uuid)?.fileName ?? ''
+    try {
+        await moveFile(uuid, dest ? `${session.rootPath}/${dest}` : session.rootPath)
+        // Show where it went.
+        const folder = dest && getFileByPath(`${session.rootPath}/${dest}`)?.uuid
+        if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
+    } catch (error) {
+        $qt.error(t('app.editor.ui.filetree.moveFailed', {name}), String(error))
+    }
+}
 
 async function openInTab(uuid: string) {
     await $navi.toWorkspaceTab(props.sessionId, openTab(uuid))
@@ -190,16 +281,21 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             collapsed-icon="i-lucide-folder-closed"
             v-model:expanded="expandedFolders"
             :get-key="(i: TreeItem) => i.id as string"
-            :class="['no-scrollbar h-full py-2.5', fade]"
+            :class="['no-scrollbar h-full py-2.5 rounded-md', fade, dropDir === '' && 'ring-1 ring-inset ring-primary/40 bg-primary/5']"
             data-tauri-drag-region
             size="sm"
             @contextmenu.capture="onContextMenu"
+            @dragstart="onDragStart"
+            @dragover="onDragOver"
+            @dragleave="onDragLeave"
+            @drop="onDrop"
         >
             <template #file-wrapper="{item, level}: {item: TreeItem, level: number}">
                 <UButton
                     size="sm"
                     :data-id="item.id"
                     :data-level="level"
+                    draggable="true"
                     :label="config?.viewConfig.fileTree.showFileExtInName ? item.label : fileNameFromPath(item.label ?? '', true)"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
@@ -210,6 +306,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 >
                     <template #leading>
                         <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
+                        <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
                         <UIcon v-if="fileIcon(item)" :name="fileIcon(item)" class="size-4 shrink-0"/>
                     </template>
                     <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
@@ -219,8 +316,9 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                 </UButton>
             </template>
             <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
-                <div :data-id="item.id" :data-level="level" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none">
+                <div :data-id="item.id" :data-level="level" draggable="true" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none py-1.5 pe-2.5">
                     <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
+                    <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
                     <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
                     <span class="truncate text-xs overflow-ellipsis">{{ item.label }}</span>
                     <span class="grow"/>

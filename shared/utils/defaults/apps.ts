@@ -1,4 +1,4 @@
-import type {AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppFileConfig, AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
@@ -29,9 +29,16 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         workflowConfig: defaultAppWorkflowConfig(data?.workflowConfig),
         aiConfig: defaultAppAiConfig(data?.aiConfig),
         gitConfig: defaultAppGitConfig(data?.gitConfig),
+        fileConfig: defaultAppFileConfig(data?.fileConfig),
 		deviceId: data?.deviceId || crypto.randomUUID(),
         updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
+}
+
+const UPDATE_LINKS: readonly AppFileConfig['updateLinks'][] = ['ask', 'update', 'keep']
+
+export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFileConfig {
+    return {updateLinks: UPDATE_LINKS.includes(data?.updateLinks as AppFileConfig['updateLinks']) ? data!.updateLinks! : 'ask'}
 }
 
 const positiveInt = (value: unknown, fallback: number) =>

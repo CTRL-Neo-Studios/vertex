@@ -220,7 +220,13 @@
 				"panelStyleButtons": "在面板内",
 				"panelStyleStrip": "边缘图标条",
 				"panelLayout": "排列",
-				"panelLayoutDescription": "在左右两侧与“已隐藏”之间拖动视图；右键点击可移动、隐藏或添加分隔线。"
+				"panelLayoutDescription": "在左右两侧与“已隐藏”之间拖动视图；右键点击可移动、隐藏或添加分隔线。",
+				"files": "文件",
+				"updateLinks": "移动或重命名后更新链接",
+				"updateLinksDescription": "笔记或文件夹被移动或重命名时，如何处理指向它的链接。默认每次询问；在对话框中勾选“记住”会为该工作区设定。",
+				"updateLinksAsk": "每次询问",
+				"updateLinksUpdate": "更新链接",
+				"updateLinksKeep": "保持原样"
 			},
 			"workflows": {
 				"title": "工作流",
@@ -541,7 +547,8 @@
 					"newCanvas": "新建画布",
 					"newBase": "新建数据库",
 					"newOpenFolderProperties": "新建/打开文件夹属性",
-					"newWorkflow": "新建工作流"
+					"newWorkflow": "新建工作流",
+					"moveFailed": "无法移动 {name}"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
@@ -556,11 +563,12 @@
 				},
 				"updateLinks": {
 					"title": "更新指向“{name}”的链接？",
-					"description": "{files} 篇笔记中有 {links} 个链接指向旧名称。",
+					"description": "{files} 篇笔记中有 {links} 个链接指向旧的名称或位置。",
 					"update": "更新链接",
 					"keep": "保持不变",
 					"done": "已更新 {links} 个链接。",
-					"failed": "无法更新 {file} 中的链接。"
+					"failed": "无法更新 {file} 中的链接。",
+					"remember": "在此工作区记住我的选择"
 				},
 				"viewImage": "点击查看图片",
 				"workflow": {

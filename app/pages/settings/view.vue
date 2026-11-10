@@ -31,6 +31,11 @@ const statusBarItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.statusBarAlways'), value: 'always-shown'},
     {label: t('app.settings.view.statusBarNever'), value: 'always-hidden'},
 ])
+const updateLinksItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.updateLinksAsk'), value: 'ask'},
+    {label: t('app.settings.view.updateLinksUpdate'), value: 'update'},
+    {label: t('app.settings.view.updateLinksKeep'), value: 'keep'},
+])
 const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
 const headerTools = ['headerHistory', 'headerFormatting'] as const
 const headerToolsItems = computed<SelectItem[]>(() => [
@@ -73,6 +78,17 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                     <USwitch
                         :model-value="scope.value(`viewConfig.fileTree.${row.key}`)"
                         @update:model-value="scope.set({[`viewConfig.fileTree.${row.key}`]: $event})"
+                    />
+                </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection :title="t('app.settings.view.files')" :dirty="scope.isDirty(['fileConfig.updateLinks'])" @reset="scope.reset(['fileConfig.updateLinks'])">
+                <SettingsRow setting="fileConfig.updateLinks" :label="t('app.settings.view.updateLinks')" :description="t('app.settings.view.updateLinksDescription')">
+                    <USelect
+                        :model-value="scope.value('fileConfig.updateLinks')"
+                        :items="updateLinksItems"
+                        class="w-52"
+                        @update:model-value="scope.set({'fileConfig.updateLinks': $event})"
                     />
                 </SettingsRow>
             </SettingsSection>

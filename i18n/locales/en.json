@@ -220,7 +220,13 @@
 				"panelStyleButtons": "In the panels",
 				"panelStyleStrip": "Strips at the edges",
 				"panelLayout": "Arrangement",
-				"panelLayoutDescription": "Drag views between the sides and Hidden; right-click one to move it, hide it or add a separator."
+				"panelLayoutDescription": "Drag views between the sides and Hidden; right-click one to move it, hide it or add a separator.",
+				"files": "Files",
+				"updateLinks": "Update links after a move or rename",
+				"updateLinksDescription": "When a note or folder is moved or renamed, what happens to the links that pointed to it. Ask is the default; the dialog's Remember choice sets it for a workspace.",
+				"updateLinksAsk": "Ask each time",
+				"updateLinksUpdate": "Update links",
+				"updateLinksKeep": "Keep as written"
 			},
 			"workflows": {
 				"title": "Workflows",
@@ -541,7 +547,8 @@
 					"newCanvas": "New Canvas",
 					"newBase": "New Base",
 					"newOpenFolderProperties": "New/Open Folder Properties",
-					"newWorkflow": "New Workflow"
+					"newWorkflow": "New Workflow",
+					"moveFailed": "Could not move {name}"
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",
@@ -556,11 +563,12 @@
 				},
 				"updateLinks": {
 					"title": "Update links to “{name}”?",
-					"description": "{links} link(s) in {files} note(s) point to the old name.",
+					"description": "{links} link(s) in {files} note(s) point to the old name or place.",
 					"update": "Update links",
 					"keep": "Keep as is",
 					"done": "Updated {links} link(s).",
-					"failed": "Could not update links in {file}."
+					"failed": "Could not update links in {file}.",
+					"remember": "Remember my decision for this workspace"
 				},
 				"viewImage": "Click to view image",
 				"workflow": {

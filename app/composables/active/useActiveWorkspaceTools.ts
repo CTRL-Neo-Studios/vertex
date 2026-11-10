@@ -2,18 +2,21 @@ import {exists, mkdir, readTextFile, writeTextFile} from "@tauri-apps/plugin-fs"
 import {dirname, join} from "@tauri-apps/api/path"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
 import UpdateLinksModal from "~/components/Modals/UpdateLinksModal.vue";
+import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {removePath, renamePath} from "~/utils/fs";
+import {movePath, removePath, renamePath} from "~/utils/fs";
 
 export function useActiveWorkspaceTools(session?: ActiveSession) {
     const $tabs = useActiveTabs(session)
     const $qt = useQuickToasts()
     const {t} = useI18n()
+    const scope = useSettingsScope()
     const updateLinksModal = useOverlay().create(UpdateLinksModal)
-    const {getFileByUuid, addFileToIndex, moveFileInIndex, removeFileFromIndex, getRenameImpact, markSelfWrite, updateIndex, notifyModified} = useActiveWorkspaceIndex(session)
+    const {getFileByUuid, getFileByPath, addFileToIndex, moveFileInIndex, removeFileFromIndex, getRenameImpact, markSelfWrite, updateIndex, notifyModified} = useActiveWorkspaceIndex(session)
 
     /**
      * Creates a file or folder relative to `atUuid` (workspace root when absent):
@@ -36,34 +39,71 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         return addFileToIndex(path, root)
     }
 
+    /** Renames a file or folder in place (a file keeps its extension when `newName` has none). Throws on failure. */
+    const renameFile = (uuid: string, newName: string) => relocateFile(uuid, path => renamePath(path, newName))
+
+    /** Moves a file or folder into the folder `destDir` (an absolute path), keeping its name. Throws on failure. */
+    const moveFile = (uuid: string, destDir: string) => relocateFile(uuid, path => movePath(path, destDir))
+
+    const filesIn = (node: ActiveWorkspaceFileIndex): ActiveWorkspaceFileIndex[] => node.isFolder
+        ? node.children.flatMap(path => {
+            const child = getFileByPath(path)
+            return child ? filesIn(child) : []
+        })
+        : [node]
+
     /**
-     * Renames a file/folder on disk and in the index (keeping its extension if `newName` has none).
-     * If other notes link to it, asks whether to rewrite those links; if declined they stay as-is and
-     * become unresolved (never silently dropped). Throws on failure so callers can revert UI.
+     * Moves or renames a file or folder on disk and in the index (uuids stay, so open tabs and expanded folders
+     * follow), then updates the links that pointed at it, or at the notes inside it, as `fileConfig.updateLinks`
+     * says: asking (the dialog can remember the answer for the workspace), always, or never. Links not updated stay
+     * as written and become unresolved, never silently dropped. Only links whose text changes count: `[[Note]]`
+     * still finds a note moved to another folder.
      */
-    async function renameFile(uuid: string, newName: string) {
+    async function relocateFile(uuid: string, relocate: (path: string) => Promise<string>) {
         const file = getFileByUuid(uuid)
-        if (!session?.rootPath || !file || !newName) return
-        const {fullPath: oldPath, relativePath: oldRel} = file
-        const impact = file.isFolder ? [] : getRenameImpact(file.uuid)
-        markSelfWrite(oldPath)
-        const newPath = await renamePath(oldPath, newName)
+        if (!session?.rootPath || !file) return
+        // What links to the moved notes has to be read before the move: afterwards those targets don't resolve.
+        const moved = filesIn(file).map(f => ({uuid: f.uuid, oldRel: f.relativePath, impact: getRenameImpact(f.uuid)}))
+        markSelfWrite(file.fullPath)
+        const newPath = await relocate(file.fullPath)
         markSelfWrite(newPath)
-        await moveFileInIndex(oldPath, newPath, session.rootPath)
-        if (impact.length === 0) return newPath
+        await moveFileInIndex(file.fullPath, newPath, session.rootPath)
 
-        const accepted = await updateLinksModal.open({
-            fileName: file.fileName,
-            referencingFiles: impact.map(i => i.file.relativePath),
-            linkCount: impact.reduce((n, i) => n + i.targets.length, 0),
-        }).result
-        if (!accepted) return newPath
+        // Per linking note (by uuid: it may have moved too), each old target and its new text.
+        const changes = new Map<string, Map<string, string>>()
+        for (const {uuid: id, oldRel, impact} of moved) {
+            const newRel = getFileByUuid(id)?.relativePath
+            if (!newRel) continue
+            for (const {file: ref, targets} of impact) {
+                for (const [from, to] of renameTargets(targets, oldRel, newRel)) {
+                    if (from === to) continue
+                    if (!changes.has(ref.uuid)) changes.set(ref.uuid, new Map())
+                    changes.get(ref.uuid)!.set(from, to)
+                }
+            }
+        }
+        if (changes.size === 0) return newPath
 
-        const newRel = getFileByUuid(file.uuid)!.relativePath
+        const choice = scope.effective.value?.fileConfig.updateLinks ?? 'ask'
+        let update = choice === 'update'
+        if (choice === 'ask') {
+            const answer = await updateLinksModal.open({
+                fileName: file.fileName,
+                referencingFiles: [...changes.keys()].map(id => getFileByUuid(id)?.relativePath ?? ''),
+                linkCount: [...changes.values()].reduce((n, m) => n + m.size, 0),
+                canRemember: session.workspaceSession,
+            }).result
+            update = !!answer?.update
+            if (answer?.remember) await scope.set({'fileConfig.updateLinks': update ? 'update' : 'keep'})
+        }
+        if (!update) return newPath
+
         let rewritten = 0
-        for (const {file: ref, targets} of impact) {
+        for (const [id, rename] of changes) {
+            const ref = getFileByUuid(id)
+            if (!ref) continue
             try {
-                const result = rewriteLinks(await readTextFile(ref.fullPath), renameTargets(targets, oldRel, newRel))
+                const result = rewriteLinks(await readTextFile(ref.fullPath), rename)
                 if (result.count === 0) continue
                 markSelfWrite(ref.fullPath)
                 await writeTextFile(ref.fullPath, result.text)
@@ -71,7 +111,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
                 notifyModified(ref.fullPath)
                 rewritten += result.count
             } catch (error) {
-                console.error(`[renameFile] could not update links in ${ref.fullPath}`, error)
+                console.error(`[relocateFile] could not update links in ${ref.fullPath}`, error)
                 $qt.error(t('app.editor.ui.updateLinks.failed', {file: ref.relativePath}))
             }
         }
@@ -102,5 +142,5 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         await updateIndex(path, content)
     }
 
-    return {createFile, renameFile, deleteFiles, saveContent}
+    return {createFile, renameFile, moveFile, deleteFiles, saveContent}
 }

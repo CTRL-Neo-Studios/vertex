@@ -108,7 +108,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 }),
             }
         }
-        return Object.keys(index).filter(p => !index[parentPathOf(p)]).map(p => toNode(index[p]!))
+        // Sorted like a folder's children (the scan and every move sort those), so a file moved to the top level
+        // lands in place rather than at the end.
+        return Object.keys(index).filter(p => !index[parentPathOf(p)]).sort().map(p => toNode(index[p]!))
     })
 
     function applyProperties(path: string, content: string) {
