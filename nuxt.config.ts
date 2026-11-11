@@ -3,7 +3,6 @@ export default defineNuxtConfig({
     $production: {devtools: {enabled: false}},
 
     modules: [
-      "@comark/nuxt",
       "@nuxt/ui",
       "@vueuse/nuxt",
       "@nuxt/icon",
@@ -14,6 +13,7 @@ export default defineNuxtConfig({
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
       "@nuxt/eslint",
+      "@comark/vue",
     ],
 
 	i18n: {
@@ -116,11 +116,11 @@ export default defineNuxtConfig({
                 "ai",
                 "@ai-sdk/openai-compatible",
                 "@ai-sdk/vue",
-                // @comark/nuxt's auto-registered <Markdown> comes from @comark/vue.
+                // Comark: the <Markdown> its Nuxt module auto-imports, and the subpaths the chat imports.
                 "@comark/vue",
-                "@comark/nuxt/utils",
-                "@comark/nuxt/plugins/math",
-                "@comark/nuxt/plugins/rangi",
+                "@comark/vue/utils",
+                "@comark/vue/plugins/math",
+                "@comark/vue/plugins/rangi",
                 // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
                 "katex",
                 "@type32/obsidian-bases-parser",
@@ -128,8 +128,14 @@ export default defineNuxtConfig({
                 "zod",
                 "@vue-flow/core",
                 "alfaaz",
-                // Write mode's change view (ChatChanges.vue); found at runtime otherwise, which reloads the window.
+                // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
+                // The chat's `bash` tool (app/utils/chatBash.ts), imported on its first command; same reason.
+                "just-bash",
+                // fetchUrl (app/utils/webPage.ts); the tool imports linkedom and defuddle on the first HTML page.
+                "@ai-sdk/tool-web-fetch",
+                "linkedom",
+                "defuddle/node",
             ],
             // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
             // exclude: ["@type32/workflows"]

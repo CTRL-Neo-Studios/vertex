@@ -58,7 +58,7 @@ function trigger(tool: Tool) {
 </script>
 
 <template>
-    <div class="flex items-center gap-0.5">
+    <div class="flex items-center gap-0.5 z-10">
         <UTooltip v-for="tool in items" :key="tool.id" :text="tool.label" :kbds="tool.kbds">
             <!-- mousedown.prevent keeps the editor's focus and selection, so formatting applies to what's selected. -->
             <UButton
@@ -71,6 +71,7 @@ function trigger(tool: Tool) {
                 :aria-pressed="tools === 'format' ? tool.active : undefined"
                 @mousedown.prevent
                 @click="trigger(tool)"
+				class="backdrop-blur-lg"
             />
         </UTooltip>
     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {diffLines} from "diff";
+import {diffCounts, lineDiff} from "#shared/utils/textDiff";
 import type {ChatChange, VertexChatMessage} from "#shared/types/app/chats";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
@@ -7,7 +7,7 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 
 /**
  * A Write-mode reply's staged changes: one row per note (path, new or not, lines added/removed, what became of it),
- * its line diff when opened, and Apply/Discard for the picked pending ones.
+ * the path opening its diff tab (`ChatChangeView`) beside the chat, and Apply/Discard for the picked pending ones.
  */
 const props = defineProps<{ chatId: string, message: VertexChatMessage, busy?: boolean }>()
 
@@ -15,14 +15,14 @@ const {t} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {applyChanges, discardChanges} = useChats(session)
+const {applyChanges, discardChanges, openChange} = useChats(session)
 
 const changes = computed(() => props.message.metadata?.changes ?? [])
 const pending = computed(() => changes.value.filter(c => c.state === 'pending').map(c => c.path))
 /** Picked for Apply/Discard: every pending one until the user unticks some. */
 const picked = ref<string[]>([])
 watch(pending, paths => { picked.value = paths }, {immediate: true})
-const opened = ref<string | null>(null)
+const open = (path: string) => void openChange(props.chatId, props.message.id, path)
 const working = ref(false)
 
 const STATE_ICONS: Record<ChatChange['state'], string> = {
@@ -33,15 +33,8 @@ const STATE_ICONS: Record<ChatChange['state'], string> = {
     undone: 'i-lucide-undo-2',
 }
 
-const diffs = computed(() => new Map(changes.value.map(c => [c.path, diffLines(c.before ?? '', c.after)])))
-function counts(path: string) {
-    let added = 0, removed = 0
-    for (const part of diffs.value.get(path) ?? []) {
-        if (part.added) added += part.count ?? 0
-        else if (part.removed) removed += part.count ?? 0
-    }
-    return {added, removed}
-}
+// The diff tab's own counting (`lineDiff`: a missing final newline isn't a change), so the numbers match.
+const counts = computed(() => new Map(changes.value.map(c => [c.path, diffCounts(lineDiff(c.before ?? '', c.after))])))
 
 function toggle(path: string, on: boolean | 'indeterminate') {
     picked.value = on === true ? [...picked.value, path] : picked.value.filter(p => p !== path)
@@ -83,18 +76,18 @@ async function settle(apply: boolean) {
                 <UTooltip v-else :text="$t(`app.chat.changes.states.${change.state}`)">
                     <UIcon :name="STATE_ICONS[change.state]" :class="['size-4 shrink-0', change.state === 'conflict' ? 'text-warning' : 'text-muted']"/>
                 </UTooltip>
-                <button type="button" class="grow min-w-0 truncate text-start hover:underline" :title="change.path" @click="opened = opened === change.path ? null : change.path">
+                <button
+                    type="button"
+                    class="grow min-w-0 truncate text-start hover:underline"
+                    :title="`${change.path} · ${$t('app.chat.changes.open')}`"
+                    @click="open(change.path)"
+                >
                     {{ change.path }}
                 </button>
                 <UBadge v-if="change.before === null" size="sm" color="neutral" variant="soft" :label="$t('app.chat.changes.new')"/>
-                <span class="text-xs tabular-nums text-success">+{{ counts(change.path).added }}</span>
-                <span class="text-xs tabular-nums text-error">−{{ counts(change.path).removed }}</span>
+                <span class="text-xs tabular-nums text-success">+{{ counts.get(change.path)?.added }}</span>
+                <span class="text-xs tabular-nums text-error">−{{ counts.get(change.path)?.removed }}</span>
             </div>
-            <pre v-if="opened === change.path" class="mx-3 mb-2 max-h-80 overflow-auto rounded bg-elevated/50 p-2 text-xs whitespace-pre-wrap break-words"><span
-                v-for="(part, i) in diffs.get(change.path)"
-                :key="i"
-                :class="part.added ? 'bg-success/15 text-success' : part.removed ? 'bg-error/15 text-error' : 'text-muted'"
-            >{{ part.value }}</span></pre>
         </div>
     </div>
 </template>

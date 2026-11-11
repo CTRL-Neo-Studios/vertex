@@ -1,6 +1,6 @@
 # Vertex Workflows — Design Brainstorm
 
-> **Status**: Brainstorm. Execution model, trust, permissions and file format are superseded by [Node Engine Spec.md](Node%20Engine%20Spec.md).
+> **Status**: Brainstorm. Execution model, trust, permissions and file format are superseded by [Node Engine Spec.md](Node Engine Spec.md).
 > **Date**: March 2026
 > **Purpose**: Design record and future blog material.
 ---

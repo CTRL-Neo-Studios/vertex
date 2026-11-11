@@ -86,4 +86,11 @@ export interface AppAiConfig {
     /** Chats are named by their model after the first reply. */
     chatTitles: boolean,
     editorAssistant: AiEditorAssistantEntries,
+    /** When the `commitMessage` feature writes a message by itself (its button always can). */
+    commitMessages: {
+        /** For auto-sync's commits; off, they're "Update N file(s)". */
+        autoSync: boolean,
+        /** When Commit or Sync goes with an empty message box; off, "Update N file(s)". */
+        whenEmpty: boolean,
+    },
 }

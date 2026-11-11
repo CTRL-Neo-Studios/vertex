@@ -76,6 +76,7 @@ function faceOf(value?: string) {
         :items="items"
         value-key="value"
         ignore-filter
+        virtualize
         :search-input="{ placeholder: t('app.settings.theme.searchFonts'), icon: 'i-lucide-search' }"
         :aria-label="ariaLabel"
         class="w-52"

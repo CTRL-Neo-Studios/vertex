@@ -19,6 +19,7 @@
 			"save": "保存",
 			"reload": "重新加载",
 			"toggleFullscreen": "切换全屏",
+			"toggleBottomPanel": "切换底部面板",
 			"closeTab": "关闭标签页",
 			"closeAllTabs": "关闭所有标签页",
 			"closeWindow": "关闭窗口",
@@ -68,7 +69,8 @@
 			"recoveryMissing": "上次会话中有 {count} 个窗口无法重新打开：其文件夹或文件已不存在。",
 			"newWorkspaceDialog": "创建工作区文件夹",
 			"newWorkspaceName": "新工作区",
-			"folderExists": "该路径已存在内容。"
+			"folderExists": "该路径已存在内容。",
+			"cloneWorkspace": "克隆工作区…"
 		},
 		"settings": {
 			"title": "设置",
@@ -79,6 +81,7 @@
 				"theme": "主题",
 				"view": "视图",
 				"workflows": "工作流",
+				"git": "Git",
 				"ai": "辅助 AI",
 				"aiProviders": "服务商",
 				"aiModels": "模型配置",
@@ -217,7 +220,25 @@
 				"panelStyleButtons": "在面板内",
 				"panelStyleStrip": "边缘图标条",
 				"panelLayout": "排列",
-				"panelLayoutDescription": "在左右两侧与“已隐藏”之间拖动视图；右键点击可移动、隐藏或添加分隔线。"
+				"panelLayoutDescription": "在左右两侧与“已隐藏”之间拖动视图；右键点击可移动、隐藏或添加分隔线。",
+				"files": "文件",
+				"updateLinks": "移动或重命名后更新链接",
+				"updateLinksDescription": "笔记或文件夹被移动或重命名时，如何处理指向它的链接。默认每次询问；在对话框中勾选“记住”会为该工作区设定。",
+				"updateLinksAsk": "每次询问",
+				"updateLinksUpdate": "更新链接",
+				"updateLinksKeep": "保持原样",
+				"deletedFiles": "已删除的文件",
+				"deletedFilesDescription": "“文件”中的删除操作将项目放到哪里。移到废纸篓或工作区的 .trash 文件夹（在“文件”中隐藏）可以撤销；永久删除会先确认，且无法撤销。",
+				"deletedFilesTrash": "移到废纸篓",
+				"deletedFilesWorkspace": "移到工作区的 .trash",
+				"deletedFilesPermanent": "永久删除",
+				"attachmentsFolder": "附件文件夹",
+				"attachmentsFolderDescription": "聊天或笔记接收工作区外的文件（以及粘贴的截图）时存放的位置。首次需要时创建。",
+				"attachmentsFolderTop": "顶层",
+				"importToChat": "拖入聊天的外部文件",
+				"importToChatDescription": "从访达或资源管理器拖入或粘贴到聊天的文件会先复制到附件文件夹。默认每次询问；对话框中的“记住”选项会为工作区设置此项。",
+				"importToChatAsk": "每次询问",
+				"importToChatAlways": "总是复制并附加"
 			},
 			"workflows": {
 				"title": "工作流",
@@ -396,6 +417,14 @@
 					"editorAssistantDescription": "在编辑器中使用 AI：改写、修正、续写等。",
 					"chat": "聊天",
 					"chatDescription": "围绕笔记的聊天。单个聊天可以固定自己的配置。关闭后会隐藏聊天相关视图、“在聊天中提问”和“新建聊天”。",
+					"commitMessage": "提交信息",
+					"commitMessageDescription": "根据更改并按仓库近期提交的风格撰写提交信息：Git 视图中的星光按钮，以及在下方开启时，信息框为空时和自动同步。差异会发送给模型。",
+					"commitMessages": {
+						"whenEmpty": "信息框为空时撰写信息",
+						"whenEmptyDescription": "未输入内容就提交或同步时，请模型撰写信息。关闭时，提交信息为“更新 N 个文件”。",
+						"autoSync": "为自动同步撰写信息",
+						"autoSyncDescription": "自动同步的提交由模型撰写信息（每次同步都会发送差异）。关闭时为“更新 N 个文件”。"
+					},
 					"chatStorage": "聊天存储位置",
 					"chatStorageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
 					"chatStorageApp": "应用数据",
@@ -437,6 +466,28 @@
 				"useGlobalAll": "使用全局主题",
 				"globalOnlyPage": "工作区无法更改这些设置；它们在所有地方生效。",
 				"editUser": "编辑用户设置"
+			},
+			"git": {
+				"title": "Git",
+				"tokens": "登录令牌",
+				"tokensDescription": "用于 HTTPS 远程的个人访问令牌，在远程拒绝登录时保存。它们保存在系统钥匙串中；git 仅在与对应主机通信时获得令牌，此时不会询问你自己的凭据助手。",
+				"noTokens": "没有已保存的令牌。远程拒绝登录时，Vertex 会请你输入。",
+				"username": "用户名：{username}",
+				"remove": "移除",
+				"failed": "无法读取或更改已保存的令牌",
+				"autoSync": {
+					"title": "自动同步",
+					"description": "无需按同步即可让本机的工作区保持一致：提交所有更改，然后拉取和推送。合并或变基期间会等待；登录失败后会暂停，直到在 Git 视图中同步成功。受信任的工作区可以有自己的设置。",
+					"interval": "自动同步",
+					"intervalDescription": "工作区窗口打开时同步的频率。",
+					"never": "从不",
+					"every": "每 {minutes} 分钟",
+					"onOpen": "打开工作区时同步",
+					"onOpenDescription": "在其窗口打开时同步一次。",
+					"pullOnFocus": "窗口获得焦点时拉取",
+					"pullOnFocusDescription": "回到窗口时拉取远程的新提交（最多每分钟一次）。",
+					"untrusted": "此工作区的自动同步在其文件夹被信任后才会生效。"
+				}
 			}
 		},
 		"editor": {
@@ -508,7 +559,38 @@
 					"newCanvas": "新建画布",
 					"newBase": "新建数据库",
 					"newOpenFolderProperties": "新建/打开文件夹属性",
-					"newWorkflow": "新建工作流"
+					"newWorkflow": "新建工作流",
+					"moveFailed": "无法移动 {name}",
+					"openInNewTabs": "在新标签页中打开全部",
+					"copyFullPaths": "复制完整路径（全部）",
+					"copyRelativePaths": "复制相对路径（全部）",
+					"itemCount": "{count} 个项目",
+					"added": "已添加 {count} 个项目。",
+					"addFailed": "无法添加：{names}",
+					"importFailed": "无法添加拖入的项目。",
+					"copy": "复制",
+					"paste": "粘贴",
+					"copied": "已复制 {count} 个项目。",
+					"copyFailed": "无法复制到剪贴板。",
+					"nothingToPaste": "剪贴板中没有可粘贴的文件。",
+					"dragFailed": "无法拖动这些项目。",
+					"moved": "已移动 {count} 个项目。",
+					"trashed": "已将 {count} 个项目移到废纸篓。",
+					"trashedWorkspace": "已将 {count} 个项目移到工作区的 .trash 文件夹。",
+					"deleteFailed": "无法删除 {name}",
+					"undo": "撤销",
+					"redo": "重做",
+					"undoStep": "撤销{step}",
+					"redoStep": "重做{step}",
+					"stepMove": "移动 {count} 个项目",
+					"stepRename": "重命名 {name}",
+					"stepDelete": "删除 {count} 个项目",
+					"stepAdd": "添加 {count} 个项目",
+					"undoSkipped": "这些项目在该操作之后已被更改或移动，因此保持原样：{names}",
+					"redoSkipped": "这些项目在撤销之后已被更改或移动，因此保持原样：{names}",
+					"undoFailed": "无法撤销。",
+					"redoFailed": "无法重做。",
+					"undoNotLast": "此后文件中有新的更改。请在文件中按 Cmd/Ctrl+Z 先撤销最近的更改。"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
@@ -523,11 +605,13 @@
 				},
 				"updateLinks": {
 					"title": "更新指向“{name}”的链接？",
-					"description": "{files} 篇笔记中有 {links} 个链接指向旧名称。",
+					"description": "{files} 篇笔记中有 {links} 个链接指向旧的名称或位置。",
 					"update": "更新链接",
 					"keep": "保持不变",
 					"done": "已更新 {links} 个链接。",
-					"failed": "无法更新 {file} 中的链接。"
+					"failed": "无法更新 {file} 中的链接。",
+					"remember": "在此工作区记住我的选择",
+					"titleMany": "更新指向 {count} 个已移动项目的链接？"
 				},
 				"viewImage": "点击查看图片",
 				"workflow": {
@@ -1354,7 +1438,20 @@
 				"redo": "重做",
 				"hiddenFolders": "隐藏的文件夹",
 				"askInChat": "在聊天中提问",
-				"editFailed": "无法完成此操作"
+				"editFailed": "无法完成此操作",
+				"conflict": {
+					"title": "“{name}” 已存在于 {folder}",
+					"description": "替换现有项目、保留两者（新项目会加上编号），或跳过此项目。",
+					"existing": "现有",
+					"incoming": "新的",
+					"fileInfo": "{size}，修改于 {date}",
+					"folderInfo": "文件夹，修改于 {date}",
+					"replace": "替换",
+					"keepBoth": "保留两者",
+					"skip": "跳过",
+					"applyToAll": "对其余 {count} 个冲突执行相同操作"
+				},
+				"tabSwitcher": "已打开的标签页"
 			},
 			"labels": {
 				"bold": "粗体",
@@ -1537,12 +1634,14 @@
 					"runWorkflow": "运行工作流",
 					"askUser": "向你提问",
 					"openInEditorTab": "在编辑器标签页中打开",
-					"fetchUrl": "获取网页"
+					"fetchUrl": "获取网页",
+					"bash": "运行命令"
 				},
 				"asksToFetch": "请求获取",
 				"fetch": "获取",
 				"dontFetch": "不获取",
-				"allowSite": "始终允许 {host}"
+				"allowSite": "始终允许 {host}",
+				"exitCode": "退出码 {code}"
 			},
 			"edit": "编辑",
 			"send": "发送",
@@ -1616,7 +1715,15 @@
 					"discarded": "已丢弃",
 					"conflict": "未应用：笔记在暂存后已被改动",
 					"undone": "已被回退撤销"
-				}
+				},
+				"tabTitle": "{name}（AI 修改）",
+				"openNote": "打开笔记",
+				"openChat": "打开聊天",
+				"open": "查看修改",
+				"gone": "此修改已不在聊天中。",
+				"chatFailed": "无法打开此修改所属的聊天。",
+				"conflictNote": "暂存后笔记已被修改；这里显示的是 AI 针对它读到的文本提出的修改。",
+				"from": "来自 {chat}"
 			},
 			"questions": {
 				"title": "问题（{count}）",
@@ -1632,7 +1739,20 @@
 				"question": "回答上方的问题，或在此输入你的回答…",
 				"approval": "在此输入以拒绝，并说明原因…"
 			},
-			"profileSearch": "搜索模型配置"
+			"profileSearch": "搜索模型配置",
+			"showEarlier": "显示更早的 {count} 条消息",
+			"attach": {
+				"failed": "无法附加这些文件。",
+				"unsupported": "聊天暂不支持：{names}",
+				"tooBig": "超过 5 MB，无法发送：{names}",
+				"noImages": "{model} 不支持图片。"
+			},
+			"importDialog": {
+				"title": "将 {count} 个文件添加到工作区？",
+				"description": "聊天只能附加工作区中的文件，因此会先将它们复制到 {folder}。",
+				"add": "添加并附加"
+			},
+			"imagesUnsupported": "模型 {model} 不支持图片。请移除附加的图片，或选择支持图片的模型。"
 		},
 		"workspaces": {
 			"switch": "切换工作区",
@@ -1646,7 +1766,8 @@
 			"moveDown": "下移",
 			"moveTo": {
 				"left": "移到左侧",
-				"right": "移到右侧"
+				"right": "移到右侧",
+				"bottom": "移到底部"
 			},
 			"hide": "隐藏",
 			"addSeparator": "在下方添加分隔线",
@@ -1654,11 +1775,298 @@
 			"hidden": "已隐藏的视图",
 			"reset": "重置布局",
 			"separator": "分隔线",
+			"split": "分栏",
+			"splitHere": "在此处分栏",
+			"removeSplit": "取消分栏",
+			"mergeUp": "与上方窗格合并",
+			"mergeLeft": "与左侧窗格合并",
+			"collapseBottom": "折叠底部面板",
+			"showBottom": "显示底部面板：{views}",
 			"lists": {
 				"left": "左侧",
 				"right": "右侧",
+				"bottom": "底部",
 				"hidden": "已隐藏"
+			},
+			"openInTab": "在标签页中打开",
+			"moveToPanel": "移回面板",
+			"viewMissing": "此视图不可用。"
+		},
+		"git": {
+			"label": "Git",
+			"sync": "同步",
+			"syncHint": "提交所有更改，拉取远程的新提交，然后推送你的提交。",
+			"syncMessage": "更新 {count} 个文件",
+			"committing": "正在提交…",
+			"pulling": "正在拉取…",
+			"pushing": "正在推送…",
+			"fetching": "正在获取…",
+			"switching": "正在切换分支…",
+			"working": "正在处理…",
+			"fetch": "获取：检查远程是否有新提交",
+			"pull": "拉取：合并远程的新提交",
+			"push": "推送：把你的提交发送到远程",
+			"pullAction": "拉取",
+			"refresh": "刷新",
+			"aheadBehind": "{ahead} 个提交待推送，{behind} 个待拉取（{upstream}）",
+			"detached": "游离于 {id}",
+			"branches": "分支",
+			"remoteBranches": "远程分支",
+			"current": "当前",
+			"createBranch": "创建分支“{name}”",
+			"branchPlaceholder": "切换或创建分支…",
+			"staged": "已暂存",
+			"stagedHint": "已暂存的更改会进入下一次提交。",
+			"changes": "更改",
+			"changesHint": "尚未暂存的更改。暂存后才会进入下一次提交。",
+			"stage": "暂存",
+			"unstage": "取消暂存",
+			"stageAll": "全部暂存",
+			"unstageAll": "全部取消暂存",
+			"discard": "放弃更改",
+			"discardAll": "放弃所有更改",
+			"openFile": "打开文件",
+			"discardConfirm": {
+				"title": "放弃更改？",
+				"description": "{count} 个文件将恢复为上一次提交时的样子，新文件会被删除。此操作无法撤销。",
+				"confirm": "放弃"
+			},
+			"clean": "没有更改",
+			"cleanHint": "所有内容都已提交。",
+			"message": "提交信息（可选；⌘↩ 提交）",
+			"commit": "提交",
+			"commitHint": "把已暂存的更改保存为一次提交：历史中的一个快照。",
+			"commitAllHint": "没有暂存任何内容，因此会提交所有更改。",
+			"commitPush": "提交并推送",
+			"commitPushHint": "提交，然后发送到远程。",
+			"merging": {
+				"title": "正在合并",
+				"description": "逐个解决冲突：保留你的（本机的）或对方的（远程的），或修正文件后标记为已解决。然后完成合并，或中止以返回。",
+				"abort": "中止合并",
+				"finish": "完成合并"
+			},
+			"states": {
+				"unchanged": "未更改",
+				"modified": "已修改",
+				"added": "已添加",
+				"deleted": "已删除",
+				"renamed": "已重命名",
+				"copied": "已复制",
+				"typeChanged": "类型已更改",
+				"conflicted": "有冲突",
+				"untracked": "未跟踪（新文件）"
+			},
+			"missing": {
+				"title": "未安装 Git",
+				"description": "Vertex 使用 git 跟踪和同步此工作区。请先安装，然后重新检查。",
+				"macos": "Vertex 使用 git 跟踪和同步此工作区。Apple 的开发者工具包含 git：请安装后再检查。",
+				"configured": "Vertex 被设置为使用 {path}，但它不是可用的 git。请指定其他 git，或让 Vertex 自动查找。",
+				"installTools": "安装开发者工具",
+				"locate": "指定 git…",
+				"locateTitle": "选择 git 程序",
+				"automatic": "自动查找 git",
+				"toolsFailed": "无法打开开发者工具安装程序"
+			},
+			"notRepo": {
+				"title": "不是 git 仓库",
+				"description": "此工作区尚未由 git 跟踪。创建仓库后会开始跟踪它的更改，并添加 .gitignore 来排除系统文件和 Vertex 的回收站。"
+			},
+			"install": "安装 git",
+			"checkAgain": "重新检查",
+			"errors": {
+				"failed": "Git 操作失败",
+				"missing": {
+					"title": "未安装 Git",
+					"description": "请安装 git 后重试。"
+				},
+				"notRepo": {
+					"title": "不是 git 仓库",
+					"description": "此工作区尚未由 git 跟踪。"
+				},
+				"auth": {
+					"title": "无法登录远程",
+					"description": "远程拒绝了登录。HTTPS 远程请重试并输入个人访问令牌；SSH 远程请将密钥添加到 SSH 代理。"
+				},
+				"conflict": {
+					"title": "合并冲突",
+					"description": "有些文件在本机和远程都有更改。请在 Git 视图的冲突列表中解决，然后完成合并，或中止合并。"
+				},
+				"rejected": {
+					"title": "远程有更新的提交",
+					"description": "请先拉取，然后再推送。"
+				},
+				"noRemote": {
+					"title": "没有可同步的远程",
+					"description": "此仓库尚未连接远程：请连接一个以推送。"
+				},
+				"noUpstream": {
+					"title": "此分支没有远程分支",
+					"description": "它没有跟踪任何远程分支，也没有可推送的 `origin`。请用 `git push -u` 加上远程名称推送一次。"
+				},
+				"identity": {
+					"title": "Git 需要你的姓名和邮箱",
+					"description": "提交会记录作者。请设置你的姓名和邮箱后再提交。"
+				}
+			},
+			"createRepo": "创建仓库",
+			"creating": "正在创建仓库…",
+			"syncChats": "同步聊天",
+			"syncChatsHint": "保存在此工作区的聊天是 git 无法合并的加密文件：两台设备修改同一个聊天时，需要选择保留其中一个版本。",
+			"diff": {
+				"openChanges": "查看更改",
+				"worktree": "工作区",
+				"staged": "已暂存",
+				"tabTitle": "{name}（{side}）",
+				"againstHead": "与上一次提交比较",
+				"againstParent": "与它之前的提交比较",
+				"added": "新文件",
+				"deleted": "已删除",
+				"renamed": "由 {path} 重命名"
+			},
+			"history": {
+				"label": "历史",
+				"show": "历史：以图形显示所有提交",
+				"empty": "还没有提交",
+				"emptyHint": "提交你的更改后，这里就会出现历史。",
+				"files": "更改的文件",
+				"noFiles": "没有文件更改",
+				"parents": "父提交",
+				"copyId": "复制提交 ID",
+				"close": "关闭"
+			},
+			"signIn": {
+				"title": "登录 {host}",
+				"description": "Git 无法登录 {host}。使用个人访问令牌即可登录。",
+				"refused": "{host} 拒绝了已保存的令牌。它可能已过期或失去权限：请输入新的令牌。",
+				"explain": "个人访问令牌是供应用使用的密码，在该站点的账户设置中创建。请授予它对仓库的读写权限。",
+				"create": "在 {host} 上创建令牌",
+				"createElsewhere": "请在 {host} 的账户设置中创建。",
+				"host": "主机",
+				"token": "令牌",
+				"username": "用户名",
+				"optional": "可选",
+				"usernameHelp": "仅当你的主机要求令牌搭配用户名时填写。",
+				"kept": "Vertex 将它保存在系统钥匙串中，仅在 git 与 {host} 通信时交给 git。可在 设置 → Git 中移除。",
+				"save": "保存并重试"
+			},
+			"setup": {
+				"steps": {
+					"create": "创建",
+					"identity": "身份",
+					"remote": "远程",
+					"push": "推送"
+				},
+				"continue": "继续",
+				"later": "稍后",
+				"firstCommit": "首次提交",
+				"identityAction": "设置姓名",
+				"remoteAction": "连接远程",
+				"identity": {
+					"title": "你的姓名和邮箱",
+					"description": "每个提交都会记录作者。它们只保存在此仓库中。",
+					"name": "姓名",
+					"email": "邮箱",
+					"emailHint": "显示在历史中"
+				},
+				"remote": {
+					"title": "连接远程",
+					"description": "远程是此仓库在服务器（如 GitHub）上的副本。你的设备通过它同步：各自推送提交，并拉取其他设备的提交。",
+					"github": "在 GitHub 上创建仓库",
+					"empty": "设为私有并保持为空：不要 README、.gitignore 或许可证，这样首次推送可以直接完成。然后把它的 HTTPS 地址复制到这里。",
+					"url": "远程地址",
+					"connect": "连接"
+				},
+				"push": {
+					"title": "推送你的笔记",
+					"description": "Vertex 会提交所有文件并推送到远程。如果远程要求登录，Vertex 会帮你创建令牌。",
+					"action": "提交并推送"
+				}
+			},
+			"tour": {
+				"start": "导览",
+				"sync": {
+					"title": "同步",
+					"description": "一键让各设备保持一致：提交所有更改，拉取远程的新提交，再推送你的提交。"
+				},
+				"branch": {
+					"title": "分支",
+					"description": "分支是一条工作线。在此切换分支，或输入名称新建分支。"
+				},
+				"aheadBehind": {
+					"title": "领先与落后",
+					"description": "远程还没有的你的提交（上箭头），以及你还没拉取的远程提交（下箭头）。"
+				},
+				"remoteActions": {
+					"title": "抓取、拉取和推送",
+					"description": "抓取检查远程是否有新提交，拉取把它们合入你的文件，推送把你的提交发送到远程。"
+				},
+				"list": {
+					"title": "更改与已暂存",
+					"description": "更改列出自上次提交以来编辑过的文件。暂存（加号）要放进下次提交的文件：它们会移到已暂存。点击文件查看改了什么。"
+				},
+				"commit": {
+					"title": "提交",
+					"description": "提交会把已暂存的更改（未暂存任何文件时为所有更改）保存为历史中的一步，并附上说明改了什么的信息。"
+				},
+				"history": {
+					"title": "历史",
+					"description": "按分支列出的所有提交：选择一个查看它改了什么。"
+				}
+			},
+			"clone": {
+				"title": "克隆工作区",
+				"description": "把远程仓库复制到新文件夹，并作为工作区打开。",
+				"url": "仓库地址",
+				"parent": "放在",
+				"parentTitle": "选择文件夹的位置",
+				"choose": "选择…",
+				"name": "文件夹名称",
+				"badName": "文件夹名称不能包含斜杠",
+				"exists": "{path} 已存在：请换一个名称。",
+				"action": "克隆并打开",
+				"cloning": "正在克隆…"
+			},
+			"ai": {
+				"write": "用 AI 撰写信息",
+				"writing": "正在撰写信息…",
+				"failed": "无法撰写提交信息"
+			},
+			"conflicts": {
+				"label": "冲突",
+				"hint": "这些文件在本机和远程都有更改。保留其中一方，或打开文件修正 git 标记的部分后标记为已解决。",
+				"keepMine": "保留我的",
+				"keepTheirs": "保留对方的",
+				"keepAllMine": "全部保留我的",
+				"keepAllTheirs": "全部保留对方的",
+				"markResolved": "标记为已解决",
+				"markAllResolved": "全部标记为已解决",
+				"markersConfirm": "{count} 个文件仍有冲突标记：{files}。仍要标记为已解决吗？"
+			},
+			"autoSync": {
+				"failed": "自动同步失败",
+				"paused": "自动同步已暂停",
+				"open": "打开 Git"
+			},
+			"rebasing": {
+				"title": "正在变基",
+				"description": "你的提交正被重放到远程的提交之上。逐个解决冲突：保留你的（本机的）或对方的（远程的），或修正文件后标记为已解决。然后继续；之后的提交可能再次停下。或中止以返回。",
+				"finish": "继续变基",
+				"abort": "中止变基"
 			}
+		},
+		"tour": {
+			"progress": "{step} / {count}",
+			"skip": "跳过",
+			"back": "上一步",
+			"next": "下一步",
+			"done": "完成"
+		},
+		"diff": {
+			"binary": "二进制文件",
+			"binaryHint": "没有可以比较的文本行。",
+			"noChanges": "文本没有更改",
+			"unchanged": "{count} 行未更改",
+			"loadFailed": "无法读取此文件的版本"
 		}
 	}
 }

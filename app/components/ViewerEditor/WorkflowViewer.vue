@@ -163,8 +163,7 @@ const status = computed(() => {
         </div>
         <div
             v-else
-            class="workflow-viewer w-full border-t border-default"
-            :style="{height: 'calc(100vh - var(--ui-header-height) - 3rem)'}"
+            class="workflow-viewer w-full h-full border-t border-default"
         >
             <WorkflowWorkbench :key="canvasKey" :editor="editor">
                 <template #widget="w">

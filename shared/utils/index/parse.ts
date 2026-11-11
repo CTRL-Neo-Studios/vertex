@@ -26,7 +26,8 @@ export function parentPathOf(path: string) {
 export function parseProperties(path: string, content: string, parsers: ContentParsers): { properties: YamlFormData, error?: unknown } {
     const ext = getFileExtensionFromPath(path)
     const parse = isYamlFile(ext) ? parsers.parseYaml : isPlainTextFile(ext) ? parsers.parseFrontmatter : undefined
-    if (!parse) return {properties: {}}
+    // An empty note has no properties (the frontmatter parser throws "No markdown text provided" on it).
+    if (!parse || !content.trim()) return {properties: {}}
     try {
         const result = parse(content)
         return {properties: (result.data ?? {}) as YamlFormData, error: result.error}

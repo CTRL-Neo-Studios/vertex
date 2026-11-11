@@ -15,6 +15,8 @@ export interface ChatSendSetup {
     /** The instructions before the notes. */
     prompt: string,
     notes: {path: string, content: string}[],
+    /** Images attached in the conversation, read at send: each goes into the message that attached it. */
+    images?: {messageId: string, mediaType: string, url: string}[],
     /** The chat's tools (`chatTools`); omitted when the model profile has them off. */
     tools?: ToolSet,
 }
@@ -74,11 +76,64 @@ export async function generateChatTitle(provider: AiProviderProfile, modelId: st
     return cleanTitle(text)
 }
 
+// ponytail: fixed character cap on the diff, its start kept; summarise per file if long commits need it.
+const COMMIT_DIFF_CHARS = 16_000
+
+/** What a commit message is written from. */
+export interface CommitContext {
+    /** Every file the commit takes, with git's status letter (`M notes/a.md`, `? new.md`). */
+    files: string[],
+    /** The patch of what it takes; new files are only listed. */
+    diff: string,
+    /** Recent commit subjects, newest first: the repository's style. */
+    subjects: string[],
+}
+
+/** The commit-message prompt: recent subjects, the files, and the diff cut at {@link COMMIT_DIFF_CHARS} (saying so). */
+export function commitPrompt({files, diff, subjects}: CommitContext): string {
+    const cut = diff.length > COMMIT_DIFF_CHARS
+    return [
+        subjects.length ? `Recent commit subjects:\n${subjects.map(s => `- ${s}`).join('\n')}` : '',
+        `Files in this commit:\n${files.join('\n')}`,
+        diff ? `Diff${cut ? ` (its first ${COMMIT_DIFF_CHARS} of ${diff.length} characters)` : ''}:\n${diff.slice(0, COMMIT_DIFF_CHARS)}` : '',
+    ].filter(Boolean).join('\n\n')
+}
+
+/** A model's commit message without reasoning, a code fence or wrapping quotes. */
+export function cleanCommitMessage(text: string): string {
+    return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+        .replace(/^```[^\n]*\n/, '').replace(/\n?```$/, '').trim()
+        .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+}
+
+/** A commit message for `context`, in the style of the repository's recent subjects; '' when the model gives nothing. */
+export async function generateCommitMessage(provider: AiProviderProfile, modelId: string, context: CommitContext): Promise<string> {
+    const {text} = await generateText({
+        model: modelFor(provider, modelId),
+        instructions: 'You write git commit messages. Reply with only the message: a subject line of at most 72 characters saying what the change does, then, only if it needs explaining, a blank line and a short body. Follow the style and language of the recent subjects when there are any. No quotes, no code fences.',
+        prompt: commitPrompt(context),
+    })
+    return cleanCommitMessage(text)
+}
+
+/** `bytes` as a `data:` URL, as a file part carries an image to the model. Built in chunks: a big image overflows one call's arguments. */
+export function dataUrl(mediaType: string, bytes: Uint8Array) {
+    let binary = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return `data:${mediaType};base64,${btoa(binary)}`
+}
+
+/** `messages` with each image added to the message that attached it, as a `file` part. */
+export function withImages(messages: VertexChatMessage[], images: ChatSendSetup['images'] = []) {
+    for (const {messageId, mediaType, url} of images) messages.find(m => m.id === messageId)?.parts.push({type: 'file', mediaType, url})
+    return messages
+}
+
 /** A chat transport that runs the model in the webview, through Rust's `ai_request` (no server route). */
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, profileId, modelId, params, prompt, notes, tools} = await setup(messages)
+            const {provider, profileId, modelId, params, prompt, notes, images, tools} = await setup(messages)
             const {system, sent} = chatSystem(prompt, notes)
             const names = Object.entries(tools ?? {})
             const request: ChatRequestInfo = {
@@ -96,8 +151,9 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
                 model: modelFor(provider, modelId, params),
                 instructions: system || undefined,
                 // Plain copies: the chat's messages are Vue proxies, which an approved tool call's input can't be
-                // `structuredClone`d from when the AI SDK checks it again before running it.
-                messages: await convertToModelMessages(markModeSwitches(JSON.parse(JSON.stringify(messages))), {tools}),
+                // `structuredClone`d from when the AI SDK checks it again before running it. Attached images are
+                // added to the copies only, as file parts: the stored chat keeps their paths, not their bytes.
+                messages: await convertToModelMessages(markModeSwitches(withImages(JSON.parse(JSON.stringify(messages)), images)), {tools}),
                 ...(tools && {tools, stopWhen: isStepCount(MAX_STEPS)}),
                 abortSignal,
             })

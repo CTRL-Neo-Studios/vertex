@@ -3,6 +3,7 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PossiblyRef} from "#shared/types/types";
 import {defaultActiveTab} from "#shared/utils/defaults/actives";
 import {sessionScope, StateKey} from "#shared/constants/app";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
 
 export function useActiveTabs(session?: ActiveSession) {
     const scope = sessionScope(session, 'useActiveTabs')
@@ -115,12 +116,28 @@ export function useActiveTabs(session?: ActiveSession) {
         }
     }
 
+    /**
+     * Closes tab `id` from outside the tab bar (a chat or a view moving back to its panel); if it was the shown one, it
+     * shows the next first (`closeTab`'s pick). The route moves first: a route left on a closed tab falls back to
+     * SessionTab, which sends the window to the empty page.
+     */
+    async function closeTabElsewhere(id: string) {
+        if (!isTabOpened(id)) return
+        if (activeTabUuid.value === id) {
+            const at = tabs.value.findIndex(t => t.fileUuid === id)
+            const next = tabs.value[at + 1] ?? tabs.value[at - 1]
+            await useAppNavigator().toWorkspaceTab(session?.uuid, next && openTab(next.fileUuid))
+        }
+        closeTab(id)
+    }
+
     return {
         tabs,
         activeTabUuid,
         openTab,
         openTabs,
         closeTab,
+        closeTabElsewhere,
         setActiveTab,
         isTabOpened,
         getActiveTab,

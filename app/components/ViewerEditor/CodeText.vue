@@ -35,7 +35,7 @@ const emit = defineEmits<{
                 :colorMode="$cm.value"
                 v-model="content"
                 class="w-full"
-                :language="getFileExtensionFromPath(props.filePath)"
+                :language="getFileExtensionFromPath(props.filePath) === 'unknown' ? undefined : getFileExtensionFromPath(props.filePath)"
                 @update:model-value="() => contentSaved = false"
             />
         </template>

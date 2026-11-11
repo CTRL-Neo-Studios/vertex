@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import math, {Math} from "@comark/nuxt/plugins/math";
-import rangi from "@comark/nuxt/plugins/rangi";
+import math, {Math} from "@comark/vue/plugins/math";
+import rangi from "@comark/vue/plugins/rangi";
 import "katex/dist/katex.min.css";
 import {callouts, frontmatterAsCode, wikiLinks} from "~/utils/comarkPlugins";
 import ChatLink from "~/components/Chat/ChatLink.vue";
 import ChatCodeBlock from "~/components/Chat/ChatCodeBlock.vue";
 
-defineProps<{ value: string, streaming?: boolean }>()
+const props = defineProps<{ value: string, streaming?: boolean }>()
+// Comark parses the whole text again on every change, queued: while a reply streams, at most every 100 ms.
+const throttled = refThrottled(toRef(props, 'value'), 100)
 
-// Callouts render as Nuxt UI's ProseCallout and everything else through its prose components (@comark/nuxt turns
+// Callouts render as Nuxt UI's ProseCallout and everything else through its prose components (@comark/vue turns
 // them on); `a` and `pre` are ours (wikilinks, Pele diagrams), `icon` is a folding callout's. rangi highlights code
 // without Shiki's weight.
 const plugins = [wikiLinks, callouts, frontmatterAsCode, math(), rangi()]
@@ -17,6 +19,6 @@ const components = {a: ChatLink, pre: ChatCodeBlock, math: Math, icon: resolveCo
 
 <template>
     <Suspense>
-        <Markdown :value :streaming :plugins :components class="*:first:mt-0 *:last:mb-0"/>
+        <Markdown :value="streaming ? throttled : value" :streaming :plugins :components class="*:first:mt-0 *:last:mb-0"/>
     </Suspense>
 </template>

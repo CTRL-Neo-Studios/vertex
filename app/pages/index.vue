@@ -46,6 +46,7 @@ const openEntry = (entry: RecentEntry) => busy(() => recents.open(entry))
                 <div class="text-3xl font-bold text-center mb-6">Vertex</div>
                 <UButton color="neutral" :label="$t('app.home.newFile')" icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.createNewFileForSinglespace)"/>
                 <UButton color="neutral" :label="$t('app.home.newWorkspace')" icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.newWorkspaceAction)"/>
+                <UButton color="neutral" :label="$t('app.home.cloneWorkspace')" icon="i-lucide-folder-git-2" class="cursor-pointer" variant="ghost" :disabled="openingFile" data-clone-workspace @click="busy($act.cloneWorkspaceAction)"/>
                 <UButton color="neutral" :label="$t('app.home.openFile')" icon="i-lucide-file" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.openSinglespaceAction)"/>
                 <UButton color="neutral" :label="$t('app.home.openFolder')" icon="i-lucide-folder-open" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.openWorkspaceAction)"/>
             </div>

@@ -1,9 +1,9 @@
-import type {AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, PanelViewId, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppFileConfig, AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
-import {normalizePanelLayout, PANEL_VIEWS} from "#shared/utils/panelLayout";
+import {isPanelViewId, normalizePanelLayout} from "#shared/utils/panelLayout";
 import {sanitizeModelParams} from "#shared/utils/aiParams";
 import type {DeepPartial} from "#shared/types/types";
 
@@ -28,9 +28,23 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         viewConfig: defaultAppViewConfig(data?.viewConfig),
         workflowConfig: defaultAppWorkflowConfig(data?.workflowConfig),
         aiConfig: defaultAppAiConfig(data?.aiConfig),
+        gitConfig: defaultAppGitConfig(data?.gitConfig),
+        fileConfig: defaultAppFileConfig(data?.fileConfig),
 		deviceId: data?.deviceId || crypto.randomUUID(),
         updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
+}
+
+const UPDATE_LINKS: readonly AppFileConfig['updateLinks'][] = ['ask', 'update', 'keep']
+const DELETED_FILES: readonly AppFileConfig['deletedFiles'][] = ['trash', 'workspaceTrash', 'permanent']
+
+export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFileConfig {
+    return {
+        updateLinks: UPDATE_LINKS.includes(data?.updateLinks as AppFileConfig['updateLinks']) ? data!.updateLinks! : 'ask',
+        attachmentsFolder: typeof data?.attachmentsFolder === 'string' ? data.attachmentsFolder.replace(/^\/+|\/+$/g, '') : 'Attachments',
+        importToChat: data?.importToChat === 'always' ? 'always' : 'ask',
+        deletedFiles: DELETED_FILES.includes(data?.deletedFiles as AppFileConfig['deletedFiles']) ? data!.deletedFiles! : 'trash',
+    }
 }
 
 const positiveInt = (value: unknown, fallback: number) =>
@@ -80,6 +94,7 @@ const AI_SEED: AppAiConfig = {
     chatMode: 'suggest',
     chatTitles: true,
     editorAssistant: {toolbar: true, slash: true, shortcut: true},
+    commitMessages: {autoSync: false, whenEmpty: true},
 }
 
 /** A stored chat mode (settings or a chat file) as a mode: `ask` is Read's old name; anything unknown is Suggest. */
@@ -111,12 +126,15 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
     const entries: Loose = isLoose(ai.editorAssistant) ? ai.editorAssistant : {}
+    const commits: Loose = isLoose(ai.commitMessages) ? ai.commitMessages : {}
     return {
         enabled: ai.enabled !== false,
         providers, modelProfiles, defaultModelProfile, features, chatStorage,
         chatMode: toChatMode(ai.chatMode),
         chatTitles: ai.chatTitles !== false,
         editorAssistant: {toolbar: entries.toolbar !== false, slash: entries.slash !== false, shortcut: entries.shortcut !== false},
+        // A timer sending diffs to a model is opt-in; an empty box asking for one is G7's default.
+        commitMessages: {autoSync: commits.autoSync === true, whenEmpty: commits.whenEmpty !== false},
     }
 }
 
@@ -130,12 +148,27 @@ export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>):
     } satisfies AppWorkflowConfig
 }
 
+export function defaultAppGitConfig(data?: DeepPartial<AppGitConfig>): AppGitConfig {
+    const interval = data?.autoSync?.interval
+    return {
+        path: typeof data?.path === 'string' ? data.path : '',
+        autoSync: {
+            interval: typeof interval === 'number' && Number.isFinite(interval) && interval > 0 ? interval : 0,
+            onOpen: data?.autoSync?.onOpen === true,
+            pullOnFocus: data?.autoSync?.pullOnFocus === true,
+        },
+    }
+}
+
 /** Old sessions kept absolute paths (Rust migrates the rest, see `sanitize_sessions`); read them too. */
 type LegacySession = Omit<Partial<AppSession>, 'context'> & {context?: LegacyContext}
 type LegacyContext = Partial<AppSessionContext> & {
     openedAbsoluteFilePaths?: string[],
     openedAbsoluteFolderPaths?: string[],
     lastFocusedAbsoluteFilePath?: string,
+    /** Before split panes: one view per side, now `shownPanelViews`. */
+    leftPanelView?: string,
+    rightPanelView?: string,
 }
 
 export function defaultAppSession(data?: LegacySession): AppSession {
@@ -152,7 +185,7 @@ export function defaultAppSession(data?: LegacySession): AppSession {
     } satisfies AppSession
 }
 
-const panelView = (value: unknown) => PANEL_VIEWS.includes(value as PanelViewId) ? value as PanelViewId : undefined
+const panelViews = (current: unknown, legacy: unknown[]) => (Array.isArray(current) ? current : legacy).filter(isPanelViewId)
 
 /** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
 export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {
@@ -167,10 +200,12 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
         openedChatIds: data?.openedChatIds || [],
         lastFocusedChatId: data?.lastFocusedChatId,
-        leftPanelView: panelView(data?.leftPanelView),
-        rightPanelView: panelView(data?.rightPanelView),
+        openedViewIds: panelViews(data?.openedViewIds, []),
+        lastFocusedViewId: isPanelViewId(data?.lastFocusedViewId) ? data.lastFocusedViewId : undefined,
+        shownPanelViews: panelViews(data?.shownPanelViews, [data?.leftPanelView, data?.rightPanelView]),
         leftPanelCollapsed: data?.leftPanelCollapsed === true,
         rightPanelCollapsed: data?.rightPanelCollapsed !== false,
+        bottomPanelCollapsed: data?.bottomPanelCollapsed === true,
     } satisfies AppSessionContext
 }
 

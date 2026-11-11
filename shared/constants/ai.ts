@@ -5,6 +5,7 @@
 export const AI_FEATURES = [
     {id: 'editorAssistant', label: 'app.settings.ai.features.editorAssistant', description: 'app.settings.ai.features.editorAssistantDescription'},
     {id: 'chat', label: 'app.settings.ai.features.chat', description: 'app.settings.ai.features.chatDescription'},
+    {id: 'commitMessage', label: 'app.settings.ai.features.commitMessage', description: 'app.settings.ai.features.commitMessageDescription'},
 ] as const
 
 export type AiFeatureId = typeof AI_FEATURES[number]['id']

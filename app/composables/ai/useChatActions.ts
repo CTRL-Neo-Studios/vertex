@@ -90,9 +90,11 @@ export function useChatActions(session?: ActiveSession) {
         ]]
         : [createItems('')])
 
+    const sortedFolders = computed(() => [...(index.value?.folders ?? [])].sort())
+
     /** `here`: where the chat is shown, so its own "open there" entry is left out. */
     function chatActions(chat: ChatSummary, here?: 'tab' | 'side'): DropdownMenuItem[][] {
-        const folders = [...(index.value?.folders ?? [])].sort()
+        const folders = sortedFolders.value
         const open: DropdownMenuItem[] = [
             ...(here === 'tab' ? [] : [{label: t('app.chat.openInTab'), icon: 'i-lucide-square-plus', onSelect: () => run(() => openInTab(chat.id))}]),
             ...(here === 'side' ? [] : [{label: t('app.chat.showInSidePanel'), icon: 'i-lucide-panel-right', onSelect: () => showInSidePanel(chat.id)}]),
@@ -119,7 +121,7 @@ export function useChatActions(session?: ActiveSession) {
         const parent = parentOf(path)
         const moveTo = (dest: string) => moveFolderTo(path, dest)
         // Not into itself or its own subfolders.
-        const targets = [...(index.value?.folders ?? [])].filter(f => f !== path && !f.startsWith(`${path}/`)).sort()
+        const targets = sortedFolders.value.filter(f => f !== path && !f.startsWith(`${path}/`))
         return [
             [
                 {label: t('app.chat.newChatHere'), icon: 'i-lucide-circle-plus', onSelect: () => newChat(path)},

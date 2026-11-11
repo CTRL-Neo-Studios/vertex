@@ -3,17 +3,19 @@ import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalRes
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {CompileError} from "@type32/workflows/core";
 import {invoke} from "@tauri-apps/api/core";
+import {readFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
+import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
-import {fileNameFromPath, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
-import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
+import {createChatTransport, dataUrl, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
-import {fetchPage} from "~/utils/webPage";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
-import {changesSummary, newNotePath, textChange} from "~/utils/chatChanges";
+import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
+import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "~/utils/chatBash";
 import {TRASH_DIR} from "#shared/workflows/vault";
 import type {Op} from "#shared/workflows/effects";
 import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
@@ -44,6 +46,8 @@ interface LiveChat {
     retryProfileId?: string
     /** Write mode: what the reply being written has staged so far, by path; kept on the reply when it ends. */
     staging?: Map<string, ChatChange>
+    /** The reply's `bash` sandbox, made on its first command; a new reply starts a fresh one (notes may have changed). */
+    sandbox?: Promise<Sandbox>
 }
 
 /**
@@ -200,6 +204,33 @@ export function useChats(session?: ActiveSession) {
         return resolved
     }
 
+    /** Whether a profile's model takes images, from its provider's model list (`inputModalities`); unknown when it doesn't say. */
+    function takesImages({profile, provider}: ReturnType<typeof resolveModel>): boolean | undefined {
+        const modalities = provider.models.find(m => m.id === profile.modelId)?.inputModalities
+        return modalities ? modalities.includes('image') : undefined
+    }
+
+    /**
+     * Every image attached in the conversation, read now as data URLs: the stored chat holds their paths, not their
+     * bytes. A model known not to take images gets an error instead of a silent drop; one deleted since is skipped.
+     */
+    async function imagesFor(messages: VertexChatMessage[], model: ReturnType<typeof resolveModel>): Promise<ChatSendSetup['images']> {
+        const wanted = messages.flatMap(m => m.role !== 'user' ? [] : (m.metadata?.notes ?? [])
+            .filter(path => isImage(getFileExtensionFromPath(path)))
+            .map(path => ({messageId: m.id, path})))
+        if (!wanted.length) return []
+        if (takesImages(model) === false) throw new Error(nuxtApp.$i18n.t('app.chat.imagesUnsupported', {model: model.profile.modelId}))
+        const files = new Map($index.getFilteredFiles(f => !f.isFolder && wanted.some(w => w.path === f.relativePath)).map(f => [f.relativePath, f.fullPath]))
+        const images: NonNullable<ChatSendSetup['images']> = []
+        for (const {messageId, path} of wanted) {
+            const full = files.get(path)
+            if (!full) continue
+            const mediaType = IMAGE_TYPES[getFileExtensionFromPath(path)]!
+            images.push({messageId, mediaType, url: dataUrl(mediaType, await readFile(full))})
+        }
+        return images
+    }
+
     /** The active tab's note (live buffer), then every note attached in the conversation. */
     async function notesFor(messages: VertexChatMessage[]) {
         const notes: {path: string, content: string}[] = []
@@ -212,7 +243,8 @@ export function useChats(session?: ActiveSession) {
         }
         const attached = new Set(messages.flatMap(m => m.metadata?.notes ?? []))
         if (open) attached.delete(open.relativePath)
-        const files = $index.getFilteredFiles(f => !f.isFolder && attached.has(f.relativePath))
+        // Images go to the model as images (`imagesFor`), not as text.
+        const files = $index.getFilteredFiles(f => !f.isFolder && !isImage(f.fileExt) && attached.has(f.relativePath))
         if (files.length === 0) return notes
         const relative = new Map(files.map(f => [f.fullPath, f.relativePath]))
         const read = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [...relative.keys()]})
@@ -237,20 +269,31 @@ export function useChats(session?: ActiveSession) {
     }
 
     /**
-     * The note's editor, shown with the chat beside it: a chat in a tab moves to the side panel and the note's tab
-     * opens, so its proposals can be seen and decided. Waits for the editor to mount; `undefined` if it doesn't.
+     * Shows `tab` with the chat beside it: a chat in a tab moves to the side panel (with the Chat view hidden it keeps
+     * its tab), and `tab` shows in the editor area.
+     */
+    async function showBeside(chatId: string, tab: ActiveTab) {
+        sidePanelChatId.value = chatId
+        const beside = panels.showView('chat')
+        // The tab's route first, then the chat's tab goes (see closeTabElsewhere).
+        await $navi.toWorkspaceTab(session?.uuid, tab)
+        if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+    }
+
+    /**
+     * The note's editor, shown with the chat beside it (`showBeside`), so its proposals can be seen and decided. Waits
+     * for the editor to mount; `undefined` if it doesn't.
      */
     async function editorFor(chatId: string, noteId: string) {
         const shown = editorViewOf(session, noteId)
         if (shown && $tabs.activeTabUuid.value === noteId) return shown
-        sidePanelChatId.value = chatId
-        // With the Chat view hidden the chat keeps its tab, and the note opens beside it.
-        const beside = panels.showView('chat')
-        // The note's route first, then the chat's tab goes (see closeChatTab).
-        await $navi.toWorkspaceTab(session?.uuid, $tabs.openTab(noteId))
-        if (beside && $tabs.isTabOpened(chatId)) $tabs.closeTab(chatId)
+        await showBeside(chatId, $tabs.openTab(noteId))
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
+
+    /** A Write-mode change's diff tab (`ChatChangeView`), with the chat beside it. */
+    const openChange = (chatId: string, messageId: string, path: string) =>
+        showBeside(chatId, $tabs.openTab(chatChangeTabId({chatId, messageId, path}), 'diff'))
 
     /** A note by workspace-relative path or, as models often pass, by name (like a wikilink: any case, `.md` optional). */
     function findNote(path: string) {
@@ -393,7 +436,7 @@ export function useChats(session?: ActiveSession) {
     }
 
     /** Stages `markdown` as a note's new text (`create`: a new note). Results and errors are worded for the model. */
-    async function stage(entry: LiveChat, path: string, markdown: string, create: boolean): Promise<object> {
+    async function stage(entry: LiveChat, path: string, markdown: string, create: boolean): Promise<{ error: string } | { status: 'staged', path: string }> {
         const staged = entry.staging ??= new Map()
         const known = stagedKey(entry, path)
         let at: string
@@ -422,6 +465,27 @@ export function useChats(session?: ActiveSession) {
         if (!allowed) return {error: `"${at}" is outside this chat's scope, which allows ${scopeText(entry.meta.scope, named)}. Ask the user to widen the scope or attach the note.`}
         staged.set(at, {path: at, before, after: markdown, state: 'pending'})
         return {status: 'staged', path: at}
+    }
+
+    /**
+     * `bash`: `command` in the reply's sandbox over the workspace's text files (as `read` gives them). In Write mode the
+     * files it wrote that differ from the notes are staged; new files only as `.md` notes. Worded for the model.
+     */
+    async function runBash(entry: LiveChat, command: string, read: (path: string) => Promise<string | null>, signal?: AbortSignal): Promise<object> {
+        const paths = () => noteFiles().map(f => slashed(f.relativePath)).filter(p => !p.split('/').some(part => part.startsWith('.')))
+        const box = await (entry.sandbox ??= createSandbox(paths(), read))
+        const result = await runCommand(box, command, signal)
+        if (modeOf(entry) !== 'write') return result
+        const staged: string[] = []
+        const notStaged: { path: string, error: string }[] = []
+        for (const w of await sandboxWrites(box, read)) {
+            const done = w.create && !/\.md$/i.test(w.path)
+                ? {error: 'Only Markdown notes (.md) are staged; other new files stay in the sandbox.'}
+                : await stage(entry, w.path, w.text, w.create)
+            if ('error' in done) notStaged.push({path: w.path, error: done.error})
+            else staged.push(done.path)
+        }
+        return {...result, ...(staged.length && {staged}), ...(notStaged.length && {notStaged})}
     }
 
     const updateMessage = (entry: LiveChat, messageId: string | undefined, change: (m: VertexChatMessage) => VertexChatMessage) => {
@@ -503,29 +567,38 @@ export function useChats(session?: ActiveSession) {
         const pinned = last?.role === 'assistant' ? last.metadata?.profileId ?? entry.meta.profileId : entry.retryProfileId ?? entry.meta.profileId
         entry.retryProfileId = undefined
         // A new reply stages from scratch; a tool round goes on with what its reply staged.
-        if (last?.role !== 'assistant') entry.staging = undefined
+        if (last?.role !== 'assistant') {
+            entry.staging = undefined
+            entry.sandbox = undefined
+        }
         const {profile, provider} = resolveModel(pinned)
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
         const mode = modeOf(entry)
         const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
+        const read = mode === 'write' ? (path: string) => readStaged(entry, path) : readNote
         const tools = toolsOn ? chatTools({
             search: query => invoke('notes_search', {root: requireRoot(), query}),
-            read: mode === 'write' ? path => readStaged(entry, path) : readNote,
+            read,
             openNote: () => {
                 const shown = editTarget()
                 const file = shown && $index.getFileByUuid(shown)
                 return file ? slashed(file.relativePath) : undefined
             },
             openInEditor: path => openInEditor(entry.meta.id, path),
-            fetchUrl: fetchPage,
             allowedHost: host => !!entry.meta.allowedHosts?.includes(host),
             list,
             files: workspaceFiles,
             mode,
-            stage: (path, markdown, create) => stage(entry, path, markdown, create),
+            stage: async (path, markdown, create) => {
+                const done = await stage(entry, path, markdown, create)
+                // A file the sandbox already read would otherwise give `bash` the text from before this change.
+                if ('path' in done) await (await entry.sandbox)?.fs.writeFile(`${WORKSPACE}/${done.path}`, markdown)
+                return done
+            },
             runWorkflow,
+            bash: (command, signal) => runBash(entry, command, read, signal),
         }, usedToolNames(messages)) : undefined
         const named = namedNotes(messages, entry.staging)
         const open = toolsOn ? editTarget() : undefined
@@ -542,7 +615,7 @@ export function useChats(session?: ActiveSession) {
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
-        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), tools}
+        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), images: await imagesFor(messages, {profile, provider}), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
@@ -746,20 +819,8 @@ export function useChats(session?: ActiveSession) {
         await save(entry)
     }
 
-    /**
-     * Closes the chat's tab; if it was the shown one, shows the next (`closeTab`'s pick). The route moves first: a route
-     * left on a closed tab falls back to SessionTab, which sends the window to the empty page.
-     */
-    async function closeChatTab(id: string) {
-        if (!$tabs.isTabOpened(id)) return
-        if ($tabs.activeTabUuid.value === id) {
-            const list = $tabs.tabs.value
-            const at = list.findIndex(t => t.fileUuid === id)
-            const next = list[at + 1] ?? list[at - 1]
-            await $navi.toWorkspaceTab(session?.uuid, next && $tabs.openTab(next.fileUuid))
-        }
-        $tabs.closeTab(id)
-    }
+    /** Closes the chat's tab; if it was the shown one, shows the next (`closeTabElsewhere`). */
+    const closeChatTab = (id: string) => $tabs.closeTabElsewhere(id)
 
     function drop(ids: string[]) {
         for (const id of ids) {
@@ -848,6 +909,14 @@ export function useChats(session?: ActiveSession) {
                 return undefined
             }
         },
+        /** Whether a loaded chat's model takes images: false when its provider says not, undefined when it doesn't say or there's no model. */
+        chatTakesImages: (id: string) => {
+            try {
+                return takesImages(resolveModel(live.get(keyOf(id))?.meta.profileId))
+            } catch {
+                return undefined
+            }
+        },
         saveError,
         retrySave,
         createChat,
@@ -867,12 +936,18 @@ export function useChats(session?: ActiveSession) {
         showBranch,
         applyChanges,
         discardChanges,
+        openChange,
         appliedAfter,
-        /** Which branch shows at `messageId`, of how many; undefined where nothing forks. */
-        branchOf: (id: string, messageId: string) => {
+        /** Which branch shows at each message where a fork starts, and of how many, by message id: one pass. */
+        branchesOf: (id: string) => {
             const entry = live.get(keyOf(id))
             const messages = entry?.chat.messages ?? []
-            return branchAt(entry?.meta.forks, messages, messages.findIndex(m => m.id === messageId))
+            const out: Record<string, { index: number, count: number }> = {}
+            messages.forEach((m, i) => {
+                const branch = branchAt(entry?.meta.forks, messages, i)
+                if (branch) out[m.id] = branch
+            })
+            return out
         },
         setProfile: (id: string, profileId: string | undefined) => update(id, {profileId}),
         setMode: (id: string, mode: ChatMode) => update(id, {mode}),

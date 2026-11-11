@@ -7,15 +7,17 @@ import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 
 /**
  * The `strip` style's icon strip at one window edge: its side's views (clicking the shown one collapses its panel),
- * dragged and right-clicked like the buttons. Both strips always show, even empty, so they keep the editor centred:
- * it centres in the space between them and the panels.
+ * dragged and right-clicked like the buttons. The left strip also holds the bottom area's views, at its foot, so a
+ * collapsed bottom area takes no room under the editor. Both strips always show, even empty, so they keep the editor
+ * centred: it centres in the space between them and the panels.
  */
 const props = defineProps<{ side: PanelSide }>()
 const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const panels = usePanels(session)
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
-const state = computed(() => panels.sides.value[props.side])
+const state = computed(() => panels.areas.value[props.side])
+const bottom = computed(() => (props.side === 'left' && panels.areas.value.bottom.slots.length ? panels.areas.value.bottom : undefined))
 </script>
 
 <template>
@@ -36,6 +38,20 @@ const state = computed(() => panels.sides.value[props.side])
             :drag
             :menu="index => panels.slotMenu(side, index)"
             @select="id => panels.select(side, id)"
+        />
+        <PanelButtons
+            v-if="bottom"
+            class="w-full pb-3"
+            list="bottom"
+            variant="strip"
+            :slots="bottom.slots"
+            :end="panels.layout.value.bottom.length"
+            :active="bottom.active"
+            :open="bottom.open"
+            :drag
+            :menu="index => panels.slotMenu('bottom', index)"
+            :kbds="panels.kbdsOf('bottom')"
+            @select="id => panels.select('bottom', id)"
         />
     </div>
 </template>

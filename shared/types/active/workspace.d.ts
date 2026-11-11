@@ -19,7 +19,10 @@ export interface ActiveWorkspaceFileIndex {
     modifiedTime: Date,
 }
 
-export interface UITreeNode extends Omit<ActiveWorkspaceFileIndex, 'children'> {
+/** What the file tree shows of an index entry: nothing a save changes, so saving doesn't rebuild the tree. */
+export interface UITreeNode extends Pick<ActiveWorkspaceFileIndex, 'uuid' | 'fileName' | 'relativePath' | 'isFolder'> {
+    /** The entry's `icon` property, when it's a non-empty string. */
+    icon?: string
     children: UITreeNode[]
 }
 
@@ -30,6 +33,11 @@ export type WorkspaceIndexEvent =
     | { type: 'rename'; oldPath: string; newPath: string; }
     | { type: 'modify'; path: string; }
     /** Something under `.vertex/chats/` changed (sync, another device); the index itself ignores dot paths. */
-    | { type: 'chats'; path: string; };
+    | { type: 'chats'; path: string; }
+    /**
+     * Anything under the root changed on disk, dot paths (`.git/`) and the app's own writes included; whole-folder
+     * watches only. For views that re-read their state from disk, like git's status.
+     */
+    | { type: 'changed'; paths: string[]; };
 
 export type WorkspaceIndexListener = (event: WorkspaceIndexEvent) => void;

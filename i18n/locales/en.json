@@ -19,6 +19,7 @@
 			"save": "Save",
 			"reload": "Reload",
 			"toggleFullscreen": "Toggle Full Screen",
+			"toggleBottomPanel": "Toggle Bottom Panel",
 			"closeTab": "Close Tab",
 			"closeAllTabs": "Close All Tabs",
 			"closeWindow": "Close Window",
@@ -68,7 +69,8 @@
 			"recoveryMissing": "{count} window(s) from your last session couldn't be reopened: their folder or file is gone.",
 			"newWorkspaceDialog": "Create a Workspace Folder",
 			"newWorkspaceName": "New Workspace",
-			"folderExists": "Something already exists at that path."
+			"folderExists": "Something already exists at that path.",
+			"cloneWorkspace": "Clone Workspace…"
 		},
 		"settings": {
 			"title": "Settings",
@@ -79,6 +81,7 @@
 				"theme": "Theme",
 				"view": "View",
 				"workflows": "Workflows",
+				"git": "Git",
 				"ai": "Assistive AI",
 				"aiProviders": "Providers",
 				"aiModels": "Model profiles",
@@ -217,7 +220,25 @@
 				"panelStyleButtons": "In the panels",
 				"panelStyleStrip": "Strips at the edges",
 				"panelLayout": "Arrangement",
-				"panelLayoutDescription": "Drag views between the sides and Hidden; right-click one to move it, hide it or add a separator."
+				"panelLayoutDescription": "Drag views between the sides and Hidden; right-click one to move it, hide it or add a separator.",
+				"files": "Files",
+				"updateLinks": "Update links after a move or rename",
+				"updateLinksDescription": "When a note or folder is moved or renamed, what happens to the links that pointed to it. Ask is the default; the dialog's Remember choice sets it for a workspace.",
+				"updateLinksAsk": "Ask each time",
+				"updateLinksUpdate": "Update links",
+				"updateLinksKeep": "Keep as written",
+				"deletedFiles": "Deleted files",
+				"deletedFilesDescription": "Where Delete in Files sends items. The Trash and the workspace’s .trash folder (hidden from Files) can be undone; deleting permanently asks first and cannot be undone.",
+				"deletedFilesTrash": "Move to the Trash",
+				"deletedFilesWorkspace": "Move to .trash in the workspace",
+				"deletedFilesPermanent": "Delete permanently",
+				"attachmentsFolder": "Attachments folder",
+				"attachmentsFolderDescription": "Where files from outside the workspace go when chat or a note takes them, and pasted screenshots. Created when first needed.",
+				"attachmentsFolderTop": "Top level",
+				"importToChat": "Files from outside in chat",
+				"importToChatDescription": "Files dropped or pasted into chat from Finder or Explorer are copied into the attachments folder first. Ask is the default; the dialog’s Remember choice sets it for a workspace.",
+				"importToChatAsk": "Ask each time",
+				"importToChatAlways": "Always copy and attach"
 			},
 			"workflows": {
 				"title": "Workflows",
@@ -396,6 +417,14 @@
 					"editorAssistantDescription": "Ask AI in the editor: rewrite, fix, continue and more.",
 					"chat": "Chat",
 					"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat.",
+					"commitMessage": "Commit messages",
+					"commitMessageDescription": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and when you set it below, an empty message box and auto-sync. The diff is sent to the model.",
+					"commitMessages": {
+						"whenEmpty": "Write a message for an empty box",
+						"whenEmptyDescription": "Commit or Sync with nothing typed asks the model for a message. Off, they commit as \"Update N file(s)\".",
+						"autoSync": "Write auto-sync's messages",
+						"autoSyncDescription": "Auto-sync's commits get a message from the model (sending the diff on every sync). Off, they're \"Update N file(s)\"."
+					},
 					"chatStorage": "Chat storage",
 					"chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
 					"chatStorageApp": "App data",
@@ -437,6 +466,28 @@
 				"useGlobalAll": "Use global theme",
 				"globalOnlyPage": "A workspace can't change these settings; they apply everywhere.",
 				"editUser": "Edit User settings"
+			},
+			"git": {
+				"title": "Git",
+				"tokens": "Sign-in tokens",
+				"tokensDescription": "Personal access tokens for HTTPS remotes, saved when a remote refused to sign in. They stay in your system keychain; git gets one only while it talks to its host, and your own credential helpers aren't asked then.",
+				"noTokens": "No saved tokens. Vertex asks for one when a remote refuses to sign in.",
+				"username": "Username: {username}",
+				"remove": "Remove",
+				"failed": "Couldn't read or change the saved tokens",
+				"autoSync": {
+					"title": "Auto-sync",
+					"description": "Keeps this computer's workspaces in step without pressing Sync: commits every change, pulls and pushes. It waits during a merge or rebase and pauses after a sign-in failure until a sync from the Git view works. A trusted workspace can have its own.",
+					"interval": "Sync automatically",
+					"intervalDescription": "How often a workspace window syncs while it's open.",
+					"never": "Never",
+					"every": "Every {minutes} min",
+					"onOpen": "Sync when a workspace opens",
+					"onOpenDescription": "Once, when its window opens.",
+					"pullOnFocus": "Pull when the window gets focus",
+					"pullOnFocusDescription": "Brings in the remote's new commits when you come back to the window (at most once a minute).",
+					"untrusted": "This workspace's auto-sync applies once its folder is trusted."
+				}
 			}
 		},
 		"editor": {
@@ -508,7 +559,38 @@
 					"newCanvas": "New Canvas",
 					"newBase": "New Base",
 					"newOpenFolderProperties": "New/Open Folder Properties",
-					"newWorkflow": "New Workflow"
+					"newWorkflow": "New Workflow",
+					"moveFailed": "Could not move {name}",
+					"openInNewTabs": "Open in New Tabs",
+					"copyFullPaths": "Copy full paths",
+					"copyRelativePaths": "Copy relative paths",
+					"itemCount": "{count} item(s)",
+					"added": "Added {count} item(s).",
+					"addFailed": "Could not add: {names}",
+					"importFailed": "Could not add the dropped items.",
+					"copy": "Copy",
+					"paste": "Paste",
+					"copied": "Copied {count} item(s).",
+					"copyFailed": "Could not copy to the clipboard.",
+					"nothingToPaste": "The clipboard has no files to paste.",
+					"dragFailed": "Could not drag the item(s).",
+					"moved": "Moved {count} item(s).",
+					"trashed": "Moved {count} item(s) to the Trash.",
+					"trashedWorkspace": "Moved {count} item(s) to the workspace’s .trash folder.",
+					"deleteFailed": "Could not delete {name}",
+					"undo": "Undo",
+					"redo": "Redo",
+					"undoStep": "Undo {step}",
+					"redoStep": "Redo {step}",
+					"stepMove": "move {count} item(s)",
+					"stepRename": "rename {name}",
+					"stepDelete": "delete {count} item(s)",
+					"stepAdd": "add {count} item(s)",
+					"undoSkipped": "Some items were left as they are, since they changed or moved after that step: {names}",
+					"redoSkipped": "Some items were left as they are, since they changed or moved after the undo: {names}",
+					"undoFailed": "Could not undo.",
+					"redoFailed": "Could not redo.",
+					"undoNotLast": "Something changed in Files since. Press Cmd/Ctrl+Z in Files to undo the latest change first."
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",
@@ -523,11 +605,13 @@
 				},
 				"updateLinks": {
 					"title": "Update links to “{name}”?",
-					"description": "{links} link(s) in {files} note(s) point to the old name.",
+					"description": "{links} link(s) in {files} note(s) point to the old name or place.",
 					"update": "Update links",
 					"keep": "Keep as is",
 					"done": "Updated {links} link(s).",
-					"failed": "Could not update links in {file}."
+					"failed": "Could not update links in {file}.",
+					"remember": "Remember my decision for this workspace",
+					"titleMany": "Update links to {count} moved item(s)?"
 				},
 				"viewImage": "Click to view image",
 				"workflow": {
@@ -1354,7 +1438,20 @@
 				"redo": "Redo",
 				"hiddenFolders": "Hidden folders",
 				"askInChat": "Ask in chat",
-				"editFailed": "Couldn't complete that"
+				"editFailed": "Couldn't complete that",
+				"conflict": {
+					"title": "“{name}” already exists in {folder}",
+					"description": "Replace the existing item, keep both (the new one gets a number), or skip this one.",
+					"existing": "Existing",
+					"incoming": "New",
+					"fileInfo": "{size}, modified {date}",
+					"folderInfo": "Folder, modified {date}",
+					"replace": "Replace",
+					"keepBoth": "Keep both",
+					"skip": "Skip",
+					"applyToAll": "Do this for the remaining {count} conflict(s)"
+				},
+				"tabSwitcher": "Open tabs"
 			},
 			"labels": {
 				"bold": "Bold",
@@ -1537,12 +1634,14 @@
 					"runWorkflow": "Run a workflow",
 					"askUser": "Ask you",
 					"openInEditorTab": "Open in an editor tab",
-					"fetchUrl": "Fetch a web page"
+					"fetchUrl": "Fetch a web page",
+					"bash": "Run a command"
 				},
 				"asksToFetch": "asks to fetch",
 				"fetch": "Fetch",
 				"dontFetch": "Don't fetch",
-				"allowSite": "Always for {host}"
+				"allowSite": "Always for {host}",
+				"exitCode": "exit code {code}"
 			},
 			"edit": "Edit",
 			"send": "Send",
@@ -1616,7 +1715,15 @@
 					"discarded": "Discarded",
 					"conflict": "Not applied: the note changed after it was staged",
 					"undone": "Undone by a rewind"
-				}
+				},
+				"tabTitle": "{name} (AI change)",
+				"openNote": "Open note",
+				"openChat": "Open chat",
+				"open": "Show the change",
+				"gone": "This change isn't in the chat any more.",
+				"chatFailed": "Couldn't open the chat this change belongs to.",
+				"conflictNote": "The note changed after this was staged; this is what the AI proposed against the text it read.",
+				"from": "From {chat}"
 			},
 			"questions": {
 				"title": "Question(s) ({count})",
@@ -1632,7 +1739,20 @@
 				"question": "Answer the question above, or type your answer here…",
 				"approval": "Type here to decline, and say why…"
 			},
-			"profileSearch": "Search profiles"
+			"profileSearch": "Search profiles",
+			"showEarlier": "Show {count} earlier message(s)",
+			"attach": {
+				"failed": "Could not attach the files.",
+				"unsupported": "Chat can’t take these yet: {names}",
+				"tooBig": "Over 5 MB, too big to send: {names}",
+				"noImages": "{model} doesn’t take images."
+			},
+			"importDialog": {
+				"title": "Add {count} file(s) to the workspace?",
+				"description": "Chat attaches workspace files, so they’re copied into {folder} first.",
+				"add": "Add and attach"
+			},
+			"imagesUnsupported": "The model {model} doesn’t take images. Remove the attached images or choose a model that does."
 		},
 		"workspaces": {
 			"switch": "Switch workspace",
@@ -1646,7 +1766,8 @@
 			"moveDown": "Move down",
 			"moveTo": {
 				"left": "Move to the left side",
-				"right": "Move to the right side"
+				"right": "Move to the right side",
+				"bottom": "Move to the bottom"
 			},
 			"hide": "Hide",
 			"addSeparator": "Add separator below",
@@ -1654,11 +1775,298 @@
 			"hidden": "Hidden views",
 			"reset": "Reset layout",
 			"separator": "Separator",
+			"split": "Split",
+			"splitHere": "Split here",
+			"removeSplit": "Remove split",
+			"mergeUp": "Merge with the pane above",
+			"mergeLeft": "Merge with the pane on the left",
+			"collapseBottom": "Collapse bottom panel",
+			"showBottom": "Show the bottom panel: {views}",
 			"lists": {
 				"left": "Left side",
 				"right": "Right side",
+				"bottom": "Bottom",
 				"hidden": "Hidden"
+			},
+			"openInTab": "Open in tab",
+			"moveToPanel": "Move to panel",
+			"viewMissing": "This view isn't available."
+		},
+		"git": {
+			"label": "Git",
+			"sync": "Sync",
+			"syncHint": "Commit every change, pull the remote's new commits, then push yours.",
+			"syncMessage": "Update {count} file(s)",
+			"committing": "Committing…",
+			"pulling": "Pulling…",
+			"pushing": "Pushing…",
+			"fetching": "Fetching…",
+			"switching": "Switching branch…",
+			"working": "Working…",
+			"fetch": "Fetch: check the remote for new commits",
+			"pull": "Pull: bring in the remote's new commits",
+			"push": "Push: send your commits to the remote",
+			"pullAction": "Pull",
+			"refresh": "Refresh",
+			"aheadBehind": "{ahead} commit(s) to push, {behind} to pull ({upstream})",
+			"detached": "Detached at {id}",
+			"branches": "Branches",
+			"remoteBranches": "Remote branches",
+			"current": "current",
+			"createBranch": "Create branch “{name}”",
+			"branchPlaceholder": "Switch to or create a branch…",
+			"staged": "Staged",
+			"stagedHint": "Staged changes go into the next commit.",
+			"changes": "Changes",
+			"changesHint": "Changes not staged yet. Stage them to put them in the next commit.",
+			"stage": "Stage",
+			"unstage": "Unstage",
+			"stageAll": "Stage all",
+			"unstageAll": "Unstage all",
+			"discard": "Discard changes",
+			"discardAll": "Discard all changes",
+			"openFile": "Open file",
+			"discardConfirm": {
+				"title": "Discard changes?",
+				"description": "{count} file(s) go back to how they were in the last commit, and new files are deleted. This can't be undone.",
+				"confirm": "Discard"
+			},
+			"clean": "No changes",
+			"cleanHint": "Everything is committed.",
+			"message": "Commit message (optional; ⌘↩ to commit)",
+			"commit": "Commit",
+			"commitHint": "Save the staged changes as a commit: a snapshot in the history.",
+			"commitAllHint": "Nothing is staged, so this commits every change.",
+			"commitPush": "Commit and Push",
+			"commitPushHint": "Commit, then send it to the remote.",
+			"merging": {
+				"title": "Merging",
+				"description": "Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then finish the merge, or abort to go back.",
+				"abort": "Abort merge",
+				"finish": "Finish merge"
+			},
+			"states": {
+				"unchanged": "Unchanged",
+				"modified": "Modified",
+				"added": "Added",
+				"deleted": "Deleted",
+				"renamed": "Renamed",
+				"copied": "Copied",
+				"typeChanged": "Type changed",
+				"conflicted": "Conflicted",
+				"untracked": "Untracked (new)"
+			},
+			"missing": {
+				"title": "Git isn't installed",
+				"description": "Vertex uses git to track and sync this workspace. Install it, then check again.",
+				"macos": "Vertex uses git to track and sync this workspace. Apple's developer tools include it: install them, then check again.",
+				"configured": "Vertex is set to use {path}, which isn't a working git. Locate another, or let Vertex find one.",
+				"installTools": "Install developer tools",
+				"locate": "Locate git…",
+				"locateTitle": "Choose the git program",
+				"automatic": "Find git automatically",
+				"toolsFailed": "Couldn't open the developer tools installer"
+			},
+			"notRepo": {
+				"title": "Not a git repository",
+				"description": "This workspace isn't tracked by git yet. Creating a repository starts tracking its changes, with a .gitignore that leaves out system files and Vertex's trash."
+			},
+			"install": "Install git",
+			"checkAgain": "Check again",
+			"errors": {
+				"failed": "Git failed",
+				"missing": {
+					"title": "Git isn't installed",
+					"description": "Install git, then try again."
+				},
+				"notRepo": {
+					"title": "Not a git repository",
+					"description": "This workspace isn't tracked by git."
+				},
+				"auth": {
+					"title": "Couldn't sign in to the remote",
+					"description": "The remote refused to sign in. For an HTTPS remote, try again and enter a personal access token; for SSH, add your key to the SSH agent."
+				},
+				"conflict": {
+					"title": "Merge conflicts",
+					"description": "Some files changed both here and on the remote. Resolve them in the Git view's Conflicts list, then finish the merge, or abort it."
+				},
+				"rejected": {
+					"title": "The remote has newer commits",
+					"description": "Pull them in first, then push again."
+				},
+				"noRemote": {
+					"title": "No remote to sync with",
+					"description": "This repository isn't connected to a remote yet: connect one to push."
+				},
+				"noUpstream": {
+					"title": "This branch has no remote branch",
+					"description": "It doesn't track a branch on a remote, and there's no `origin` to push it to. Push it once with `git push -u` and the remote's name."
+				},
+				"identity": {
+					"title": "Git needs your name and email",
+					"description": "Commits record who made them. Set your name and email to commit."
+				}
+			},
+			"createRepo": "Create repository",
+			"creating": "Creating repository…",
+			"syncChats": "Sync chats",
+			"syncChatsHint": "Chats kept in this workspace are encrypted files git can't merge: when two devices change the same chat, you pick one version.",
+			"diff": {
+				"openChanges": "Open changes",
+				"worktree": "Working tree",
+				"staged": "Staged",
+				"tabTitle": "{name} ({side})",
+				"againstHead": "Compared with the last commit",
+				"againstParent": "Compared with the commit before it",
+				"added": "New file",
+				"deleted": "Deleted",
+				"renamed": "Renamed from {path}"
+			},
+			"history": {
+				"label": "History",
+				"show": "History: every commit, as a graph",
+				"empty": "No commits yet",
+				"emptyHint": "Commit your changes to start the history.",
+				"files": "Changed files",
+				"noFiles": "No file changes",
+				"parents": "Parents",
+				"copyId": "Copy commit id",
+				"close": "Close"
+			},
+			"signIn": {
+				"title": "Sign in to {host}",
+				"description": "Git couldn't sign in to {host}. A personal access token lets it.",
+				"refused": "{host} refused the saved token. It may have expired or lost access: enter a new one.",
+				"explain": "A personal access token is a password for apps, made in your account settings on the host. Give it read and write access to your repositories.",
+				"create": "Create a token on {host}",
+				"createElsewhere": "Create one in your account settings on {host}.",
+				"host": "Host",
+				"token": "Token",
+				"username": "Username",
+				"optional": "Optional",
+				"usernameHelp": "Only if your host wants your username with tokens.",
+				"kept": "Vertex keeps it in your system keychain and hands it to git only while it talks to {host}. Remove it in Settings → Git.",
+				"save": "Save and try again"
+			},
+			"setup": {
+				"steps": {
+					"create": "Create",
+					"identity": "You",
+					"remote": "Remote",
+					"push": "Push"
+				},
+				"continue": "Continue",
+				"later": "Later",
+				"firstCommit": "First commit",
+				"identityAction": "Set your name",
+				"remoteAction": "Connect a remote",
+				"identity": {
+					"title": "Your name and email",
+					"description": "Every commit records who made it. These are kept in this repository only.",
+					"name": "Name",
+					"email": "Email",
+					"emailHint": "Shown in the history"
+				},
+				"remote": {
+					"title": "Connect a remote",
+					"description": "A remote is a copy of this repository on a server, like GitHub. Your devices sync through it: each pushes its commits there and pulls the others'.",
+					"github": "Create a repository on GitHub",
+					"empty": "Make it private, and leave it empty: no README, .gitignore or license, so the first push goes straight in. Then copy its HTTPS URL here.",
+					"url": "Remote URL",
+					"connect": "Connect"
+				},
+				"push": {
+					"title": "Push your notes",
+					"description": "Vertex commits every file and pushes the commit to the remote. If the remote asks you to sign in, Vertex helps you make a token.",
+					"action": "Commit and push"
+				}
+			},
+			"tour": {
+				"start": "Tour",
+				"sync": {
+					"title": "Sync",
+					"description": "One click keeps your devices in step: it commits every change, pulls the remote's new commits, then pushes yours."
+				},
+				"branch": {
+					"title": "Branch",
+					"description": "A branch is a line of work. Switch branches here, or type a name to start a new one."
+				},
+				"aheadBehind": {
+					"title": "Ahead and behind",
+					"description": "Commits of yours the remote doesn't have yet (up arrow), and commits on the remote you haven't pulled (down arrow)."
+				},
+				"remoteActions": {
+					"title": "Fetch, pull and push",
+					"description": "Fetch checks the remote for new commits, pull brings them into your files, push sends your commits to the remote."
+				},
+				"list": {
+					"title": "Changes and staged",
+					"description": "Changes lists the files you edited since the last commit. Stage (plus) the ones that go into the next commit: they move to Staged. Click a file to see what changed."
+				},
+				"commit": {
+					"title": "Commit",
+					"description": "A commit saves the staged changes (or every change, when nothing is staged) as one step in the history, with a message saying what changed."
+				},
+				"history": {
+					"title": "History",
+					"description": "Every commit, branch by branch: select one to see what it changed."
+				}
+			},
+			"clone": {
+				"title": "Clone a workspace",
+				"description": "Copy a repository from a remote into a new folder and open it as a workspace.",
+				"url": "Repository URL",
+				"parent": "Put it in",
+				"parentTitle": "Choose where the folder goes",
+				"choose": "Choose…",
+				"name": "Folder name",
+				"badName": "A folder name without slashes",
+				"exists": "{path} exists already: choose another name.",
+				"action": "Clone and open",
+				"cloning": "Cloning…"
+			},
+			"ai": {
+				"write": "Write a message with AI",
+				"writing": "Writing message…",
+				"failed": "Couldn't write a commit message"
+			},
+			"conflicts": {
+				"label": "Conflicts",
+				"hint": "Files changed both here and on the remote. Keep one side, or open the file, fix the parts git marked and mark it resolved.",
+				"keepMine": "Keep mine",
+				"keepTheirs": "Keep theirs",
+				"keepAllMine": "Keep all mine",
+				"keepAllTheirs": "Keep all theirs",
+				"markResolved": "Mark resolved",
+				"markAllResolved": "Mark all resolved",
+				"markersConfirm": "{count} file(s) still have conflict markers: {files}. Mark them resolved anyway?"
+			},
+			"autoSync": {
+				"failed": "Auto-sync couldn't sync",
+				"paused": "Auto-sync paused",
+				"open": "Open Git"
+			},
+			"rebasing": {
+				"title": "Rebasing",
+				"description": "Your commits are being replayed onto the remote's. Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then continue; a later commit may stop again. Or abort to go back.",
+				"finish": "Continue rebase",
+				"abort": "Abort rebase"
 			}
+		},
+		"tour": {
+			"progress": "{step} of {count}",
+			"skip": "Skip",
+			"back": "Back",
+			"next": "Next",
+			"done": "Done"
+		},
+		"diff": {
+			"binary": "Binary file",
+			"binaryHint": "It has no lines to compare.",
+			"noChanges": "No changes in the text",
+			"unchanged": "{count} unchanged line(s)",
+			"loadFailed": "Couldn't read this file's versions"
 		}
 	}
 }
