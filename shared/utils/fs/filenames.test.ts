@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileNameFromPath, getFileExtensionFromPath, isValidFilename, sanitizeFilename } from './filenames'
+import { fileNameFromPath, freeName, getFileExtensionFromPath, isValidFilename, sanitizeFilename } from './filenames'
 
 describe('fileNameFromPath', () => {
     it.each([
@@ -55,5 +55,22 @@ describe('sanitizeFilename', () => {
 
     it('never returns an empty name', () => {
         expect(sanitizeFilename('???')).toBe('_')
+    })
+})
+
+describe('freeName', () => {
+    it('keeps a name nothing has', () => {
+        expect(freeName('Note.md', ['Other.md'])).toBe('Note.md')
+    })
+
+    it('numbers before the extension, skipping numbers already taken, ignoring case', () => {
+        expect(freeName('Note.md', ['note.md'])).toBe('Note 2.md')
+        expect(freeName('Note.md', ['Note.md', 'NOTE 2.md', 'Note 3.md'])).toBe('Note 4.md')
+    })
+
+    it('treats a leading dot as part of the name, and a folder name whole', () => {
+        expect(freeName('.env', ['.env'])).toBe('.env 2')
+        expect(freeName('v1.2', ['v1.2'], true)).toBe('v1.2 2')
+        expect(freeName('archive.tar.gz', ['archive.tar.gz'])).toBe('archive.tar 2.gz')
     })
 })

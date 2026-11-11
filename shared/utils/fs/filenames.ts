@@ -145,3 +145,19 @@ export function getFileExtensionFromPath(path: PossiblyRef<string>) {
     const dot = name.lastIndexOf('.')
     return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'unknown'
 }
+
+/**
+ * `name`, or with a number before its extension ("Note 2.md", then "Note 3.md") when `taken` already holds it, as a
+ * file manager's Keep both does. Compared case-insensitively (macOS and Windows disks are). A folder's dots are part
+ * of its name.
+ */
+export function freeName(name: string, taken: Iterable<string>, asFolder = false) {
+    const used = new Set([...taken].map(n => n.toLowerCase()))
+    if (!used.has(name.toLowerCase())) return name
+    const dot = asFolder ? -1 : name.lastIndexOf('.')
+    const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+    for (let n = 2; ; n++) {
+        const next = `${base} ${n}${ext}`
+        if (!used.has(next.toLowerCase())) return next
+    }
+}

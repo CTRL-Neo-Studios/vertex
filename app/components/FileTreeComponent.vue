@@ -32,7 +32,7 @@ const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, openTabs, activeTabUuid} = useActiveTabs(session)
 const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
-const {createFile, moveFile} = useActiveWorkspaceTools(session)
+const {createFile, moveFiles} = useActiveWorkspaceTools(session)
 const $qt = useQuickToasts()
 // The workspace's own view settings, when it overrides them.
 const config = useSettingsScope().effective
@@ -117,11 +117,19 @@ function select(id: string, e: MouseEvent | KeyboardEvent) {
     return true
 }
 
-// Collapsing a folder deselects what's inside it, and removed files drop out: no action reaches unseen rows.
-watch([formattedTreeData, expandedFolders], () => {
+// No action reaches rows you can't see: collapsing a folder deselects what's inside it, and removed files drop out.
+// Only a collapse prunes by what's shown. An index change prunes only what's gone: a move re-indexes in steps (the
+// row exists before its new folder lists it), and a moved row mustn't drop out halfway.
+const keepSelected = (keep: (id: string) => boolean) => {
+    if ([...selected.value].some(id => !keep(id))) selected.value = new Set([...selected.value].filter(keep))
+}
+watch(expandedFolders, () => {
     if (!selected.value.size) return
     const shown = new Set(shownIds())
-    if ([...selected.value].some(id => !shown.has(id))) selected.value = new Set([...selected.value].filter(id => shown.has(id)))
+    keepSelected(id => shown.has(id))
+})
+watch(formattedTreeData, () => {
+    if (selected.value.size) keepSelected(id => !!getFileByUuid(id))
 })
 
 function onBlankClick(event: MouseEvent) {
@@ -288,24 +296,40 @@ const indent = (level: number, extra = 0) => `calc(var(--spacing) * ${(level - 1
 const guide = (parentLevel: number) => `calc(var(--spacing) * ${(parentLevel - 1) * 6 + 4.5})`
 
 // Drag and drop, as in a file manager: onto a folder, into it; onto a file, into its folder; onto empty space, the
-// workspace's top level. Rows carry `data-id`; the listeners sit on the tree, since a virtual list remounts rows.
-const dragged = shallowRef<string | null>(null)
-/** Where the dragged row would land, relative: a folder, `''` for the top level, `null` for nowhere. */
+// workspace's top level. Dragging a selected row moves the whole selection (what's inside a selected folder goes
+// with the folder); an unselected row is selected alone first. Rows carry `data-id`; the listeners sit on the tree,
+// since a virtual list remounts rows.
+const dragged = shallowRef<string[]>([])
+/** Where the dragged rows would land, relative: a folder, `''` for the top level, `null` for nowhere. */
 const dropDir = shallowRef<string | null>(null)
-const DROP_ROW = 'bg-primary/10'
 const rowId = (event: Event) => (event.target as Element | null)?.closest('li')?.querySelector<HTMLElement>('[data-id]')?.dataset.id
 function destOf(event: DragEvent) {
     const node = getFileByUuid(rowId(event))
     return !node ? '' : node.isFolder ? node.relativePath : parentPathOf(node.relativePath)
 }
-/** Not where it already is, and a folder not into itself or below it. */
-function canDrop(uuid: string, dest: string) {
-    const node = getFileByUuid(uuid)
-    if (!node || parentPathOf(node.relativePath) === dest) return false
-    return !node.isFolder || (dest !== node.relativePath && !dest.startsWith(`${node.relativePath}/`))
+/** No folder into itself or below it, and at least one item not already there (those stay put). */
+function canDrop(uuids: string[], dest: string) {
+    const nodes = uuids.map(id => getFileByUuid(id)).filter(n => !!n)
+    if (nodes.some(n => n.isFolder && (dest === n.relativePath || dest.startsWith(`${n.relativePath}/`)))) return false
+    return nodes.some(n => parentPathOf(n.relativePath) !== dest)
 }
-/** The target folder's row and the rows directly in it light up, like a file manager's drop area. */
-const dropHere = (node: UITreeNode) => !!dropDir.value && (node.relativePath === dropDir.value || parentPathOf(node.relativePath) === dropDir.value)
+/**
+ * The drop target's outline, by row: one `border-primary` box around the target folder's row (its top) and the rows
+ * shown inside it (its sides, and the last one its bottom), over `bg-primary/10`.
+ */
+const dropEdges = computed(() => {
+    const dir = dropDir.value, edges = new Map<string, string>()
+    if (!dir) return edges
+    const ids = shownIds()
+    const start = ids.findIndex(id => getFileByUuid(id)?.relativePath === dir)
+    if (start === -1) return edges
+    let end = start
+    while (end + 1 < ids.length && getFileByUuid(ids[end + 1])?.relativePath.startsWith(`${dir}/`)) end++
+    for (let i = start; i <= end; i++) {
+        edges.set(ids[i]!, i === start && i === end ? 'border rounded-md' : i === start ? 'border-x border-t rounded-t-md' : i === end ? 'border-x border-b rounded-b-md' : 'border-x')
+    }
+    return edges
+})
 
 let opening: {id: string, timer: ReturnType<typeof setTimeout>} | undefined
 /** A closed folder held under the pointer opens after a moment, so a drop can reach inside it. */
@@ -317,17 +341,38 @@ function openLater(id: string | undefined) {
     opening = {id, timer: setTimeout(() => { expandedFolders.value = [...expandedFolders.value, id] }, 600)}
 }
 
+// The drag image: the first item's icon and name, with two cards stacked behind and a count for more than one. It
+// stays mounted off-screen and is filled in on the DOM, since `setDragImage` takes it within `dragstart`.
+const ghostRef = useTemplateRef<HTMLElement>('ghostRef')
+function fillGhost(grab: Element | null | undefined, count: number) {
+    const ghost = ghostRef.value
+    if (!ghost || !grab) return
+    ghost.querySelector('[data-ghost-name]')!.replaceChildren(grab.cloneNode(true))
+    const badge = ghost.querySelector<HTMLElement>('[data-ghost-count]')!
+    badge.textContent = t('app.editor.ui.filetree.itemCount', {count})
+    for (const el of [badge, ...ghost.querySelectorAll<HTMLElement>('[data-ghost-stack]')]) el.hidden = count < 2
+    return ghost
+}
+
 function onDragStart(event: DragEvent) {
     const id = rowId(event)
     if (!id || !event.dataTransfer) return
-    dragged.value = id
+    if (!selected.value.has(id)) {
+        selected.value = new Set([id])
+        anchor = id
+    }
+    const nodes = [...selected.value].map(s => getFileByUuid(s)).filter(n => !!n)
+    const ids = nodes.filter(n => !nodes.some(o => o.isFolder && n.relativePath.startsWith(`${o.relativePath}/`))).map(n => n.uuid)
+    dragged.value = ids
     event.dataTransfer.effectAllowed = 'move'
     // WebKit starts a drag only with some data set.
-    event.dataTransfer.setData('text/plain', getFileByUuid(id)?.relativePath ?? id)
+    event.dataTransfer.setData('text/plain', ids.map(i => getFileByUuid(i)?.relativePath ?? i).join('\n'))
+    const ghost = fillGhost((event.target as Element | null)?.closest('li')?.querySelector('[data-grab]'), ids.length)
+    if (ghost) event.dataTransfer.setDragImage(ghost, 12, 12)
 }
 
 function onDragOver(event: DragEvent) {
-    if (!dragged.value) return
+    if (!dragged.value.length) return
     // The tree hides its scrollbar and a drag doesn't scroll it: near an edge, scroll.
     const el = treeRef.value?.$el
     if (el) {
@@ -351,7 +396,7 @@ function onDragLeave(event: DragEvent) {
 }
 
 function onDragEnd() {
-    dragged.value = null
+    dragged.value = []
     dropDir.value = null
     openLater(undefined)
 }
@@ -359,16 +404,17 @@ function onDragEnd() {
 useEventListener(window, 'dragend', onDragEnd)
 
 async function onDrop(event: DragEvent) {
-    const uuid = dragged.value, dest = dropDir.value
+    const uuids = dragged.value, dest = dropDir.value
     onDragEnd()
-    if (!uuid || dest === null || !session?.rootPath) return
+    if (!uuids.length || dest === null || !session?.rootPath) return
     event.preventDefault()
-    const name = getFileByUuid(uuid)?.fileName ?? ''
+    const name = uuids.length === 1 ? getFileByUuid(uuids[0])?.fileName ?? '' : t('app.editor.ui.filetree.itemCount', {count: uuids.length})
+    // Open the target first: the moved rows are shown there as they arrive, so they stay selected (a hidden row would
+    // drop out of the selection; uuids don't change on a move).
+    const folder = dest && getFileByPath(`${session.rootPath}/${dest}`)?.uuid
+    if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
     try {
-        await moveFile(uuid, dest ? `${session.rootPath}/${dest}` : session.rootPath)
-        // Show where it went.
-        const folder = dest && getFileByPath(`${session.rootPath}/${dest}`)?.uuid
-        if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
+        await moveFiles(uuids, dest ? `${session.rootPath}/${dest}` : session.rootPath)
     } catch (error) {
         $qt.error(t('app.editor.ui.filetree.moveFailed', {name}), String(error))
     }
@@ -488,7 +534,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             :model-value="selectedItems"
             color="neutral"
             :get-key="(i: TreeItem) => i.id as string"
-            :class="['scrollbar-x h-full py-2.5 rounded-md', fade, dropDir === '' && 'ring-1 ring-inset ring-primary/40 bg-primary/5']"
+            :class="['scrollbar-x h-full py-2.5 rounded-md', fade, dropDir === '' && 'ring-1 ring-inset ring-primary bg-primary/5']"
             :ui="TREE_UI"
             size="sm"
             @pointerdown="onBoxStart"
@@ -513,7 +559,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
                 >
                     <template #leading>
                         <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
-                        <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
+                        <span v-if="dropEdges.has(item.id as string)" :class="['absolute inset-0 pointer-events-none bg-primary/10 border-primary', dropEdges.get(item.id as string)]"/>
                     </template>
                     <span data-grab draggable="true" class="inline-flex items-center gap-1.5 whitespace-nowrap">
                         <UIcon v-if="fileIcon(item)" :name="fileIcon(item)" class="size-4 shrink-0"/>
@@ -528,7 +574,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
                 <div :data-id="item.id" :data-level="level" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none py-1.5 pe-2.5">
                     <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
-                    <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
+                    <span v-if="dropEdges.has(item.id as string)" :class="['absolute inset-0 pointer-events-none bg-primary/10 border-primary', dropEdges.get(item.id as string)]"/>
                     <span data-grab draggable="true" class="inline-flex items-center gap-1.5 whitespace-nowrap">
                         <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
                         <span class="text-xs">{{ item.label }}</span>
@@ -542,5 +588,17 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
     <!-- The drag-select box, on screen over the tree (`drawBox`). -->
     <Teleport to="body">
         <div ref="boxRef" class="fixed z-50 hidden pointer-events-none rounded-sm border border-primary bg-primary/10"/>
+        <!-- The drag image (`fillGhost`): off-screen but laid out, so `setDragImage` can draw it; the padding holds the
+             stacked cards. -->
+        <div ref="ghostRef" class="fixed -top-96 left-0 w-max pe-2 pb-2 pointer-events-none">
+            <div class="relative">
+                <div data-ghost-stack class="absolute inset-0 translate-x-2 translate-y-2 rounded-md border border-accented bg-muted"/>
+                <div data-ghost-stack class="absolute inset-0 translate-x-1 translate-y-1 rounded-md border border-accented bg-elevated"/>
+                <div class="relative inline-flex items-center gap-2 rounded-md border border-accented bg-default px-2.5 py-1.5 text-xs font-medium text-highlighted shadow-sm">
+                    <span data-ghost-name/>
+                    <span data-ghost-count class="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] text-inverted"/>
+                </div>
+            </div>
+        </div>
     </Teleport>
 </template>

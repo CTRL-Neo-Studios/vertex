@@ -121,9 +121,13 @@ Rows select like a file manager's. The selection is the tree's own (uuids plus a
 - Keys, with the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (or Cmd+Backspace on macOS) asks to delete the selection.
 
 Rows drag like a file manager's:
-- Where a drop lands: onto a folder, into it; onto a file, into its folder; onto empty space, the top level. Never into the item itself, its subfolders or its current folder.
+- What moves: dragging a selected row moves the selection (what's inside a selected folder goes with it); an unselected row is selected alone first. The drag image is a card with the row's icon and name, with two stacked cards and an "N item(s)" badge for more than one.
+- Where a drop lands: onto a folder, into it; onto a file, into its folder; onto empty space, the top level. Items already there stay; a folder never goes into itself or its subfolders. The target folder and its shown rows get one `border-primary` outline (the top level, a ring around the tree), and the target opens before the move so the moved rows stay selected.
 - While dragging: a closed folder held for 600 ms opens, and the edges scroll.
-- Renaming and moving share `relocateFile` (`useActiveWorkspaceTools`: `renameFile`, `moveFile`). It moves on disk and in the index (uuids stay, so tabs and open folders follow), then updates the links whose text changes, to the item or to any note inside a moved folder.
+- Moves go through `moveFiles` (`useActiveWorkspaceTools`). It plans first, then asks, then moves:
+  - **Plan:** a folder onto a same-named folder merges, so its contents move in and the emptied folder is removed.
+  - **Ask:** every other name clash, ignoring case, goes through `FileConflictModal`: Replace, Keep both ("Note 2.md", `freeName`) or Skip, optionally for the remaining clashes. Cancel moves nothing.
+  - **Move:** then `relocateFiles`, which renaming uses too, moves each item on disk and in the index (uuids stay, so tabs and open folders follow). It then updates the links whose text changes, to the items or to any note inside a moved folder, with one dialog for the whole move.
 - Whether links are updated comes from `fileConfig.updateLinks`, overridable per workspace (Settings → View → Files): ask (the default), update, or keep. The dialog's "Remember my decision for this workspace" writes it.
 
 ### AI requests

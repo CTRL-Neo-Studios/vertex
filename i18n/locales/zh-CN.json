@@ -551,7 +551,8 @@
 					"moveFailed": "无法移动 {name}",
 					"openInNewTabs": "在新标签页中打开全部",
 					"copyFullPaths": "复制完整路径（全部）",
-					"copyRelativePaths": "复制相对路径（全部）"
+					"copyRelativePaths": "复制相对路径（全部）",
+					"itemCount": "{count} 个项目"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
@@ -571,7 +572,8 @@
 					"keep": "保持不变",
 					"done": "已更新 {links} 个链接。",
 					"failed": "无法更新 {file} 中的链接。",
-					"remember": "在此工作区记住我的选择"
+					"remember": "在此工作区记住我的选择",
+					"titleMany": "更新指向 {count} 个已移动项目的链接？"
 				},
 				"viewImage": "点击查看图片",
 				"workflow": {
@@ -1398,7 +1400,19 @@
 				"redo": "重做",
 				"hiddenFolders": "隐藏的文件夹",
 				"askInChat": "在聊天中提问",
-				"editFailed": "无法完成此操作"
+				"editFailed": "无法完成此操作",
+				"conflict": {
+					"title": "“{name}” 已存在于 {folder}",
+					"description": "替换现有项目、保留两者（新项目会加上编号），或跳过此项目。",
+					"existing": "现有",
+					"incoming": "新的",
+					"fileInfo": "{size}，修改于 {date}",
+					"folderInfo": "文件夹，修改于 {date}",
+					"replace": "替换",
+					"keepBoth": "保留两者",
+					"skip": "跳过",
+					"applyToAll": "对其余 {count} 个冲突执行相同操作"
+				}
 			},
 			"labels": {
 				"bold": "粗体",

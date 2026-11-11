@@ -551,7 +551,8 @@
 					"moveFailed": "Could not move {name}",
 					"openInNewTabs": "Open in New Tabs",
 					"copyFullPaths": "Copy full paths",
-					"copyRelativePaths": "Copy relative paths"
+					"copyRelativePaths": "Copy relative paths",
+					"itemCount": "{count} item(s)"
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",
@@ -571,7 +572,8 @@
 					"keep": "Keep as is",
 					"done": "Updated {links} link(s).",
 					"failed": "Could not update links in {file}.",
-					"remember": "Remember my decision for this workspace"
+					"remember": "Remember my decision for this workspace",
+					"titleMany": "Update links to {count} moved item(s)?"
 				},
 				"viewImage": "Click to view image",
 				"workflow": {
@@ -1398,7 +1400,19 @@
 				"redo": "Redo",
 				"hiddenFolders": "Hidden folders",
 				"askInChat": "Ask in chat",
-				"editFailed": "Couldn't complete that"
+				"editFailed": "Couldn't complete that",
+				"conflict": {
+					"title": "“{name}” already exists in {folder}",
+					"description": "Replace the existing item, keep both (the new one gets a number), or skip this one.",
+					"existing": "Existing",
+					"incoming": "New",
+					"fileInfo": "{size}, modified {date}",
+					"folderInfo": "Folder, modified {date}",
+					"replace": "Replace",
+					"keepBoth": "Keep both",
+					"skip": "Skip",
+					"applyToAll": "Do this for the remaining {count} conflict(s)"
+				}
 			},
 			"labels": {
 				"bold": "Bold",

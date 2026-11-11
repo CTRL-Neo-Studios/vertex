@@ -1,7 +1,11 @@
 <script setup lang="ts">
-/** `canRemember`: offer to keep the answer for this workspace (`fileConfig.updateLinks`); workspaces only. */
+/**
+ * `canRemember`: offer to keep the answer for this workspace (`fileConfig.updateLinks`); workspaces only. `count`:
+ * how many items moved at once (the title names `fileName` only for one).
+ */
 const props = defineProps<{
     fileName: string,
+    count?: number,
     referencingFiles: string[],
     linkCount: number,
     canRemember?: boolean,
@@ -14,7 +18,7 @@ const answer = (update: boolean) => emit('close', {update, remember: remember.va
 
 <template>
     <UModal
-        :title="t('app.editor.ui.updateLinks.title', {name: props.fileName})"
+        :title="(props.count ?? 1) > 1 ? t('app.editor.ui.updateLinks.titleMany', {count: props.count}) : t('app.editor.ui.updateLinks.title', {name: props.fileName})"
         :description="t('app.editor.ui.updateLinks.description', {links: props.linkCount, files: props.referencingFiles.length})"
         :close="{ onClick: () => emit('close', {update: false, remember: false}) }"
         size="sm"

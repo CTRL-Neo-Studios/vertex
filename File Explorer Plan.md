@@ -26,7 +26,7 @@ All the work is in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plu
 | Drop target | The target folder's row and its shown contents get one `border-primary` outline (top on the folder's row, sides down its contents, bottom on its last shown row) over the existing `bg-primary/10`. The top level gets `ring-primary` around the whole tree. |
 | Drag preview | `setDragImage` with a small card: the first item's icon and name, two offset cards behind it when there are more, and a count badge ("3 items"). The element stays mounted off-screen and is filled in directly at `dragstart`; Vue can't render it within the event. |
 | Many moves | One move path, `moveFiles(uuids, destDir)`. `renameFile` and `moveFile` (O3) become a list of one. Links get one pass, with at most one links dialog for the whole move ("Update links to 5 items?"). |
-| Name clashes | Always asked, as a file manager does. Folders merge, as in Windows Explorer: their contents move in, and only clashing files ask. A file clash offers **Replace**, **Keep both** ("Note 2.md") or **Skip**. With more clashes left, "Do this for the remaining N" applies the choice to the rest, and **Cancel** stops; what's done stays done. The same dialog serves tree moves (today a clash only shows an error toast) and OS imports. |
+| Name clashes | Always asked, as a file manager does. Folders merge, as in Windows Explorer: their contents move in, and only clashing files ask. A file clash offers **Replace**, **Keep both** ("Note 2.md") or **Skip**. With more clashes left, "Do this for the remaining N" applies the choice to the rest. **Cancel**: for moves, everything is asked before anything moves, so Cancel moves nothing (as built); for F5 imports it stops, and what's done stays done. The same dialog serves tree moves (before, a clash only showed an error toast) and OS imports. |
 | OS drops | `dragDropEnabled` stays `false`: Tauri's own handler would give paths but turns off HTML5 drag & drop on every platform (tauri#14373), which the tree, the Chats list and the panels use. A dropped item's contents are read through the browser File API (`webkitGetAsEntry` for folders) and written with plugin-fs `writeFile`/`mkdir`, then indexed parent-first (`addFileToIndex`). A drop is a copy. `.DS_Store` and `Thumbs.db` are skipped. |
 | Drops anywhere else | A window-level guard: an OS file drag that no handler accepts gets `dropEffect = 'none'` and `preventDefault`, so the webview never navigates. Only the tree accepts OS files. The editor, chat and panels show the "not allowed" cursor. |
 | Items already in the workspace | **Detection:** an item whose name, size and modified time match an indexed one at the drop is treated as that item. If the probe (F5) finds the webview exposes the item's path (`text/uri-list`), the path decides instead. **Handling:** a found item moves, exactly as a tree drag would (links updated, refusals, its own folder a no-op). This is what Finder and Explorer do on the same disk. Holding Option/Alt at the drop copies instead, through the clash dialog. **Risk:** a false match (an identical outside copy, such as a backup) moves the workspace's file instead of copying the outside one. Nothing is lost. |
@@ -163,6 +163,37 @@ Unverified: Windows/Linux Ctrl, and losing the window drag on the tree's empty a
   - Skip leaves both where they were.
 - Two clashes with "Do this for the remaining 1" checked ask once.
 - A folder moved onto a same-named folder merges.
+
+### As built
+- `relocateFiles(relocations)` replaces `relocateFile`. It gathers the link impact of every item before any move, and moves each item (one failure doesn't stop the rest). Then `updateMovedLinks` makes one pass with at most one dialog, and the first failure is thrown afterwards. `renameFile` is a list of one; `moveFile` became `moveFiles`. The private `relocate` in `utils/fs.ts` is now the exported `relocatePath`, and `movePath` is gone.
+- **`moveFiles`:**
+  - It plans first: it walks the items and expands folder-onto-folder merges into their children, and finds clashes by name, ignoring case.
+  - Two items of the same move bound for the same name clash with each other, and Replace there means the other one stays put.
+  - Then it asks everything, deletes what's replaced, relocates the rest, and removes merged source folders left empty (deepest first). It returns false when cancelled.
+- `deleteFiles` now closes the tabs of everything it removes, a deleted folder's notes included (before, only the folder's own uuid).
+- **Drop target and preview:**
+  - The drop outline is `dropEdges` (a map of row id to border classes) over the rows as shown.
+  - The preview is `fillGhost`: it clones the row's icon and name, the stacked cards are `border-accented`, and the badge reads "{count} item(s)".
+- **The target folder opens before the move.** A selection prune on index changes dropped moved rows: `moveFileInIndex` awaits between adding the moved entry and listing it in its new folder, and the watcher ran in that gap. Now only a collapse prunes by what's shown; an index change prunes only ids that are gone.
+- The clash dialog shows sizes in narrow units ("4B", "1.2KB") and dates in the app's locale.
+
+### Results (done)
+Checked on the stubbed production build (dispatched drag events, real clicks):
+- **Multi-item drag:**
+  - Selecting Sub and M0_2–M0_4, then dragging M0_3: the preview read "M0_3" with "4 item(s)" and two stacked cards.
+  - Dropping on Big made four renames into Big, with no dialog (no links changed). Big opened, and the four stayed selected.
+  - Hovering inside their own folder F00 was refused.
+- **Outline:** hovering F01 outlined its row (top), every shown row inside it (sides) and its last row, Sub (bottom). Hovering a top-level file ringed the tree.
+- **Keep both:** F00/M0_1 onto F01, which holds an M0_1, asked "“M0_1.md” already exists in F01" with both sides' size and date. Keep both made `F01/M0_1 2.md`, and the links dialog rewrote `[[F00/M0_1]]` to `[[F01/M0_1 2]]` in Links.md.
+- **Replace for all:** M0_6 and M0_7 onto F01 (both clash) asked once with "Do this for the remaining 1 conflict(s)" ticked. Replace removed both F01 notes, then moved the two in. The replaced note's open tab closed.
+- **Cancel:** no rename.
+- **Merge:**
+  - Big/Sub onto F01 (whose Sub holds S0.md) moved Deep, S1 and S2 into F01/Sub and asked only about S0. Skip kept Big/Sub with S0 in it.
+  - Again with Keep both, it made `S0 2.md` and removed the emptied Big/Sub.
+- **Same-named pair:** F00/M0_1 and F01/M0_1 dragged together onto Big asked about the second against the first. Keep both gave `Big/M0_1.md` and `Big/M0_1 2.md`, under one links dialog titled "Update links to 2 moved item(s)?".
+- **Rename:** from the menu, it still renamed and asked about links.
+
+Unverified: the drag preview as WKWebView draws it (headless only shows the element), and real pointer drags in WebKit.
 
 ## F5: OS drops
 
