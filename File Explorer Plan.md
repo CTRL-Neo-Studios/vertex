@@ -554,6 +554,63 @@ After the other phases, as decided; their operations are wired in here.
 - **Outside changes:** a step whose files changed outside Vertex since undoes what it still can and says what it skipped.
 - **The editor:** Cmd+Z in a note still undoes typing, not file operations.
 
+### As built
+- **Setting:** `deletedFiles: 'trash' | 'workspaceTrash' | 'permanent'` in `AppFileConfig`, defaulting to `'trash'` (`defaultAppFileConfig`, `DELETED_FILES`). It's a "Deleted files" select in Settings → View → Files, in `filePaths` for reset, with en and zh-CN strings.
+- **Rust `src-tauri/src/trash.rs`:**
+  - `trash_item(path) → {original, trashed, deletedAt}` and `trash_restore(item)`, which fails with `taken` or `missing`.
+  - **macOS:** `NSFileManager.trashItemAtURL_resultingItemURL_error` through `objc2-foundation` 0.3.2, already in the tree; the macOS target gains the features `NSFileManager`, `NSURL`, `NSError` and `NSString`. Restoring is a `rename` back.
+  - **Windows and Linux:** the `trash` 5.3 crate (a target dependency). Restoring takes the newest `os_limited::list()` entry with that original path, deleted at or after the step (a second of slack), and calls `restore_all`.
+  - Each item goes in its own call, so one failure doesn't lose the record of the others.
+- **`useFilesHistory(sessionId)`** (`app/composables/active/useFilesHistory.ts`):
+  - Per-session stacks in a module map, `shallowReactive` for the menu labels, 50 steps; a push clears the redo side.
+  - `FilesStep = {label, undo, redo}`; `undo` and `redo` return the names they skipped.
+  - One run at a time; skipped names go in one warning toast.
+  - `undo(step)` from a toast acts only while that step is the latest; otherwise it says so.
+- **`useActiveWorkspaceTools`:**
+  - The public operations each create a `Change` and `remember` it as a step, with a toast and Undo where there's a toast. The work happens in internal functions (`moveInto`, `importInto`, `relocateFiles(…, change)`, `removeItems`), so an import that moves the workspace's own items is still one step.
+  - **What the steps and toasts are:**
+    - `moveFiles`: "Moved N item(s)." (new).
+    - `importItems`: "Added N item(s).", now given there rather than inside.
+    - `deleteFiles`: "Moved N item(s) to the Trash." or "…to the workspace's .trash folder.", plus a "Could not delete X" error per failure (failures used to be silent).
+    - `renameFile`: a step without a toast.
+  - **Trash helpers:** `toTrash` and `fromTrash` handle both trashes. `toTrash` records the indexed items it removes, parent first; `fromTrash` indexes them again with those uuids. For that, `addFileToIndex` takes an optional `uuid`, used unless another item holds it.
+  - **Undo order** (`undoChange`), last part first: created → notes → merged → moves → trashed. Redo (`redoChange`) runs in the forward order. Each item is checked and its errors are caught (`each`).
+  - **The care undo takes:**
+    - A move goes back only from where the step left it (`shift`, by uuid, through `relocatePath`, which refuses a taken name).
+    - A note goes back only while it reads the step's "after" (`rewrite`).
+    - A created item is trashed only while its size and modified time are as recorded once written. It goes to the workspace trash or the system Trash, never deleted for good, even with `'permanent'`.
+  - **Replace in a clash** goes through `removeItems` like a delete, so it's restored on Undo, unless deletes are permanent.
+- **The tree:**
+  - `requestDelete` opens the dialog only for `'permanent'`.
+  - The keys go in `onKeydown`: Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, and Ctrl+Y off macOS.
+  - The empty-space menu has "Undo {step}" and "Redo {step}" items, disabled when there's nothing to undo or redo.
+- **`useQuickToasts.success`** takes `actions` (`{label, onClick}`), shown as small outline buttons.
+
+### Results (done)
+All of these ran in the browser, on the stubbed production build. The stubs: a stable `stat` (size, a modified time per path, changed by writes), `read_dir`, and `trash_item`/`trash_restore` moving into `/Users/me/.Trash`. Keys are real.
+
+| Case | Result |
+|---|---|
+| Move M0_1, M0_3 and M0_4 out of F00, Update links | 3 renames, `Links.md` rewritten, "Updated 2 link(s)." and "Moved 3 item(s)." |
+| Cmd+Z in the tree | `Links.md` got its old text back, then the three were renamed back into F00 with their uuids |
+| Cmd+Shift+Z | Moved and rewritten again |
+| `Links.md` edited, then Cmd+Z | The notes went back, `Links.md` kept the edit, and the toast named it |
+| Delete Other.md (`'trash'`) | No dialog; `trash_item`; "Moved 1 item(s) to the Trash." with an Undo button |
+| The toast's Undo | Restored, with the same uuid; redo trashed it again, and undo restored it again |
+| `'workspaceTrash'` | `mkdir /vault/.trash`, renamed into it, hidden from Files; a second delete reused the folder; two Cmd+Z restored both |
+| `'permanent'` | The dialog asked, the item was removed, there was no toast, and Cmd+Z did nothing |
+| Copy and paste Links.md in place | "Links 2.md"; Cmd+Z trashed it, and Cmd+Shift+Z restored it |
+| The copy edited, then Cmd+Z | Left alone, named in the toast |
+| Cmd+Z in the editor after typing | Undid the typing; Files did nothing |
+| Empty-space menu | "Undo add 1 item(s)" and a disabled "Redo" |
+
+- **Windows and Linux code:** the non-macOS half of `trash.rs` compiled for `x86_64-pc-windows-msvc` and `x86_64-unknown-linux-gnu` in a scratch crate with `trash` 5.3.
+- **Not checked:**
+  - the real Trash on any system (macOS's resulting URL, Finder's Put Back, the Recycle Bin listing);
+  - the macOS Edit menu's own Undo with Files focused (it might take Cmd+Z before the page does);
+  - undoing a merge and a Replace (the code path, but no browser run);
+  - in Vertex itself.
+
 ## Checks
 - **Each phase:**
   - Browser runs on the stubbed production build, as in the Performance Plan: dispatched pointer, mouse, drag and paste events, and a synthetic `DataTransfer` with `File`s for F5–F8. Selection, ranges, the box over unmounted rows, multi-moves with clashes, the outline, the preview's content, attachments and the model request's parts, and the inserted editor text.

@@ -34,6 +34,11 @@ export interface AppFileConfig {
     attachmentsFolder: string,
     /** OS files dropped or pasted into chat are copied into the workspace first: ask each time, or always do it. */
     importToChat: 'ask' | 'always',
+    /**
+     * Where Files' Delete sends items: the system Trash (Recycle Bin), the workspace's `.trash/` folder (hidden from
+     * Files), or nowhere (deleted for good, after a confirmation, and not undoable).
+     */
+    deletedFiles: 'trash' | 'workspaceTrash' | 'permanent',
 }
 
 export interface AppGitConfig {

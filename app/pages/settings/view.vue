@@ -40,7 +40,12 @@ const importToChatItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.importToChatAsk'), value: 'ask'},
     {label: t('app.settings.view.importToChatAlways'), value: 'always'},
 ])
-const filePaths = ['fileConfig.updateLinks' as const, 'fileConfig.attachmentsFolder' as const, 'fileConfig.importToChat' as const]
+const deletedFilesItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.deletedFilesTrash'), value: 'trash'},
+    {label: t('app.settings.view.deletedFilesWorkspace'), value: 'workspaceTrash'},
+    {label: t('app.settings.view.deletedFilesPermanent'), value: 'permanent'},
+])
+const filePaths = ['fileConfig.updateLinks' as const, 'fileConfig.deletedFiles' as const, 'fileConfig.attachmentsFolder' as const, 'fileConfig.importToChat' as const]
 /** A folder path as typed: no leading or trailing slashes; empty means the top level. */
 const folderPath = (event: Event) => (event.target as HTMLInputElement).value.trim().replace(/^\/+|\/+$/g, '')
 const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
@@ -96,6 +101,14 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         :items="updateLinksItems"
                         class="w-52"
                         @update:model-value="scope.set({'fileConfig.updateLinks': $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow setting="fileConfig.deletedFiles" :label="t('app.settings.view.deletedFiles')" :description="t('app.settings.view.deletedFilesDescription')">
+                    <USelect
+                        :model-value="scope.value('fileConfig.deletedFiles')"
+                        :items="deletedFilesItems"
+                        class="w-52"
+                        @update:model-value="scope.set({'fileConfig.deletedFiles': $event})"
                     />
                 </SettingsRow>
                 <SettingsRow setting="fileConfig.attachmentsFolder" :label="t('app.settings.view.attachmentsFolder')" :description="t('app.settings.view.attachmentsFolderDescription')">

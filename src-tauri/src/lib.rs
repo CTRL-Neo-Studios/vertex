@@ -4,6 +4,7 @@ mod fonts;
 mod git;
 mod notes;
 mod state;
+mod trash;
 mod updater;
 mod web;
 
@@ -273,6 +274,8 @@ pub fn run() {
             quit_app,
             clipboard_files_get,
             clipboard_files_set,
+            trash::trash_item,
+            trash::trash_restore,
             updater::update_token_get,
             updater::update_token_set,
             updater::update_channels,

@@ -34,7 +34,12 @@ const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, openTabs, activeTabUuid} = useActiveTabs(session)
 const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
-const {createFile, moveFiles, importItems} = useActiveWorkspaceTools(session)
+const {createFile, moveFiles, importItems, deleteFiles, deletedFiles, undo, redo, undoLabel, redoLabel} = useActiveWorkspaceTools(session)
+/** Delete: straight into a trash (the toast offers Undo), or after the dialog when it's for good (`fileConfig.deletedFiles`). */
+function requestDelete(ids: string[]) {
+    if (deletedFiles() === 'permanent') deleteFilesModal.open({fileIndexIds: ids})
+    else void deleteFiles(ids)
+}
 const $qt = useQuickToasts()
 // The workspace's own view settings, when it overrides them.
 const config = useSettingsScope().effective
@@ -153,7 +158,14 @@ function onKeydown(event: KeyboardEvent) {
         clipboardOnce(() => pasteInto(pasteTarget()))
     } else if (selected.value.size && (event.key === 'Delete' || (mac && event.metaKey && event.key === 'Backspace'))) {
         event.preventDefault()
-        deleteFilesModal.open({fileIndexIds: [...selected.value]})
+        requestDelete([...selected.value])
+    } else if (toggleKey(event) && key === 'z') {
+        // Files' own history; the editor's Cmd/Ctrl+Z never reaches the tree.
+        event.preventDefault()
+        void (event.shiftKey ? redo() : undo())
+    } else if (!mac && event.ctrlKey && key === 'y') {
+        event.preventDefault()
+        void redo()
     }
 }
 
@@ -248,7 +260,10 @@ const fileIcon = (item: TreeItem) => {
 }
 const menuItems = computed(() => {
     const row = menuRow.value
-    if (!row) return [...props.emptyMenu ?? [], [pasteItem('')]]
+    if (!row) return [...props.emptyMenu ?? [], [pasteItem('')], [
+        {label: undoLabel.value ? t('app.editor.ui.filetree.undoStep', {step: undoLabel.value}) : t('app.editor.ui.filetree.undo'), icon: 'i-lucide-undo-2', kbds: ['meta', 'z'], disabled: !undoLabel.value, onSelect: () => undo()},
+        {label: redoLabel.value ? t('app.editor.ui.filetree.redoStep', {step: redoLabel.value}) : t('app.editor.ui.filetree.redo'), icon: 'i-lucide-redo-2', kbds: ['meta', 'shift', 'z'], disabled: !redoLabel.value, onSelect: () => redo()},
+    ]]
     return selected.value.size > 1 ? getSelectionMenu([...selected.value]) : getItemContextMenu(row.item, row.level, (row.item.originalNodeData as UITreeNode).isFolder)
 })
 const copyItem = (ids: string[]): ContextMenuItem => ({label: t('app.editor.ui.filetree.copy'), icon: 'i-lucide-copy', kbds: ['meta', 'c'], onSelect: () => copySelection(ids)})
@@ -674,7 +689,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             duplicateItem([item.id]),
             {label: t('app.editor.ui.moveFileTo'), icon: 'i-lucide-folder-tree', disabled: true}, // not implemented yet
             {label: t('app.editor.ui.rename'), icon: 'i-lucide-pen-line', onSelect: () => renameFileModal.open({fileIndexId: item.id, currentFileName: item.label ?? ''})},
-            {label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: [item.id]})},
+            {label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => requestDelete([item.id])},
         ],
     ]
     return groups.filter(group => group.length)
@@ -699,7 +714,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-copy', onSelect: () => $opener.revealFilesInFileManager(files.map(f => f.fullPath))},
         ],
         [copyItem(ids), duplicateItem(ids)],
-        [{label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: ids})}],
+        [{label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => requestDelete(ids)}],
     ]
 }
 </script>

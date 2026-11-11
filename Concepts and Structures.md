@@ -118,7 +118,24 @@ Rows select like a file manager's. The selection is the tree's own (uuids plus a
 - Collapsing a folder deselects what's inside it, and removed files drop out, so actions never reach rows you can't see. A click below the rows clears the selection.
 - Drag select: pressing on a row's blank part (not its icon and name) or below the rows and dragging draws a box. The rows it touches are selected, or added with Cmd/Ctrl; near the top or bottom edge the tree scrolls. Rows are found by index × row height over the rows as shown, so rows scrolled out of the virtual list count too. The box is drawn on the DOM (teleported to `body`), and the click that ends it is swallowed. For this the tree has no `data-tauri-drag-region`.
 - Right-click outside the selection selects that row. Inside a selection of several, the menu acts on all of them: Open in New Tabs, Copy full or relative paths, Reveal in File Explorer, and Delete.
-- Keys, with the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (or Cmd+Backspace on macOS) asks to delete the selection.
+- Keys, with the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (or Cmd+Backspace on macOS) deletes the selection, as `fileConfig.deletedFiles` says (below); Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z (Ctrl+Y on Windows too) undo and redo Files' operations.
+
+Deleting (`deleteFiles`, `useActiveWorkspaceTools`) follows `fileConfig.deletedFiles`, workspace-overridable (Settings → View → Files):
+- **`'trash'`** (the default): the system Trash or Recycle Bin, through Rust `trash_item` (`src-tauri/src/trash.rs`). On macOS it uses `NSFileManager trashItemAtURL:resultingItemURL:` (`objc2-foundation`), which says where the item went; elsewhere it uses the `trash` crate. `trash_restore` puts an item back: on macOS by moving it from where it went, elsewhere by finding it in the Trash's listing by original path and deletion time. It fails with `taken` or `missing`.
+- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index.
+- **`'permanent'`:** `DeleteFilesModal` asks first, then the items are removed for good, with no undo.
+- Either trash asks nothing, and the toast ("Moved N item(s) to the Trash.") has an **Undo** button. An item a clash's Replace displaces goes the same way.
+
+Files' history (`useFilesHistory`, per session, in memory, 50 steps; a new step clears the redo side):
+- **What records a step:** `moveFiles`, `renameFile`, `deleteFiles` and `importItems`, so drops, pastes, Duplicate and the chat's and editor's imports too. Each records a `Change`:
+  - the items moved (uuid, from, to);
+  - the notes whose links were rewritten, with their text before and after;
+  - the folders a merge emptied and removed;
+  - what it trashed, with what restoring needs, including every indexed item it took along, so a restore indexes them again under their old uuids (`addFileToIndex(path, root, uuid)`);
+  - what it created, with its size and modified time once written.
+- **Undo** reverses the change, last part first. Created items go to a trash (never deleted for good), the notes get their old text, the merged folders come back, the items move back, and trashed items are restored. Each part acts only where things are as the change left them: an item still at its new path, a note still reading the rewritten text, a created item unchanged. **Redo** does it again with the same care. Whatever is skipped is named in one toast.
+- **Where to undo:** the keys above, the toast's Undo (that step, only while it's the latest), and Undo/Redo items naming the step in the tree's empty-space menu. A move now also has a toast: "Moved N item(s)."
+- **The editor is unaffected:** its Cmd/Ctrl+Z is its own, since the tree only sees keys while it has focus.
 
 Rows drag like a file manager's:
 - What moves: dragging a selected row moves the selection (what's inside a selected folder goes with it); an unselected row is selected alone first. The drag image is a card with the row's icon and name, with two stacked cards and an "N item(s)" badge for more than one.

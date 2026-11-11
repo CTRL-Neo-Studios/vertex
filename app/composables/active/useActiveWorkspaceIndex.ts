@@ -184,7 +184,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         runtimes.delete(scope)
     }
 
-    async function addFileToIndex(path: string, root: string = runtime().root) {
+    /** Indexes the item at `path`. `uuid` gives it back the one it had (Undo of a delete), unless that's in use. */
+    async function addFileToIndex(path: string, root: string = runtime().root, uuid?: string) {
         const existing = unref(fileIndex)[path]
         if (existing) return existing
         runtime().root = root
@@ -192,6 +193,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const info = await stat(path)
             const fileName = path.slice(path.lastIndexOf('/') + 1)
             const node = defaultActiveWorkspaceFileIndex({
+                uuid: uuid && !unref(uuidToFilePathIndex).has(uuid) ? uuid : undefined,
                 fullPath: path,
                 relativePath: relativeOf(path),
                 fileName,
