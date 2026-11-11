@@ -6,7 +6,7 @@ Problems found in packages Vertex depends on. They need fixing in the package it
 
 | Package | Version | Problem | Seen as | In Vertex |
 |---|---|---|---|---|
-| `@type32/obsidian-bases-parser` | 0.3.4 (latest) | The build runs its example code at import: module-level `console.log` calls for a sample task-tracker base. They start at `dist/index.mjs` line 3855 (`console.log("Tokens:", tokens)`) and run through `Active tasks:`, `Total count:`, `Groups:`, `Summaries:` and the serialized YAML. | About 20 log lines (Tokens, Parse result, Filter uses…, YAML Output, Active tasks…) whenever the parser loads. | Nothing to work around. Take the examples out of the package's entry or build. |
+| `@type32/obsidian-bases-parser` | 0.3.4, **fixed in 0.4.0** | The build ran its example code at import: module-level `console.log` calls for a sample task-tracker base. They started at `dist/index.mjs` line 3855 (`console.log("Tokens:", tokens)`) and ran through `Active tasks:`, `Total count:`, `Groups:`, `Summaries:` and the serialized YAML. | About 20 log lines (Tokens, Parse result, Filter uses…, YAML Output, Active tasks…) whenever the parser loaded. | **Fixed.** `src/obsidian-bases-example.ts` is plain data, and the demo is `examples/walkthrough.ts`, outside the build. Vertex is on `^0.4.0`, and its build has none of the logs. |
 
 ## Third-party
 

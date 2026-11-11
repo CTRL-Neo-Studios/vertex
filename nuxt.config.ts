@@ -3,7 +3,6 @@ export default defineNuxtConfig({
     $production: {devtools: {enabled: false}},
 
     modules: [
-      "@comark/nuxt",
       "@nuxt/ui",
       "@vueuse/nuxt",
       "@nuxt/icon",
@@ -14,6 +13,7 @@ export default defineNuxtConfig({
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
       "@nuxt/eslint",
+      "@comark/vue",
     ],
 
 	i18n: {
