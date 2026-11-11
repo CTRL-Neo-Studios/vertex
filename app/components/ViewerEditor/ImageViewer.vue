@@ -4,6 +4,10 @@
  * Displays images with zoom, pan, and metadata
  */
 
+// `SessionTab` hands every viewer `content-saved` and the internal-link listener; an image has neither, and its root
+// (`LayoutWrapper`) renders a fragment, so passing them on only warned.
+defineOptions({inheritAttrs: false})
+
 const fileName = defineModel<string>('fileName', { required: true })
 
 withDefaults(defineProps<{

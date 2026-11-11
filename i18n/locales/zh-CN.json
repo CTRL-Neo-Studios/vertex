@@ -548,7 +548,10 @@
 					"newBase": "新建数据库",
 					"newOpenFolderProperties": "新建/打开文件夹属性",
 					"newWorkflow": "新建工作流",
-					"moveFailed": "无法移动 {name}"
+					"moveFailed": "无法移动 {name}",
+					"openInNewTabs": "在新标签页中打开全部",
+					"copyFullPaths": "复制完整路径（全部）",
+					"copyRelativePaths": "复制相对路径（全部）"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",

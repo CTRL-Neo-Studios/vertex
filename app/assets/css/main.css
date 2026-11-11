@@ -10,6 +10,13 @@
     @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
 
+/* Only a thin horizontal scrollbar (the file tree's wide rows); the vertical one stays hidden. */
+@utility scrollbar-x {
+    &::-webkit-scrollbar { width: 0; height: 6px; }
+    &::-webkit-scrollbar-thumb { background: var(--ui-border-accented); border-radius: 9999px; }
+    &::-webkit-scrollbar-track, &::-webkit-scrollbar-corner { background: transparent; }
+}
+
 /* A scroll area's fading edges; `useScrollFade` sets `fade-top` once it's scrolled and `fade-bottom` while there's more below. */
 @property --fade-top {
     syntax: '<length>';
@@ -180,4 +187,11 @@
     .bg-submuted {
         @apply bg-inverted/2;
     }
+}
+
+/* The file tree: a row whose name runs under its tag or arrow, pinned at the panel's edge (`data-clip`, set by the tree
+   with `--clip`, where the tag starts measured from the name's left), fades the name out before the tag. The mask
+   is on the name only, so the row's own highlight stays whole. */
+[data-clip] [data-grab] {
+    mask-image: linear-gradient(to right, #000 calc(var(--clip) - 1.5rem), transparent var(--clip));
 }

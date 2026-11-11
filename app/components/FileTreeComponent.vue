@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {StateKey} from "#shared/constants/app";
-import type {TreeItem, ContextMenuItem} from '@nuxt/ui';
+import type {TreeItem, TreeProps, ContextMenuItem} from '@nuxt/ui';
 import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
 import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
+import {platform} from "@tauri-apps/plugin-os"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
 import RenameFileModal from "~/components/Modals/RenameFileModal.vue";
@@ -29,7 +30,7 @@ const $ovl = useOverlay()
 const $navi = useAppNavigator()
 const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
-const {openTab, activeTabUuid} = useActiveTabs(session)
+const {openTab, openTabs, activeTabUuid} = useActiveTabs(session)
 const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
 const {createFile, moveFile} = useActiveWorkspaceTools(session)
 const $qt = useQuickToasts()
@@ -56,8 +57,13 @@ const formattedTreeData = computed<TreeItem[]>(() => {
             icon,
             children: node.children ? build(node.children) : undefined,
             onSelect(e) {
-                e?.preventDefault()
-                onItemClick(item)
+                e.preventDefault()
+                if (select(node.uuid, e.detail.originalEvent) && !node.isFolder) emit('file-click', node)
+            },
+            // A click with a modifier only selects: the folder stays open or closed.
+            onToggle(e) {
+                const ev = e.detail.originalEvent
+                if (ev.shiftKey || toggleKey(ev)) e.preventDefault()
             },
             slot: node.isFolder ? 'folder' as const : 'file' as const,
             // A folder's row is its slot's element edge to edge, so all of it can be dragged and highlighted.
@@ -69,9 +75,69 @@ const formattedTreeData = computed<TreeItem[]>(() => {
     return build(props.nodes)
 })
 
-function onItemClick(item: TreeItem) {
-    const node = item.originalNodeData as UITreeNode
-    if (!node.isFolder) emit('file-click', node)
+// Selection, as in a file manager: a plain click selects one row (and opens a file or toggles a folder),
+// Cmd (macOS) or Ctrl toggles a row, Shift selects the range from the anchor over the rows as shown. Reka's tree
+// gets the selection only to mark rows (`data-selected`, `aria-selected`); its own select is prevented.
+const mac = platform() === 'macos'
+const toggleKey = (e: MouseEvent | KeyboardEvent) => mac ? e.metaKey : e.ctrlKey
+const selected = shallowRef(new Set<string>())
+const selectedItems = computed(() => [...selected.value].map(id => ({id})))
+let anchor: string | undefined
+
+/** The rows as shown: inside expanded folders only. */
+function shownIds() {
+    const open = new Set(expandedFolders.value), ids: string[] = []
+    const walk = (items: TreeItem[]) => {
+        for (const item of items) {
+            ids.push(item.id)
+            if (item.children && open.has(item.id)) walk(item.children)
+        }
+    }
+    walk(formattedTreeData.value)
+    return ids
+}
+
+/** Applies a click to the selection; true for a plain one, which also opens or toggles the row. */
+function select(id: string, e: MouseEvent | KeyboardEvent) {
+    const adding = toggleKey(e)
+    if (e.shiftKey) {
+        const ids = shownIds(), from = anchor ? ids.indexOf(anchor) : -1, to = ids.indexOf(id)
+        const range = from === -1 ? [id] : ids.slice(Math.min(from, to), Math.max(from, to) + 1)
+        selected.value = new Set(adding ? [...selected.value, ...range] : range)
+        return false
+    }
+    anchor = id
+    if (adding) {
+        const next = new Set(selected.value)
+        if (!next.delete(id)) next.add(id)
+        selected.value = next
+        return false
+    }
+    selected.value = new Set([id])
+    return true
+}
+
+// Collapsing a folder deselects what's inside it, and removed files drop out: no action reaches unseen rows.
+watch([formattedTreeData, expandedFolders], () => {
+    if (!selected.value.size) return
+    const shown = new Set(shownIds())
+    if ([...selected.value].some(id => !shown.has(id))) selected.value = new Set([...selected.value].filter(id => shown.has(id)))
+})
+
+function onBlankClick(event: MouseEvent) {
+    if (!(event.target as Element | null)?.closest('li')) selected.value = new Set()
+}
+
+function onKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && selected.value.size) {
+        selected.value = new Set()
+    } else if (toggleKey(event) && event.key.toLowerCase() === 'a') {
+        event.preventDefault()
+        selected.value = new Set(shownIds())
+    } else if (selected.value.size && (event.key === 'Delete' || (mac && event.metaKey && event.key === 'Backspace'))) {
+        event.preventDefault()
+        deleteFilesModal.open({fileIndexIds: [...selected.value]})
+    }
 }
 
 // One menu for the whole tree (a menu per row gave every row a menu root, and a virtual list remounts rows as it
@@ -86,6 +152,11 @@ function findItem(items: TreeItem[], id: string): TreeItem | undefined {
 function onContextMenu(event: MouseEvent) {
     const row = (event.target as Element | null)?.closest('li')?.querySelector<HTMLElement>('[data-id]')
     const item = row?.dataset.id ? findItem(formattedTreeData.value, row.dataset.id) : undefined
+    // Right-clicking outside the selection selects just that row (or, on empty space, nothing).
+    if (!item || !selected.value.has(item.id)) {
+        selected.value = new Set(item ? [item.id] : [])
+        anchor = item?.id
+    }
     menuRow.value = item && {item, level: Number(row!.dataset.level)}
 }
 const fileIcon = (item: TreeItem) => {
@@ -95,11 +166,122 @@ const fileIcon = (item: TreeItem) => {
 }
 const menuItems = computed(() => {
     const row = menuRow.value
-    return row ? getItemContextMenu(row.item, row.level, (row.item.originalNodeData as UITreeNode).isFolder) : props.emptyMenu ?? []
+    if (!row) return props.emptyMenu ?? []
+    return selected.value.size > 1 ? getSelectionMenu([...selected.value]) : getItemContextMenu(row.item, row.level, (row.item.originalNodeData as UITreeNode).isFolder)
 })
 
 const treeRef = useTemplateRef<{ $el: HTMLElement }>('treeRef')
 const fade = useScrollFade(() => treeRef.value?.$el)
+// Typeahead (a key with the tree focused) reads each row's text. Nuxt UI hands Reka `getItemLabel(item.value)`, but
+// the item is already the value, so every such key (Shift and Esc too) threw `value.toLowerCase`. Its `virtualize`
+// object is bound after that prop, so this one wins; its type doesn't list the Reka props it forwards.
+const TREE_VIRTUALIZE = {textContent: (item: TreeItem) => item.label ?? ''} as unknown as TreeProps['virtualize']
+// Deep or long rows scroll sideways instead of truncating. The virtual list positions rows absolutely, so they can't
+// size each other: every row is as wide as the widest one on screen (`--row-w`, at least the panel), so highlights
+// span the whole scroll width. Measured from each row's icon and name (`data-grab`) plus its right-hand tag or arrow
+// (`data-tail`, sticky at the panel's edge), which a stretched row doesn't change. A row whose name runs under its
+// pinned tail gets `data-clip` and `--clip` (main.css), which fade the name out just before it. Set on the DOM, so
+// nothing re-renders; on scroll it runs in the same frame, before paint.
+const TREE_UI = {item: 'min-w-full w-(--row-w)'}
+const fitRows = useRafFn(() => {
+    fitRows.pause()
+    const root = treeRef.value?.$el
+    if (!root) return
+    let width = 0
+    for (const li of root.querySelectorAll('li')) {
+        const grab = li.querySelector('[data-grab]')?.getBoundingClientRect(), tail = li.querySelector('[data-tail]')?.getBoundingClientRect()
+        if (!grab) continue
+        // Name, spacer and tail are flex items with 6 px gaps, then the row's 10 px end padding.
+        width = Math.max(width, grab.right - li.getBoundingClientRect().left + (tail ? 12 + tail.width : 0) + 10)
+        const clip = !!tail && grab.right > tail.left - 4
+        li.toggleAttribute('data-clip', clip)
+        if (clip) li.style.setProperty('--clip', `${tail!.left - 4 - grab.left}px`)
+    }
+    root.style.setProperty('--row-w', `${Math.ceil(width)}px`)
+}, {immediate: false})
+useMutationObserver(() => treeRef.value?.$el, () => fitRows.resume(), {childList: true, subtree: true, characterData: true})
+useEventListener(() => treeRef.value?.$el, 'scroll', () => fitRows.resume(), {passive: true})
+// A late web font changes the names' widths, and a resized panel which names run under their tag.
+useEventListener(import.meta.client ? document.fonts : undefined, 'loadingdone', () => fitRows.resume())
+useResizeObserver(() => treeRef.value?.$el, () => fitRows.resume())
+
+// Drag select, as in a file manager's details view: a press on a row's blank part (not its icon and name, which drag
+// it) or below the rows, moved past 4 px, draws a box; every row it touches is selected, or added with Cmd/Ctrl.
+// Rows are found by index × row height over the rows as shown, so rows the virtual list has unmounted count too.
+// The box is tracked in the tree's content coordinates (it stays put on auto-scroll) and drawn on the DOM.
+const boxRef = useTemplateRef<HTMLElement>('boxRef')
+/** `x`, `y`: where it started, in content coordinates; `sx`, `sy` and `cx`, `cy`: where it started and is, on screen. */
+type Box = {x: number, y: number, sx: number, sy: number, cx: number, cy: number, active: boolean, adding: boolean, base: Set<string>, ids: string[], top: number, h: number}
+let box: Box | undefined
+let boxFrame = 0
+
+function onBoxStart(event: PointerEvent) {
+    const root = treeRef.value?.$el
+    if (event.button !== 0 || !root || (event.target as Element | null)?.closest('[data-grab]')) return
+    const r = root.getBoundingClientRect()
+    // Not on the scrollbar.
+    if (event.clientX - r.left > root.clientWidth || event.clientY - r.top > root.clientHeight) return
+    const li = root.querySelector<HTMLElement>('li[data-index]')
+    if (!li) return
+    const h = li.getBoundingClientRect().height
+    box = {
+        x: event.clientX - r.left + root.scrollLeft, y: event.clientY - r.top + root.scrollTop,
+        sx: event.clientX, sy: event.clientY, cx: event.clientX, cy: event.clientY,
+        active: false, adding: toggleKey(event), base: selected.value, ids: shownIds(), h,
+        top: li.getBoundingClientRect().top - r.top + root.scrollTop - Number(li.dataset.index) * h,
+    }
+}
+
+function drawBox() {
+    const root = treeRef.value?.$el, el = boxRef.value
+    if (!box || !root || !el) return
+    const r = root.getBoundingClientRect()
+    const x = box.cx - r.left + root.scrollLeft, y = box.cy - r.top + root.scrollTop
+    // On screen, clipped to the tree.
+    const left = Math.max(Math.min(box.x, x) - root.scrollLeft + r.left, r.left), right = Math.min(Math.max(box.x, x) - root.scrollLeft + r.left, r.left + root.clientWidth)
+    const top = Math.max(Math.min(box.y, y) - root.scrollTop + r.top, r.top), bottom = Math.min(Math.max(box.y, y) - root.scrollTop + r.top, r.top + root.clientHeight)
+    el.style.cssText = `display: block; left: ${left}px; top: ${top}px; width: ${Math.max(0, right - left)}px; height: ${Math.max(0, bottom - top)}px`
+    const first = Math.max(0, Math.floor((Math.min(box.y, y) - box.top) / box.h))
+    const last = Math.min(box.ids.length - 1, Math.floor((Math.max(box.y, y) - box.top) / box.h))
+    const hit = first <= last ? box.ids.slice(first, last + 1) : []
+    const next = new Set(box.adding ? [...box.base, ...hit] : hit)
+    // Only a change re-renders the tree.
+    if (next.size !== selected.value.size || [...next].some(id => !selected.value.has(id))) selected.value = next
+    anchor = hit[0] ?? anchor
+}
+
+/** Each frame while boxing: near the top or bottom edge the tree scrolls, and the box follows. */
+function boxLoop() {
+    const root = treeRef.value?.$el
+    if (!box?.active || !root) return
+    const {top, bottom} = root.getBoundingClientRect()
+    if (box.cy < top + 40) root.scrollTop -= 12
+    else if (box.cy > bottom - 40) root.scrollTop += 12
+    drawBox()
+    boxFrame = requestAnimationFrame(boxLoop)
+}
+
+useEventListener(window, 'pointermove', (event: PointerEvent) => {
+    if (!box) return
+    box.cx = event.clientX
+    box.cy = event.clientY
+    if (!box.active && Math.hypot(event.clientX - box.sx, event.clientY - box.sy) > 4) {
+        box.active = true
+        boxFrame = requestAnimationFrame(boxLoop)
+    }
+})
+useEventListener(window, 'pointerup', () => {
+    if (box?.active) {
+        // The click that ends a box isn't a row click (or a click below the rows, which would clear it). It follows
+        // pointerup in the same task, so the swallow is dropped right after.
+        const swallow = (e: Event) => { e.stopPropagation(); e.preventDefault() }
+        window.addEventListener('click', swallow, {capture: true, once: true})
+        setTimeout(() => window.removeEventListener('click', swallow, {capture: true}))
+    }
+    cancelAnimationFrame(boxFrame)
+    box = undefined
+    if (boxRef.value) boxRef.value.style.display = 'none'
+})
 // The virtual tree draws rows flat: indents and the nesting guides (at each parent's icon) come from the level, as
 // Nuxt UI's flat rows do for its own link (`sm`: 2.5 + 6 per level, in spacing units).
 const indent = (level: number, extra = 0) => `calc(var(--spacing) * ${(level - 1) * 6 + 2.5 + extra})`
@@ -269,6 +451,28 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
     ]
     return groups.filter(group => group.length)
 }
+
+/** The menu for a selection of several rows: what applies to all of them at once. */
+function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
+    const files = ids.map(getFileByUuid).filter(f => !!f)
+    const notes = files.filter(f => !f.isFolder).map(f => f.uuid)
+    const copy = (key: 'fullPath' | 'relativePath') => writeText(files.map(f => f[key]).join('\n'))
+    return [
+        [{
+            label: t('app.editor.ui.filetree.openInNewTabs'), icon: 'i-lucide-square-plus', disabled: !notes.length,
+            async onSelect() {
+                const tab = openTabs(notes)
+                if (tab) await $navi.toWorkspaceTab(props.sessionId, tab)
+            },
+        }],
+        [
+            {label: t('app.editor.ui.filetree.copyFullPaths'), icon: 'i-lucide-copy', onSelect: () => copy('fullPath')},
+            {label: t('app.editor.ui.filetree.copyRelativePaths'), icon: 'i-lucide-copy', onSelect: () => copy('relativePath')},
+            {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-copy', onSelect: () => $opener.revealFilesInFileManager(files.map(f => f.fullPath))},
+        ],
+        [{label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: ids})}],
+    ]
+}
 </script>
 
 <template>
@@ -276,15 +480,21 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
         <UTree
             ref="treeRef"
             :items="formattedTreeData"
-            virtualize
+            :virtualize="TREE_VIRTUALIZE"
             expanded-icon="i-lucide-folder-open"
             collapsed-icon="i-lucide-folder-closed"
             v-model:expanded="expandedFolders"
+            multiple
+            :model-value="selectedItems"
+            color="neutral"
             :get-key="(i: TreeItem) => i.id as string"
-            :class="['no-scrollbar h-full py-2.5 rounded-md', fade, dropDir === '' && 'ring-1 ring-inset ring-primary/40 bg-primary/5']"
-            data-tauri-drag-region
+            :class="['scrollbar-x h-full py-2.5 rounded-md', fade, dropDir === '' && 'ring-1 ring-inset ring-primary/40 bg-primary/5']"
+            :ui="TREE_UI"
             size="sm"
+            @pointerdown="onBoxStart"
             @contextmenu.capture="onContextMenu"
+            @click="onBlankClick"
+            @keydown="onKeydown"
             @dragstart="onDragStart"
             @dragover="onDragOver"
             @dragleave="onDragLeave"
@@ -295,36 +505,42 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
                     size="sm"
                     :data-id="item.id"
                     :data-level="level"
-                    draggable="true"
-                    :label="config?.viewConfig.fileTree.showFileExtInName ? item.label : fileNameFromPath(item.label ?? '', true)"
                     :variant="item.id == activeTabUuid ? 'soft' : 'ghost'"
                     :color="item.id == activeTabUuid ? 'primary' : 'neutral'"
-                    :class="['select-none relative align-middle items-center justify-start text-left transition-all duration-300 after:transition-all after:duration-300 after:h-0 after:w-0 after:border-0 after:border-primary/0 after:left-0 after:absolute', item.id == activeTabUuid ? ' transition-all duration-300 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : '']"
+                    :class="['select-none relative align-middle items-center justify-start text-left transition-all duration-300 after:transition-all after:duration-300 after:h-0 after:w-0 after:border-0 after:border-primary/0 after:left-0 after:absolute', item.id == activeTabUuid ? ' transition-all duration-300 after:absolute after:border-primary after:h-1/2 after:w-0 after:border-[1.5px] after:rounded-lg after:left-1.5' : 'data-selected:bg-elevated data-selected:text-highlighted']"
                     :style="{paddingInlineStart: indent(level, item.id == activeTabUuid ? 1.5 : 0)}"
                     block
-                    @click="onItemClick(item)"
                 >
                     <template #leading>
                         <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
                         <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
-                        <UIcon v-if="fileIcon(item)" :name="fileIcon(item)" class="size-4 shrink-0"/>
                     </template>
+                    <span data-grab draggable="true" class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <UIcon v-if="fileIcon(item)" :name="fileIcon(item)" class="size-4 shrink-0"/>
+                        {{ config?.viewConfig.fileTree.showFileExtInName ? item.label : fileNameFromPath(item.label ?? '', true) }}
+                    </span>
                     <template #trailing v-if="config?.viewConfig.fileTree.showFileExtAsTag">
                         <div class="grow"/>
-                        <UBadge size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${getFileExtensionFromPath(item.label ?? '')}`"/>
+                        <UBadge data-tail class="sticky right-2.5" size="xs" :color="item.id == activeTabUuid ? 'primary' : 'neutral'" :variant="item.id == activeTabUuid ? 'solid' : 'soft'" :label="`.${getFileExtensionFromPath(item.label ?? '')}`"/>
                     </template>
                 </UButton>
             </template>
             <template #folder="{item, expanded, level}: {item: TreeItem, expanded: boolean, level: number}">
-                <div :data-id="item.id" :data-level="level" draggable="true" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none py-1.5 pe-2.5">
+                <div :data-id="item.id" :data-level="level" class="inline-flex w-full items-center justify-start font-medium rounded-md gap-1.5 select-none py-1.5 pe-2.5">
                     <span v-for="k in level - 1" :key="k" class="absolute inset-y-0 border-s border-dotted border-muted pointer-events-none" :style="{insetInlineStart: guide(k)}"/>
                     <span v-if="dropHere(item.originalNodeData as UITreeNode)" :class="['absolute inset-0 rounded-md pointer-events-none', DROP_ROW]"/>
-                    <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
-                    <span class="truncate text-xs overflow-ellipsis">{{ item.label }}</span>
+                    <span data-grab draggable="true" class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <UIcon v-if="config?.viewConfig.fileTree.showDefaultFolderIcons" class="text-sm size-4 shrink-0" :name="expanded ? ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-open') : ((config?.viewConfig.fileTree.allowCustomFolderIcons && item.icon) ? item.icon : 'i-lucide-folder-closed')" />
+                        <span class="text-xs">{{ item.label }}</span>
+                    </span>
                     <span class="grow"/>
-                    <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" :class="['text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up" />
+                    <UIcon v-if="config?.viewConfig.fileTree.showFoldArrows" data-tail :class="['sticky right-2.5 text-sm size-4 shrink-0 transition-all duration-200', expanded ? 'rotate-180' : '']" name="i-lucide-chevron-up"/>
                 </div>
             </template>
         </UTree>
     </UContextMenu>
+    <!-- The drag-select box, on screen over the tree (`drawBox`). -->
+    <Teleport to="body">
+        <div ref="boxRef" class="fixed z-50 hidden pointer-events-none rounded-sm border border-primary bg-primary/10"/>
+    </Teleport>
 </template>

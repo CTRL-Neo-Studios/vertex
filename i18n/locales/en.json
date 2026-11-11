@@ -548,7 +548,10 @@
 					"newBase": "New Base",
 					"newOpenFolderProperties": "New/Open Folder Properties",
 					"newWorkflow": "New Workflow",
-					"moveFailed": "Could not move {name}"
+					"moveFailed": "Could not move {name}",
+					"openInNewTabs": "Open in New Tabs",
+					"copyFullPaths": "Copy full paths",
+					"copyRelativePaths": "Copy relative paths"
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",

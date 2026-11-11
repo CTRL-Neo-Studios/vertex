@@ -111,6 +111,15 @@ The frontend wrapper is `app/utils/stateClient.ts`. It has no Vue lifecycle, so 
 
 The Files view (`FileTreeComponent`) is a virtual `UTree`: only the rows on screen exist, so a folder of thousands of notes opens and scrolls like a small one. Its rows are flat. Each file row's indent and the dotted nesting guides come from the row's level. There is one right-click menu for the whole tree: the clicked row's `data-id` picks its items, and outside any row it shows the panel's New items.
 
+Names don't truncate. Rows wider than the panel scroll sideways, with a thin horizontal scrollbar only (`scrollbar-x`). The virtual list positions rows absolutely, so `fitRows` measures the rows on screen and sets `--row-w` on the tree's DOM; every row is that wide, so highlights span the scroll width. The extension tag or fold arrow is sticky at the panel's right edge. A row whose name runs under it gets `data-clip` and `--clip`, which mask the name so it fades out before the tag; the row's highlight stays whole. Only a row's icon and name (`data-grab`) start a drag; the rest of the row doesn't.
+
+Rows select like a file manager's. The selection is the tree's own (uuids plus an anchor). Reka's tree only receives it to mark rows (`data-selected`, styled `bg-elevated`); its own select is prevented.
+- A plain click selects one row and opens a file or toggles a folder. Cmd (macOS) or Ctrl toggles a row; Shift selects the range from the anchor over the rows as shown; Cmd/Ctrl+Shift adds the range. A click with a modifier never opens or toggles.
+- Collapsing a folder deselects what's inside it, and removed files drop out, so actions never reach rows you can't see. A click below the rows clears the selection.
+- Drag select: pressing on a row's blank part (not its icon and name) or below the rows and dragging draws a box. The rows it touches are selected, or added with Cmd/Ctrl; near the top or bottom edge the tree scrolls. Rows are found by index × row height over the rows as shown, so rows scrolled out of the virtual list count too. The box is drawn on the DOM (teleported to `body`), and the click that ends it is swallowed. For this the tree has no `data-tauri-drag-region`.
+- Right-click outside the selection selects that row. Inside a selection of several, the menu acts on all of them: Open in New Tabs, Copy full or relative paths, Reveal in File Explorer, and Delete.
+- Keys, with the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (or Cmd+Backspace on macOS) asks to delete the selection.
+
 Rows drag like a file manager's:
 - Where a drop lands: onto a folder, into it; onto a file, into its folder; onto empty space, the top level. Never into the item itself, its subfolders or its current folder.
 - While dragging: a closed folder held for 600 ms opens, and the edges scroll.
