@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {createMarkdownParser, parseMarkdown} from "@comark/nuxt/parse";
+import {createMarkdownParser, parseMarkdown} from "@comark/vue/parse";
 import {callouts, frontmatterAsCode, wikiLinks} from "./comarkPlugins";
 
 const parse = async (md: string) => (await parseMarkdown(md, {plugins: [wikiLinks, callouts]})).nodes

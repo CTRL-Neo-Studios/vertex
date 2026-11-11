@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {PropType} from "vue";
 import type {ElementNode} from "comark";
-import {textContent} from "@comark/nuxt/utils";
+import {textContent} from "@comark/vue/utils";
 import MermaidDiagram from "~/components/Utility/MermaidDiagram.vue";
 
 defineOptions({inheritAttrs: false})

@@ -1,5 +1,5 @@
 import type {ComarkPlugin, ElementNode, Node} from "comark";
-import {visit} from "@comark/nuxt/utils";
+import {visit} from "@comark/vue/utils";
 
 /** Comark parses `[[X]]` as a span in a span; returns `X` for that shape. Code never gets there: its text isn't parsed. */
 function wikiText(n: Node): string | undefined {

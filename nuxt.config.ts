@@ -116,11 +116,11 @@ export default defineNuxtConfig({
                 "ai",
                 "@ai-sdk/openai-compatible",
                 "@ai-sdk/vue",
-                // @comark/nuxt's auto-registered <Markdown> comes from @comark/vue.
+                // Comark: the <Markdown> its Nuxt module auto-imports, and the subpaths the chat imports.
                 "@comark/vue",
-                "@comark/nuxt/utils",
-                "@comark/nuxt/plugins/math",
-                "@comark/nuxt/plugins/rangi",
+                "@comark/vue/utils",
+                "@comark/vue/plugins/math",
+                "@comark/vue/plugins/rangi",
                 // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
                 "katex",
                 "@type32/obsidian-bases-parser",
