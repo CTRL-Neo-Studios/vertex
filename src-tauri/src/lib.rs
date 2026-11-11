@@ -1,8 +1,10 @@
 mod ai;
 mod chats;
 mod fonts;
+mod git;
 mod notes;
 mod state;
+mod trash;
 mod updater;
 mod web;
 
@@ -162,6 +164,24 @@ fn sync_main_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>, closing: O
     }
 }
 
+/// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
+/// holds no files or can't be read.
+#[tauri::command]
+fn clipboard_files_get() -> Vec<String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.get().file_list())
+        .map(|list| list.into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
+        .unwrap_or_default()
+}
+
+/// Puts files on the system clipboard, as Finder's or Explorer's Copy does: they paste there, and into Vertex.
+#[tauri::command]
+fn clipboard_files_set(paths: Vec<String>) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.set().file_list(&paths))
+        .map_err(|e| e.to_string())
+}
+
 /// Quits the app after every session window has flushed its pending session write.
 /// Each window answers `vertex://flush-requested` by awaiting its last write and calling `flush_done`.
 /// The timeout only guards against a hung webview; normal flushes finish in milliseconds.
@@ -207,6 +227,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(ai::AiRequests::default())
         .manage(chats::ChatVaults::default())
+        .manage(git::Git::default())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -221,6 +242,7 @@ pub fn run() {
         // Each session window (`session-{uuid}`, stable per session) and Settings reopen at their last size and
         // place, pulled back on screen when that monitor is gone. `main`, the start window, stays centred.
         builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[MAIN_WINDOW]).build());
+        builder = builder.plugin(tauri_plugin_drag::init());
     }
 
     builder
@@ -250,6 +272,10 @@ pub fn run() {
             state::workspace_settings_reload,
             state::take_open_requests,
             quit_app,
+            clipboard_files_get,
+            clipboard_files_set,
+            trash::trash_item,
+            trash::trash_restore,
             updater::update_token_get,
             updater::update_token_set,
             updater::update_channels,
@@ -274,6 +300,34 @@ pub fn run() {
             chats::chat_folder_rename,
             chats::chat_folder_delete,
             chats::chat_search,
+            git::git_version,
+            git::git_status,
+            git::git_log,
+            git::git_commit_files,
+            git::git_diff,
+            git::git_show_file,
+            git::git_stage,
+            git::git_unstage,
+            git::git_discard,
+            git::git_commit,
+            git::git_fetch,
+            git::git_pull,
+            git::git_push,
+            git::git_branches,
+            git::git_switch,
+            git::git_remotes,
+            git::git_remote_set,
+            git::git_merge_abort,
+            git::git_init,
+            git::git_clone,
+            git::git_tokens,
+            git::git_token_set,
+            git::git_identity,
+            git::git_identity_set,
+            git::git_install_tools,
+            git::git_resolve,
+            git::git_conflict_markers,
+            git::git_merge_continue,
         ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();

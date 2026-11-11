@@ -32,10 +32,7 @@ const emit = defineEmits<{
         :bottomSpacing="false"
     >
         <template #default>
-            <div
-                class="w-full flex flex-col flex-1 h-full pb-10"
-                :style="{maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)'}"
-            >
+            <div class="w-full flex flex-col flex-1 h-full pb-10">
                 <div class="flex-1 grid grid-cols-2 grid-rows-1 w-full min-h-0 pb-6">
                     <UScrollArea orientation="vertical" class="no-scrollbar border-r border-r-default overflow-auto">
                         <CodeEditor

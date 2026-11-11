@@ -94,6 +94,19 @@ useHead({
     }
 })
 
+// An OS file dropped where nothing takes it would make the webview open the file in place of the app. Whatever takes
+// files (the Files tree) handles `dragover` first and cancels it; anywhere else gets the "not allowed" cursor, and
+// the drop is stopped.
+const osFiles = (event: DragEvent) => !!event.dataTransfer?.types.includes('Files')
+useEventListener(window, 'dragover', (event: DragEvent) => {
+    if (event.defaultPrevented || !osFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer!.dropEffect = 'none'
+})
+useEventListener(window, 'drop', (event: DragEvent) => {
+    if (osFiles(event)) event.preventDefault()
+})
+
 </script>
 
 <template>

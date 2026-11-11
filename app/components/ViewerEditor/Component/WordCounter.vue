@@ -12,13 +12,15 @@ withDefaults(defineProps<{
 })
 
 const $du = useDocumentUtils()
-const wordCount = computed(() => $du.getWordCount(unref(content) || ''))
-const lineCount = computed(() => $du.getLineCount(unref(content) || ''))
-const paragraphCount = computed(() => $du.getParagraphs(unref(content) || ''))
+// Three passes over the whole text: once typing pauses, not per keystroke.
+const text = refDebounced(content, 250)
+const wordCount = computed(() => $du.getWordCount(text.value || ''))
+const lineCount = computed(() => $du.getLineCount(text.value || ''))
+const paragraphCount = computed(() => $du.getParagraphs(text.value || ''))
 </script>
 
 <template>
-    <div class="text-center flex justify-center items-center gap-3 text-dimmed text-xs select-none">
+    <div class="text-center flex justify-center items-center gap-3 text-default text-xs select-none">
         <template v-if="words">
             <div class="font-mono!">{{ wordCount }} {{ $t('app.generic.words') }}</div>
             <USeparator orientation="vertical" class="h-3 w-fit last:hidden"/>

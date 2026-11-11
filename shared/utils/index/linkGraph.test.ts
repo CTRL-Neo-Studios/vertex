@@ -9,8 +9,9 @@ function graph(files: Record<string, string>, links: Record<string, string[]> = 
 }
 
 describe('linkKeys', () => {
-    it('registers basename, path without extension and full path', () => {
-        expect(linkKeys('notes/B.md')).toEqual(['B', 'notes/B', 'notes/B.md'])
+    it('registers the name and the path, each without and with the extension', () => {
+        expect(linkKeys('notes/B.md')).toEqual(['B', 'notes/B', 'notes/B.md', 'B.md'])
+        expect(linkKeys('cat.png')).toEqual(['cat', 'cat.png'])
     })
     it('does not strip a leading dot as an extension', () => {
         expect(linkKeys('.hidden')).toEqual(['.hidden'])

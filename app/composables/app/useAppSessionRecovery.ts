@@ -7,6 +7,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
+import {panelViews} from "~/utils/panelViews";
 
 /**
  * Brings a freshly created session window back to its persisted state:
@@ -28,7 +29,7 @@ export function useAppSessionRecovery() {
         return result
     }
 
-    /** Restore tabs (files, then chats), focused tab, expanded folders and the left sidebar's view after the workspace index is built. */
+    /** Restore tabs (files, then chats, then views), focused tab, expanded folders and the panels' state after the workspace index is built. */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
         const {getFilteredFiles} = useActiveWorkspaceIndex(activeSession)
         const {openTab, openTabs, getActiveTab} = useActiveTabs(activeSession)
@@ -39,18 +40,21 @@ export function useAppSessionRecovery() {
 
         expandedFolders.value = uuids(context.openedFolderPaths)
         const layouts = useActiveLayouts(activeSession)
-        layouts.leftPanelView.value = context.leftPanelView
-        layouts.rightPanelView.value = context.rightPanelView
+        layouts.shownPanelViews.value = context.shownPanelViews ?? []
         layouts.leftPanelCollapsed.value = context.leftPanelCollapsed ?? false
         layouts.rightPanelCollapsed.value = context.rightPanelCollapsed ?? true
+        layouts.bottomPanelCollapsed.value = context.bottomPanelCollapsed ?? false
 
         const fileUuids = uuids(context.openedFilePaths)
         const chatIds = context.openedChatIds ?? []
-        if (fileUuids.length === 0 && chatIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
+        // A view that isn't registered any more (a plugin's, later) has nothing to show.
+        const viewIds = (context.openedViewIds ?? []).filter(id => panelViews.get(id)?.tab)
+        if (fileUuids.length === 0 && chatIds.length === 0 && viewIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
 
         let lastOpened = openTabs(fileUuids)
         for (const id of chatIds) lastOpened = openTab(id, 'chat')
-        const focused = getActiveTab(context.lastFocusedChatId ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0])
+        for (const id of viewIds) lastOpened = openTab(id, 'view')
+        const focused = getActiveTab(context.lastFocusedChatId ?? context.lastFocusedViewId ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0])
         await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
     }
 

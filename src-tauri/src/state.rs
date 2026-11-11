@@ -497,6 +497,16 @@ impl AppState {
         )
     }
 
+    /// `settings.gitConfig.path`: the git to run, `""` to look for one. Global only: a workspace can't pick an
+    /// executable.
+    pub fn git_path<R: Runtime>(&self, app: &AppHandle<R>) -> Result<String, String> {
+        self.with_settings(
+            app,
+            |s| s.pointer("/gitConfig/path").and_then(Value::as_str).unwrap_or_default().to_owned(),
+            false,
+        )
+    }
+
     /// From now on, a destroyed session window is the app quitting, not the user closing it.
     pub fn set_quitting(&self) {
         self.quitting.store(true, Ordering::SeqCst);

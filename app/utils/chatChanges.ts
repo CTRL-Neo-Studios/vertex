@@ -1,5 +1,32 @@
 import type {ChatChange, VertexChatMessage} from "#shared/types/app/chats";
 import {vaultPath} from "#shared/workflows/vault";
+import {fromBase64Url, toBase64Url} from "#shared/utils/base64url";
+
+/** Which staged change a diff tab shows: `path` in the changes of `messageId` in `chatId`. */
+export interface ChatChangeRef {
+    chatId: string
+    messageId: string
+    path: string
+}
+
+const TAB_PREFIX = 'chat-change-'
+
+/**
+ * A chat change's diff tab id (a `diff` tab, like git's `diffTabId`, with its own prefix): the whole reference,
+ * URL-safe, so the page shows it from the route alone and the same change opens the same tab.
+ */
+export const chatChangeTabId = (ref: ChatChangeRef) => TAB_PREFIX + toBase64Url(JSON.stringify([ref.chatId, ref.messageId, ref.path]))
+
+/** The change a tab id names; `undefined` for any other id. */
+export function chatChangeOf(id: string): ChatChangeRef | undefined {
+    if (!id.startsWith(TAB_PREFIX)) return undefined
+    try {
+        const [chatId, messageId, path] = JSON.parse(fromBase64Url(id.slice(TAB_PREFIX.length))) as unknown[]
+        return typeof chatId === 'string' && typeof messageId === 'string' && typeof path === 'string' ? {chatId, messageId, path} : undefined
+    } catch {
+        return undefined
+    }
+}
 
 /**
  * The path a model gave for a new note, checked: workspace-relative (leading slashes dropped), nothing under a dot

@@ -28,12 +28,14 @@ export default function () {
         })
     }
 
-    function success(title: string, description?: string) {
+    /** `actions`: buttons on the toast, such as Files' Undo. */
+    function success(title: string, description?: string, actions?: { label: string, onClick: () => void }[]) {
         $t.add({
             title: title,
             description: description,
             color: 'success',
-            icon: 'lucide:circle-check'
+            icon: 'lucide:circle-check',
+            actions: actions?.map(a => ({...a, color: 'neutral', variant: 'outline', size: 'xs'})),
         })
     }
 

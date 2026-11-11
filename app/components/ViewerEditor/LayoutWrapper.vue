@@ -13,6 +13,11 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
  * - Different alignment strategies
  */
 
+// Viewers wrap themselves in this, and `SessionTab` hands every viewer the same props and listeners (`content-saved`,
+// the internal-link listener); what a viewer doesn't declare falls through to here. This renders a fragment, so such
+// attrs could never land anywhere: dropped, instead of a Vue warning per viewer.
+defineOptions({inheritAttrs: false})
+
 const fileName = defineModel<string>('fileName')
 // The workspace's own view settings, when it overrides them.
 const {effective} = useSettingsScope()
@@ -85,6 +90,11 @@ const contentClasses = computed(() => {
 
     classes.push('justify-start')
 
+    // Without scrolling, the content fills what the header spacing leaves, so views inside can be `h-full`.
+    if (props.scrollMode === 'none') {
+        classes.push('flex-1 min-h-0')
+    }
+
     // Padding
     if (props.contentPadding) {
         classes.push('md:p-0')
@@ -147,12 +157,12 @@ const viewportClasses = computed(() => {
         </div>
     </DefineHeaderRow>
 
-    <!-- Root container with conditional scroll -->
+    <!-- Root container with conditional scroll. Sized by its container (the editor's pane), not the window: the bottom
+    area can take part of the height. -->
     <div
         v-if="scrollMode === 'none'"
         class="w-full h-full flex flex-col relative"
         :class="ui?.root"
-        :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)', maxHeight: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
     >
         <!-- Header (no scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
@@ -176,7 +186,6 @@ const viewportClasses = computed(() => {
     <ScrollAreaRoot
         v-else
         class="w-full h-full flex flex-col relative"
-        :style="{ height: 'calc(100vh - var(--ui-header-height) - 0.0rem)' }"
     >
         <!-- Header (with scroll) -->
         <div v-if="showHeader" class="absolute z-10 bg-linear-to-t from-transparent via-default to-default left-0 right-0 top-0 h-10">
@@ -207,7 +216,7 @@ const viewportClasses = computed(() => {
 			<!-- Actual status bar -->
 			<div
 				:class="[
-					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300',
+					'bg-submuted inline-flex justify-start items-center w-fit border border-default p-1 px-3 pb-1.5 rounded-md origin-bottom transition duration-300 backdrop-blur-lg',
 					statusBarDisplayMode == 'show-on-hover'
 					? 'opacity-0 translate-y-1 group-hover/sb:h-fit scale-0 group-hover/sb:opacity-100 group-hover/sb:translate-y-0 group-hover/sb:scale-100'
 					: ''

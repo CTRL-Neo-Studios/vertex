@@ -38,6 +38,7 @@ export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, labe
 
     {id: 'view.reload', section: 'view', group: 0, label: 'app.commands.reload', accelerator: 'CmdOrCtrl+R'},
     {id: 'view.toggleFullscreen', section: 'view', group: 0, label: 'app.commands.toggleFullscreen', accelerator: 'Ctrl+CmdOrCtrl+F'},
+    {id: 'view.toggleBottomPanel', section: 'view', group: 0, label: 'app.commands.toggleBottomPanel'},
     {id: 'view.closeTab', section: 'view', group: 1, label: 'app.commands.closeTab', accelerator: 'CmdOrCtrl+W'},
     {id: 'view.closeAllTabs', section: 'view', group: 1, label: 'app.commands.closeAllTabs', accelerator: 'CmdOrCtrl+Shift+W'},
     {id: 'view.closeWindow', section: 'view', group: 1, label: 'app.commands.closeWindow', accelerator: 'CmdOrCtrl+Alt+W'},

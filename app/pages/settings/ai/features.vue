@@ -24,6 +24,8 @@ const CHAT_MODE = 'aiConfig.chatMode' as const
 const CHAT_TITLES = 'aiConfig.chatTitles' as const
 const ENTRIES = 'aiConfig.editorAssistant' as const
 const ENTRY_KEYS = ['toolbar', 'slash', 'shortcut'] as const
+const COMMIT_MESSAGES = 'aiConfig.commitMessages' as const
+const COMMIT_KEYS = ['whenEmpty', 'autoSync'] as const
 const path = (id: string) => `${FEATURES}.${id}` as AppSettingPath
 
 // Profiles are global: the effective settings carry the global ones. Each shows its provider and model.
@@ -187,6 +189,21 @@ const untrusted = computed(() => scope.root.value !== null && (scope.overridden(
                                 :disabled="!aiOn || !featureOn(feature.id)"
                                 :model-value="scope.value(CHAT_MODE)"
                                 @update:model-value="scope.set({[CHAT_MODE]: $event})"
+                            />
+                        </SettingsRow>
+                    </template>
+                    <template v-if="feature.id === 'commitMessage'">
+                        <SettingsRow
+                            v-for="key in COMMIT_KEYS"
+                            :key
+                            :setting="`${COMMIT_MESSAGES}.${key}`"
+                            :label="t(`app.settings.ai.features.commitMessages.${key}`)"
+                            :description="t(`app.settings.ai.features.commitMessages.${key}Description`)"
+                        >
+                            <USwitch
+                                :disabled="!aiOn || !featureOn(feature.id)"
+                                :model-value="scope.value(`${COMMIT_MESSAGES}.${key}`)"
+                                @update:model-value="scope.set({[`${COMMIT_MESSAGES}.${key}`]: $event})"
                             />
                         </SettingsRow>
                     </template>

@@ -92,7 +92,7 @@ const fileSizeKB = computed(() => {
         </template>
         
         <template #default>
-            <div class="w-full max-h-svh h-svh pb-6 flex items-center justify-center overflow-hidden bg-muted/30">
+            <div class="w-full h-full pb-6 flex items-center justify-center overflow-hidden bg-muted/30">
                 <img
                     ref="imageRef"
                     :src="imageSrc" 

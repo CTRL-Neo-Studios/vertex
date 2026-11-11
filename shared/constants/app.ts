@@ -48,8 +48,8 @@ export const StateKey = {
     tabActiveHeading: (s: string, f: string) => `active.tabs.currentTab.${s}.${f}.active-heading`,
     leftPanel: (s: string) => `active.layouts.left-panel.${s}`,
     rightPanel: (s: string) => `active.layouts.right-panel.${s}`,
-    leftPanelView: (s: string) => `active.layouts.left-panel-view.${s}`,
-    rightPanelView: (s: string) => `active.layouts.right-panel-view.${s}`,
+    bottomPanel: (s: string) => `active.layouts.bottom-panel.${s}`,
+    shownPanelViews: (s: string) => `active.layouts.shown-panel-views.${s}`,
     fileSearchOpen: (s: string) => `active.layouts.file-search-open.${s}`,
     chatSearchOpen: (s: string) => `active.chats.search-open.${s}`,
     chatsExpanded: (s: string) => `active.chats.expanded.${s}`,
@@ -61,7 +61,6 @@ export const StateKey = {
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,
-    activeTreeItem: (s: string) => `active.workspace.active-tree-item-${s}`,
 } as const
 
 /**

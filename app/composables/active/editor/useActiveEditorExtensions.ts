@@ -6,6 +6,7 @@ import type {ActiveSession} from "#shared/types/active/sessions";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAiEditorExtension} from "~/composables/ai/useAiEditorExtension";
+import {useEditorFileDrops} from "~/composables/active/editor/useEditorFileDrops";
 
 // Plugins must be stable objects (package README), so they are built once and only picked per settings.
 const toolbarExt = selectionToolbar()
@@ -72,19 +73,22 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
     const {effective} = useSettingsScope()
     const {t, locale} = useI18n()
     const ai = useAiEditorExtension()
+    const fileDrops = useEditorFileDrops(session)
     // `{n}`/`{total}` are the package's own placeholders: pass them through vue-i18n untouched.
     const labels = computed(() => {
         void locale.value
         return editorLabels.of(Object.fromEntries(LABEL_KEYS.map(k => [k, t(`app.editor.labels.${k}`, {n: '{n}', total: '{total}'})])))
     })
 
+    // The heading list is a new array on every edit: stored raw (no deep proxy of every heading) and at most every
+    // 100 ms while typing, with the active heading in the same write so the two always match.
     let lastHeadings: Heading[] | undefined
-    function sync(state: EditorState) {
+    const sync = useThrottleFn((state: EditorState) => {
         const list = state.field(headingsField)
-        if (list !== lastHeadings) outline.value = lastHeadings = list
+        if (list !== lastHeadings) outline.value = lastHeadings = markRaw(list)
         const from = headingAt(state, state.selection.main.head)?.from ?? null
         if (from !== activeHeading.value) activeHeading.value = from
-    }
+    }, 100, true, true)
     // A view plugin rather than an update listener so the outline is also written when the view is created.
     const scope = sessionScope(session, 'useActiveEditorExtensions')
     const viewKey = `${scope}:${toValue(tabId)}`
@@ -103,6 +107,7 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
             labels.value,
             headingsField,
             tracker,
+            fileDrops,
             panel?.selectionToolbar ?? true ? toolbarExt : [],
             panel?.slashMenu ?? true ? slashExt : [],
             panel?.blockHandle ?? true ? blockHandleExt : [],

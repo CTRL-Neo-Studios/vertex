@@ -14,9 +14,45 @@ export interface AppSettings {
     workflowConfig: AppWorkflowConfig,
     /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
     aiConfig: AppAiConfig,
+    /** Global only: a workspace mustn't choose which program runs as git. */
+    gitConfig: AppGitConfig,
+    /** Moving and renaming files; workspace-overridable. */
+    fileConfig: AppFileConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
+}
+
+export interface AppFileConfig {
+    /**
+     * After a move or rename changes links to a note (or to the notes in a folder): ask each time, update them, or
+     * keep them as written. The link dialog's "Remember my decision" sets it for the workspace.
+     */
+    updateLinks: 'ask' | 'update' | 'keep',
+    /** Where files from outside go when chat or the editor takes them (and pasted screenshots), relative to the
+     *  workspace; created when first needed. */
+    attachmentsFolder: string,
+    /** OS files dropped or pasted into chat are copied into the workspace first: ask each time, or always do it. */
+    importToChat: 'ask' | 'always',
+    /**
+     * Where Files' Delete sends items: the system Trash (Recycle Bin), the workspace's `.trash/` folder (hidden from
+     * Files), or nowhere (deleted for good, after a confirmation, and not undoable).
+     */
+    deletedFiles: 'trash' | 'workspaceTrash' | 'permanent',
+}
+
+export interface AppGitConfig {
+    /** The git executable; `''` finds it (src-tauri/src/git.rs `find_git`). */
+    path: string,
+    /** Keeping workspaces in step without the Sync button (`useGitAutoSync`); everything off by default. */
+    autoSync: {
+        /** Commit, pull and push every this many minutes; 0 is off. */
+        interval: number,
+        /** Sync once when a workspace window opens. */
+        onOpen: boolean,
+        /** Pull when the window gets focus. */
+        pullOnFocus: boolean,
+    },
 }
 
 /** Trusted folders and files aren't settings: they live in `trust.json` (`shared/workflows/trust.ts`). */
@@ -75,18 +111,25 @@ export interface AppViewConfig {
 
 export type HeaderToolsPosition = 'left' | 'right' | 'hidden'
 
-/** A view a side panel can show; `search` is an action (it opens a search) rather than a view. */
-export type PanelViewId = 'files' | 'chats' | 'search' | 'forelinks' | 'backlinks' | 'writersTools' | 'toc' | 'chat'
-export type PanelSlot = PanelViewId | 'separator'
+/**
+ * A view a side panel can show, as registered in `app/utils/panelViews.ts`; `search` is an action (it opens a search)
+ * rather than a view. Any well-formed id is kept in a saved layout (`isPanelViewId`), registered or not.
+ */
+export type PanelViewId = string
+/** `separator` draws a line between buttons; `split` starts a new pane in its area (stacked on a side, side by side at the bottom). */
+export type PanelSlot = PanelViewId | 'separator' | 'split'
 export type PanelSide = 'left' | 'right'
+/** Where views show: the side panels, or the bottom area under the editor. */
+export type PanelArea = PanelSide | 'bottom'
 
 export interface PanelLayout {
     left: PanelSlot[],
     right: PanelSlot[],
+    bottom: PanelSlot[],
     hidden: PanelViewId[],
 }
 
 export interface AppPanelsConfig extends PanelLayout {
-    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. */
+    /** `buttons`: in the side panels (a list on the left, icons in the right's header); `strip`: icon strips at the window's edges. The bottom area always has its buttons in its own header. */
     style: 'buttons' | 'strip',
 }

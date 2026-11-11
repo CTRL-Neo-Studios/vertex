@@ -88,8 +88,11 @@ export function isValidFilename(name: string): boolean {
     return !RESERVED_FILENAMES_REGEX.test(baseName);
 }
 
+/** The image types Vertex shows and chat can send to a model, by extension. */
+export const IMAGE_TYPES: Readonly<Record<string, string>> = {png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif'}
+
 export function isImage(extension: PossiblyRef<string>) {
-    return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
+    return Object.hasOwn(IMAGE_TYPES, unref(extension))
 }
 
 export function isPlainTextFile(extension: PossiblyRef<string>) {
@@ -144,4 +147,20 @@ export function getFileExtensionFromPath(path: PossiblyRef<string>) {
     const name = fileNameFromPath(path)
     const dot = name.lastIndexOf('.')
     return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'unknown'
+}
+
+/**
+ * `name`, or with a number before its extension ("Note 2.md", then "Note 3.md") when `taken` already holds it, as a
+ * file manager's Keep both does. Compared case-insensitively (macOS and Windows disks are). A folder's dots are part
+ * of its name.
+ */
+export function freeName(name: string, taken: Iterable<string>, asFolder = false) {
+    const used = new Set([...taken].map(n => n.toLowerCase()))
+    if (!used.has(name.toLowerCase())) return name
+    const dot = asFolder ? -1 : name.lastIndexOf('.')
+    const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+    for (let n = 2; ; n++) {
+        const next = `${base} ${n}${ext}`
+        if (!used.has(next.toLowerCase())) return next
+    }
 }
