@@ -555,7 +555,12 @@
 					"itemCount": "{count} item(s)",
 					"added": "Added {count} item(s).",
 					"addFailed": "Could not add: {names}",
-					"importFailed": "Could not add the dropped items."
+					"importFailed": "Could not add the dropped items.",
+					"copy": "Copy",
+					"paste": "Paste",
+					"copied": "Copied {count} item(s).",
+					"copyFailed": "Could not copy to the clipboard.",
+					"nothingToPaste": "The clipboard has no files to paste."
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",

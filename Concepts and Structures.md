@@ -136,6 +136,12 @@ Files from the OS (Finder or Explorer) drop onto the tree like rows, with the sa
 
 An OS file dropped anywhere else is refused: a window guard in `app.vue`, and `refuseOsFiles` in the editor, whose CodeMirror would otherwise insert the file's bytes as text. Before, the webview could navigate to the file or the note got its contents.
 
+Copy and paste in Files go through the system clipboard's file list (Rust `clipboard_files_get`/`clipboard_files_set`, `arboard`), so there's one clipboard shared with Finder and Explorer:
+- **Copy** (Cmd/Ctrl+C, or the menu) puts the selected rows there as files.
+- **Paste** (Cmd/Ctrl+V, or the menu) copies whatever files it holds into the selected folder, a selected file's folder, or the top level. It uses `outsideItemsAt(paths)` and `importItems` with `copy`/`inPlace`: by path with `copyFile`, never through the webview.
+- **Naming:** in the items' own folder the copies are named like Keep both without asking ("Note 2.md"), as Duplicate does; elsewhere clashes ask.
+- **Keys:** the tree takes Cmd/Ctrl+C/V as a keydown or as the `copy`/`paste` event the macOS Edit menu may send, whichever comes first.
+
 ### AI requests
 
 Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys never reach the webview:

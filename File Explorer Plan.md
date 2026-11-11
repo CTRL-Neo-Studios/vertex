@@ -43,7 +43,7 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | Pasted screenshots | Image data with no file behind it is saved as `Pasted image YYYYMMDDHHmmss.png` (Obsidian's naming) in the attachments folder. |
 | Chat attachments | Notes (`.md`) and folders as now, plus images (`png`, `jpg`, `jpeg`, `webp`, `gif`) sent as images to models whose `inputModalities` include `image`. With a text-only model, attaching an image is refused with a toast naming the model; switching to one with images attached warns before sending. Images over 5 MB are refused (common provider limits). **PDFs and other files: deferred.** You'll come back with more on PDFs and new chat tools. |
 | Chat copy dialog | OS files dropped or pasted into chat are first copied into the attachments folder, then attached. A dialog asks "Add N file(s) to the workspace and attach them?", showing the folder, with "Remember my decision for this workspace". New setting `fileConfig.importToChat`: `'ask'` (default) or `'always'`, workspace-overridable like `updateLinks`. Items already in the workspace are attached as they are: no copy, no dialog. |
-| Copy and paste in Files | **Cmd/Ctrl+C** on the selection:<br>• puts the items on Vertex's own clipboard (uuids);<br>• puts their relative paths, one per line, on the system clipboard as text.<br><br>**Cmd/Ctrl+V** in Files copies them into the selected folder (a selected file's folder, or the top level):<br>• pasting into the folder they're in names them like Keep both ("Note 2.md") without asking, as Finder does;<br>• elsewhere, clashes ask through the dialog.<br><br>The disabled **Duplicate** menu item becomes copy and paste into the same folder. Pasting copied rows into chat attaches them; pasting them into a note inserts links. No cut: dragging already moves. |
+| Copy and paste in Files | One clipboard, the system's file list (as built): there is no clipboard of Vertex's own.<br>• **Cmd/Ctrl+C** puts the selection there as files, as Finder's and Explorer's Copy does, so they paste in Finder too.<br>• **Cmd/Ctrl+V** in Files copies whatever files it holds, copied in Vertex or in the OS, into the selected folder (a selected file's folder, or the top level).<br>• Pasting into the folder the items are in names them like Keep both ("Note 2.md") without asking, as Finder does; elsewhere, clashes ask through the dialog.<br><br>The disabled **Duplicate** menu item now makes the same copies in place. Pasting copied rows into chat attaches them (they're workspace paths); pasting them into a note inserts links. No cut: dragging already moves. |
 | Editor drops and pastes | A Vertex CodeMirror extension in `useActiveEditorExtensions` (`domEventHandlers` `paste`/`drop`); the editor package doesn't change.<br>• **A pasted screenshot:** saved, then `![[Pasted image ….png]]` at the cursor.<br>• **A pasted or dropped OS file:** copied into the attachments folder, then `![[…]]` for an image or `[[…]]` otherwise, at the cursor or drop point. No dialog: pasting into a note is a clear intent, as in Obsidian.<br>• **Rows dragged from Files:** `[[links]]`, one per line, with no copy. |
 | Drag out | Rows dragged out of Vertex copy into Finder or Explorer through a native drag: CrabNebula's `tauri-plugin-drag` (drag-rs, macOS/Windows/Linux). A new dependency, since HTML5 can't hand the OS real files and WebKit has no `DownloadURL`. How it coexists with the HTML5 tree drag is F9's first step. |
 | Deleted files | Deleting is permanent today (`deleteFiles` → `removePath`). New setting `fileConfig.deletedFiles`, workspace-overridable like the other `fileConfig` keys (Settings → View → Files), like Obsidian's "Deleted files":<br>• `'trash'` (default): the system Trash or Recycle Bin;<br>• `'workspaceTrash'`: a `.trash/` folder in the workspace, hidden from Files like every dot-folder;<br>• `'permanent'`: as today.<br><br>Moving to a trash asks nothing; Finder and Explorer don't, and Undo is right there. A permanent delete keeps the confirmation dialog. |
@@ -274,24 +274,57 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
 ## F6: Copy and paste in Files
 
 ### Change
-- **Cmd/Ctrl+C with the tree focused, or Copy in the menu:**
-  - Vertex's clipboard (a `useState`) holds the selection's uuids, minus items inside a selected folder.
-  - The system clipboard gets their relative paths as text.
+- **Cmd/Ctrl+C with the tree focused, or Copy in the menu:** the system clipboard gets the selection, minus items inside a selected folder, as files.
 - **Cmd/Ctrl+V with the tree focused, or Paste in the menu:**
   - The target is the selected folder, a selected file's folder, or the top level.
-  - Paste copies the items with plugin-fs `copyFile`, and `mkdir` plus recursion for folders; each path gets `markSelfWrite` and is then indexed.
+  - Paste reads the system clipboard's files, from Vertex or the OS, and copies them in with `importItems`. Files go by path (plugin-fs `copyFile`); folders get `mkdir` plus recursion. Each path gets `markSelfWrite` and is then indexed.
   - Pasting into the folder an item is in names the copy like Keep both, without asking. Anywhere else, clashes go through `FileConflictModal`.
   - The copies end up selected.
-  - When Vertex's clipboard is empty but the system clipboard holds OS files (per the F5 probe), paste imports them with `importItems`.
-- **Duplicate** (the disabled menu item) copies the selection and pastes it into its own folder.
+- **Duplicate** (the disabled menu item) copies the selection into its own folder.
 - **Links in copies:** a copied note's `[[links]]` are kept as written. They resolve by name, and path links still point at the originals, as Obsidian does.
 
 ### Acceptance
 - Copying two notes and a folder, then pasting them into another folder, copies all three; the folder arrives with its contents, and the copies are selected.
 - Pasting into the same folder gives "Note 2.md" without asking; Duplicate does the same.
 - A clash elsewhere asks.
-- The system clipboard holds the paths as text.
-- A file copied in Finder pastes into Files as an import (if the probe allows).
+- What Files copies pastes in Finder.
+- A file copied in Finder pastes into Files.
+
+### As built
+- **No probe needed.** The webview's `paste` event would only have carried what WebKit chooses to expose. Instead, two Rust commands read and write the system clipboard's file list: `clipboard_files_get` and `clipboard_files_set` in `lib.rs`, using `arboard` 3.7. It was already in the tree through the clipboard plugin and is now a direct desktop dependency. Its `file_list` works on macOS, Windows and Linux.
+  - **Paste** becomes "copy these paths in". `outsideItemsAt(paths)` (in `app/utils/outsideItems.ts`) describes them with plugin-fs `stat`/`readDir`, folders whole.
+  - **`importItems`** copies by path (`OutsideItem.source`, `copyFile`), so nothing passes through the webview.
+  - **`{copy: true, inPlace: true}`:** a paste always copies, even the workspace's own files, and an item pasted into its own folder gets Keep both through `planInto`'s new `preset`. Such an item never merges into itself.
+- **The keys:**
+  - `onKeydown` handles Cmd/Ctrl+C and Cmd/Ctrl+V.
+  - The tree also handles DOM `copy`/`paste` events, because on macOS the predefined Edit menu items can deliver the key that way. Whichever arrives first acts (`clipboardOnce`, 300 ms).
+- **The menus:**
+  - A row's menu has Copy and Paste (into that folder, or the file's folder), with ⌘C/⌘V hints (Ctrl elsewhere), and Duplicate is enabled.
+  - The selection menu has Copy and Duplicate.
+  - Right-click on empty space adds Paste (top level).
+- **The tree's helpers:**
+  - `addInto` is shared by drops, pastes and Duplicate: it opens the target, imports, selects what arrived, and shows the error toast.
+  - `topOf` (the rows minus those inside a selected folder) is shared by drag, copy and Duplicate.
+- **Feedback:**
+  - Copy toasts "Copied N item(s)."
+  - A paste toasts "Added N item(s).", the same as drops.
+  - Paste with no files on the clipboard says "The clipboard has no files to paste."
+
+### Results (done)
+Checked on the stubbed production build with the clipboard commands stubbed, real Cmd+C/Cmd+V keys and real clicks:
+- **Copy:** selecting F00's M0_1 and M0_2 and pressing Cmd+C put both paths on the clipboard, with "Copied 2 item(s)."
+- **Paste elsewhere:** with F01 selected, Cmd+V asked about M0_1, which F01 already had. Keep both gave `copy F00/M0_1.md → F01/M0_1 2.md` and `F00/M0_2.md → F01/M0_2.md`, with "Added 2 item(s)." and both copies selected.
+- **Paste into the same folder:** with F00's M0_5 selected, Cmd+V made `F00/M0_1 2.md` and `F00/M0_2 2.md` with no dialog.
+- **A folder:** copying Sub, which holds Deep, and pasting on Big made `mkdir Big/Sub`, `mkdir Big/Sub/Deep`, then the five files by path.
+- **Duplicate** from M0_3's menu made `F00/M0_3 2.md`. The menu shows Copy ⌘C, Paste ⌘V and Duplicate.
+- **From outside:** a file "copied on the Desktop" (`/Users/me/Desktop/Ext.md`) pasted into Big by path.
+- **Nothing to paste:** with the clipboard empty, the toast said so.
+- **The `paste` event route** (as the macOS Edit menu sends it) pasted too, asking about the clash with Ext.md.
+
+Unverified:
+- the real system clipboard: `arboard`'s file list on macOS, Windows and Linux;
+- pasting Vertex's copies in Finder or Explorer;
+- whether the macOS Edit menu delivers Cmd+C/V as a keydown or as `copy`/`paste` (both are handled).
 
 ## F7: Chat drops and pastes
 
@@ -307,8 +340,7 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
     - for the rest, unless `importToChat` is `'always'`, a new `ImportToChatModal` asks: "Add N file(s) to the workspace and attach them?", with the folder and "Remember my decision for this workspace";
     - then `importItems` copies them into the attachments folder, and they're attached.
 - **Pasting into the prompt:**
-  - Vertex's clipboard (F6): attached.
-  - OS files: the same as a drop.
+  - Files on the system clipboard (`clipboard_files_get`; F6): ones in the workspace are attached as they are, others as an OS drop.
   - Image data: saved as a pasted screenshot (Decisions), through the same dialog, then attached.
   - Plain text: pasted as text, as now.
 - **Sending images:**
@@ -337,7 +369,7 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
 - **Paste:**
   - image data → a pasted screenshot (Decisions), then `![[Pasted image ….png]]`;
   - OS files → `importItems` into the attachments folder, then `![[name]]` for images and `[[name]]` for others, one per line;
-  - Vertex-copied rows (F6) → `[[links]]`.
+  - files on the system clipboard that are in the workspace (copied in Files, F6) → `[[links]]`.
 - **Drop:**
   - OS files are handled as when pasted, at the drop position (`posAtCoords`).
   - Rows from Files (`application/x-vertex-files`) become `[[links]]` at the drop position, and the drop cursor shows where they'll go.

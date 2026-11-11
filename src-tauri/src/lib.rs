@@ -163,6 +163,24 @@ fn sync_main_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>, closing: O
     }
 }
 
+/// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
+/// holds no files or can't be read.
+#[tauri::command]
+fn clipboard_files_get() -> Vec<String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.get().file_list())
+        .map(|list| list.into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
+        .unwrap_or_default()
+}
+
+/// Puts files on the system clipboard, as Finder's or Explorer's Copy does: they paste there, and into Vertex.
+#[tauri::command]
+fn clipboard_files_set(paths: Vec<String>) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.set().file_list(&paths))
+        .map_err(|e| e.to_string())
+}
+
 /// Quits the app after every session window has flushed its pending session write.
 /// Each window answers `vertex://flush-requested` by awaiting its last write and calling `flush_done`.
 /// The timeout only guards against a hung webview; normal flushes finish in milliseconds.
@@ -252,6 +270,8 @@ pub fn run() {
             state::workspace_settings_reload,
             state::take_open_requests,
             quit_app,
+            clipboard_files_get,
+            clipboard_files_set,
             updater::update_token_get,
             updater::update_token_set,
             updater::update_channels,

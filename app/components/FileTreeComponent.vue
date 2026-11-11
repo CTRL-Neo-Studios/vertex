@@ -5,6 +5,7 @@ import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
 import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
+import {invoke} from "@tauri-apps/api/core"
 import {platform} from "@tauri-apps/plugin-os"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
@@ -19,7 +20,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {outsideItems} from "~/utils/outsideItems";
+import {outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
 
 const {t} = useI18n()
 
@@ -138,15 +139,87 @@ function onBlankClick(event: MouseEvent) {
 }
 
 function onKeydown(event: KeyboardEvent) {
+    const key = event.key.toLowerCase()
     if (event.key === 'Escape' && selected.value.size) {
         selected.value = new Set()
-    } else if (toggleKey(event) && event.key.toLowerCase() === 'a') {
+    } else if (toggleKey(event) && key === 'a') {
         event.preventDefault()
         selected.value = new Set(shownIds())
+    } else if (toggleKey(event) && key === 'c' && selected.value.size) {
+        event.preventDefault()
+        clipboardOnce(() => copySelection())
+    } else if (toggleKey(event) && key === 'v') {
+        event.preventDefault()
+        clipboardOnce(() => pasteInto(pasteTarget()))
     } else if (selected.value.size && (event.key === 'Delete' || (mac && event.metaKey && event.key === 'Backspace'))) {
         event.preventDefault()
         deleteFilesModal.open({fileIndexIds: [...selected.value]})
     }
+}
+
+// Copy and paste, as in a file manager, through the system clipboard's file list (Rust, `clipboard_files_*`): Copy
+// puts the selection there as files, so Finder or Explorer can paste them too; Paste copies whatever files are there,
+// copied in Vertex or in the OS, into the selected folder, a selected file's folder, or the top level. Pasting into the
+// folder an item is in names the copy like Keep both, unasked ("Note 2.md"); elsewhere clashes ask.
+// On macOS the Edit menu's Copy/Paste can turn Cmd+C/V into a `copy`/`paste` event instead of a keydown: whichever
+// arrives first acts.
+let clipboardAt = 0
+function clipboardOnce(run: () => unknown) {
+    if (Date.now() - clipboardAt < 300) return
+    clipboardAt = Date.now()
+    void run()
+}
+function onClipboard(event: ClipboardEvent, run: () => unknown) {
+    event.preventDefault()
+    clipboardOnce(run)
+}
+
+/** The given rows minus those inside another of them (they go with their folder). */
+function topOf(ids: Iterable<string>) {
+    const nodes = [...ids].map(id => getFileByUuid(id)).filter(n => !!n)
+    return nodes.filter(n => !nodes.some(o => o.isFolder && n.relativePath.startsWith(`${o.relativePath}/`)))
+}
+const absOf = (rel: string) => rel ? `${session!.rootPath}/${rel}` : session!.rootPath!
+
+async function copySelection(ids: Iterable<string> = selected.value) {
+    const files = topOf(ids)
+    if (!files.length) return
+    try {
+        await invoke('clipboard_files_set', {paths: files.map(f => f.fullPath)})
+        $qt.success(t('app.editor.ui.filetree.copied', {count: files.length}))
+    } catch (error) {
+        $qt.error(t('app.editor.ui.filetree.copyFailed'), String(error))
+    }
+}
+
+/** Where Paste goes (relative): the selected folder, a selected file's folder, or the top level. */
+function pasteTarget() {
+    const node = getFileByUuid(anchor && selected.value.has(anchor) ? anchor : selected.value.values().next().value)
+    return !node ? '' : node.isFolder ? node.relativePath : parentPathOf(node.relativePath)
+}
+
+async function pasteInto(dest: string) {
+    if (!session?.rootPath) return
+    const paths = await invoke<string[]>('clipboard_files_get')
+    if (!paths.length) return $qt.info(t('app.editor.ui.filetree.nothingToPaste'))
+    await addInto(dest, await outsideItemsAt(paths), {copy: true, inPlace: true})
+}
+
+/** Copies of the rows next to them ("Note 2.md"), as pasting them into their own folders would make. */
+async function duplicate(ids: Iterable<string>) {
+    const byFolder = new Map<string, string[]>()
+    for (const node of topOf(ids)) {
+        const dir = parentPathOf(node.relativePath)
+        byFolder.set(dir, [...byFolder.get(dir) ?? [], node.fullPath])
+    }
+    const made: string[] = []
+    for (const [dir, paths] of byFolder) made.push(...await addInto(dir, await outsideItemsAt(paths), {copy: true, inPlace: true}, false))
+    if (made.length) selectOnly(made)
+}
+
+function selectOnly(ids: string[]) {
+    selected.value = new Set(ids)
+    anchor = ids[0]
 }
 
 // One menu for the whole tree (a menu per row gave every row a menu root, and a virtual list remounts rows as it
@@ -175,9 +248,12 @@ const fileIcon = (item: TreeItem) => {
 }
 const menuItems = computed(() => {
     const row = menuRow.value
-    if (!row) return props.emptyMenu ?? []
+    if (!row) return [...props.emptyMenu ?? [], [pasteItem('')]]
     return selected.value.size > 1 ? getSelectionMenu([...selected.value]) : getItemContextMenu(row.item, row.level, (row.item.originalNodeData as UITreeNode).isFolder)
 })
+const copyItem = (ids: string[]): ContextMenuItem => ({label: t('app.editor.ui.filetree.copy'), icon: 'i-lucide-copy', kbds: ['meta', 'c'], onSelect: () => copySelection(ids)})
+const pasteItem = (dest: string): ContextMenuItem => ({label: t('app.editor.ui.filetree.paste'), icon: 'i-lucide-clipboard-paste', kbds: ['meta', 'v'], onSelect: () => pasteInto(dest)})
+const duplicateItem = (ids: string[]): ContextMenuItem => ({label: t('app.editor.ui.duplicate'), icon: 'i-lucide-files', onSelect: () => duplicate(ids)})
 
 const treeRef = useTemplateRef<{ $el: HTMLElement }>('treeRef')
 const fade = useScrollFade(() => treeRef.value?.$el)
@@ -362,8 +438,7 @@ function onDragStart(event: DragEvent) {
         selected.value = new Set([id])
         anchor = id
     }
-    const nodes = [...selected.value].map(s => getFileByUuid(s)).filter(n => !!n)
-    const ids = nodes.filter(n => !nodes.some(o => o.isFolder && n.relativePath.startsWith(`${o.relativePath}/`))).map(n => n.uuid)
+    const ids = topOf(selected.value).map(n => n.uuid)
     dragged.value = ids
     event.dataTransfer.effectAllowed = 'move'
     // WebKit starts a drag only with some data set.
@@ -428,27 +503,31 @@ async function onDrop(event: DragEvent) {
 
 /** Opens the folder at `dest` (relative; `''` is the top level) so what lands there shows, and stays selected. */
 function openDest(dest: string) {
-    const folder = dest && getFileByPath(`${session!.rootPath}/${dest}`)?.uuid
+    const folder = dest && getFileByPath(absOf(dest))?.uuid
     if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
 }
 
 /**
- * OS files dropped on the tree: copied in, or moved when they're already the workspace's (Option/Alt copies them
- * anyway). What arrives is selected.
+ * Brings `items` into the folder at `dest` (relative) through `importItems`, opening it first, and selects what
+ * arrives (unless `select` is false: Duplicate selects across several folders itself). Returns the new uuids.
  */
+async function addInto(dest: string, items: OutsideItem[], options: {copy?: boolean, inPlace?: boolean}, select = true) {
+    openDest(dest)
+    try {
+        const ids = await importItems(items, absOf(dest), options) || []
+        if (select && ids.length) selectOnly(ids)
+        return ids
+    } catch (error) {
+        $qt.error(t('app.editor.ui.filetree.importFailed'), String(error))
+        return []
+    }
+}
+
+/** OS files dropped on the tree: copied in, or moved when they're already the workspace's (Option/Alt copies them anyway). */
 async function importDrop(event: DragEvent, dest: string) {
     // Taken while the event lasts.
     const pending = outsideItems(event.dataTransfer!), copy = event.altKey
-    openDest(dest)
-    try {
-        const ids = await importItems(await pending, dest ? `${session!.rootPath}/${dest}` : session!.rootPath!, {copy})
-        if (ids && ids.length) {
-            selected.value = new Set(ids)
-            anchor = ids[0]
-        }
-    } catch (error) {
-        $qt.error(t('app.editor.ui.filetree.importFailed'), String(error))
-    }
+    await addInto(dest, await pending, {copy})
 }
 
 async function openInTab(uuid: string) {
@@ -519,8 +598,9 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.copyRelativePath'), icon: 'i-lucide-copy', onSelect: () => writeText(file()?.relativePath ?? '')},
             {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-copy', onSelect: () => file() && $opener.revealFilesInFileManager([file()!.fullPath])},
         ],
+        [copyItem([item.id]), pasteItem(isFolder ? node.relativePath : parentPathOf(node.relativePath))],
         [
-            {label: t('app.editor.ui.duplicate'), icon: 'i-lucide-files', disabled: true}, // not implemented yet
+            duplicateItem([item.id]),
             {label: t('app.editor.ui.moveFileTo'), icon: 'i-lucide-folder-tree', disabled: true}, // not implemented yet
             {label: t('app.editor.ui.rename'), icon: 'i-lucide-pen-line', onSelect: () => renameFileModal.open({fileIndexId: item.id, currentFileName: item.label ?? ''})},
             {label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: [item.id]})},
@@ -547,6 +627,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             {label: t('app.editor.ui.filetree.copyRelativePaths'), icon: 'i-lucide-copy', onSelect: () => copy('relativePath')},
             {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-copy', onSelect: () => $opener.revealFilesInFileManager(files.map(f => f.fullPath))},
         ],
+        [copyItem(ids), duplicateItem(ids)],
         [{label: t('app.editor.ui.delete'), color: 'error', icon: 'i-lucide-trash-2', onSelect: () => deleteFilesModal.open({fileIndexIds: ids})}],
     ]
 }
@@ -572,6 +653,8 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             @contextmenu.capture="onContextMenu"
             @click="onBlankClick"
             @keydown="onKeydown"
+            @copy="(e: ClipboardEvent) => onClipboard(e, () => copySelection())"
+            @paste="(e: ClipboardEvent) => onClipboard(e, () => pasteInto(pasteTarget()))"
             @dragstart="onDragStart"
             @dragover="onDragOver"
             @dragleave="onDragLeave"

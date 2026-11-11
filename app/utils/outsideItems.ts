@@ -1,6 +1,10 @@
+import {readDir, stat} from "@tauri-apps/plugin-fs";
+import {join} from "@tauri-apps/api/path";
+
 /**
- * Files and folders from outside the workspace, as a drop or a paste hands them over. `read` gives a file's bytes;
- * `path` is its place on disk when the webview tells (a `text/uri-list` with `file:` URLs).
+ * Files and folders from outside the workspace, as a drop or a paste hands them over. A dropped file is read through
+ * `read`; a pasted one is a path on disk (`source`), copied by path. `path` is where it is on disk when known, which
+ * tells whether it's the workspace's own.
  */
 export interface OutsideItem {
     name: string
@@ -9,6 +13,7 @@ export interface OutsideItem {
     modified: number
     children: () => OutsideItem[]
     read?: () => Promise<Uint8Array>
+    source?: string
     path?: string
 }
 
@@ -43,4 +48,17 @@ export async function outsideItems(transfer: DataTransfer): Promise<OutsideItem[
     const items = (await Promise.all(sources.map(s => !s ? undefined : s instanceof File ? (SKIPPED.has(s.name) ? undefined : fromFile(s)) : fromEntry(s)))).filter(i => !!i)
     for (const item of items) item.path = paths.find(p => p.endsWith(`/${item.name}`))
     return items
+}
+
+/** Items at paths on disk (a pasted file list), folders read whole. Nothing is read into the webview: copies go by path. */
+export async function outsideItemsAt(paths: string[]): Promise<OutsideItem[]> {
+    const at = async (path: string, name: string): Promise<OutsideItem | undefined> => {
+        if (SKIPPED.has(name)) return
+        const info = await stat(path), modified = info.mtime?.getTime() ?? Date.now()
+        const children = info.isDirectory
+            ? (await Promise.all((await readDir(path)).map(async e => at(await join(path, e.name), e.name)))).filter(c => !!c)
+            : []
+        return {name, isFolder: info.isDirectory, size: info.size, modified, children: () => children, source: path, path}
+    }
+    return (await Promise.all(paths.map(p => at(p, p.split(/[\\/]/).pop() ?? p)))).filter(i => !!i)
 }

@@ -1,4 +1,4 @@
-import {exists, mkdir, readTextFile, writeFile, writeTextFile} from "@tauri-apps/plugin-fs"
+import {copyFile, exists, mkdir, readTextFile, writeFile, writeTextFile} from "@tauri-apps/plugin-fs"
 import {dirname, join} from "@tauri-apps/api/path"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
@@ -63,16 +63,18 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
      * - a name already taken (ignoring case, by an indexed item or by another incoming one) asks through
      *   `FileConflictModal`: Replace, Keep both ("Note 2.md", the name is chosen here) or Skip, optionally for every
      *   clash left. Replacing another incoming item means that one stays out.
+     * `preset` answers a clash without asking (paste's Keep both in the item's own folder); such an item never merges.
      * Returns the steps to carry out (skipped ones dropped), or false when cancelled.
      */
-    async function planInto<T extends Incoming<T>>(items: T[], destDir: string) {
+    async function planInto<T extends Incoming<T>>(items: T[], destDir: string, preset?: (item: T, dir: string) => ConflictAction | undefined) {
         const root = session!.rootPath!
         const steps: Step<T>[] = [], merged: T[] = []
         const claimed = new Map<string, Step<T>>()
         const plan = (item: T, dir: string) => {
             const lower = item.name.toLowerCase(), key = `${dir}/${lower}`
             const clash = entriesIn(dir).find(e => e.fileName.toLowerCase() === lower)
-            if (clash?.isFolder && item.isFolder) {
+            const answer = preset?.(item, dir)
+            if (clash?.isFolder && item.isFolder && !answer) {
                 merged.push(item)
                 for (const child of item.children()) plan(child, clash.fullPath)
                 return
@@ -82,12 +84,13 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
                 item, dir, name: item.name, rival,
                 clash: clash ? {uuid: clash.uuid, isFolder: clash.isFolder, size: clash.size, modified: clash.modifiedTime} : rival && {...rival.item},
             }
+            if (step.clash) step.action = answer
             steps.push(step)
             claimed.set(key, step)
         }
         for (const item of items) plan(item, destDir)
 
-        const clashes = steps.filter(s => s.clash)
+        const clashes = steps.filter(s => s.clash && !s.action)
         let always: ConflictAction | undefined
         for (const [i, step] of clashes.entries()) {
             if (!always) {
@@ -177,11 +180,13 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
     /**
      * Brings files and folders from outside (a drop or a paste) into the folder `destDir` (absolute). Items already in
      * the workspace (`indexedMatch`) move there instead, as on the same disk in a file manager, unless `copy` (Option
-     * or Alt held) copies them. The rest are copied in: clashes and merges as `planInto` plans them, each path marked
-     * as Vertex's own write and indexed parent-first. One toast reports what was added and what failed. Returns the
-     * uuids of everything that ended up in `destDir`, or false when cancelled.
+     * or Alt held, or a paste) copies them. With `inPlace` (paste, Duplicate), an item copied into the folder it's in
+     * is named like Keep both without asking, as Finder does. The rest are copied in: clashes and merges as `planInto`
+     * plans them, a pasted file by path (`copyFile`), a dropped one from its bytes, each path marked as Vertex's own
+     * write and indexed parent-first. One toast reports what was added and what failed. Returns the uuids of
+     * everything that ended up in `destDir`, or false when cancelled.
      */
-    async function importItems(items: OutsideItem[], destDir: string, {copy = false} = {}) {
+    async function importItems(items: OutsideItem[], destDir: string, {copy = false, inPlace = false} = {}) {
         const root = session?.rootPath
         if (!root || !items.length) return []
         const found: string[] = [], outside: OutsideItem[] = []
@@ -191,7 +196,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             else outside.push(item)
         }
         if (found.length && !await moveFiles(found, destDir)) return false
-        const plan = await planInto(outside, destDir)
+        const plan = await planInto(outside, destDir, inPlace ? (item, dir) => item.source && parentPathOf(item.source) === dir ? 'keepBoth' : undefined : undefined)
         if (!plan) return found
 
         const replaced = replacedBy(plan.steps)
@@ -201,6 +206,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             try {
                 markSelfWrite(path)
                 if (item.isFolder) await mkdir(path)
+                else if (item.source) await copyFile(item.source, path)
                 else await writeFile(path, await item.read!())
                 await addFileToIndex(path, root)
                 if (item.isFolder) for (const child of item.children()) await write(child, await join(path, child.name))

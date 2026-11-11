@@ -38,6 +38,8 @@ age = "0.12.1"
 uuid = { version = "1.29.0", features = ["v4"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+# Already in the tree through the clipboard plugin; used directly for file lists (Copy/Paste in Files).
+arboard = "3.7"
 fontdb = "0.23"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
