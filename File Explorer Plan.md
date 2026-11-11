@@ -4,14 +4,20 @@ The Files tree should behave like a file manager rather than a styled hierarchy.
 - selecting several items with a click and Shift, Cmd/Ctrl or a drag box;
 - moving the selection by dragging, with a stacked preview of what's moving and a clear outline around the target folder;
 - copying files and folders in from Finder or Explorer;
-- deeply nested rows scroll sideways instead of squeezing their names.
+- deeply nested rows scroll sideways instead of squeezing their names;
+- copying and pasting files within Files, and dragging them out to Finder or Explorer;
+- files reaching chat and the editor the way users expect:
+  - dragged from Files or the OS, or pasted, into chat, they get attached;
+  - pasted or dropped into a note, they're inserted as embeds or links.
 
 Today:
 - The tree selects nothing; the open tab is the only highlighted row.
 - A drag moves one row (O3).
 - A file dragged in from the OS lands on the webview, which navigates to the file and loses the app.
+- **Chat:** attaches only `.md` notes and folders (by path, with `@` or the picker), and sends their text when the message goes out. Nothing can be dropped or pasted into it. The model never gets images, though `inputModalities` already tells which models accept them.
+- **Editor:** `@type32/codemirror-rich-obsidian-editor` 0.3.6 has no paste or drop handling for files, so a pasted screenshot does nothing.
 
-All the work is in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus one new dialog and one global listener.
+F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus one new dialog and one global listener. F6–F9 build on F5's import.
 
 ## Decisions
 
@@ -28,16 +34,30 @@ All the work is in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plu
 | Many moves | One move path, `moveFiles(uuids, destDir)`. `renameFile` and `moveFile` (O3) become a list of one. Links get one pass, with at most one links dialog for the whole move ("Update links to 5 items?"). |
 | Name clashes | Always asked, as a file manager does. Folders merge, as in Windows Explorer: their contents move in, and only clashing files ask. A file clash offers **Replace**, **Keep both** ("Note 2.md") or **Skip**. With more clashes left, "Do this for the remaining N" applies the choice to the rest. **Cancel**: for moves, everything is asked before anything moves, so Cancel moves nothing (as built); for F5 imports it stops, and what's done stays done. The same dialog serves tree moves (before, a clash only showed an error toast) and OS imports. |
 | OS drops | `dragDropEnabled` stays `false`: Tauri's own handler would give paths but turns off HTML5 drag & drop on every platform (tauri#14373), which the tree, the Chats list and the panels use. A dropped item's contents are read through the browser File API (`webkitGetAsEntry` for folders) and written with plugin-fs `writeFile`/`mkdir`, then indexed parent-first (`addFileToIndex`). A drop is a copy. `.DS_Store` and `Thumbs.db` are skipped. |
-| Drops anywhere else | A window-level guard: an OS file drag that no handler accepts gets `dropEffect = 'none'` and `preventDefault`, so the webview never navigates. Only the tree accepts OS files. The editor, chat and panels show the "not allowed" cursor. |
+| Drops anywhere else | A window-level guard: an OS file drag that no handler accepts gets `dropEffect = 'none'` and `preventDefault`, so the webview never navigates. The tree (F5), chat (F7) and the editor (F8) accept OS files; everything else shows the "not allowed" cursor. |
 | Items already in the workspace | **Detection:** an item whose name, size and modified time match an indexed one at the drop is treated as that item. If the probe (F5) finds the webview exposes the item's path (`text/uri-list`), the path decides instead. **Handling:** a found item moves, exactly as a tree drag would (links updated, refusals, its own folder a no-op). This is what Finder and Explorer do on the same disk. Holding Option/Alt at the drop copies instead, through the clash dialog. **Risk:** a false match (an identical outside copy, such as a backup) moves the workspace's file instead of copying the outside one. Nothing is lost. |
 | Keyboard | With the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (and Cmd+Backspace on macOS) opens the existing delete dialog for the selection. Shift+arrow ranges: not now. |
+| One import | F5's import (copy outside items into a workspace folder, clash dialog, "already in the workspace" detection) is one function, `importItems(items, destDir)` in `useActiveWorkspaceTools`. The tree, chat, the editor and paste all use it, and it returns the new items' uuids. |
+| Attachments folder | New setting `fileConfig.attachmentsFolder`, default `Attachments` at the top level, like Obsidian's "Default location for new attachments". `fileConfig` is already workspace-overridable, so each workspace can set its own (Settings → View → Files). Files copied in for chat or the editor and pasted screenshots land there; the folder is created on first use. The tree's own drops and pastes go where they're dropped or pasted, not here. |
+| Pasted screenshots | Image data with no file behind it is saved as `Pasted image YYYYMMDDHHmmss.png` (Obsidian's naming) in the attachments folder. |
+| Chat attachments | Notes (`.md`) and folders as now, plus images (`png`, `jpg`, `jpeg`, `webp`, `gif`) sent as images to models whose `inputModalities` include `image`. With a text-only model, attaching an image is refused with a toast naming the model; switching to one with images attached warns before sending. Images over 5 MB are refused (common provider limits). **PDFs and other files: deferred.** You'll come back with more on PDFs and new chat tools. |
+| Chat copy dialog | OS files dropped or pasted into chat are first copied into the attachments folder, then attached. A dialog asks "Add N file(s) to the workspace and attach them?", showing the folder, with "Remember my decision for this workspace". New setting `fileConfig.importToChat`: `'ask'` (default) or `'always'`, workspace-overridable like `updateLinks`. Items already in the workspace are attached as they are: no copy, no dialog. |
+| Copy and paste in Files | **Cmd/Ctrl+C** on the selection:<br>• puts the items on Vertex's own clipboard (uuids);<br>• puts their relative paths, one per line, on the system clipboard as text.<br><br>**Cmd/Ctrl+V** in Files copies them into the selected folder (a selected file's folder, or the top level):<br>• pasting into the folder they're in names them like Keep both ("Note 2.md") without asking, as Finder does;<br>• elsewhere, clashes ask through the dialog.<br><br>The disabled **Duplicate** menu item becomes copy and paste into the same folder. Pasting copied rows into chat attaches them; pasting them into a note inserts links. No cut: dragging already moves. |
+| Editor drops and pastes | A Vertex CodeMirror extension in `useActiveEditorExtensions` (`domEventHandlers` `paste`/`drop`); the editor package doesn't change.<br>• **A pasted screenshot:** saved, then `![[Pasted image ….png]]` at the cursor.<br>• **A pasted or dropped OS file:** copied into the attachments folder, then `![[…]]` for an image or `[[…]]` otherwise, at the cursor or drop point. No dialog: pasting into a note is a clear intent, as in Obsidian.<br>• **Rows dragged from Files:** `[[links]]`, one per line, with no copy. |
+| Drag out | Rows dragged out of Vertex copy into Finder or Explorer through a native drag: CrabNebula's `tauri-plugin-drag` (drag-rs, macOS/Windows/Linux). A new dependency, since HTML5 can't hand the OS real files and WebKit has no `DownloadURL`. How it coexists with the HTML5 tree drag is F9's first step. |
 
 ```mermaid
 flowchart LR
   F1[F1 Selection] --> F3[F3 Drag select]
   F2[F2 Wide rows] --> F3
   F1 --> F4[F4 Moving many]
-  F4 --> F5[F5 OS drops]
+  F4 --> F5[F5 OS drops and import]
+  F5 --> F6[F6 Copy and paste in Files]
+  F5 --> F7[F7 Chat drops and pastes]
+  F5 --> F8[F8 Editor drops and pastes]
+  F6 --> F7
+  F6 --> F8
+  F4 --> F9[F9 Drag out]
 ```
 
 ## F1: Selection
@@ -195,10 +215,14 @@ Checked on the stubbed production build (dispatched drag events, real clicks):
 
 Unverified: the drag preview as WKWebView draws it (headless only shows the element), and real pointer drags in WebKit.
 
-## F5: OS drops
+## F5: OS drops and import
 
 ### Change
-- **Probe first**, in Vertex on macOS (needs the user): log `dataTransfer.types`, and `text/uri-list` if present, for a Finder drop on the tree. That shows whether paths are available for detection. On Windows, check that the guard alone stops the navigation.
+- **Probe first**, in Vertex on macOS (needs the user). It answers two questions:
+  - **A Finder drop on the tree:** log `dataTransfer.types`, and `text/uri-list` if present. That shows whether paths are available for detection.
+  - **A Finder Cmd+C, then Cmd+V into the app:** log the paste event's `clipboardData.types` and `clipboardData.files`. That shows whether a copied file arrives as a `File` (F6–F8 paste depends on it). If it doesn't, a small Rust command reads the copied files' paths from the system clipboard (`NSPasteboard` on macOS, `CF_HDROP` on Windows), and paste imports by path instead.
+  - On Windows, check that the guard alone stops the navigation.
+- **`importItems(items, destDir)`** in `useActiveWorkspaceTools`, the one import (Decisions). It takes `File`s, directory entries or, if the probe needs it, paths, and returns the new or found uuids.
 - **Guard:** a window-level `dragover`/`drop` listener in `app.vue`, for drags carrying `Files` that no handler accepted (`defaultPrevented`): `dropEffect = 'none'` and `preventDefault`. Other windows load the same app, so the guard covers them too.
 - **The tree accepts `Files`:**
   - It uses the same targets, outline and hover-to-open as tree drags. The effect is `copy`, or `move` for items already in the workspace.
@@ -212,20 +236,118 @@ Unverified: the drag preview as WKWebView draws it (headless only shows the elem
 - `ponytail:` file bytes cross the IPC in memory, so a multi-GB file is slow and memory-heavy. If that matters, enable Tauri's path-based drops (paths, copied in Rust) once Tauri stops making them exclusive with HTML5 drag & drop.
 
 ### Acceptance
-- **Guard:** an OS file dropped on the editor, the chat or a panel does nothing, and the app stays where it was.
+- **Guard:** an OS file dropped anywhere that doesn't take files does nothing, and the app stays where it was. That means the panels, plus the editor and chat until F7 and F8.
 - **Copies:**
   - A Finder file dropped on a folder row is copied in and opens like any note; its links are indexed.
   - A Finder folder with subfolders arrives whole.
 - **Clashes:** a clash asks, and many clashes offer "Do this for the remaining N".
 - **Items already in the workspace:** dropped back onto a different folder, a file moves (links updated). Onto its own folder, nothing happens. With Option/Alt held, it's copied through the clash dialog.
 
+## F6: Copy and paste in Files
+
+### Change
+- **Cmd/Ctrl+C with the tree focused, or Copy in the menu:**
+  - Vertex's clipboard (a `useState`) holds the selection's uuids, minus items inside a selected folder.
+  - The system clipboard gets their relative paths as text.
+- **Cmd/Ctrl+V with the tree focused, or Paste in the menu:**
+  - The target is the selected folder, a selected file's folder, or the top level.
+  - Paste copies the items with plugin-fs `copyFile`, and `mkdir` plus recursion for folders; each path gets `markSelfWrite` and is then indexed.
+  - Pasting into the folder an item is in names the copy like Keep both, without asking. Anywhere else, clashes go through `FileConflictModal`.
+  - The copies end up selected.
+  - When Vertex's clipboard is empty but the system clipboard holds OS files (per the F5 probe), paste imports them with `importItems`.
+- **Duplicate** (the disabled menu item) copies the selection and pastes it into its own folder.
+- **Links in copies:** a copied note's `[[links]]` are kept as written. They resolve by name, and path links still point at the originals, as Obsidian does.
+
+### Acceptance
+- Copying two notes and a folder, then pasting them into another folder, copies all three; the folder arrives with its contents, and the copies are selected.
+- Pasting into the same folder gives "Note 2.md" without asking; Duplicate does the same.
+- A clash elsewhere asks.
+- The system clipboard holds the paths as text.
+- A file copied in Finder pastes into Files as an import (if the probe allows).
+
+## F7: Chat drops and pastes
+
+### Change
+- **Settings** (`AppFileConfig`, `defaultAppFileConfig`, Settings → View → Files), both workspace-overridable through `fileConfig`:
+  - `attachmentsFolder` (default `Attachments`);
+  - `importToChat` (`'ask' | 'always'`).
+- **Attachable files** are notes, folders and images (Decisions). The `@` list and the picker include images, with an image icon, when the chosen model accepts images.
+- **Drop targets:** the whole chat view (its messages and its prompt) accepts drops, with a primary ring while something hovers over it.
+  - Rows from Files: a custom type (`application/x-vertex-files`, set at the tree's `dragstart`) carries the uuids. They're attached, with no dialog.
+  - OS files:
+    - those already in the workspace (F5's detection) are attached as they are;
+    - for the rest, unless `importToChat` is `'always'`, a new `ImportToChatModal` asks: "Add N file(s) to the workspace and attach them?", with the folder and "Remember my decision for this workspace";
+    - then `importItems` copies them into the attachments folder, and they're attached.
+- **Pasting into the prompt:**
+  - Vertex's clipboard (F6): attached.
+  - OS files: the same as a drop.
+  - Image data: saved as a pasted screenshot (Decisions), through the same dialog, then attached.
+  - Plain text: pasted as text, as now.
+- **Sending images:**
+  - The message keeps image paths in `metadata.notes`, as it does notes, so the encrypted chat file holds no image bytes.
+  - At send, `chatTransport` reads each attached image (`readFile`) and adds it to that user message as a `file` part (`mediaType` from the extension). Only the model's request carries the bytes; the stored chat doesn't.
+  - Refusals:
+    - an image over 5 MB is refused when attached, with a toast;
+    - with a text-only model, attaching an image is refused with a toast naming the model;
+    - sending with images attached after switching to a text-only model shows a send error, not a silent drop.
+- **Shown in the thread:** a user message with images attached shows small thumbnails (`convertFileSrc`), not just names.
+
+### Acceptance
+- **From Files:** dragging two notes and an image from Files onto the chat attaches all three. The image reaches a vision model, checked in the request's parts.
+- **From Finder, never remembered:** a dropped image asks, is copied into `Attachments/` and attached. The thread shows its thumbnail.
+- **Remember:** with "Remember my decision" ticked, the next drop doesn't ask, and the workspace's Files settings show it.
+- **Paste:**
+  - A pasted screenshot becomes `Attachments/Pasted image ….png`, attached.
+  - Pasting Vertex-copied rows attaches them.
+- **Refusals:** with a text-only model, attaching an image is refused with the model named. Dropping a PDF is refused (for now).
+- **Unchanged:** the stored chat has paths only, and other chats and the Chats list are unaffected.
+
+## F8: Editor drops and pastes
+
+### Change
+- **An editor extension** (`useActiveEditorExtensions`): `EditorView.domEventHandlers({paste, drop, dragover})`. It returns true only when it handles the event, so text paste and the editor's own drags stay as they are.
+- **Paste:**
+  - image data → a pasted screenshot (Decisions), then `![[Pasted image ….png]]`;
+  - OS files → `importItems` into the attachments folder, then `![[name]]` for images and `[[name]]` for others, one per line;
+  - Vertex-copied rows (F6) → `[[links]]`.
+- **Drop:**
+  - OS files are handled as when pasted, at the drop position (`posAtCoords`).
+  - Rows from Files (`application/x-vertex-files`) become `[[links]]` at the drop position, and the drop cursor shows where they'll go.
+- **Link text:** the shortest link that resolves, using the index's link resolution: the name when it's unique, otherwise the path.
+- **In Files:** files saved into the attachments folder are indexed like any file, so they show in Files at once.
+
+### Acceptance
+- A pasted screenshot inserts `![[Pasted image ….png]]`, and the image shows inline.
+- A Finder image dropped mid-paragraph inserts its embed there.
+- Dragging two notes from Files inserts two links; a note with a duplicate name gets its path.
+- Text paste and the editor's own drags (tables, text) behave as before.
+
+## F9: Drag out
+
+### Change
+- **First, decide the trigger**, by probing `tauri-plugin-drag` in Vertex.
+  - **The question:** when a native drag started by the plugin comes back over Vertex's own window, does it arrive as HTML5 drag events carrying `Files`? With `dragDropEnabled: false`, OS drags do arrive that way.
+  - **If it does:** tree rows start the native drag instead of an HTML5 one.
+    - Inside Vertex, the tree, chat and editor recognize it as ours, since the tree knows what it started, and handle it as today: move, attach, link.
+    - Outside, Finder or Explorer copies the files.
+    - The drag image becomes a PNG of F4's card (rendered at `dragstart`) passed as the plugin's icon.
+  - **If it doesn't:** HTML5 stays for drags inside Vertex, and drag-out needs its own trigger, such as a modifier held at the start of the drag. Bring that choice back as a question.
+- **Dependencies:** the Rust crate and its JS package, a capability for its command, and a note in `Concepts and Structures.md`.
+
+### Acceptance
+- Dragging two notes out to Finder copies them there, and the originals stay.
+- Dragging inside Vertex still moves, attaches or links as before.
+- macOS first; Windows checked in SMOKE.
+
 ## Checks
 - **Each phase:**
-  - Browser runs on the stubbed production build, as in the Performance Plan: dispatched pointer, mouse and drag events, and a synthetic `DataTransfer` with `File`s for F5. Selection, ranges, the box over unmounted rows, multi-moves with clashes, the outline, and the preview's content.
+  - Browser runs on the stubbed production build, as in the Performance Plan: dispatched pointer, mouse, drag and paste events, and a synthetic `DataTransfer` with `File`s for F5–F8. Selection, ranges, the box over unmounted rows, multi-moves with clashes, the outline, the preview's content, attachments and the model request's parts, and the inserted editor text.
   - Then `bun run typecheck`, `bun run lint` and `bun run test`.
-  - The docs: `Concepts and Structures.md` (the Files tree) and a `SMOKE.md` row.
+  - The docs: `Concepts and Structures.md` (the Files tree, chat attachments, the editor) and a `SMOKE.md` row.
 - **Only in Vertex (SMOKE):**
-  - real Finder and Explorer drops;
+  - real Finder and Explorer drops and pastes;
   - the drag preview's look in WKWebView and WebView2;
   - trackpad sideways scrolling;
-  - the guard on Windows.
+  - the guard on Windows;
+  - an image reaching a real vision model;
+  - drag-out to Finder and Explorer.
