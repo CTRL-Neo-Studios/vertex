@@ -8,7 +8,8 @@ The Files tree should behave like a file manager rather than a styled hierarchy.
 - copying and pasting files within Files, and dragging them out to Finder or Explorer;
 - files reaching chat and the editor the way users expect:
   - dragged from Files or the OS, or pasted, into chat, they get attached;
-  - pasted or dropped into a note, they're inserted as embeds or links.
+  - pasted or dropped into a note, they're inserted as embeds or links;
+- undo and redo for what Files does (moves, renames, deletes, copies), with deleted files going to the Trash rather than gone for good.
 
 Today:
 - The tree selects nothing; the open tab is the only highlighted row.
@@ -45,6 +46,8 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | Copy and paste in Files | **Cmd/Ctrl+C** on the selection:<br>• puts the items on Vertex's own clipboard (uuids);<br>• puts their relative paths, one per line, on the system clipboard as text.<br><br>**Cmd/Ctrl+V** in Files copies them into the selected folder (a selected file's folder, or the top level):<br>• pasting into the folder they're in names them like Keep both ("Note 2.md") without asking, as Finder does;<br>• elsewhere, clashes ask through the dialog.<br><br>The disabled **Duplicate** menu item becomes copy and paste into the same folder. Pasting copied rows into chat attaches them; pasting them into a note inserts links. No cut: dragging already moves. |
 | Editor drops and pastes | A Vertex CodeMirror extension in `useActiveEditorExtensions` (`domEventHandlers` `paste`/`drop`); the editor package doesn't change.<br>• **A pasted screenshot:** saved, then `![[Pasted image ….png]]` at the cursor.<br>• **A pasted or dropped OS file:** copied into the attachments folder, then `![[…]]` for an image or `[[…]]` otherwise, at the cursor or drop point. No dialog: pasting into a note is a clear intent, as in Obsidian.<br>• **Rows dragged from Files:** `[[links]]`, one per line, with no copy. |
 | Drag out | Rows dragged out of Vertex copy into Finder or Explorer through a native drag: CrabNebula's `tauri-plugin-drag` (drag-rs, macOS/Windows/Linux). A new dependency, since HTML5 can't hand the OS real files and WebKit has no `DownloadURL`. How it coexists with the HTML5 tree drag is F9's first step. |
+| Deleted files | Deleting is permanent today (`deleteFiles` → `removePath`). New setting `fileConfig.deletedFiles`, workspace-overridable like the other `fileConfig` keys (Settings → View → Files), like Obsidian's "Deleted files":<br>• `'trash'` (default): the system Trash or Recycle Bin;<br>• `'workspaceTrash'`: a `.trash/` folder in the workspace, hidden from Files like every dot-folder;<br>• `'permanent'`: as today.<br><br>Moving to a trash asks nothing; Finder and Explorer don't, and Undo is right there. A permanent delete keeps the confirmation dialog. |
+| Undo and redo | A history of what Files did, per session and in memory, about 50 steps. Each step records how to reverse itself:<br>• a move or rename: the items back where they were, and the notes whose links were rewritten get their old text back if they haven't changed since;<br>• a delete: the items back from the trash;<br>• an import, copy, paste or duplicate: what was created goes to the trash (redo brings it back);<br>• a Replace in the clash dialog: the replaced item back from the trash.<br><br>**How:** **Cmd/Ctrl+Z** and **Cmd/Ctrl+Shift+Z** while Files has focus, so the editor's own undo is untouched, plus an **Undo** button in the toast after each operation. Anything changed or moved outside Vertex since is skipped with a toast, never overwritten. With `'permanent'`, a delete isn't undoable and its toast has no Undo. Undo/Redo items in the Files menu are wanted, but low priority. |
 
 ```mermaid
 flowchart LR
@@ -58,6 +61,7 @@ flowchart LR
   F6 --> F7
   F6 --> F8
   F4 --> F9[F9 Drag out]
+  F9 --> F10[F10 Undo and redo]
 ```
 
 ## F1: Selection
@@ -363,6 +367,41 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
 - Dragging inside Vertex still moves, attaches or links as before.
 - macOS first; Windows checked in SMOKE.
 
+## F10: Undo and redo
+
+After the other phases, as decided; their operations are wired in here.
+
+### Change
+- **Setting:** `fileConfig.deletedFiles` (`AppFileConfig`, `defaultAppFileConfig`, Settings → View → Files), as in Decisions.
+- **Trash**, a Rust command `trash_items(paths)` returning where each item went:
+  - **macOS:** `NSFileManager trashItemAtURL:resultingItemURL:` gives the trashed path, which the history keeps. Restoring moves it back. macOS has no Trash listing to fall back on, so after a restart only Finder's Put Back works.
+  - **Windows and Linux:** the `trash` crate; restoring finds the item in its trash listing by original path and deletion time.
+  - **`'workspaceTrash'`:** a move into `<root>/.trash/`, with Keep both names on a clash; restoring moves it back.
+  - **New dependencies:** the `trash` crate (Windows, Linux) and `objc2-foundation` (macOS), unless Tauri's own objc2 covers it.
+- **`deleteFiles`** follows the setting. `DeleteFilesModal` stays for `'permanent'` only.
+- **History** (`useFilesHistory`, per session):
+  - **Steps:** `moveFiles`, `relocateFiles` (rename), `deleteFiles`, `importItems`, paste and duplicate (F6), and the chat and editor imports (F7, F8) each push a step `{label, undo, redo}` with what they need.
+  - **A move's step:** each item's uuid with its old and new path; the rewritten notes with their before and after text; the merged folders it removed; the items it replaced.
+  - **Limits:** at most 50 steps, and a new step clears the redo side.
+  - **Undo is careful:**
+    - An item is only moved back if it's still where the step left it.
+    - A note's links are only restored if its text is still the step's "after".
+    - Created items are only trashed if they're unchanged (size and modified time).
+    - Whatever is skipped is named in one toast.
+- **Keys:** Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z (Ctrl+Y too on Windows) in `FileTreeComponent`'s `onKeydown`.
+- **Toasts:** each operation's toast gets an **Undo** action (`useQuickToasts` gains actions). After a move, the toast is "Moved N item(s)", which today has no toast at all.
+- **Low priority:** "Undo …" and "Redo …" items naming the step, in the Files menu.
+
+### Acceptance
+- **Moves:** moving three notes, then Cmd+Z, puts them back. Their links are restored, and a note edited since keeps its edit (named in the toast). Cmd+Shift+Z moves them again.
+- **Deletes:**
+  - Deleting a note with `'trash'` puts it in the system Trash with no dialog. The toast's Undo brings it back, links and all, with the same uuid if Vertex still tracks it, otherwise re-indexed.
+  - With `'workspaceTrash'` it goes to `.trash/` and doesn't show in Files.
+  - With `'permanent'` the dialog asks, and there's no Undo.
+- **Imports and pastes:** undoing one trashes what it created; redoing restores it.
+- **Outside changes:** a step whose files changed outside Vertex since undoes what it still can and says what it skipped.
+- **The editor:** Cmd+Z in a note still undoes typing, not file operations.
+
 ## Checks
 - **Each phase:**
   - Browser runs on the stubbed production build, as in the Performance Plan: dispatched pointer, mouse, drag and paste events, and a synthetic `DataTransfer` with `File`s for F5–F8. Selection, ranges, the box over unmounted rows, multi-moves with clashes, the outline, the preview's content, attachments and the model request's parts, and the inserted editor text.
@@ -374,4 +413,5 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
   - trackpad sideways scrolling;
   - the guard on Windows;
   - an image reaching a real vision model;
-  - drag-out to Finder and Explorer.
+  - drag-out to Finder and Explorer;
+  - the system Trash on macOS and Windows: deleting, Undo, and Finder's Put Back.
