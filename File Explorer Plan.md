@@ -486,6 +486,37 @@ Unverified:
 - Dragging inside Vertex still moves, attaches or links as before.
 - macOS first; Windows checked in SMOKE.
 
+### As built
+- **Probe answer: yes.** In Vertex, the native drag comes back over the window as HTML5 drag events carrying `Files`, so tree rows always start the native drag there; no modifier is needed.
+- **Dependencies:**
+  - `tauri-plugin-drag` 2.1.1, a desktop-only crate registered in the `#[cfg(desktop)]` block of `lib.rs`, and its JS package `@crabnebula/tauri-plugin-drag` 2.1.0.
+  - `capabilities/drag.json` grants `drag:default` to every desktop window. `desktop.json` covers only `main`, and Files lives in the session windows.
+- **`dragOut(root, refs, icon, ended)`** (`app/utils/outsideItems.ts`):
+  - It starts the drag with the rows' absolute paths and keeps `refs` as the drag under way.
+  - The plugin's mode is copy, so Finder and Explorer copy and never move files out of the workspace.
+  - When the plugin reports the end, a cancel clears the drag at once. A drop clears it after 500 ms, since the page's `drop` may come after that report. `ended` (the tree's `onDragEnd`) then runs; the page never gets a `dragend`.
+- **`draggedRows(transfer)`** gives `FILES_DRAG`'s rows, or, for `Files` while a native drag is under way, its rows. The chat (`ChatView.onDrop`) and the editor (`useEditorFileDrops`) read it in place of `FILES_DRAG`. The tree needs no change on drop: its `dragged` state was set at `dragstart`.
+- **The tree** (`onDragStart`): under Tauri (`isTauri()`), it cancels the page's `dragstart` and starts `dragOut`. Elsewhere (a browser), it uses the HTML5 drag as before. A failure clears the drag and toasts "Could not drag the item(s).".
+- **Cursor:** under the native drag, `onDragOver` answers `copy`. The drag offers only a copy, and WebKit refuses a drop whose effect it doesn't offer.
+- **The drag image** (`ghostPng`): the plugin takes a PNG, and a webview can't snapshot DOM. So F4's ghost is filled as before, then drawn on a canvas from its laid-out boxes and computed styles: cards, the badge, the icon (its CSS mask `--svg`, filled with its colour) and the text.
+  - It's drawn at 1x, because a PNG without a DPI is read as 72 dpi. It's therefore soft on a Retina screen (`ponytail:` note; a pHYs chunk would fix it).
+
+### Results (done)
+- **In Vertex (macOS, `tauri:dev`, by the user):** all five checks passed.
+  - Two notes dragged onto Finder were copied there, and the originals stayed.
+  - A note dragged onto a folder in Files was moved.
+  - A note dragged into a paragraph was linked there.
+  - A note dragged onto a chat was attached as a chip.
+  - Clicks, Shift-clicks and the drag image were fine afterwards.
+  - The console showed nothing from the drag. The "Couldn't find callback id" warnings came at load, before the index, so they're from the dev reload.
+- **Browser (stubbed production build, `window.isTauri` and `plugin:drag|start_drag` stubbed):**
+  - **Start:** Hub.md and Links.md selected and dragged cancelled the page's drag and started the plugin with `['/vault/Hub.md', '/vault/Links.md']` and a PNG of the card ("Links" with "2 item(s)" and stacked cards). A folder came out as `/vault/F00`, with its icon drawn.
+  - **Into Vertex:** the same drag dropped as `Files` on F01 moved both, with the links dialog. Onto a note it inserted `![[Pics/cat.png]]` with no import. Onto a chat it attached both rows with no dialog or writes.
+  - **After a cancel:** a dropped file was the OS's again, copied into Attachments.
+  - **Without Tauri:** the HTML5 drag carries `FILES_DRAG` as before.
+
+Not checked: Windows (Explorer, WebView2) and Linux.
+
 ## F10: Undo and redo
 
 After the other phases, as decided; their operations are wired in here.
