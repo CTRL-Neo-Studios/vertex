@@ -517,6 +517,8 @@ Unverified:
 
 Not checked: Windows (Explorer, WebView2) and Linux.
 
+The terminal also showed `sandbox_extension_consume failed: 1 (Operation not permitted)`, six times during the test. It comes from macOS, not Vertex: the system's libraries hold `sandbox_extension_consume failed` format strings, and Vertex and the plugin never call it. A sandbox extension is the token macOS issues so another process can read a dragged file. Which process failed to take it, the page's WebKit process or Finder, is unknown [INFERENCE]. Every drop worked, so it's left as it is.
+
 ## F10: Undo and redo
 
 After the other phases, as decided; their operations are wired in here.
