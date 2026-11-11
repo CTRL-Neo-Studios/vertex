@@ -12,7 +12,7 @@ import {useChatActions} from "~/composables/ai/useChatActions";
 import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useChatAttach} from "~/composables/ai/useChatAttach";
-import {FILES_DRAG, outsideItems} from "~/utils/outsideItems";
+import {FILES_DRAG, draggedRows, outsideItems} from "~/utils/outsideItems";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {ASK_USER, toolsUnsupported} from "~/utils/chatTools";
 import ChatThread from "~/components/Chat/ChatThread.vue";
@@ -156,8 +156,8 @@ function onDrop(event: DragEvent) {
 	const transfer = event.dataTransfer
 	if (!transfer || !takesDrop(event)) return
 	event.preventDefault()
-	const rows = transfer.getData(FILES_DRAG)
-	if (rows) return attach(fromWorkspace(JSON.parse(rows) as string[]))
+	const rows = draggedRows(transfer)
+	if (rows) return attach(fromWorkspace(rows))
 	// Taken while the event lasts.
 	const pending = outsideItems(transfer)
 	void attachFrom(async () => fromOutside(await pending))

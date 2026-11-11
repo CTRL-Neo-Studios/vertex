@@ -24,6 +24,7 @@
 		"@ai-sdk/vue": "^4.0.166",
 		"@catppuccin/codemirror": "^1.0.3",
 		"@comark/nuxt": "^0.8.1",
+		"@crabnebula/tauri-plugin-drag": "2.1.0",
 		"@iconify-json/lucide": "^1.2.151",
 		"@iconify-json/simple-icons": "^1.2.101",
 		"@nuxt/fonts": "1.2.0",

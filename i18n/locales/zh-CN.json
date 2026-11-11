@@ -567,7 +567,8 @@
 					"paste": "粘贴",
 					"copied": "已复制 {count} 个项目。",
 					"copyFailed": "无法复制到剪贴板。",
-					"nothingToPaste": "剪贴板中没有可粘贴的文件。"
+					"nothingToPaste": "剪贴板中没有可粘贴的文件。",
+					"dragFailed": "无法拖动这些项目。"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",

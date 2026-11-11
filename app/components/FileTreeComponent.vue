@@ -5,7 +5,7 @@ import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
 import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
-import {invoke} from "@tauri-apps/api/core"
+import {invoke, isTauri} from "@tauri-apps/api/core"
 import {platform} from "@tauri-apps/plugin-os"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
@@ -20,7 +20,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {FILES_DRAG, outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
+import {FILES_DRAG, dragOut, outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
 
 const {t} = useI18n()
 
@@ -431,6 +431,61 @@ function fillGhost(grab: Element | null | undefined, count: number) {
     return ghost
 }
 
+/**
+ * The filled ghost as a PNG data URL, for the native drag (`dragOut`), which takes an image rather than an element. A
+ * webview can't snapshot DOM, so its cards, icon and text are drawn on a canvas from their laid-out boxes and styles.
+ */
+// ponytail: drawn at 1x (a PNG without a DPI is read as 72 dpi), so it's soft on a Retina screen; write a pHYs chunk if it matters.
+async function ghostPng(ghost: HTMLElement) {
+    const origin = ghost.getBoundingClientRect(), canvas = document.createElement('canvas')
+    canvas.width = Math.ceil(origin.width)
+    canvas.height = Math.ceil(origin.height)
+    const ctx = canvas.getContext('2d')!
+    const box = (el: Element | Range) => { const r = el.getBoundingClientRect(); return [r.x - origin.x, r.y - origin.y, r.width, r.height] as const }
+    const shown = (el: Element) => !el.closest('[hidden]')
+    for (const el of [...ghost.querySelectorAll('[data-ghost-stack], [data-ghost-card], [data-ghost-count]')].filter(shown)) {
+        const s = getComputedStyle(el), [x, y, w, h] = box(el)
+        ctx.beginPath()
+        ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, parseFloat(s.borderTopLeftRadius))
+        ctx.fillStyle = s.backgroundColor
+        ctx.fill()
+        if (parseFloat(s.borderTopWidth)) {
+            ctx.strokeStyle = s.borderTopColor
+            ctx.stroke()
+        }
+    }
+    // An icon is a CSS mask (`--svg`): drawn, then filled with its colour.
+    for (const icon of ghost.querySelectorAll('.iconify')) {
+        const s = getComputedStyle(icon), url = /url\((['"]?)(.+)\1\)/.exec(s.getPropertyValue('--svg'))?.[2]
+        if (!url) continue
+        const image = new Image(), [x, y, w, h] = box(icon)
+        image.src = url
+        await image.decode().catch(() => {})
+        const mask = document.createElement('canvas')
+        mask.width = w
+        mask.height = h
+        const m = mask.getContext('2d')!
+        m.drawImage(image, 0, 0, w, h)
+        m.globalCompositeOperation = 'source-in'
+        m.fillStyle = s.color
+        m.fillRect(0, 0, w, h)
+        ctx.drawImage(mask, x, y)
+    }
+    const texts = document.createTreeWalker(ghost, NodeFilter.SHOW_TEXT)
+    for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+        const text = node.textContent?.trim(), parent = node.parentElement!
+        if (!text || !shown(parent)) continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const s = getComputedStyle(parent), [x, y, , h] = box(range)
+        ctx.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`
+        ctx.fillStyle = s.color
+        ctx.textBaseline = 'middle'
+        ctx.fillText(text, x, y + h / 2)
+    }
+    return canvas.toDataURL('image/png')
+}
+
 function onDragStart(event: DragEvent) {
     const id = rowId(event)
     if (!id || !event.dataTransfer) return
@@ -440,13 +495,25 @@ function onDragStart(event: DragEvent) {
     }
     const ids = topOf(selected.value).map(n => n.uuid)
     dragged.value = ids
+    const nodes = ids.map(i => getFileByUuid(i)).filter(n => !!n)
+    const refs = nodes.map(n => n.isFolder ? `${n.relativePath}/` : n.relativePath)
+    const ghost = fillGhost((event.target as Element | null)?.closest('li')?.querySelector('[data-grab]'), ids.length)
+    // In Vertex, a native drag instead, which Finder or Explorer takes as files; back over Vertex it's still these rows
+    // (`draggedRows`). The page never sees its `dragend`, so it ends through `dragOut`.
+    if (isTauri() && ghost && session?.rootPath) {
+        event.preventDefault()
+        const root = session.rootPath
+        void ghostPng(ghost).then(icon => dragOut(root, refs, icon, onDragEnd)).catch(error => {
+            onDragEnd()
+            $qt.error(t('app.editor.ui.filetree.dragFailed'), String(error))
+        })
+        return
+    }
     // A move in the tree; a copy (attach, link) where chat or a note takes the rows.
     event.dataTransfer.effectAllowed = 'copyMove'
     // WebKit starts a drag only with some data set.
-    const nodes = ids.map(i => getFileByUuid(i)).filter(n => !!n)
     event.dataTransfer.setData('text/plain', nodes.map(n => n.relativePath).join('\n'))
-    event.dataTransfer.setData(FILES_DRAG, JSON.stringify(nodes.map(n => n.isFolder ? `${n.relativePath}/` : n.relativePath)))
-    const ghost = fillGhost((event.target as Element | null)?.closest('li')?.querySelector('[data-grab]'), ids.length)
+    event.dataTransfer.setData(FILES_DRAG, JSON.stringify(refs))
     if (ghost) event.dataTransfer.setDragImage(ghost, 12, 12)
 }
 
@@ -469,7 +536,8 @@ function onDragOver(event: DragEvent) {
     dropDir.value = outside || canDrop(dragged.value, dest) ? dest : null
     if (dropDir.value === null) return
     event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = outside ? 'copy' : 'move'
+    // The native drag (`dragOut`) only offers a copy, so a move under it says copy, or the drop is refused.
+    if (event.dataTransfer) event.dataTransfer.dropEffect = event.dataTransfer.types.includes('Files') ? 'copy' : 'move'
 }
 
 function onDragLeave(event: DragEvent) {
@@ -711,7 +779,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
             <div class="relative">
                 <div data-ghost-stack class="absolute inset-0 translate-x-2 translate-y-2 rounded-md border border-accented bg-muted"/>
                 <div data-ghost-stack class="absolute inset-0 translate-x-1 translate-y-1 rounded-md border border-accented bg-elevated"/>
-                <div class="relative inline-flex items-center gap-2 rounded-md border border-accented bg-default px-2.5 py-1.5 text-xs font-medium text-highlighted shadow-sm">
+                <div data-ghost-card class="relative inline-flex items-center gap-2 rounded-md border border-accented bg-default px-2.5 py-1.5 text-xs font-medium text-highlighted shadow-sm">
                     <span data-ghost-name/>
                     <span data-ghost-count class="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] text-inverted"/>
                 </div>

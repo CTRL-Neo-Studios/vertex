@@ -1,8 +1,37 @@
 import {readDir, stat} from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path";
+import {startDrag} from "@crabnebula/tauri-plugin-drag";
 
 /** What a drag from the Files tree carries besides its own state: the rows' workspace-relative paths, a folder's ending in `/`. */
 export const FILES_DRAG = 'application/x-vertex-files'
+
+/** The rows of the native drag under way (`dragOut`), since it comes back over Vertex as plain OS files. */
+let outgoing: {refs: string[]} | undefined
+
+/**
+ * Starts a native drag of the rows `refs` (as `FILES_DRAG`) under `root`, with `icon` (a PNG data URL) as its image.
+ * Finder or Explorer copies the files; over Vertex it arrives as OS files, which `draggedRows` recognizes. `ended`
+ * runs when the drag is over.
+ */
+export async function dragOut(root: string, refs: string[], icon: string, ended: () => void) {
+    const drag = {refs}
+    outgoing = drag
+    const end = () => {
+        if (outgoing !== drag) return
+        outgoing = undefined
+        ended()
+    }
+    // A drop in Vertex may reach the page after the drag reports it, so the rows stay known a moment longer.
+    await startDrag({item: refs.map(ref => `${root}/${ref.replace(/\/$/, '')}`), icon}, ({result}) => result === 'Dropped' ? setTimeout(end, 500) : end())
+        .catch(error => { end(); throw error })
+}
+
+/** The rows of a drag from the Files tree, `FILES_DRAG` or the native drag's (`dragOut`); undefined for anything else. */
+export function draggedRows(transfer: DataTransfer | null): string[] | undefined {
+    const rows = transfer?.getData(FILES_DRAG)
+    if (rows) return JSON.parse(rows) as string[]
+    return transfer?.types.includes('Files') ? outgoing?.refs : undefined
+}
 
 /**
  * Files and folders from outside the workspace, as a drop or a paste hands them over. A dropped file is read through

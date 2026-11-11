@@ -241,6 +241,7 @@ pub fn run() {
         // Each session window (`session-{uuid}`, stable per session) and Settings reopen at their last size and
         // place, pulled back on screen when that monitor is gone. `main`, the start window, stays centred.
         builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[MAIN_WINDOW]).build());
+        builder = builder.plugin(tauri_plugin_drag::init());
     }
 
     builder

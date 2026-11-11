@@ -8,7 +8,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {FILES_DRAG, outsideItems, outsideItemsAt, pastedImage, type OutsideItem} from "~/utils/outsideItems";
+import {FILES_DRAG, draggedRows, outsideItems, outsideItemsAt, pastedImage, type OutsideItem} from "~/utils/outsideItems";
 
 /**
  * Files into a note, as Obsidian does: links where they're dropped or pasted, `![[…]]` for an image (an embed),
@@ -106,9 +106,9 @@ export function useEditorFileDrops(session: ActiveSession | undefined): Extensio
                 event.preventDefault()
                 if (!workspace) return true
                 const at = view.posAtCoords({x: event.clientX, y: event.clientY}) ?? view.state.selection.main.head
-                const rows = transfer.getData(FILES_DRAG)
+                const rows = draggedRows(transfer)
                 if (rows) {
-                    insert(view, linksFor((JSON.parse(rows) as string[]).map(ref => getFileByPath(`${session!.rootPath}/${ref}`)?.uuid)), at)
+                    insert(view, linksFor(rows.map(ref => getFileByPath(`${session!.rootPath}/${ref}`)?.uuid)), at)
                     return true
                 }
                 // Taken while the event lasts.

@@ -1,0 +1,15 @@
+{
+  "identifier": "drag-capability",
+  "description": "Rows dragged out of Files, in the session windows",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "*"
+  ],
+  "permissions": [
+    "drag:default"
+  ]
+}

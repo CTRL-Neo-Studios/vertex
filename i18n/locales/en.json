@@ -567,7 +567,8 @@
 					"paste": "Paste",
 					"copied": "Copied {count} item(s).",
 					"copyFailed": "Could not copy to the clipboard.",
-					"nothingToPaste": "The clipboard has no files to paste."
+					"nothingToPaste": "The clipboard has no files to paste.",
+					"dragFailed": "Could not drag the item(s)."
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",

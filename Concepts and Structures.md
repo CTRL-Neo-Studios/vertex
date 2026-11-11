@@ -129,6 +129,11 @@ Rows drag like a file manager's:
   - **Ask:** every other name clash, ignoring case, goes through `FileConflictModal`: Replace, Keep both ("Note 2.md", `freeName`) or Skip, optionally for the remaining clashes. Cancel moves nothing.
   - **Move:** then `relocateFiles`, which renaming uses too, moves each item on disk and in the index (uuids stay, so tabs and open folders follow). It then updates the links whose text changes, to the items or to any note inside a moved folder, with one dialog for the whole move.
 - Whether links are updated comes from `fileConfig.updateLinks`, overridable per workspace (Settings → View → Files): ask (the default), update, or keep. The dialog's "Remember my decision for this workspace" writes it.
+- **In Vertex, the drag is native** (`tauri-plugin-drag`, `dragOut` in `outsideItems.ts`), so Finder or Explorer copy the rows as files. `dragstart` is cancelled and the plugin starts the OS drag. Its image is the same card, drawn onto a canvas from the laid-out ghost (`ghostPng`), since the plugin takes a PNG rather than an element.
+  - **Back over Vertex,** the drag arrives as plain OS files. The rows it started stay known (`draggedRows`) until the plugin reports the end, plus half a second, since the page may see the drop after that report. The tree moves them, the chat attaches them and a note links them, as with the HTML5 drag.
+  - **Copy only:** the drag offers only a copy, so the outside never moves files out of the workspace. Inside the tree, the move therefore shows the copy cursor; asking for a move would get the drop refused.
+  - **In a browser** (no Tauri), the tree keeps the HTML5 drag with `FILES_DRAG`.
+  - The plugin's command is allowed in every window by `capabilities/drag.json`.
 
 Files from the OS (Finder or Explorer) drop onto the tree like rows, with the same targets and outline. `dragDropEnabled` stays false, so they arrive as HTML5 `Files`. `outsideItems` (`app/utils/outsideItems.ts`) reads them while the event lasts: folders whole, skipping `.DS_Store`/`Thumbs.db`/`desktop.ini`. `importItems` then decides what each one is:
 - **Already the workspace's:** an item with the same path when the webview gives one, or else the only one with the same name, size and modified time, moves instead (as on the same disk). Option/Alt copies it anyway.
