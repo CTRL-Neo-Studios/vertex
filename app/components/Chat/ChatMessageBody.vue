@@ -2,7 +2,8 @@
 import type {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart, type DynamicToolUIPart, type ToolUIPart} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
-import {fileNameFromPath} from "#shared/utils/fs/filenames";
+import {convertFileSrc} from "@tauri-apps/api/core";
+import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -22,7 +23,9 @@ const props = defineProps<{ chatId: string, chat: Chat<VertexChatMessage>, messa
 const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
-const {allowHost} = useChats(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+const {allowHost, root} = useChats(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+/** An attached image shows as itself (from disk, by the asset protocol), not as a name. */
+const imageSrc = (note: string) => root.value && isImage(getFileExtensionFromPath(note)) ? convertFileSrc(`${root.value}/${note}`) : undefined
 
 const refName = (ref: string) => ref.endsWith('/') ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
 
@@ -123,7 +126,9 @@ async function allowSite(part: ToolPart, id: string) {
 		v-if="message.role === 'user' && (message.metadata?.notes?.length || message.metadata?.folders?.length)"
 		class="flex flex-wrap gap-1 mb-1.5">
 		<ChatLink v-for="note in message.metadata?.notes ?? []" :key="note" :note>
-			<UBadge icon="i-lucide-file-text" size="sm" color="neutral" variant="outline"
+			<img v-if="imageSrc(note)" :src="imageSrc(note)" :alt="fileNameFromPath(note)" :title="note"
+			     class="h-20 max-w-40 rounded-md border border-default object-cover">
+			<UBadge v-else icon="i-lucide-file-text" size="sm" color="neutral" variant="outline"
 			        :label="fileNameFromPath(note, true)"/>
 		</ChatLink>
 		<UBadge v-for="folder in message.metadata?.folders ?? []" :key="`${folder}/`"

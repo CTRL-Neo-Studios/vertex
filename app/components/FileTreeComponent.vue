@@ -21,6 +21,7 @@ import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
+import {FILES_DRAG} from "~/composables/ai/useChatAttach";
 
 const {t} = useI18n()
 
@@ -440,9 +441,12 @@ function onDragStart(event: DragEvent) {
     }
     const ids = topOf(selected.value).map(n => n.uuid)
     dragged.value = ids
-    event.dataTransfer.effectAllowed = 'move'
+    // A move in the tree; a copy (attach, link) where chat or a note takes the rows.
+    event.dataTransfer.effectAllowed = 'copyMove'
     // WebKit starts a drag only with some data set.
-    event.dataTransfer.setData('text/plain', ids.map(i => getFileByUuid(i)?.relativePath ?? i).join('\n'))
+    const nodes = ids.map(i => getFileByUuid(i)).filter(n => !!n)
+    event.dataTransfer.setData('text/plain', nodes.map(n => n.relativePath).join('\n'))
+    event.dataTransfer.setData(FILES_DRAG, JSON.stringify(nodes.map(n => n.isFolder ? `${n.relativePath}/` : n.relativePath)))
     const ghost = fillGhost((event.target as Element | null)?.closest('li')?.querySelector('[data-grab]'), ids.length)
     if (ghost) event.dataTransfer.setDragImage(ghost, 12, 12)
 }

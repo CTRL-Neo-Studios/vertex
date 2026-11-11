@@ -3,14 +3,15 @@ import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalRes
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {CompileError} from "@type32/workflows/core";
 import {invoke} from "@tauri-apps/api/core";
+import {readFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {sessionScope, StateKey} from "#shared/constants/app";
-import {fileNameFromPath, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
-import {createChatTransport, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
+import {createChatTransport, dataUrl, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
@@ -203,6 +204,33 @@ export function useChats(session?: ActiveSession) {
         return resolved
     }
 
+    /** Whether a profile's model takes images, from its provider's model list (`inputModalities`); unknown when it doesn't say. */
+    function takesImages({profile, provider}: ReturnType<typeof resolveModel>): boolean | undefined {
+        const modalities = provider.models.find(m => m.id === profile.modelId)?.inputModalities
+        return modalities ? modalities.includes('image') : undefined
+    }
+
+    /**
+     * Every image attached in the conversation, read now as data URLs: the stored chat holds their paths, not their
+     * bytes. A model known not to take images gets an error instead of a silent drop; one deleted since is skipped.
+     */
+    async function imagesFor(messages: VertexChatMessage[], model: ReturnType<typeof resolveModel>): Promise<ChatSendSetup['images']> {
+        const wanted = messages.flatMap(m => m.role !== 'user' ? [] : (m.metadata?.notes ?? [])
+            .filter(path => isImage(getFileExtensionFromPath(path)))
+            .map(path => ({messageId: m.id, path})))
+        if (!wanted.length) return []
+        if (takesImages(model) === false) throw new Error(nuxtApp.$i18n.t('app.chat.imagesUnsupported', {model: model.profile.modelId}))
+        const files = new Map($index.getFilteredFiles(f => !f.isFolder && wanted.some(w => w.path === f.relativePath)).map(f => [f.relativePath, f.fullPath]))
+        const images: NonNullable<ChatSendSetup['images']> = []
+        for (const {messageId, path} of wanted) {
+            const full = files.get(path)
+            if (!full) continue
+            const mediaType = IMAGE_TYPES[getFileExtensionFromPath(path)]!
+            images.push({messageId, mediaType, url: dataUrl(mediaType, await readFile(full))})
+        }
+        return images
+    }
+
     /** The active tab's note (live buffer), then every note attached in the conversation. */
     async function notesFor(messages: VertexChatMessage[]) {
         const notes: {path: string, content: string}[] = []
@@ -215,7 +243,8 @@ export function useChats(session?: ActiveSession) {
         }
         const attached = new Set(messages.flatMap(m => m.metadata?.notes ?? []))
         if (open) attached.delete(open.relativePath)
-        const files = $index.getFilteredFiles(f => !f.isFolder && attached.has(f.relativePath))
+        // Images go to the model as images (`imagesFor`), not as text.
+        const files = $index.getFilteredFiles(f => !f.isFolder && !isImage(f.fileExt) && attached.has(f.relativePath))
         if (files.length === 0) return notes
         const relative = new Map(files.map(f => [f.fullPath, f.relativePath]))
         const read = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [...relative.keys()]})
@@ -586,7 +615,7 @@ export function useChats(session?: ActiveSession) {
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
-        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), tools}
+        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), images: await imagesFor(messages, {profile, provider}), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
@@ -876,6 +905,14 @@ export function useChats(session?: ActiveSession) {
         chatProfile: (id: string) => {
             try {
                 return resolveModel(live.get(keyOf(id))?.meta.profileId).profile
+            } catch {
+                return undefined
+            }
+        },
+        /** Whether a loaded chat's model takes images: false when its provider says not, undefined when it doesn't say or there's no model. */
+        chatTakesImages: (id: string) => {
+            try {
+                return takesImages(resolveModel(live.get(keyOf(id))?.meta.profileId))
             } catch {
                 return undefined
             }

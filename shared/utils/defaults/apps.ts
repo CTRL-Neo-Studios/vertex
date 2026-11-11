@@ -38,7 +38,11 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
 const UPDATE_LINKS: readonly AppFileConfig['updateLinks'][] = ['ask', 'update', 'keep']
 
 export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFileConfig {
-    return {updateLinks: UPDATE_LINKS.includes(data?.updateLinks as AppFileConfig['updateLinks']) ? data!.updateLinks! : 'ask'}
+    return {
+        updateLinks: UPDATE_LINKS.includes(data?.updateLinks as AppFileConfig['updateLinks']) ? data!.updateLinks! : 'ask',
+        attachmentsFolder: typeof data?.attachmentsFolder === 'string' ? data.attachmentsFolder.replace(/^\/+|\/+$/g, '') : 'Attachments',
+        importToChat: data?.importToChat === 'always' ? 'always' : 'ask',
+    }
 }
 
 const positiveInt = (value: unknown, fallback: number) =>

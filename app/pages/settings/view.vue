@@ -36,6 +36,13 @@ const updateLinksItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.updateLinksUpdate'), value: 'update'},
     {label: t('app.settings.view.updateLinksKeep'), value: 'keep'},
 ])
+const importToChatItems = computed<SelectItem[]>(() => [
+    {label: t('app.settings.view.importToChatAsk'), value: 'ask'},
+    {label: t('app.settings.view.importToChatAlways'), value: 'always'},
+])
+const filePaths = ['fileConfig.updateLinks' as const, 'fileConfig.attachmentsFolder' as const, 'fileConfig.importToChat' as const]
+/** A folder path as typed: no leading or trailing slashes; empty means the top level. */
+const folderPath = (event: Event) => (event.target as HTMLInputElement).value.trim().replace(/^\/+|\/+$/g, '')
 const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
 const headerTools = ['headerHistory', 'headerFormatting'] as const
 const headerToolsItems = computed<SelectItem[]>(() => [
@@ -82,13 +89,29 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                 </SettingsRow>
             </SettingsSection>
 
-            <SettingsSection :title="t('app.settings.view.files')" :dirty="scope.isDirty(['fileConfig.updateLinks'])" @reset="scope.reset(['fileConfig.updateLinks'])">
+            <SettingsSection :title="t('app.settings.view.files')" :dirty="scope.isDirty(filePaths)" @reset="scope.reset(filePaths)">
                 <SettingsRow setting="fileConfig.updateLinks" :label="t('app.settings.view.updateLinks')" :description="t('app.settings.view.updateLinksDescription')">
                     <USelect
                         :model-value="scope.value('fileConfig.updateLinks')"
                         :items="updateLinksItems"
                         class="w-52"
                         @update:model-value="scope.set({'fileConfig.updateLinks': $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow setting="fileConfig.attachmentsFolder" :label="t('app.settings.view.attachmentsFolder')" :description="t('app.settings.view.attachmentsFolderDescription')">
+                    <UInput
+                        :model-value="scope.value('fileConfig.attachmentsFolder')"
+                        :placeholder="t('app.settings.view.attachmentsFolderTop')"
+                        class="w-52"
+                        @change="scope.set({'fileConfig.attachmentsFolder': folderPath($event)})"
+                    />
+                </SettingsRow>
+                <SettingsRow setting="fileConfig.importToChat" :label="t('app.settings.view.importToChat')" :description="t('app.settings.view.importToChatDescription')">
+                    <USelect
+                        :model-value="scope.value('fileConfig.importToChat')"
+                        :items="importToChatItems"
+                        class="w-52"
+                        @update:model-value="scope.set({'fileConfig.importToChat': $event})"
                     />
                 </SettingsRow>
             </SettingsSection>

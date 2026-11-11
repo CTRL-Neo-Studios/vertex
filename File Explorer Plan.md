@@ -41,7 +41,7 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | One import | F5's import (copy outside items into a workspace folder, clash dialog, "already in the workspace" detection) is one function, `importItems(items, destDir)` in `useActiveWorkspaceTools`. The tree, chat, the editor and paste all use it, and it returns the new items' uuids. |
 | Attachments folder | New setting `fileConfig.attachmentsFolder`, default `Attachments` at the top level, like Obsidian's "Default location for new attachments". `fileConfig` is already workspace-overridable, so each workspace can set its own (Settings → View → Files). Files copied in for chat or the editor and pasted screenshots land there; the folder is created on first use. The tree's own drops and pastes go where they're dropped or pasted, not here. |
 | Pasted screenshots | Image data with no file behind it is saved as `Pasted image YYYYMMDDHHmmss.png` (Obsidian's naming) in the attachments folder. |
-| Chat attachments | Notes (`.md`) and folders as now, plus images (`png`, `jpg`, `jpeg`, `webp`, `gif`) sent as images to models whose `inputModalities` include `image`. With a text-only model, attaching an image is refused with a toast naming the model; switching to one with images attached warns before sending. Images over 5 MB are refused (common provider limits). **PDFs and other files: deferred.** You'll come back with more on PDFs and new chat tools. |
+| Chat attachments | Notes (`.md`, `.txt`) and folders as before, plus images (`png`, `jpg`, `jpeg`, `webp`, `gif`) sent as images to models whose `inputModalities` include `image`. A model whose provider doesn't say is given the benefit of the doubt. With a model known to be text-only, attaching an image is refused with a toast naming the model; sending with images attached after switching to one fails with a message naming it (as built: a send error, not a pre-send warning). Images over 5 MB are refused (common provider limits). **PDFs and other files: deferred.** You'll come back with more on PDFs and new chat tools. |
 | Chat copy dialog | OS files dropped or pasted into chat are first copied into the attachments folder, then attached. A dialog asks "Add N file(s) to the workspace and attach them?", showing the folder, with "Remember my decision for this workspace". New setting `fileConfig.importToChat`: `'ask'` (default) or `'always'`, workspace-overridable like `updateLinks`. Items already in the workspace are attached as they are: no copy, no dialog. |
 | Copy and paste in Files | One clipboard, the system's file list (as built): there is no clipboard of Vertex's own.<br>• **Cmd/Ctrl+C** puts the selection there as files, as Finder's and Explorer's Copy does, so they paste in Finder too.<br>• **Cmd/Ctrl+V** in Files copies whatever files it holds, copied in Vertex or in the OS, into the selected folder (a selected file's folder, or the top level).<br>• Pasting into the folder the items are in names them like Keep both ("Note 2.md") without asking, as Finder does; elsewhere, clashes ask through the dialog.<br><br>The disabled **Duplicate** menu item now makes the same copies in place. Pasting copied rows into chat attaches them (they're workspace paths); pasting them into a note inserts links. No cut: dragging already moves. |
 | Editor drops and pastes | A Vertex CodeMirror extension in `useActiveEditorExtensions` (`domEventHandlers` `paste`/`drop`); the editor package doesn't change.<br>• **A pasted screenshot:** saved, then `![[Pasted image ….png]]` at the cursor.<br>• **A pasted or dropped OS file:** copied into the attachments folder, then `![[…]]` for an image or `[[…]]` otherwise, at the cursor or drop point. No dialog: pasting into a note is a clear intent, as in Obsidian.<br>• **Rows dragged from Files:** `[[links]]`, one per line, with no copy. |
@@ -361,6 +361,54 @@ Unverified:
   - Pasting Vertex-copied rows attaches them.
 - **Refusals:** with a text-only model, attaching an image is refused with the model named. Dropping a PDF is refused (for now).
 - **Unchanged:** the stored chat has paths only, and other chats and the Chats list are unaffected.
+
+### As built
+- **`useChatAttach(session, chatId)`** (`app/composables/ai/useChatAttach.ts`) turns drops and pastes into attachment refs. They're workspace-relative paths, a folder's ending in `/`, the same as the `@` list.
+  - **`fromWorkspace(refs)`:** rows from Files, or the clipboard's workspace files. They're attached as they are.
+  - **`fromOutside(items)`:**
+    - `indexedMatch` attaches the workspace's own files as they are.
+    - It checks the rest first, so nothing chat can't take gets copied.
+    - It asks through `ImportToChatModal` unless `importToChat` is `'always'`; Remember writes that for the workspace.
+    - Then `ensureFolder(attachmentsFolder)` (new in `useActiveWorkspaceTools`: created and indexed on first use) and `importItems({copy: true})`.
+  - **`fromPaste(images)`:** the system clipboard's files (`clipboard_files_get`) first, else the pasted image data, named `Pasted image YYYYMMDDHHmmss.png` (`pastedImageName`).
+  - **Refusals:** what chat can't take (types, size, a text-only model) is named in one toast per reason.
+- **The tree's drag** now also sets `application/x-vertex-files` (`FILES_DRAG`, its rows' refs) and allows `copyMove`, since chat accepts a copy.
+- **`ChatView`:**
+  - The tab's and the side panel's chat containers take drops, with a `ring-primary` while hovered.
+  - The prompt takes pastes: one carrying files or image data attaches them, and if there turn out to be none, its text is inserted as it would have been. Plain text is untouched.
+  - Chips show an image icon for images, and the `@` list includes images unless the model is known to be text-only.
+- **Sending:**
+  - `useChats.imagesFor` reads every image attached in the conversation (`readFile`, `dataUrl`). `chatTransport.withImages` adds each one to the message that attached it as a `file` part, on the request's copy only.
+  - `notesFor` no longer reads images as text.
+  - `chatTakesImages(id)` reads the model's `inputModalities`.
+  - `isImage` now includes `gif` (`IMAGE_TYPES` maps extensions to media types).
+- **The thread:** a user message's attached images show as thumbnails (`convertFileSrc`), and other notes as before.
+- **Settings:** Settings → View → Files has an attachments folder field and the chat import choice. Both are `fileConfig`, so a workspace can set its own.
+- **A test** (`chatTransport.test.ts`) covers `dataUrl` across chunks and `withImages` placing each image on its own message.
+
+### Results (done)
+Checked on the stubbed production build (dispatched drags and pastes, real clicks):
+- **From Files:**
+  - Hub.md, Pics/cat.png and F00 dragged from Files attached as "Hub", "cat" and "F00".
+  - Sending put `{type: image_url, url: data:image/png;base64,UE5HREFUQQ==}` (exactly the file's bytes) on that user message, Hub.md in the system prompt, F00's listing, and cat.png nowhere as text.
+  - The thread showed the image (`asset://localhost/vault/Pics/cat.png`).
+  - doc.pdf was refused: "Chat can't take these yet: doc.pdf".
+- **From Finder:**
+  - A JPEG dropped on the chat asked "Add 1 file(s) to the workspace?" with Attachments. Add and attach made `mkdir /vault/Attachments` and `Attachments/beach.jpg`, attached.
+  - With Remember ticked, the next drop didn't ask, and the workspace's settings held `fileConfig.importToChat: 'always'`.
+  - Cancel wrote and attached nothing.
+- **Pastes:**
+  - A screenshot (image data with no files on the clipboard) became `Attachments/Pasted image 20261111020204.png`, attached.
+  - `/vault/Links.md` on the clipboard attached Links with nothing written.
+  - Plain text pasted as text.
+- **Refusals:**
+  - A 6 MB image: "Over 5 MB, too big to send: huge.png", with no dialog.
+  - With the chat switched to a text-only profile: dropping an image toasted "gpt-y doesn't take images.", `@ca` offered no images, and sending with an image attached failed with "The model gpt-y doesn't take images. Remove the attached images or choose a model that does.", with no request made.
+
+Unverified:
+- a real vision model replying about an image;
+- real Finder drops and pastes into chat (WKWebView's paste types);
+- the thumbnail through Tauri's asset protocol (headless can't load `asset://`).
 
 ## F8: Editor drops and pastes
 

@@ -29,6 +29,11 @@ export interface AppFileConfig {
      * keep them as written. The link dialog's "Remember my decision" sets it for the workspace.
      */
     updateLinks: 'ask' | 'update' | 'keep',
+    /** Where files from outside go when chat or the editor takes them (and pasted screenshots), relative to the
+     *  workspace; created when first needed. */
+    attachmentsFolder: string,
+    /** OS files dropped or pasted into chat are copied into the workspace first: ask each time, or always do it. */
+    importToChat: 'ask' | 'always',
 }
 
 export interface AppGitConfig {

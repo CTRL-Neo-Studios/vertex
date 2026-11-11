@@ -344,5 +344,19 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         await updateIndex(path, content)
     }
 
-    return {createFile, renameFile, moveFiles, importItems, deleteFiles, saveContent}
+    /** The workspace folder at `relative` (`''`: the top level), created and indexed if missing. Returns its full path. */
+    async function ensureFolder(relative: string) {
+        const root = session!.rootPath!
+        let path = root
+        for (const part of relative.split('/').filter(Boolean)) {
+            path = await join(path, part)
+            if (getFileByPath(path)) continue
+            markSelfWrite(path)
+            if (!await exists(path)) await mkdir(path)
+            await addFileToIndex(path, root)
+        }
+        return path
+    }
+
+    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, saveContent}
 }

@@ -88,8 +88,11 @@ export function isValidFilename(name: string): boolean {
     return !RESERVED_FILENAMES_REGEX.test(baseName);
 }
 
+/** The image types Vertex shows and chat can send to a model, by extension. */
+export const IMAGE_TYPES: Readonly<Record<string, string>> = {png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif'}
+
 export function isImage(extension: PossiblyRef<string>) {
-    return ['png', 'jpg', 'jpeg', 'webp'].includes(unref(extension))
+    return Object.hasOwn(IMAGE_TYPES, unref(extension))
 }
 
 export function isPlainTextFile(extension: PossiblyRef<string>) {

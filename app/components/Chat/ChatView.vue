@@ -3,7 +3,7 @@ import type {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
 import {ask} from "@tauri-apps/plugin-dialog";
-import {fileNameFromPath} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -11,6 +11,8 @@ import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {FILES_DRAG, useChatAttach} from "~/composables/ai/useChatAttach";
+import {outsideItems} from "~/utils/outsideItems";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {ASK_USER, toolsUnsupported} from "~/utils/chatTools";
 import ChatThread from "~/components/Chat/ChatThread.vue";
@@ -41,7 +43,8 @@ const {
 	renameChat,
 	showInSidePanel,
 	openInTab,
-	pendingPrompt
+	pendingPrompt,
+	chatTakesImages,
 } = useChats(session)
 const {updateModelProfile} = useAiConfig()
 const {chatActions} = useChatActions(session)
@@ -121,6 +124,60 @@ const input = ref('')
 const notes = ref<string[]>([])
 const isFolderRef = (ref: string) => ref.endsWith('/')
 const refName = (ref: string) => isFolderRef(ref) ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
+const refIcon = (ref: string) => isFolderRef(ref) ? 'i-lucide-folder' : isImage(getFileExtensionFromPath(ref)) ? 'i-lucide-image' : 'i-lucide-file-text'
+
+// Files dropped on the chat (from Files, Finder or Explorer) or pasted into the prompt are attached: `useChatAttach`
+// decides what chat can take and copies outside files into the workspace first.
+const {fromWorkspace, fromOutside, fromPaste} = useChatAttach(session, () => props.chatId)
+const attach = (refs: string[]) => {
+	notes.value = [...new Set([...notes.value, ...refs])]
+}
+async function attachFrom(run: () => Promise<string[]>) {
+	try {
+		attach(await run())
+	} catch (e) {
+		$qt.error(t('app.chat.attach.failed'), errorText(e))
+	}
+}
+
+const dropping = ref(false)
+const takesDrop = (event: DragEvent) => !!event.dataTransfer?.types.some(type => type === FILES_DRAG || type === 'Files')
+function onDragOver(event: DragEvent) {
+	if (!takesDrop(event)) return
+	event.preventDefault()
+	event.dataTransfer!.dropEffect = 'copy'
+	dropping.value = true
+}
+function onDragLeave(event: DragEvent) {
+	if (!(event.currentTarget as Element).contains(event.relatedTarget as Node | null)) dropping.value = false
+}
+function onDrop(event: DragEvent) {
+	dropping.value = false
+	const transfer = event.dataTransfer
+	if (!transfer || !takesDrop(event)) return
+	event.preventDefault()
+	const rows = transfer.getData(FILES_DRAG)
+	if (rows) return attach(fromWorkspace(JSON.parse(rows) as string[]))
+	// Taken while the event lasts.
+	const pending = outsideItems(transfer)
+	void attachFrom(async () => fromOutside(await pending))
+}
+
+/**
+ * A paste with files in it (copied in Files, Finder or Explorer) or image data (a screenshot) attaches them; plain
+ * text pastes as text. When there turn out to be no files after all, the text goes in as it would have.
+ */
+function onPaste(event: ClipboardEvent) {
+	const data = event.clipboardData
+	if (!data || (!data.files.length && !data.types.includes('Files') && !data.types.includes('text/uri-list'))) return
+	event.preventDefault()
+	const images = [...data.files].filter(file => file.type.startsWith('image/')), text = data.getData('text/plain')
+	void attachFrom(async () => {
+		const refs = await fromPaste(images)
+		if (!refs.length && text) document.execCommand('insertText', false, text)
+		return refs
+	})
+}
 const sendError = ref('')
 const banner = computed(() => sendError.value || chat.value?.error?.message)
 const unsaved = computed(() => saveError(props.chatId).value)
@@ -193,6 +250,14 @@ const noteItems = computed(() => [
 			description: f.relativePath,
 			value: f.relativePath,
 			icon: 'i-lucide-file-text'
+		})),
+	// Images, unless the chat's model is known not to take them.
+	...(chatTakesImages(props.chatId) === false ? [] : getFilteredFiles(f => !f.isFolder && isImage(f.fileExt)))
+		.map(f => ({
+			label: f.fileName,
+			description: f.relativePath,
+			value: f.relativePath,
+			icon: 'i-lucide-image'
 		})),
 	...getFilteredFiles(f => f.isFolder)
 		.map(f => ({
@@ -367,6 +432,7 @@ const MENU = 'w-max min-w-48 max-w-80'
 					 @input="updateMention"
 					 @keyup="updateMention"
 				     @click="updateMention"
+				     @paste="onPaste"
 				>
 					<UChatPrompt :ui="{ root: 'bg-transparent backdrop-blur-lg' }" ref="promptRef" v-model="input"
 					             :error="chat.error" :placeholder="waitingOn ? $t(`app.chat.waitingPlaceholder.${waitingOn}`) : $t('app.chat.placeholder')" variant="subtle"
@@ -374,7 +440,7 @@ const MENU = 'w-max min-w-48 max-w-80'
 						<template #header v-if="notes.length">
 							<div class="flex flex-wrap gap-1">
 								<UBadge v-for="note in notes" :key="note"
-								        :icon="isFolderRef(note) ? 'i-lucide-folder' : 'i-lucide-file-text'" size="sm"
+								        :icon="refIcon(note)" size="sm"
 								        color="neutral" variant="soft" :label="refName(note)" :title="note">
 									<template #trailing>
 										<UButton icon="i-lucide-x" size="xs" color="neutral" variant="link" class="p-0"
@@ -516,12 +582,12 @@ const MENU = 'w-max min-w-48 max-w-80'
 				         variant="ghost" :aria-label="$t('app.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
 			</UTooltip>
 		</template>
-		<div class="absolute inset-0 flex flex-col">
+		<div :class="['absolute inset-0 flex flex-col rounded-md', dropping && 'ring-2 ring-inset ring-primary']" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
 			<Body/>
 		</div>
 	</ViewerEditorLayoutWrapper>
 
-	<div v-else class="relative flex flex-col h-full w-full min-h-0">
+	<div v-else :class="['relative flex flex-col h-full w-full min-h-0 rounded-md', dropping && 'ring-2 ring-inset ring-primary']" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
 		<div class="flex items-center gap-1.5 px-3 h-10 shrink-0 border-b border-default">
 			<UIcon name="i-lucide-message-square" class="size-4 text-muted shrink-0"/>
 			<span class="truncate text-sm font-medium text-highlighted grow">{{ title }}</span>

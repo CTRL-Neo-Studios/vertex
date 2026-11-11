@@ -15,6 +15,8 @@ export interface ChatSendSetup {
     /** The instructions before the notes. */
     prompt: string,
     notes: {path: string, content: string}[],
+    /** Images attached in the conversation, read at send: each goes into the message that attached it. */
+    images?: {messageId: string, mediaType: string, url: string}[],
     /** The chat's tools (`chatTools`); omitted when the model profile has them off. */
     tools?: ToolSet,
 }
@@ -114,11 +116,24 @@ export async function generateCommitMessage(provider: AiProviderProfile, modelId
     return cleanCommitMessage(text)
 }
 
+/** `bytes` as a `data:` URL, as a file part carries an image to the model. Built in chunks: a big image overflows one call's arguments. */
+export function dataUrl(mediaType: string, bytes: Uint8Array) {
+    let binary = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return `data:${mediaType};base64,${btoa(binary)}`
+}
+
+/** `messages` with each image added to the message that attached it, as a `file` part. */
+export function withImages(messages: VertexChatMessage[], images: ChatSendSetup['images'] = []) {
+    for (const {messageId, mediaType, url} of images) messages.find(m => m.id === messageId)?.parts.push({type: 'file', mediaType, url})
+    return messages
+}
+
 /** A chat transport that runs the model in the webview, through Rust's `ai_request` (no server route). */
 export function createChatTransport(setup: (messages: VertexChatMessage[]) => Promise<ChatSendSetup>): ChatTransport<VertexChatMessage> {
     return {
         async sendMessages({messages, abortSignal}) {
-            const {provider, profileId, modelId, params, prompt, notes, tools} = await setup(messages)
+            const {provider, profileId, modelId, params, prompt, notes, images, tools} = await setup(messages)
             const {system, sent} = chatSystem(prompt, notes)
             const names = Object.entries(tools ?? {})
             const request: ChatRequestInfo = {
@@ -136,8 +151,9 @@ export function createChatTransport(setup: (messages: VertexChatMessage[]) => Pr
                 model: modelFor(provider, modelId, params),
                 instructions: system || undefined,
                 // Plain copies: the chat's messages are Vue proxies, which an approved tool call's input can't be
-                // `structuredClone`d from when the AI SDK checks it again before running it.
-                messages: await convertToModelMessages(markModeSwitches(JSON.parse(JSON.stringify(messages))), {tools}),
+                // `structuredClone`d from when the AI SDK checks it again before running it. Attached images are
+                // added to the copies only, as file parts: the stored chat keeps their paths, not their bytes.
+                messages: await convertToModelMessages(markModeSwitches(withImages(JSON.parse(JSON.stringify(messages)), images)), {tools}),
                 ...(tools && {tools, stopWhen: isStepCount(MAX_STEPS)}),
                 abortSignal,
             })

@@ -226,7 +226,14 @@
 				"updateLinksDescription": "笔记或文件夹被移动或重命名时，如何处理指向它的链接。默认每次询问；在对话框中勾选“记住”会为该工作区设定。",
 				"updateLinksAsk": "每次询问",
 				"updateLinksUpdate": "更新链接",
-				"updateLinksKeep": "保持原样"
+				"updateLinksKeep": "保持原样",
+				"attachmentsFolder": "附件文件夹",
+				"attachmentsFolderDescription": "聊天或笔记接收工作区外的文件（以及粘贴的截图）时存放的位置。首次需要时创建。",
+				"attachmentsFolderTop": "顶层",
+				"importToChat": "拖入聊天的外部文件",
+				"importToChatDescription": "从访达或资源管理器拖入或粘贴到聊天的文件会先复制到附件文件夹。默认每次询问；对话框中的“记住”选项会为工作区设置此项。",
+				"importToChatAsk": "每次询问",
+				"importToChatAlways": "总是复制并附加"
 			},
 			"workflows": {
 				"title": "工作流",
@@ -1709,7 +1716,19 @@
 				"approval": "在此输入以拒绝，并说明原因…"
 			},
 			"profileSearch": "搜索模型配置",
-			"showEarlier": "显示更早的 {count} 条消息"
+			"showEarlier": "显示更早的 {count} 条消息",
+			"attach": {
+				"failed": "无法附加这些文件。",
+				"unsupported": "聊天暂不支持：{names}",
+				"tooBig": "超过 5 MB，无法发送：{names}",
+				"noImages": "{model} 不支持图片。"
+			},
+			"importDialog": {
+				"title": "将 {count} 个文件添加到工作区？",
+				"description": "聊天只能附加工作区中的文件，因此会先将它们复制到 {folder}。",
+				"add": "添加并附加"
+			},
+			"imagesUnsupported": "模型 {model} 不支持图片。请移除附加的图片，或选择支持图片的模型。"
 		},
 		"workspaces": {
 			"switch": "切换工作区",

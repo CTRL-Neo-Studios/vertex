@@ -226,7 +226,14 @@
 				"updateLinksDescription": "When a note or folder is moved or renamed, what happens to the links that pointed to it. Ask is the default; the dialog's Remember choice sets it for a workspace.",
 				"updateLinksAsk": "Ask each time",
 				"updateLinksUpdate": "Update links",
-				"updateLinksKeep": "Keep as written"
+				"updateLinksKeep": "Keep as written",
+				"attachmentsFolder": "Attachments folder",
+				"attachmentsFolderDescription": "Where files from outside the workspace go when chat or a note takes them, and pasted screenshots. Created when first needed.",
+				"attachmentsFolderTop": "Top level",
+				"importToChat": "Files from outside in chat",
+				"importToChatDescription": "Files dropped or pasted into chat from Finder or Explorer are copied into the attachments folder first. Ask is the default; the dialog’s Remember choice sets it for a workspace.",
+				"importToChatAsk": "Ask each time",
+				"importToChatAlways": "Always copy and attach"
 			},
 			"workflows": {
 				"title": "Workflows",
@@ -1709,7 +1716,19 @@
 				"approval": "Type here to decline, and say why…"
 			},
 			"profileSearch": "Search profiles",
-			"showEarlier": "Show {count} earlier message(s)"
+			"showEarlier": "Show {count} earlier message(s)",
+			"attach": {
+				"failed": "Could not attach the files.",
+				"unsupported": "Chat can’t take these yet: {names}",
+				"tooBig": "Over 5 MB, too big to send: {names}",
+				"noImages": "{model} doesn’t take images."
+			},
+			"importDialog": {
+				"title": "Add {count} file(s) to the workspace?",
+				"description": "Chat attaches workspace files, so they’re copied into {folder} first.",
+				"add": "Add and attach"
+			},
+			"imagesUnsupported": "The model {model} doesn’t take images. Remove the attached images or choose a model that does."
 		},
 		"workspaces": {
 			"switch": "Switch workspace",
