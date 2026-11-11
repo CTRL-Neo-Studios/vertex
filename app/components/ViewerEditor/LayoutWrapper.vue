@@ -13,6 +13,11 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
  * - Different alignment strategies
  */
 
+// Viewers wrap themselves in this, and `SessionTab` hands every viewer the same props and listeners (`content-saved`,
+// the internal-link listener); what a viewer doesn't declare falls through to here. This renders a fragment, so such
+// attrs could never land anywhere: dropped, instead of a Vue warning per viewer.
+defineOptions({inheritAttrs: false})
+
 const fileName = defineModel<string>('fileName')
 // The workspace's own view settings, when it overrides them.
 const {effective} = useSettingsScope()

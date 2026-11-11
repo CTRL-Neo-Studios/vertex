@@ -26,8 +26,9 @@ export const viewers: ViewerDefinition[] = [
     {id: 'bases', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
     {id: 'workflow', loadsText: true, extras: ['sessionId'], modes: ['workspace'], match: isWorkflowFile},
     {id: 'yaml', loadsText: true, extras: [], match: isYamlFile},
-    {id: 'latex', loadsText: true, extras: ['editorInstance'], match: isLatexFile},
-    {id: 'code', loadsText: true, extras: ['editorInstance'], match: ext => !isUnreadableAsText(ext)},
+    // Only the markdown editor exposes its CodeMirror view (`editorInstance`, for the outline's jumps).
+    {id: 'latex', loadsText: true, extras: [], match: isLatexFile},
+    {id: 'code', loadsText: true, extras: [], match: ext => !isUnreadableAsText(ext)},
 ]
 
 export function viewerFor(ext: string, mode: 'workspace' | 'singlespace'): ViewerDefinition | undefined {
