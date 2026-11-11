@@ -282,6 +282,15 @@ Git runs in Rust (`src-tauri/src/git.rs`), which spawns the installed `git`, so 
 
 Labels, routes and `useState` keys come from `shared/constants/app.ts`; never hand-build them.
 
+### Switching tabs
+
+In a workspace window, `TabSwitcher` (mounted by the session layout) switches tabs from the keyboard:
+- **Ctrl+Tab** on every platform, since Cmd+Tab and Alt+Tab belong to the OS. The tabs come in most-recently-shown order (`recent`, in the component), so a quick press goes back to the previous tab.
+- **Held:** after 200 ms a list (`role="listbox"`) appears over the window, lightly blurred (`backdrop-blur-xs`). Tab goes on and ` or Shift+Tab goes back, like macOS's Cmd+Tab; releasing Ctrl, Enter or a click goes to the highlighted tab, and Esc or leaving the window stays put.
+- **No list:** Cmd/Ctrl+Shift+] and [ step through the tab bar's order.
+- **Keys:** caught on `window` in the capture phase, so the editor and prompts never see them. There are no Ctrl+arrows (macOS's Mission Control and Spaces).
+- **Labels:** rows use `useTabLabel`, as the tab bar does.
+
 ### Opening something
 
 ```mermaid

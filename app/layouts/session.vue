@@ -16,6 +16,7 @@ import DashboardSidePanel from "~/components/LayoutComponents/DashboardSidePanel
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
 import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
+import TabSwitcher from "~/components/TabSwitcher.vue";
 import {Routes} from "#shared/constants/app";
 
 /**
@@ -95,6 +96,7 @@ onBeforeUnmount(async () => {
         <DashboardSidePanel side="left"/>
         <WorkspaceCommandPalette v-if="isWorkspace"/>
         <UDashboardSearch v-else shortcut="meta_p"/>
+        <TabSwitcher v-if="isWorkspace && activeSesh" :session="activeSesh"/>
         <DashboardCenterPanel>
             <slot/>
         </DashboardCenterPanel>

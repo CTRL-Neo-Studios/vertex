@@ -48,7 +48,7 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | Drag out | Rows dragged out of Vertex copy into Finder or Explorer through a native drag: CrabNebula's `tauri-plugin-drag` (drag-rs, macOS/Windows/Linux). A new dependency, since HTML5 can't hand the OS real files and WebKit has no `DownloadURL`. How it coexists with the HTML5 tree drag is F9's first step. |
 | Deleted files | Deleting is permanent today (`deleteFiles` → `removePath`). New setting `fileConfig.deletedFiles`, workspace-overridable like the other `fileConfig` keys (Settings → View → Files), like Obsidian's "Deleted files":<br>• `'trash'` (default): the system Trash or Recycle Bin;<br>• `'workspaceTrash'`: a `.trash/` folder in the workspace, hidden from Files like every dot-folder;<br>• `'permanent'`: as today.<br><br>Moving to a trash asks nothing; Finder and Explorer don't, and Undo is right there. A permanent delete keeps the confirmation dialog. |
 | Undo and redo | A history of what Files did, per session and in memory, about 50 steps. Each step records how to reverse itself:<br>• a move or rename: the items back where they were, and the notes whose links were rewritten get their old text back if they haven't changed since;<br>• a delete: the items back from the trash;<br>• an import, copy, paste or duplicate: what was created goes to the trash (redo brings it back);<br>• a Replace in the clash dialog: the replaced item back from the trash.<br><br>**How:** **Cmd/Ctrl+Z** and **Cmd/Ctrl+Shift+Z** while Files has focus, so the editor's own undo is untouched, plus an **Undo** button in the toast after each operation. Anything changed or moved outside Vertex since is skipped with a toast, never overwritten. With `'permanent'`, a delete isn't undoable and its toast has no Undo. Undo/Redo items in the Files menu are wanted, but low priority. |
-| Tab switcher | Users asked for a tab-switching shortcut. **Ctrl+Tab** on every platform, as in browsers, since Cmd+Tab and Alt+Tab belong to the OS. Tabs are in most-recently-used order. A quick press switches to the previous tab. Holding Ctrl a moment (about 200 ms) shows a list of the window's tabs; while Ctrl stays down, Tab and the arrow keys move the highlight, and releasing Ctrl goes to it, like the OS app switchers. Beside it, **Cmd/Ctrl+Shift+]** and **[** go to the next or previous tab in the tab bar, with no list. Not part of Files; it's F11 because it's next in this plan. |
+| Tab switcher | Users asked for a tab-switching shortcut. **Ctrl+Tab** on every platform, as in browsers, since Cmd+Tab and Alt+Tab belong to the OS. Tabs are in most-recently-used order. A quick press switches to the previous tab. Holding Ctrl a moment (about 200 ms) shows a list of the window's tabs over the lightly blurred window. While Ctrl stays down, Tab goes on and ` (or Shift+Tab) goes back, like macOS's Cmd+Tab; releasing Ctrl goes to the highlighted tab. There are no Ctrl+arrows, since macOS uses them for Mission Control. Beside it, **Cmd/Ctrl+Shift+]** and **[** go to the next or previous tab in the tab bar, with no list. Not part of Files; it's F11 because it's next in this plan. |
 
 ```mermaid
 flowchart LR
@@ -640,15 +640,21 @@ Run by the agent with real mouse and key events (CGEvent, System Events) in a sc
 Not part of Files. It's in this plan because it's the next piece of work.
 
 ### Change
-- **Decided with the user:** most recently used order, the list only after a short hold, and next/previous keys in tab-bar order beside it.
+- **Decided with the user:**
+  - most recently used order;
+  - the list only after a short hold;
+  - next/previous keys in tab-bar order beside it;
+  - Ctrl+` rather than Ctrl+arrows for going back;
+  - a light blur over the whole window while the list shows.
 - **First, probe the keys in Vertex.**
   - **macOS:** does Ctrl+Tab reach the page as a `keydown` in WKWebView, with focus in the editor, the chat prompt, Files, and nowhere? AppKit uses Ctrl+Tab to move keyboard focus out of text views. Does Control's `keyup` arrive?
   - **Windows:** the same in WebView2.
   - **If the page doesn't get it:** a hidden menu item with the `Ctrl+Tab` accelerator, which emits an event to the window. Releasing Ctrl still has to reach the page; if it doesn't, the list stays open until Enter or a click. Bring that back as a question.
 - **Keys:** caught on `window` in the capture phase, so the editor (where Tab would indent), the chat prompt and Files never see them.
-  - **Ctrl+Tab** opens the list with the next tab highlighted; **Ctrl+Shift+Tab** opens it with the previous one highlighted.
+  - **Ctrl+Tab** opens the list with the next tab highlighted; **Ctrl+`** (by `code`, `Backquote`, so any layout) or **Ctrl+Shift+Tab** opens it with the previous one highlighted.
   - **While Ctrl is held:**
-    - **Tab** or **Down** moves to the next tab, and **Shift+Tab** or **Up** to the previous one, wrapping at the ends.
+    - **Tab** moves to the next tab, and **`** or **Shift+Tab** to the previous one, wrapping at the ends, as in macOS's Cmd+Tab.
+    - There are no arrow keys: macOS keeps Ctrl+Up/Down/Left/Right for Mission Control, App Exposé and Spaces.
     - Hovering a row highlights it, and a click goes to it.
   - **Releasing Ctrl**, or **Enter**, goes to the highlighted tab (`toWorkspaceTab`, as the tab bar does).
   - **Esc**, or the window losing focus, closes the list and stays where it was.
@@ -659,8 +665,9 @@ Not part of Files. It's in this plan because it's the next piece of work.
   - A card centred over the editor, like the OS switchers.
   - One row per tab, with the tab bar's icon and title: a note's name with its folder, a chat's title, a diff's title, a view's name.
   - The highlighted row is scrolled into view.
-  - **Shown only after a short hold:** about 200 ms after the first press while Ctrl is still down, like macOS's Cmd+Tab. A quick Ctrl+Tab just switches, without the list flashing. Any further Tab or arrow shows it at once.
-- **Order:** most recently used first, so one Ctrl+Tab goes back to the previous tab and another returns. `useActiveTabs` keeps `recent` (tab ids, moved to the front whenever `activeTabUuid` changes, dropped when closed). It lives in memory, so after a relaunch it starts as the tab bar's order.
+  - **Shown only after a short hold:** about 200 ms after the first press while Ctrl is still down, like macOS's Cmd+Tab. A quick Ctrl+Tab just switches, without the list flashing. Any further Tab or ` shows it at once.
+  - **Backdrop:** while the list shows, the whole window behind it is lightly blurred and dimmed (`backdrop-blur-xs`, `bg-default/20`), fading in over 150 ms.
+- **Order:** most recently used first, so one Ctrl+Tab goes back to the previous tab and another returns. `TabSwitcher` keeps `recent` (tab ids, the shown one moved to the front whenever `activeTabUuid` changes; closed ones left out when a switch starts). It lives in memory, so after a relaunch it starts as the tab bar's order.
 - **One label for a tab:** the title and icon logic in `TabsHeaderComponent`'s `dropdownItems` moves to one function both use, so the switcher never names a tab differently from the tab bar.
 - **Where:** workspace windows. A singlespace window has one tab, so nothing happens there.
 - **No setting.**
@@ -669,12 +676,44 @@ Not part of Files. It's in this plan because it's the next piece of work.
 - With A, B and C opened in that order (C shown):
   - Ctrl+Tab, released at once, shows B; again shows C.
   - Holding Ctrl and pressing Tab twice highlights A, and releasing shows A.
-  - Up and Down, Shift+Tab, and Esc behave as above.
+  - Tab, ` and Shift+Tab move the highlight, and Esc stays on the current tab.
 - It works with focus in a note, the chat prompt, Files or nowhere. Tab never indents the note, and the prompt never gets a tab.
 - Chat, diff and view tabs are listed with the same names and icons as in the tab bar.
 - macOS first; Windows checked in SMOKE.
 - **The bracket keys:** with A, B and C in the bar and B shown, Cmd/Ctrl+Shift+] shows C, again shows A (wrapping), and Cmd/Ctrl+Shift+[ goes back. No list appears.
 - **The hold:** a quick Ctrl+Tab never shows the list, and holding Ctrl for a moment does.
+
+### As built
+- **Probe not run yet.** Vertex was closed, and you needed the computer. It's built as if the keys reach the page, and the probe is SMOKE row 107.
+- **`useTabLabel(session)`** (`app/composables/active/useTabLabel.ts`): `(tab) → {label, icon, folder?} | undefined`, moved out of `TabsHeaderComponent`'s `dropdownItems`, which now uses it too. A note also gets its folder (`parentPathOf(relativePath)`) for the switcher.
+- **`TabSwitcher.vue`** (`app/components/`), mounted by the session layout for workspace windows. It's placed after the `UDashboardSearch` `v-else`, so that pair stays intact.
+  - **Recent order:** `recent` is kept in the component (it lives as long as the window). The shown tab moves to the front, and a switch's order is taken at the first press and frozen while it lasts. That's the open tabs in recent order, then any never shown.
+  - **Keys:** `keydown`/`keyup` on `window` in the capture phase, stopped there; `blur` stops a switch.
+    - Ctrl+Tab and Ctrl+` (`back !== shiftKey` picks the direction).
+    - Enter or Control's `keyup` finishes; Esc stops.
+    - Cmd (macOS) or Ctrl + Shift + `BracketRight`/`BracketLeft` step through `tabs` in bar order.
+  - **Going there:** `toWorkspaceTab(session.uuid, openTab(id))`.
+  - **The list:** teleported to `body`, `role="listbox"`, labelled "Open tabs". Rows show the icon, the label and a dimmed folder. Hovering highlights a row, and pressing it finishes. The highlighted row is scrolled into view.
+  - **Backdrop:** the full-window layer under the card is `bg-default/20 backdrop-blur-xs` (4 px), in a fade `Transition`.
+
+### Results (done)
+All of these ran in the browser, on the stubbed production build, with real keys (Playwright `keyboard.down/press/up`).
+
+| Case | Result |
+|---|---|
+| Hub, Other, Links opened, Links shown; Ctrl+Tab released at once | Other, with no list; again goes back to Links |
+| Ctrl held 400 ms | List `Links, >Other, Hub` |
+| Tab, then ` twice | Hub; back to Other; back to Links |
+| Releasing Ctrl | Goes to the highlighted tab, and the list closes |
+| Ctrl+Tab, Esc, release | Stays |
+| Focus in the editor: Ctrl+Tab and back | Switched both ways; the note's text unchanged (no tab inserted) |
+| Bar Hub, Other, Links with Links shown: Cmd+Shift+] twice, then Cmd+Shift+[ | Hub (wrapping), Other, Hub; no list |
+| The backdrop | `backdrop-filter: blur(4px)` with a 20% tint; the screenshot shows the window blurred behind a sharp card, and it's gone after release |
+
+Not checked:
+- in Vertex: whether WKWebView and WebView2 pass Ctrl+Tab, Ctrl+` and Control's `keyup` to the page;
+- the chat prompt's focus;
+- chat, diff and view tabs in the list (the same label function as the bar).
 
 ## Checks
 - **Each phase:**

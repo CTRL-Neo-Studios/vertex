@@ -1450,7 +1450,8 @@
 					"keepBoth": "Keep both",
 					"skip": "Skip",
 					"applyToAll": "Do this for the remaining {count} conflict(s)"
-				}
+				},
+				"tabSwitcher": "Open tabs"
 			},
 			"labels": {
 				"bold": "Bold",

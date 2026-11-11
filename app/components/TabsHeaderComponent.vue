@@ -3,16 +3,12 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useTabLabel} from "~/composables/active/useTabLabel";
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {usePanels} from "~/composables/active/usePanels";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import SpaceOnOs from "~/components/SpaceOnOs.vue";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
-import {useChats} from "~/composables/ai/useChats";
-import {diffSpecOf, diffTitle} from "~/utils/gitDiff";
-import {chatChangeOf} from "~/utils/chatChanges";
-import {panelViews} from "~/utils/panelViews";
 
 const $route = useRoute()
 const sessionId = computed<string>(() => $route.params.sessionId as string), tabId = computed<string>(() => $route.params.tabId as string)
@@ -28,8 +24,7 @@ const {
     getActiveTab,
     clearTabs
 } = useActiveTabs($sesh.getSession(sessionId))
-const {getFileByUuid} = useActiveWorkspaceIndex($sesh.getSession(sessionId))
-const {summary: chatSummary} = useChats($sesh.getSession(sessionId))
+const labelOf = useTabLabel($sesh.getSession(sessionId))
 const panels = usePanels($sesh.getSession(sessionId))
 // The left panel's header holds the switcher (and the traffic lights' room) while it shows; this one otherwise.
 const leftClosed = computed(() => !panels.areas.value.left.open)
@@ -102,19 +97,11 @@ const dropdownItems = computed<DropdownMenuItem[][]>(() => {
     ]
 
     unref(tabs)?.forEach(i => {
-        const node = getFileByUuid(i.fileUuid)
-        const isChat = i.kind === 'chat'
-        const diff = i.kind === 'diff' ? diffSpecOf(i.fileUuid) : undefined
-        const aiChange = i.kind === 'diff' ? chatChangeOf(i.fileUuid) : undefined
-        const view = i.kind === 'view' ? panelViews.get(i.fileUuid) : undefined
-
-        if (node || isChat || diff || aiChange || view) {
+        const shown = labelOf(i)
+        if (shown) {
             items[1]?.push({
-                label: isChat ? chatSummary(i.fileUuid).value?.title || t('app.chat.untitled')
-                    : diff ? diffTitle(diff, t)
-                        : aiChange ? t('app.chat.changes.tabTitle', {name: aiChange.path.slice(aiChange.path.lastIndexOf('/') + 1)})
-                            : view ? t(view.label) : node?.fileName,
-                icon: isChat ? 'i-lucide-message-square' : diff ? 'i-lucide-git-compare' : aiChange ? 'i-lucide-sparkles' : view ? view.icon : i.changesSaved ? 'i-lucide-file-check' : 'i-lucide-file-diff',
+                label: shown.label,
+                icon: shown.icon,
                 id: i.fileUuid,
                 async toTab(index?: number) {
                     await toTab(i)

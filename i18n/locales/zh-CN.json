@@ -1450,7 +1450,8 @@
 					"keepBoth": "保留两者",
 					"skip": "跳过",
 					"applyToAll": "对其余 {count} 个冲突执行相同操作"
-				}
+				},
+				"tabSwitcher": "已打开的标签页"
 			},
 			"labels": {
 				"bold": "粗体",
