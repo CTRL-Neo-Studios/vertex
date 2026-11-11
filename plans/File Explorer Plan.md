@@ -168,7 +168,7 @@ Unverified: Windows/Linux Ctrl, and losing the window drag on the tree's empty a
     - makes one link pass, with one dialog.
   - **Replace** removes the existing item first (index, open tab).
   - **Keep both** relocates under a free name, and its links follow like a rename.
-- **Free names:** `freeName(name, taken)` in `shared/utils/fs/filenames.ts`. "Note.md" becomes "Note 2.md", then "Note 3.md"; "Folder" becomes "Folder 2". A small test covers extensions, dotfiles and numbers already taken.
+- **Free names:** `freeName(name, taken)` in `../shared/utils/fs/filenames.ts`. "Note.md" becomes "Note 2.md", then "Note 3.md"; "Folder" becomes "Folder 2". A small test covers extensions, dotfiles and numbers already taken.
 - **`FileConflictModal`:**
   - It shows the clashing name, the folder, and both sides' size and modified date.
   - Its result is `{action: 'replace' | 'keepBoth' | 'skip' | 'cancel', all: boolean}`. The "Do this for the remaining N" checkbox appears only when N is at least 1.
@@ -251,7 +251,7 @@ Unverified: the drag preview as WKWebView draws it (headless only shows the elem
 
 ### As built
 - **`planInto(items, destDir)`** in `useActiveWorkspaceTools` plans for moves and imports alike. It handles merges, clashes with indexed items and between incoming ones, the questions, and Keep both names. `moveFiles` feeds it the workspace's items (`asIncoming`); `importItems` feeds it outside ones. Moves behave exactly as in F4.
-- **`app/utils/outsideItems.ts`:**
+- **`../app/utils/outsideItems.ts`:**
   - `outsideItems(transfer)` takes a drop's or paste's items before its first `await` (`webkitGetAsEntry`, else `getAsFile`), then reads folders whole (`readEntries` until empty).
   - It skips `.DS_Store`, `Thumbs.db` and `desktop.ini`, and adds `path` from `text/uri-list` when there is one.
 - **`importItems(items, destDir, {copy})`:**
@@ -294,7 +294,7 @@ Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modif
 
 ### As built
 - **No probe needed.** The webview's `paste` event would only have carried what WebKit chooses to expose. Instead, two Rust commands read and write the system clipboard's file list: `clipboard_files_get` and `clipboard_files_set` in `lib.rs`, using `arboard` 3.7. It was already in the tree through the clipboard plugin and is now a direct desktop dependency. Its `file_list` works on macOS, Windows and Linux.
-  - **Paste** becomes "copy these paths in". `outsideItemsAt(paths)` (in `app/utils/outsideItems.ts`) describes them with plugin-fs `stat`/`readDir`, folders whole.
+  - **Paste** becomes "copy these paths in". `outsideItemsAt(paths)` (in `../app/utils/outsideItems.ts`) describes them with plugin-fs `stat`/`readDir`, folders whole.
   - **`importItems`** copies by path (`OutsideItem.source`, `copyFile`), so nothing passes through the webview.
   - **`{copy: true, inPlace: true}`:** a paste always copies, even the workspace's own files, and an item pasted into its own folder gets Keep both through `planInto`'s new `preset`. Such an item never merges into itself.
 - **The keys:**
@@ -365,7 +365,7 @@ Unverified:
 - **Unchanged:** the stored chat has paths only, and other chats and the Chats list are unaffected.
 
 ### As built
-- **`useChatAttach(session, chatId)`** (`app/composables/ai/useChatAttach.ts`) turns drops and pastes into attachment refs. They're workspace-relative paths, a folder's ending in `/`, the same as the `@` list.
+- **`useChatAttach(session, chatId)`** (`../app/composables/ai/useChatAttach.ts`) turns drops and pastes into attachment refs. They're workspace-relative paths, a folder's ending in `/`, the same as the `@` list.
   - **`fromWorkspace(refs)`:** rows from Files, or the clipboard's workspace files. They're attached as they are.
   - **`fromOutside(items)`:**
     - `indexedMatch` attaches the workspace's own files as they are.
@@ -433,7 +433,7 @@ Unverified:
 - Text paste and the editor's own drags (tables, text) behave as before.
 
 ### As built
-- **`useEditorFileDrops(session)`** (`app/composables/active/editor/useEditorFileDrops.ts`) replaces F5's `refuseOsFiles` in `useActiveEditorExtensions`. It's CodeMirror's `dropCursor()` plus `domEventHandlers`:
+- **`useEditorFileDrops(session)`** (`../app/composables/active/editor/useEditorFileDrops.ts`) replaces F5's `refuseOsFiles` in `useActiveEditorExtensions`. It's CodeMirror's `dropCursor()` plus `domEventHandlers`:
   - **`dragover`:** accepts rows from Files (`FILES_DRAG`, now in `outsideItems.ts`) and OS files, but doesn't claim the event, so the drop cursor follows.
   - **`drop`:**
     - Rows become links at `posAtCoords`; folders are left out.
@@ -493,7 +493,7 @@ Unverified:
 - **Dependencies:**
   - `tauri-plugin-drag` 2.1.1, a desktop-only crate registered in the `#[cfg(desktop)]` block of `lib.rs`, and its JS package `@crabnebula/tauri-plugin-drag` 2.1.0.
   - `capabilities/drag.json` grants `drag:default` to every desktop window. `desktop.json` covers only `main`, and Files lives in the session windows.
-- **`dragOut(root, refs, icon, ended)`** (`app/utils/outsideItems.ts`):
+- **`dragOut(root, refs, icon, ended)`** (`../app/utils/outsideItems.ts`):
   - It starts the drag with the rows' absolute paths and keeps `refs` as the drag under way.
   - The plugin's mode is copy, so Finder and Explorer copy and never move files out of the workspace.
   - When the plugin reports the end, a cancel clears the drag at once. A drop clears it after 500 ms, since the page's `drop` may come after that report. `ended` (the tree's `onDragEnd`) then runs; the page never gets a `dragend`.
@@ -558,12 +558,12 @@ After the other phases, as decided; their operations are wired in here.
 
 ### As built
 - **Setting:** `deletedFiles: 'trash' | 'workspaceTrash' | 'permanent'` in `AppFileConfig`, defaulting to `'trash'` (`defaultAppFileConfig`, `DELETED_FILES`). It's a "Deleted files" select in Settings → View → Files, in `filePaths` for reset, with en and zh-CN strings.
-- **Rust `src-tauri/src/trash.rs`:**
+- **Rust `../src-tauri/src/trash.rs`:**
   - `trash_item(path) → {original, trashed, deletedAt}` and `trash_restore(item)`, which fails with `taken` or `missing`.
   - **macOS:** `NSFileManager.trashItemAtURL_resultingItemURL_error` through `objc2-foundation` 0.3.2, already in the tree; the macOS target gains the features `NSFileManager`, `NSURL`, `NSError` and `NSString`. Restoring is a `rename` back.
   - **Windows and Linux:** the `trash` 5.3 crate (a target dependency). Restoring takes the newest `os_limited::list()` entry with that original path, deleted at or after the step (a second of slack), and calls `restore_all`.
   - Each item goes in its own call, so one failure doesn't lose the record of the others.
-- **`useFilesHistory(sessionId)`** (`app/composables/active/useFilesHistory.ts`):
+- **`useFilesHistory(sessionId)`** (`../app/composables/active/useFilesHistory.ts`):
   - Per-session stacks in a module map, `shallowReactive` for the menu labels, 50 steps; a push clears the redo side.
   - `FilesStep = {label, undo, redo}`; `undo` and `redo` return the names they skipped.
   - One run at a time; skipped names go in one warning toast.
@@ -685,8 +685,8 @@ Not part of Files. It's in this plan because it's the next piece of work.
 
 ### As built
 - **Probe not run yet.** Vertex was closed, and you needed the computer. It's built as if the keys reach the page, and the probe is SMOKE row 107.
-- **`useTabLabel(session)`** (`app/composables/active/useTabLabel.ts`): `(tab) → {label, icon, folder?} | undefined`, moved out of `TabsHeaderComponent`'s `dropdownItems`, which now uses it too. A note also gets its folder (`parentPathOf(relativePath)`) for the switcher.
-- **`TabSwitcher.vue`** (`app/components/`), mounted by the session layout for workspace windows. It's placed after the `UDashboardSearch` `v-else`, so that pair stays intact.
+- **`useTabLabel(session)`** (`../app/composables/active/useTabLabel.ts`): `(tab) → {label, icon, folder?} | undefined`, moved out of `TabsHeaderComponent`'s `dropdownItems`, which now uses it too. A note also gets its folder (`parentPathOf(relativePath)`) for the switcher.
+- **`TabSwitcher.vue`** (`../app/components`), mounted by the session layout for workspace windows. It's placed after the `UDashboardSearch` `v-else`, so that pair stays intact.
   - **Recent order:** `recent` is kept in the component (it lives as long as the window). The shown tab moves to the front, and a switch's order is taken at the first press and frozen while it lasts. That's the open tabs in recent order, then any never shown.
   - **Keys:** `keydown`/`keyup` on `window` in the capture phase, stopped there; `blur` stops a switch.
     - Ctrl+Tab and Ctrl+` (`back !== shiftKey` picks the direction).
@@ -719,7 +719,7 @@ Not checked:
 - **Each phase:**
   - Browser runs on the stubbed production build, as in the Performance Plan: dispatched pointer, mouse, drag and paste events, and a synthetic `DataTransfer` with `File`s for F5–F8. Selection, ranges, the box over unmounted rows, multi-moves with clashes, the outline, the preview's content, attachments and the model request's parts, and the inserted editor text.
   - Then `bun run typecheck`, `bun run lint` and `bun run test`.
-  - The docs: `Concepts and Structures.md` (the Files tree, chat attachments, the editor) and a `SMOKE.md` row.
+  - The docs: `Concepts and Structures.md` (the Files tree, chat attachments, the editor) and a `../SMOKE.md` row.
 - **Only in Vertex (SMOKE):**
   - real Finder and Explorer drops and pastes;
   - the drag preview's look in WKWebView and WebView2;

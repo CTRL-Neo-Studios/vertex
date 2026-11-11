@@ -35,7 +35,7 @@ flowchart LR
 ## G1: Git backend (#49)
 
 ### Change
-- `src-tauri/src/git.rs` (commands) and `app/utils/gitClient.ts` (`GitCommand`, `GitError`, `gitClient`), like `chats.rs` / `chatClient.ts`; types in `shared/types/app/git.d.ts`.
+- `../src-tauri/src/git.rs` (commands) and `app/utils/gitClient.ts` (`GitCommand`, `GitError`, `gitClient`), like `chats.rs` / `chatClient.ts`; types in `shared/types/app/git.d.ts`.
 - Finding git, cached once found:
   - `gitConfig.path` (global settings only: a workspace must not choose an executable), else
   - on macOS `/opt/homebrew/bin/git`, `/usr/local/bin/git` (an app opened from Finder doesn't get the shell's `PATH`), then
@@ -73,7 +73,7 @@ Blocked by G1.
 - Commit box: message, Commit (with nothing staged it commits every change), Commit and Push; ⌘↩ commits.
 - Header actions (`usePanelActions`): Fetch, Pull, Push, Refresh. Branch picker on the branch name: switch, check out a remote branch, type a new name to create one.
 - Refresh: every watcher event under the workspace (`.git/` and the app's own saves included), debounced; and on window focus (a repository above the workspace isn't watched).
-- Not a repository: **Create repository** (`git_init` with `.gitignore` lines: `.DS_Store`, `Thumbs.db`, `desktop.ini`, `.vertex/trash/`, `.vertex/**/*.tmp`; with chats stored in the workspace, a **Sync chats** checkbox, unticked adds `.vertex/chats/`). G5's wizard builds on it.
+- Not a repository: **Create repository** (`git_init` with `../.gitignore` lines: `.DS_Store`, `Thumbs.db`, `desktop.ini`, `.vertex/trash/`, `.vertex/**/*.tmp`; with chats stored in the workspace, a **Sync chats** checkbox, unticked adds `.vertex/chats/`). G5's wizard builds on it.
 
 ### Acceptance
 - [ ] Edit, stage, commit and push from the view against a real remote; Sync does it in one click.
@@ -87,7 +87,7 @@ Blocked by G2.
 
 ### Change
 - A file's diff opens as a tab (`kind: 'diff'`, `GitDiffView`): working copy vs last commit (Changes rows), staged vs last commit (Staged rows), or a commit vs its first parent (G4). The tab id holds the whole spec (`diffTabId`, URL-safe), so the page renders from the route and the same diff reopens the same tab; diff tabs aren't restored after a relaunch.
-- `lineDiff` / `splitRows` (`shared/utils/textDiff.ts`, on `diff`): numbered lines, unchanged runs folded to 3 lines of context (click to unfold; unfolded stays open across reloads), a missing final newline ignored; side by side from 760 px, one column below; read-only; binary files (a NUL in the first 8000 characters) say so.
+- `lineDiff` / `splitRows` (`../shared/utils/textDiff.ts`, on `diff`): numbered lines, unchanged runs folded to 3 lines of context (click to unfold; unfolded stays open across reloads), a missing final newline ignored; side by side from 760 px, one column below; read-only; binary files (a NUL in the first 8000 characters) say so.
 - From a row: click (or Enter) opens the diff, Open file opens the note; a conflicted file opens itself, to fix its markers. Right-click: Open changes. The diff's header has the side, what it compares with, new / deleted / renamed, +/− counts and Open file.
 
 ### Acceptance
@@ -101,7 +101,7 @@ Blocked by G1 and G3. Lands P5 (#48).
 
 ### Change
 - `definePanelView({id: 'gitHistory', defaultArea: 'bottom', tab: true})`, available only where the workspace is a git repository (`isGitRepo`, kept by `watchGitPresence`: checked when the window opens and when `.git` comes or goes), so other workspaces get no bottom area for it. The Git view's History button shows it in its panel (moving it out of Hidden if needed) or, failing that, in a tab.
-- Commit graph: `graphRows` (`shared/utils/gitGraph.ts`) lays out lanes from parent ids (a lane waits for the commit it leads to; parents another lane waits for are joined at once; lanes never move sideways); colored per lane, merge commits hollow, HEAD larger; branch, remote branch and tag badges (the current branch solid), so ahead/behind shows as separate tips.
+- Commit graph: `graphRows` (`../shared/utils/gitGraph.ts`) lays out lanes from parent ids (a lane waits for the commit it leads to; parents another lane waits for are joined at once; lanes never move sideways); colored per lane, merge commits hollow, HEAD larger; branch, remote branch and tag badges (the current branch solid), so ahead/behind shows as separate tips.
 - Paging: `git_log` 300 at a time as the list nears its end; only the rows on screen are drawn (`useVirtualList`). It reloads (as many rows as are loaded) when the head, branch, upstream or ahead/behind change.
 - Selecting a commit: subject, body, author, date, copyable id, parents (click to select), changed files (`git_commit_files`), each opening a G3 diff against the first parent. Side by side from 720 px, stacked below.
 - P5 (#48): History opens as a tab too (see Concepts → Panels).
@@ -119,7 +119,7 @@ Blocked by G2 and G6.
 - The Changes view shows a setup card when:
   - git is missing: on macOS **Install developer tools** (`git_install_tools`: `xcode-select --install`), then **Install git** (git-scm.com's page for the OS), a **Locate git…** button (`gitConfig.path`; once set, the card says it isn't a working git and offers **Find git automatically**), Check again;
   - the workspace isn't a repository: the wizard.
-- Wizard (`GitSetup`, a stepper): create the repository → `.gitignore` (system files, `.vertex/trash/`, `.vertex/**/*.tmp`; the **Sync chats** checkbox explaining the conflict risk, adding `.vertex/chats/` when off) → your name and email (`git_identity` / `git_identity_set`, repository config; prefilled from what git uses) → connect a remote (paste a URL; a link to create a repository on GitHub, kept empty) → first push (`sync`; sign-in from G6 on the way). Remote and push can wait (Later). A failed commit (`identity`) or push (`no-remote`) offers that step from its toast.
+- Wizard (`GitSetup`, a stepper): create the repository → `../.gitignore` (system files, `.vertex/trash/`, `.vertex/**/*.tmp`; the **Sync chats** checkbox explaining the conflict risk, adding `.vertex/chats/` when off) → your name and email (`git_identity` / `git_identity_set`, repository config; prefilled from what git uses) → connect a remote (paste a URL; a link to create a repository on GitHub, kept empty) → first push (`sync`; sign-in from G6 on the way). Remote and push can wait (Later). A failed commit (`identity`) or push (`no-remote`) offers that step from its toast.
 - Home page: **Clone Workspace…** (URL, a folder to put it in, the new folder's name from the URL; sign-in from G6), then opens it.
 - `useTour` tour of the Changes view (Sync, Branch, ahead/behind, Fetch/Pull/Push, the lists and staging, Commit, History), once after setup and from a Tour button; terms explained once.
 
