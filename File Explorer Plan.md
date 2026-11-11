@@ -48,6 +48,7 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | Drag out | Rows dragged out of Vertex copy into Finder or Explorer through a native drag: CrabNebula's `tauri-plugin-drag` (drag-rs, macOS/Windows/Linux). A new dependency, since HTML5 can't hand the OS real files and WebKit has no `DownloadURL`. How it coexists with the HTML5 tree drag is F9's first step. |
 | Deleted files | Deleting is permanent today (`deleteFiles` → `removePath`). New setting `fileConfig.deletedFiles`, workspace-overridable like the other `fileConfig` keys (Settings → View → Files), like Obsidian's "Deleted files":<br>• `'trash'` (default): the system Trash or Recycle Bin;<br>• `'workspaceTrash'`: a `.trash/` folder in the workspace, hidden from Files like every dot-folder;<br>• `'permanent'`: as today.<br><br>Moving to a trash asks nothing; Finder and Explorer don't, and Undo is right there. A permanent delete keeps the confirmation dialog. |
 | Undo and redo | A history of what Files did, per session and in memory, about 50 steps. Each step records how to reverse itself:<br>• a move or rename: the items back where they were, and the notes whose links were rewritten get their old text back if they haven't changed since;<br>• a delete: the items back from the trash;<br>• an import, copy, paste or duplicate: what was created goes to the trash (redo brings it back);<br>• a Replace in the clash dialog: the replaced item back from the trash.<br><br>**How:** **Cmd/Ctrl+Z** and **Cmd/Ctrl+Shift+Z** while Files has focus, so the editor's own undo is untouched, plus an **Undo** button in the toast after each operation. Anything changed or moved outside Vertex since is skipped with a toast, never overwritten. With `'permanent'`, a delete isn't undoable and its toast has no Undo. Undo/Redo items in the Files menu are wanted, but low priority. |
+| Tab switcher | Users asked for a tab-switching shortcut. **Ctrl+Tab** on every platform, as in browsers, since Cmd+Tab and Alt+Tab belong to the OS. Tabs are in most-recently-used order. A quick press switches to the previous tab. Holding Ctrl a moment (about 200 ms) shows a list of the window's tabs; while Ctrl stays down, Tab and the arrow keys move the highlight, and releasing Ctrl goes to it, like the OS app switchers. Beside it, **Cmd/Ctrl+Shift+]** and **[** go to the next or previous tab in the tab bar, with no list. Not part of Files; it's F11 because it's next in this plan. |
 
 ```mermaid
 flowchart LR
@@ -62,6 +63,7 @@ flowchart LR
   F6 --> F8
   F4 --> F9[F9 Drag out]
   F9 --> F10[F10 Undo and redo]
+  F11[F11 Tab switcher]
 ```
 
 ## F1: Selection
@@ -605,11 +607,74 @@ All of these ran in the browser, on the stubbed production build. The stubs: a s
 | Empty-space menu | "Undo add 1 item(s)" and a disabled "Redo" |
 
 - **Windows and Linux code:** the non-macOS half of `trash.rs` compiled for `x86_64-pc-windows-msvc` and `x86_64-unknown-linux-gnu` in a scratch crate with `trash` 5.3.
+
+#### Smoke in Vertex (macOS, `tauri:dev`)
+Run by the agent with real mouse and key events (CGEvent, System Events) in a scratch folder `Smoke F10/` of the Test workspace. The folder was removed afterwards, and the workspace's `.vertex/settings.json` restored. The run stopped early when the user needed the computer.
+
+| Step | Result |
+|---|---|
+| Alpha, Beta, Gamma selected, dragged (native drag) onto `Dest`, Update links | Moved on disk; `Linker.md` rewritten to `Smoke F10/Dest/…`; "Updated 3 link(s)." and "Moved 3 item(s)." with Undo |
+| Cmd+Z in Files | Back in `Smoke F10/`, `Linker.md` restored. The Edit menu didn't take Cmd+Z |
+| Cmd+Shift+Z | Moved and rewritten again |
+| `Linker.md` edited on disk, then Cmd+Z | The notes moved back, `Linker.md` kept the edit, and the toast named it |
+| Doomed.md, Cmd+Backspace | No dialog, "Moved 1 item(s) to the Trash."; the file was at `~/.Trash/Doomed.md` (the resulting URL) |
+| Cmd+Z, and later the toast's Undo | Back in place from the real Trash and indexed again; Cmd+Shift+Z trashed it again |
+| `.trash` in the workspace | **Failed:** "Could not delete Doomed.md: forbidden path …/.trash". Fixed (below), not run again |
+
+**Found and fixed:**
+- **`.trash/` was outside the fs scopes.** `capabilities/default.json` allowed dot paths only for `.vertex`. `**/.trash` and `**/.trash/**` were added to `fs:read-all` (`read_dir`, `stat`), `fs:write-all`, `fs:allow-rename`, `fs:allow-mkdir` and `fs:allow-exists`. Unverified in Vertex: the app needs a restart to pick it up.
+- **Deleting the shown note left it on screen.** The route stayed on the closed tab, and the page kept showing the deleted note in a plain editor. This came from `closeTab`, so it predates F10 and permanent deletes had it too. `toTrash` and permanent deletes now call `closeTabElsewhere`, which moves the route to the next tab first.
+  - **Browser check:** deleting the shown Links.md showed Other.md, and Cmd+Z restored Links.md without reopening its tab.
+
 - **Not checked:**
-  - the real Trash on any system (macOS's resulting URL, Finder's Put Back, the Recycle Bin listing);
-  - the macOS Edit menu's own Undo with Files focused (it might take Cmd+Z before the page does);
-  - undoing a merge and a Replace (the code path, but no browser run);
-  - in Vertex itself.
+  - Finder's Put Back: the agent can't move items out of `~/.Trash`, so it couldn't be simulated;
+  - the Recycle Bin and the Linux trash;
+  - `.trash` and permanent deletes in Vertex after the scope fix;
+  - undoing a paste, a merge or a Replace in Vertex;
+  - the editor's Cmd+Z in Vertex;
+  - the empty-space menu in Vertex.
+- **Note:** while Vertex wasn't frontmost, a Cmd+Shift+Z and a Cmd+Z went to the frontmost app, the agent's own window. From then on, keys were sent only after checking that Vertex was frontmost.
+
+## F11: Tab switcher (Ctrl+Tab)
+
+Not part of Files. It's in this plan because it's the next piece of work.
+
+### Change
+- **Decided with the user:** most recently used order, the list only after a short hold, and next/previous keys in tab-bar order beside it.
+- **First, probe the keys in Vertex.**
+  - **macOS:** does Ctrl+Tab reach the page as a `keydown` in WKWebView, with focus in the editor, the chat prompt, Files, and nowhere? AppKit uses Ctrl+Tab to move keyboard focus out of text views. Does Control's `keyup` arrive?
+  - **Windows:** the same in WebView2.
+  - **If the page doesn't get it:** a hidden menu item with the `Ctrl+Tab` accelerator, which emits an event to the window. Releasing Ctrl still has to reach the page; if it doesn't, the list stays open until Enter or a click. Bring that back as a question.
+- **Keys:** caught on `window` in the capture phase, so the editor (where Tab would indent), the chat prompt and Files never see them.
+  - **Ctrl+Tab** opens the list with the next tab highlighted; **Ctrl+Shift+Tab** opens it with the previous one highlighted.
+  - **While Ctrl is held:**
+    - **Tab** or **Down** moves to the next tab, and **Shift+Tab** or **Up** to the previous one, wrapping at the ends.
+    - Hovering a row highlights it, and a click goes to it.
+  - **Releasing Ctrl**, or **Enter**, goes to the highlighted tab (`toWorkspaceTab`, as the tab bar does).
+  - **Esc**, or the window losing focus, closes the list and stays where it was.
+  - **Cmd/Ctrl+Shift+]** and **Cmd/Ctrl+Shift+[** go to the next or previous tab in the tab bar's order, wrapping, with no list (as in browsers).
+    - Same capture phase, so they win over CodeMirror's `Ctrl-Shift-[`/`]` (fold/unfold off macOS; on macOS those are `Cmd-Alt-[`/`]`).
+    - The probe covers them too.
+- **The list** (`TabSwitcher.vue`, mounted once by the session layout):
+  - A card centred over the editor, like the OS switchers.
+  - One row per tab, with the tab bar's icon and title: a note's name with its folder, a chat's title, a diff's title, a view's name.
+  - The highlighted row is scrolled into view.
+  - **Shown only after a short hold:** about 200 ms after the first press while Ctrl is still down, like macOS's Cmd+Tab. A quick Ctrl+Tab just switches, without the list flashing. Any further Tab or arrow shows it at once.
+- **Order:** most recently used first, so one Ctrl+Tab goes back to the previous tab and another returns. `useActiveTabs` keeps `recent` (tab ids, moved to the front whenever `activeTabUuid` changes, dropped when closed). It lives in memory, so after a relaunch it starts as the tab bar's order.
+- **One label for a tab:** the title and icon logic in `TabsHeaderComponent`'s `dropdownItems` moves to one function both use, so the switcher never names a tab differently from the tab bar.
+- **Where:** workspace windows. A singlespace window has one tab, so nothing happens there.
+- **No setting.**
+
+### Acceptance
+- With A, B and C opened in that order (C shown):
+  - Ctrl+Tab, released at once, shows B; again shows C.
+  - Holding Ctrl and pressing Tab twice highlights A, and releasing shows A.
+  - Up and Down, Shift+Tab, and Esc behave as above.
+- It works with focus in a note, the chat prompt, Files or nowhere. Tab never indents the note, and the prompt never gets a tab.
+- Chat, diff and view tabs are listed with the same names and icons as in the tab bar.
+- macOS first; Windows checked in SMOKE.
+- **The bracket keys:** with A, B and C in the bar and B shown, Cmd/Ctrl+Shift+] shows C, again shows A (wrapping), and Cmd/Ctrl+Shift+[ goes back. No list appears.
+- **The hold:** a quick Ctrl+Tab never shows the list, and holding Ctrl for a moment does.
 
 ## Checks
 - **Each phase:**

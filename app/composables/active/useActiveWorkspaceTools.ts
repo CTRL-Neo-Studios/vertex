@@ -60,7 +60,8 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             item = {original: file.fullPath, trashed: path, deletedAt: Math.floor(Date.now() / 1000), workspace: true, nodes: []}
         } else item = {...await invoke<Omit<Trashed, 'nodes'>>('trash_item', {path: file.fullPath}), nodes: []}
         const removed = removeFileFromIndex(file.fullPath)
-        for (const node of removed) $tabs.closeTab(node.uuid)
+        // The route leaves a shown tab first; left on it, the page kept showing the gone note in a plain editor.
+        for (const node of removed) await $tabs.closeTabElsewhere(node.uuid)
         item.nodes = removed.reverse().map(n => ({path: n.fullPath, uuid: n.uuid}))
         return item
     }
@@ -522,7 +523,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
                 else {
                     await removePath(file.fullPath)
                     // Everything removed (a folder's notes too) loses its tab.
-                    for (const removed of removeFileFromIndex(file.fullPath)) $tabs.closeTab(removed.uuid)
+                    for (const removed of removeFileFromIndex(file.fullPath)) await $tabs.closeTabElsewhere(removed.uuid)
                 }
             } catch (error) {
                 console.error(`[deleteFiles] could not delete ${file.fullPath}`, error)

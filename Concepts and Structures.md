@@ -122,9 +122,10 @@ Rows select like a file manager's. The selection is the tree's own (uuids plus a
 
 Deleting (`deleteFiles`, `useActiveWorkspaceTools`) follows `fileConfig.deletedFiles`, workspace-overridable (Settings → View → Files):
 - **`'trash'`** (the default): the system Trash or Recycle Bin, through Rust `trash_item` (`src-tauri/src/trash.rs`). On macOS it uses `NSFileManager trashItemAtURL:resultingItemURL:` (`objc2-foundation`), which says where the item went; elsewhere it uses the `trash` crate. `trash_restore` puts an item back: on macOS by moving it from where it went, elsewhere by finding it in the Trash's listing by original path and deletion time. It fails with `taken` or `missing`.
-- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index.
+- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index. Like `.vertex`, it's listed in the fs scopes (`capabilities/default.json`), whose `**/*` doesn't match dot paths.
 - **`'permanent'`:** `DeleteFilesModal` asks first, then the items are removed for good, with no undo.
 - Either trash asks nothing, and the toast ("Moved N item(s) to the Trash.") has an **Undo** button. An item a clash's Replace displaces goes the same way.
+- **Tabs:** every removed item's tab closes through `closeTabElsewhere`, so a shown one hands the page to the next tab first. Undo doesn't reopen the tab.
 
 Files' history (`useFilesHistory`, per session, in memory, 50 steps; a new step clears the redo side):
 - **What records a step:** `moveFiles`, `renameFile`, `deleteFiles` and `importItems`, so drops, pastes, Duplicate and the chat's and editor's imports too. Each records a `Change`:
