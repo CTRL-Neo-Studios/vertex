@@ -211,25 +211,55 @@ Checked in the browser:
 ## O6: Chat
 
 ### Change
-- The prompt: find what a keystroke re-renders (O0: 250 ms per key with 500 messages, 1.8 s with the Chats list open too; none with 40) and cut it off, as `GitCommitBox` did: the prompt in its own component if the messages share its render. Profile on a dev build first; the survey's guess (isolated by `createReusableTemplate`) is wrong.
-- `ChatMarkdown` parses a throttled copy (about 100 ms) while streaming; complete messages as before.
-- Tool cards: `unmount-on-hide`; whether a card has a body from its state, not by serializing its output twice per render.
-- A message's body in its own component (`ChatMessageBody`), so a streamed chunk re-renders the streaming message, not all 500 (`UChatMessages`' dynamic slots force every message to update).
-- A long chat mounts its latest 50 messages with **Show earlier** (50 more each time) above them. Only `ChatView`'s `UChatMessages` gets the slice; everything else keeps reading the whole `chat.messages`:
-  - What the model gets: the transport is handed the SDK chat's own messages (`chatTransport.ts`, `convertToModelMessages`), never the rendered ones, so the context is always the whole branch. A check sends a message in a 120-message chat and asserts the request holds all of them.
-  - Window anchoring: the window is a start index, not "the last 50", so streamed replies and new messages extend it instead of pushing older shown ones out. Reopening the chat (or switching chats) resets it to the latest 50.
-  - Branches (`chatForks.ts`): switching a branch, editing a message or retrying a reply replaces everything after that message. The window then grows to keep the message acted on in view, so a longer branch doesn't push it out. `branches` and `branchOf` keep working by message id over the whole list. Their O(n²) `findIndex` per message becomes one pass.
-  - Undo and changes (`appliedAfter`, `undoChanges`, rewind): they read the whole list. A rewind to a shown message only cuts after it, so the window stays valid; clamp it if it ends past the new end.
-  - Diffs (`ChatChanges`): each message's own. Hidden messages' applied changes stay applied and undoable from a later message.
-  - Context window (`ChatContextModal`) and the token totals: the whole list, as now. Its jump to a message works inside the modal, not the view.
-  - Show earlier keeps the scroll position (adjusted by the added height), so the view doesn't jump. Auto-scroll and scroll-to-submitted only use the end of the list.
-  - Message search opens the chat without jumping to the message today. If it ever jumps, the window grows to include it.
-  - A chat open in a tab and in the side panel: each view has its own window.
-  - Find in page only reaches loaded messages; accepted.
-- Chats list: a row's menu built when opened, folders sorted once, one date formatter, the drop highlight off the items (as in O3); the `@` note list sorted with one `Intl.Collator`; the scope picker `virtualize`.
-- Chats list on a tab switch: find why it costs about 2 s with 2000 chats (`activeTabUuid` in `items`, each row's `chatActions`) and stop it re-rendering every row. If it still costs over 100 ms after the row fixes, virtualizing the list comes back as a question.
-- Not now: a custom chat state with throttled, shallow messages (replacing `new Chat()`); only if the above leaves streaming slow. Virtualizing the Chats list: row fixes only, decided.
+- Done, the prompt. Cause: `ChatView`'s body is a `createReusableTemplate`, which renders without the compiler's slot flags. Every keystroke re-rendered the body, and `UChatMessages` (its slots never "stable" there) redrew every message. The messages moved to their own component, `ChatThread` (list, actions, edit box, window). Typing re-renders only the prompt now.
+- Done: `ChatMarkdown` parses a 100 ms-throttled copy while streaming, and the full text once done.
+- Done: tool cards `unmount-on-hide`. Whether a card opens comes from its state (`hasDetail`), so a closed card never serializes its output.
+- Done: `ChatMessageBody`, one message's content (notes, text, reasoning, tool calls, questions, approvals, changes). A streamed chunk is a new object for the last message only, so only that body re-renders.
+- Done: a long chat mounts its latest 50 messages, with **Show earlier** (50 more each time). The window is a start index (`start`, clamped to keep 50: `from`), only in `ChatThread`. Each edge case as planned:
+  - The model gets every message.
+  - Replies extend the window.
+  - Edit, retry and branch switches keep the message acted on in view.
+  - Rewind clamps the window.
+  - Show earlier holds the first shown message in place: it adjusts until the earlier messages' markdown has laid out.
+  - The context window counts every message.
+  - Each view has its own window.
+  - `branchesOf` (one pass) replaces `branchOf` (a `findIndex` per message).
+- Done, Chats list rows:
+  - Each row's "…" menu is its own component (`ChatRowMenu`). It builds its items when opened, and opening it redraws only that menu.
+  - Folders are sorted once (`sortedFolders`); there is one date formatter.
+  - The drop highlight and the open chat's row (`data-current`, styled in `NAV_UI`) are marked through the DOM, no longer in the items.
+  - The menu's `ui` is a constant.
+  - Unchanged chats keep their item object.
+  - The `@` list and the scope picker sort with one `Intl.Collator`; the scope picker is virtualized.
+  - Root cause of the 2 s tab switch: each tab switch rebuilt every row, and each row's menu got new props (items, content). Vue checks the pending pre-flush queue on every component update, so a few thousand updating rows cost about 2 s.
+- Dropped: a custom chat state. Streaming into 500 messages now costs two long tasks, 151 ms in total.
+- Kept, by decision: the Chats list still redraws on every index save (send, finish, a new title), about 0.44 s with 2000 chats, and only while the list is open. Virtualizing it (a flat list with folder open/close, keyboard navigation, drag & drop and row menus redone) is the fix if it ever matters.
 
 ### Acceptance
 - Streaming into a 500-message chat: no long task per chunk; opening it under 200 ms; tab switches with 2k chats don't re-render every row.
 - In a 120-message chat: the request carries every message; branch arrows, edit, retry, rewind and undo on shown messages behave as before; Show earlier doesn't move what's on screen.
+
+### Results (after)
+| Scenario | Before | After |
+|---|---|---|
+| Type in the prompt, 500 messages, Chats (2000) open | about 1.8 s per key | none |
+| … Chats closed | about 250 ms per key | none |
+| Open the 500-message chat (from load, with Chats) | 4.7 s, longest 1745 ms | 1.05 s, longest 777 ms (app start included); 50 messages mounted |
+| Stream 300 chunks into it | 1.25 s, longest 716 ms; 8.0 s for 6.1 s of chunks | 0.15 s, longest 92 ms; 7.1 s; the request held all 586 model messages |
+| Switch tabs ×10 with 2000 chats listed | 19.2 s, about 2 s each | none |
+| Scroll the 2000-chat list | not measured | none |
+| Stream into a 120-message chat with Chats open | 4.3 s, longest 2141 ms | 0.87 s: two 444 ms tasks, the list redrawing on the save at send and at finish (Chats closed: one 94 ms task) |
+| Show earlier (50 more) | | one 144 ms task; the first shown message stays at the same height on screen (144 px before and after) |
+
+Checked in the browser:
+- **Messages and the window:**
+  - Editing a message inside the window kept it in view, showed 2/2, and sent 539 model messages (the whole branch).
+  - The previous-branch arrow brought the original back (1/2).
+  - A rewind to Answer 470 ended the list there, still 50 shown.
+  - The context dialog on a windowed message said 500 messages.
+- **Streaming and tool cards:**
+  - The streamed reply ended complete (`word299`).
+  - A closed tool card had no body until opened.
+- **Chats list:**
+  - The open chat's row was in the primary color.
+  - A row's menu opened with its six items.

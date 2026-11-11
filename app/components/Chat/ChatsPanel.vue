@@ -47,6 +47,7 @@ async function onNavClick(event: MouseEvent) {
 }
 
 /** Today, Yesterday, Last 7 days, Last 30 days, then month and year, from `updated`. */
+const monthYear = computed(() => new Intl.DateTimeFormat(locale.value, {month: 'long', year: 'numeric'}))
 function dateLabel(updated: number) {
     const now = new Date()
     const dayStart = (daysAgo: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo).getTime()
@@ -54,7 +55,13 @@ function dateLabel(updated: number) {
     if (updated >= dayStart(1)) return t('app.chat.yesterday')
     if (updated >= dayStart(7)) return t('app.chat.lastWeek')
     if (updated >= dayStart(30)) return t('app.chat.lastMonth')
-    return new Intl.DateTimeFormat(locale.value, {month: 'long', year: 'numeric'}).format(updated)
+    return monthYear.value.format(updated)
+}
+
+/** Stable: a new object on each render (inline in the template) redrew every row of the list. */
+const NAV_UI = {
+    link: 'overflow-hidden pr-7.5 data-current:text-primary data-current:before:bg-elevated',
+    linkTrailing: 'translate-x-full group-hover:translate-x-0 group-has-data-[state=open]:translate-x-0 transition-transform ms-0 absolute inset-e-px',
 }
 
 function onChatSelect(chat: ChatSummary, event: Event) {
@@ -67,16 +74,24 @@ function onChatSelect(chat: ChatSummary, event: Event) {
 type ChatNavItem = NavigationMenuChildItem & { chat: ChatSummary }
 type FolderNavItem = NavigationMenuChildItem & { path: string }
 
-const chatItem = (chat: ChatSummary): ChatNavItem => ({
-    label: chatTitle(chat),
-    value: chat.id,
-    slot: 'chat',
-    chat,
-    active: chat.id === activeTabUuid.value,
-    class: chat.title ? '' : 'text-muted',
-    'data-drag': `chat:${chat.id}`,
-    onSelect: (e: Event) => onChatSelect(chat, e),
-})
+// The same item object for a chat whose summary didn't change: a save rewrites one chat's summary, and the others'
+// rows then have nothing new to draw.
+const itemCache = new WeakMap<ChatSummary, { locale: string, item: ChatNavItem }>()
+function chatItem(chat: ChatSummary): ChatNavItem {
+    const cached = itemCache.get(chat)
+    if (cached?.locale === locale.value) return cached.item
+    const item: ChatNavItem = {
+        label: chatTitle(chat),
+        value: chat.id,
+        slot: 'chat',
+        chat,
+        class: chat.title ? '' : 'text-muted',
+        'data-drag': `chat:${chat.id}`,
+        onSelect: (e: Event) => onChatSelect(chat, e),
+    }
+    itemCache.set(chat, {locale: locale.value, item})
+    return item
+}
 
 // Not while the encrypted store is locked or unset: the unlock form is all there is then.
 usePanelActions(() => locked.value ? [] : [
@@ -97,7 +112,6 @@ const items = computed<NavigationMenuItem[]>(() => {
             slot: 'folder',
             path,
             'data-drag': `folder:${path}`,
-            class: dropTarget.value === path ? DROP_TARGET : undefined,
             defaultOpen: expanded.value.includes(folderKey(path)),
             children: [],
         }
@@ -130,8 +144,26 @@ const dragged = ref<string | null>(null)
 const dropTarget = ref<string | null>(null)
 const listEl = computed(() => scrollAreaRef.value?.$el)
 const markDraggable = () => listEl.value?.querySelectorAll('[data-drag]:not([draggable])').forEach(el => el.setAttribute('draggable', 'true'))
-useMutationObserver(listEl, markDraggable, {childList: true, subtree: true})
-watch(listEl, markDraggable, {flush: 'post'})
+// The open chat's row is marked through the DOM (`data-current`, styled by `NAV_UI`): as an item's `active`, every tab
+// switch rebuilt the items and redrew every row.
+function markCurrent() {
+    const id = activeTabUuid.value
+    const row = id ? listEl.value?.querySelector(`[data-drag="chat:${CSS.escape(id)}"]`) : null
+    listEl.value?.querySelectorAll('[data-current]').forEach(el => el !== row && el.removeAttribute('data-current'))
+    row?.setAttribute('data-current', '')
+}
+const markRows = () => {
+    markDraggable()
+    markCurrent()
+}
+useMutationObserver(listEl, markRows, {childList: true, subtree: true})
+watch([listEl, activeTabUuid], markRows, {flush: 'post'})
+// The target folder's row lights up through the DOM: in the items, every change of target rebuilt the whole list.
+const folderRow = (path: string | null) => (path ? listEl.value?.querySelector(`[data-drag="folder:${CSS.escape(path)}"]`) : null)
+watch(dropTarget, (next, previous) => {
+    folderRow(previous)?.classList.remove(...DROP_TARGET.split(' '))
+    folderRow(next)?.classList.add(...DROP_TARGET.split(' '))
+})
 
 const rowOf = (event: DragEvent) => (event.target as Element).closest?.('[data-drag]')?.getAttribute('data-drag') ?? undefined
 const chatOf = (id: string) => index.value?.chats.find(c => c.id === id)
@@ -256,25 +288,10 @@ const searchGroups = computed<CommandPaletteGroup[]>(() => {
                         orientation="vertical"
                         class="pb-2.5"
                         @click="onNavClick"
-                        :ui="{
-                            link: 'overflow-hidden pr-7.5',
-                            linkTrailing: 'translate-x-full group-hover:translate-x-0 group-has-data-[state=open]:translate-x-0 transition-transform ms-0 absolute inset-e-px'
-                        }"
+                        :ui="NAV_UI"
                     >
                         <template #chat-trailing="{ item }: { item: ChatNavItem }">
-                            <UDropdownMenu :items="chatActions(item.chat)" :content="{ align: 'end' }" size="sm">
-                                <UButton
-                                    as="div"
-                                    icon="i-lucide-ellipsis"
-                                    color="neutral"
-                                    variant="link"
-                                    size="sm"
-                                    class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50 data-[state=open]:bg-accented/50"
-                                    :aria-label="$t('app.chat.actions')"
-                                    tabindex="-1"
-                                    @click.stop.prevent
-                                />
-                            </UDropdownMenu>
+                            <ChatRowMenu :items="() => chatActions(item.chat)"/>
                         </template>
                         <template #folder-leading="{ item }: { item: FolderNavItem }">
                             <!-- The link is the accordion trigger, so its data-state tells whether the folder is open. -->
@@ -284,19 +301,7 @@ const searchGroups = computed<CommandPaletteGroup[]>(() => {
                             </span>
                         </template>
                         <template #folder-trailing="{ item }: { item: FolderNavItem }">
-                            <UDropdownMenu :items="folderActions(item.path)" :content="{ align: 'end' }" size="sm">
-                                <UButton
-                                    as="div"
-                                    icon="i-lucide-ellipsis"
-                                    color="neutral"
-                                    variant="link"
-                                    size="sm"
-                                    class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50 data-[state=open]:bg-accented/50"
-                                    :aria-label="$t('app.chat.actions')"
-                                    tabindex="-1"
-                                    @click.stop.prevent
-                                />
-                            </UDropdownMenu>
+                            <ChatRowMenu :items="() => folderActions(item.path)"/>
                         </template>
                     </UNavigationMenu>
                 </UScrollArea>

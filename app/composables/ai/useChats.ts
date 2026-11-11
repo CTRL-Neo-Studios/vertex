@@ -901,11 +901,16 @@ export function useChats(session?: ActiveSession) {
         discardChanges,
         openChange,
         appliedAfter,
-        /** Which branch shows at `messageId`, of how many; undefined where nothing forks. */
-        branchOf: (id: string, messageId: string) => {
+        /** Which branch shows at each message where a fork starts, and of how many, by message id: one pass. */
+        branchesOf: (id: string) => {
             const entry = live.get(keyOf(id))
             const messages = entry?.chat.messages ?? []
-            return branchAt(entry?.meta.forks, messages, messages.findIndex(m => m.id === messageId))
+            const out: Record<string, { index: number, count: number }> = {}
+            messages.forEach((m, i) => {
+                const branch = branchAt(entry?.meta.forks, messages, i)
+                if (branch) out[m.id] = branch
+            })
+            return out
         },
         setProfile: (id: string, profileId: string | undefined) => update(id, {profileId}),
         setMode: (id: string, mode: ChatMode) => update(id, {mode}),
