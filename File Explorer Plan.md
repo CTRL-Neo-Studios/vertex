@@ -32,7 +32,7 @@ F1–F5 are in `FileTreeComponent.vue` and `useActiveWorkspaceTools.ts`, plus on
 | Drop target | The target folder's row and its shown contents get one `border-primary` outline (top on the folder's row, sides down its contents, bottom on its last shown row) over the existing `bg-primary/10`. The top level gets `ring-primary` around the whole tree. |
 | Drag preview | `setDragImage` with a small card: the first item's icon and name, two offset cards behind it when there are more, and a count badge ("3 items"). The element stays mounted off-screen and is filled in directly at `dragstart`; Vue can't render it within the event. |
 | Many moves | One move path, `moveFiles(uuids, destDir)`. `renameFile` and `moveFile` (O3) become a list of one. Links get one pass, with at most one links dialog for the whole move ("Update links to 5 items?"). |
-| Name clashes | Always asked, as a file manager does. Folders merge, as in Windows Explorer: their contents move in, and only clashing files ask. A file clash offers **Replace**, **Keep both** ("Note 2.md") or **Skip**. With more clashes left, "Do this for the remaining N" applies the choice to the rest. **Cancel**: for moves, everything is asked before anything moves, so Cancel moves nothing (as built); for F5 imports it stops, and what's done stays done. The same dialog serves tree moves (before, a clash only showed an error toast) and OS imports. |
+| Name clashes | Always asked, as a file manager does. Folders merge, as in Windows Explorer: their contents move in, and only clashing files ask. A file clash offers **Replace**, **Keep both** ("Note 2.md") or **Skip**. With more clashes left, "Do this for the remaining N" applies the choice to the rest. **Cancel**: everything is asked before anything happens, so Cancel changes nothing, for moves and imports alike (as built: one planner, `planInto`). The same dialog serves tree moves (before, a clash only showed an error toast) and OS imports. |
 | OS drops | `dragDropEnabled` stays `false`: Tauri's own handler would give paths but turns off HTML5 drag & drop on every platform (tauri#14373), which the tree, the Chats list and the panels use. A dropped item's contents are read through the browser File API (`webkitGetAsEntry` for folders) and written with plugin-fs `writeFile`/`mkdir`, then indexed parent-first (`addFileToIndex`). A drop is a copy. `.DS_Store` and `Thumbs.db` are skipped. |
 | Drops anywhere else | A window-level guard: an OS file drag that no handler accepts gets `dropEffect = 'none'` and `preventDefault`, so the webview never navigates. The tree (F5), chat (F7) and the editor (F8) accept OS files; everything else shows the "not allowed" cursor. |
 | Items already in the workspace | **Detection:** an item whose name, size and modified time match an indexed one at the drop is treated as that item. If the probe (F5) finds the webview exposes the item's path (`text/uri-list`), the path decides instead. **Handling:** a found item moves, exactly as a tree drag would (links updated, refusals, its own folder a no-op). This is what Finder and Explorer do on the same disk. Holding Option/Alt at the drop copies instead, through the clash dialog. **Risk:** a false match (an identical outside copy, such as a backup) moves the workspace's file instead of copying the outside one. Nothing is lost. |
@@ -242,6 +242,30 @@ Unverified: the drag preview as WKWebView draws it (headless only shows the elem
   - A Finder folder with subfolders arrives whole.
 - **Clashes:** a clash asks, and many clashes offer "Do this for the remaining N".
 - **Items already in the workspace:** dropped back onto a different folder, a file moves (links updated). Onto its own folder, nothing happens. With Option/Alt held, it's copied through the clash dialog.
+
+### As built
+- **`planInto(items, destDir)`** in `useActiveWorkspaceTools` plans for moves and imports alike. It handles merges, clashes with indexed items and between incoming ones, the questions, and Keep both names. `moveFiles` feeds it the workspace's items (`asIncoming`); `importItems` feeds it outside ones. Moves behave exactly as in F4.
+- **`app/utils/outsideItems.ts`:**
+  - `outsideItems(transfer)` takes a drop's or paste's items before its first `await` (`webkitGetAsEntry`, else `getAsFile`), then reads folders whole (`readEntries` until empty).
+  - It skips `.DS_Store`, `Thumbs.db` and `desktop.ini`, and adds `path` from `text/uri-list` when there is one.
+- **`importItems(items, destDir, {copy})`:**
+  - It moves what `indexedMatch` recognizes (by path, else a single item with the same name, size and modified time within 2 s; a folder by the same contents).
+  - It copies the rest: `writeFile`/`mkdir`, `markSelfWrite`, `addFileToIndex` parent-first.
+  - One toast says "Added N item(s)." and another lists failures. It returns the uuids that ended up in the folder.
+- **The tree:** OS files are `copy` drags with the same targets, outline and hover-to-open. The target opens first, and what arrives is selected. Option/Alt at the drop copies.
+- **The guard:** two window listeners in `app.vue`.
+- **The editor refuses OS files (until F8).** CodeMirror's own drop handler inserted a dropped file's bytes as text: a Finder note's text, or an image as garbage. That was one way an OS drop wrecked a tab. `refuseOsFiles` (a `domEventHandlers` extension in `useActiveEditorExtensions`) shows "not allowed" there now.
+- The probe (path availability, Finder paste) is still to be run in Vertex. Without a path, detection uses name, size and modified time, as planned.
+
+### Results (done)
+Checked on the stubbed production build with synthetic OS drops; a fake directory entry stood in for a Finder folder:
+- **Copies into a folder:** two files dropped on F01 (a note and a PNG, plus a `.DS_Store`) wrote `F01/Two.md` and `F01/pic.png`, binary intact, and skipped `.DS_Store`. A note dropped where no row was hit landed at the top level, and "Added 1 item(s)." showed.
+- **The workspace's own file:** a file matching F00/M0_3 by name, size and modified time, dropped on Big, was moved there (a rename), not copied. With Option/Alt, it was copied: Big now had an M0_3, so the clash dialog asked, and Keep both wrote `Big/M0_3 2.md`, which was selected.
+- **Folders:** a folder `Trip` with `Plan.md`, `.DS_Store` and `Photos/a.png` became `mkdir Big/Trip`, `Plan.md`, `mkdir Big/Trip/Photos`, `a.png`, in that order, with Trip selected.
+- **A different outside file** with a workspace name (different size) asked, and Skip wrote nothing.
+- **Guard:** an OS file over the editor or a plain element was refused (`dropEffect` `none`, drop cancelled), and the page stayed. The note's text was unchanged; before `refuseOsFiles`, the editor had inserted the file's text.
+
+Unverified: real Finder and Explorer drops (WKWebView's entries, sizes and modified times, and whether `text/uri-list` comes along); WebView2 on Windows.
 
 ## F6: Copy and paste in Files
 

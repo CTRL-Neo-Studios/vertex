@@ -552,7 +552,10 @@
 					"openInNewTabs": "Open in New Tabs",
 					"copyFullPaths": "Copy full paths",
 					"copyRelativePaths": "Copy relative paths",
-					"itemCount": "{count} item(s)"
+					"itemCount": "{count} item(s)",
+					"added": "Added {count} item(s).",
+					"addFailed": "Could not add: {names}",
+					"importFailed": "Could not add the dropped items."
 				},
 				"openInNewTab": "Open in New Tab",
 				"openInDefaultApp": "Open in Default App",

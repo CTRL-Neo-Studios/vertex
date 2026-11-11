@@ -124,11 +124,17 @@ Rows drag like a file manager's:
 - What moves: dragging a selected row moves the selection (what's inside a selected folder goes with it); an unselected row is selected alone first. The drag image is a card with the row's icon and name, with two stacked cards and an "N item(s)" badge for more than one.
 - Where a drop lands: onto a folder, into it; onto a file, into its folder; onto empty space, the top level. Items already there stay; a folder never goes into itself or its subfolders. The target folder and its shown rows get one `border-primary` outline (the top level, a ring around the tree), and the target opens before the move so the moved rows stay selected.
 - While dragging: a closed folder held for 600 ms opens, and the edges scroll.
-- Moves go through `moveFiles` (`useActiveWorkspaceTools`). It plans first, then asks, then moves:
+- Moves go through `moveFiles` (`useActiveWorkspaceTools`). It plans first (`planInto`, which imports share), then asks, then moves:
   - **Plan:** a folder onto a same-named folder merges, so its contents move in and the emptied folder is removed.
   - **Ask:** every other name clash, ignoring case, goes through `FileConflictModal`: Replace, Keep both ("Note 2.md", `freeName`) or Skip, optionally for the remaining clashes. Cancel moves nothing.
   - **Move:** then `relocateFiles`, which renaming uses too, moves each item on disk and in the index (uuids stay, so tabs and open folders follow). It then updates the links whose text changes, to the items or to any note inside a moved folder, with one dialog for the whole move.
 - Whether links are updated comes from `fileConfig.updateLinks`, overridable per workspace (Settings → View → Files): ask (the default), update, or keep. The dialog's "Remember my decision for this workspace" writes it.
+
+Files from the OS (Finder or Explorer) drop onto the tree like rows, with the same targets and outline. `dragDropEnabled` stays false, so they arrive as HTML5 `Files`. `outsideItems` (`app/utils/outsideItems.ts`) reads them while the event lasts: folders whole, skipping `.DS_Store`/`Thumbs.db`/`desktop.ini`. `importItems` then decides what each one is:
+- **Already the workspace's:** an item with the same path when the webview gives one, or else the only one with the same name, size and modified time, moves instead (as on the same disk). Option/Alt copies it anyway.
+- **Everything else** is copied in through the same planner and clash dialog, written with plugin-fs and indexed parent-first. What arrives is selected, with one "Added N item(s)." toast.
+
+An OS file dropped anywhere else is refused: a window guard in `app.vue`, and `refuseOsFiles` in the editor, whose CodeMirror would otherwise insert the file's bytes as text. Before, the webview could navigate to the file or the note got its contents.
 
 ### AI requests
 

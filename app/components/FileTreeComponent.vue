@@ -19,6 +19,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {outsideItems} from "~/utils/outsideItems";
 
 const {t} = useI18n()
 
@@ -32,7 +33,7 @@ const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, openTabs, activeTabUuid} = useActiveTabs(session)
 const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
-const {createFile, moveFiles} = useActiveWorkspaceTools(session)
+const {createFile, moveFiles, importItems} = useActiveWorkspaceTools(session)
 const $qt = useQuickToasts()
 // The workspace's own view settings, when it overrides them.
 const config = useSettingsScope().effective
@@ -371,8 +372,12 @@ function onDragStart(event: DragEvent) {
     if (ghost) event.dataTransfer.setDragImage(ghost, 12, 12)
 }
 
+/** A drag of files from the OS (not one of the tree's own rows). */
+const fromOs = (event: DragEvent) => !dragged.value.length && !!event.dataTransfer?.types.includes('Files')
+
 function onDragOver(event: DragEvent) {
-    if (!dragged.value.length) return
+    const outside = fromOs(event)
+    if (!dragged.value.length && !outside) return
     // The tree hides its scrollbar and a drag doesn't scroll it: near an edge, scroll.
     const el = treeRef.value?.$el
     if (el) {
@@ -382,10 +387,11 @@ function onDragOver(event: DragEvent) {
     }
     openLater(rowId(event))
     const dest = destOf(event)
-    dropDir.value = canDrop(dragged.value, dest) ? dest : null
+    // What OS files are isn't known until the drop, so any folder takes them.
+    dropDir.value = outside || canDrop(dragged.value, dest) ? dest : null
     if (dropDir.value === null) return
     event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    if (event.dataTransfer) event.dataTransfer.dropEffect = outside ? 'copy' : 'move'
 }
 
 function onDragLeave(event: DragEvent) {
@@ -404,19 +410,44 @@ function onDragEnd() {
 useEventListener(window, 'dragend', onDragEnd)
 
 async function onDrop(event: DragEvent) {
-    const uuids = dragged.value, dest = dropDir.value
+    const uuids = dragged.value, dest = dropDir.value, outside = fromOs(event)
     onDragEnd()
-    if (!uuids.length || dest === null || !session?.rootPath) return
+    if ((!uuids.length && !outside) || dest === null || !session?.rootPath) return
     event.preventDefault()
+    if (outside) return importDrop(event, dest)
     const name = uuids.length === 1 ? getFileByUuid(uuids[0])?.fileName ?? '' : t('app.editor.ui.filetree.itemCount', {count: uuids.length})
     // Open the target first: the moved rows are shown there as they arrive, so they stay selected (a hidden row would
     // drop out of the selection; uuids don't change on a move).
-    const folder = dest && getFileByPath(`${session.rootPath}/${dest}`)?.uuid
-    if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
+    openDest(dest)
     try {
         await moveFiles(uuids, dest ? `${session.rootPath}/${dest}` : session.rootPath)
     } catch (error) {
         $qt.error(t('app.editor.ui.filetree.moveFailed', {name}), String(error))
+    }
+}
+
+/** Opens the folder at `dest` (relative; `''` is the top level) so what lands there shows, and stays selected. */
+function openDest(dest: string) {
+    const folder = dest && getFileByPath(`${session!.rootPath}/${dest}`)?.uuid
+    if (folder && !expandedFolders.value.includes(folder)) expandedFolders.value = [...expandedFolders.value, folder]
+}
+
+/**
+ * OS files dropped on the tree: copied in, or moved when they're already the workspace's (Option/Alt copies them
+ * anyway). What arrives is selected.
+ */
+async function importDrop(event: DragEvent, dest: string) {
+    // Taken while the event lasts.
+    const pending = outsideItems(event.dataTransfer!), copy = event.altKey
+    openDest(dest)
+    try {
+        const ids = await importItems(await pending, dest ? `${session!.rootPath}/${dest}` : session!.rootPath!, {copy})
+        if (ids && ids.length) {
+            selected.value = new Set(ids)
+            anchor = ids[0]
+        }
+    } catch (error) {
+        $qt.error(t('app.editor.ui.filetree.importFailed'), String(error))
     }
 }
 

@@ -552,7 +552,10 @@
 					"openInNewTabs": "在新标签页中打开全部",
 					"copyFullPaths": "复制完整路径（全部）",
 					"copyRelativePaths": "复制相对路径（全部）",
-					"itemCount": "{count} 个项目"
+					"itemCount": "{count} 个项目",
+					"added": "已添加 {count} 个项目。",
+					"addFailed": "无法添加：{names}",
+					"importFailed": "无法添加拖入的项目。"
 				},
 				"openInNewTab": "在新标签页中打开",
 				"openInDefaultApp": "用默认应用打开",
