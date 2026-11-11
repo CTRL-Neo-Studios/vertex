@@ -1,6 +1,9 @@
 import {readDir, stat} from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path";
 
+/** What a drag from the Files tree carries besides its own state: the rows' workspace-relative paths, a folder's ending in `/`. */
+export const FILES_DRAG = 'application/x-vertex-files'
+
 /**
  * Files and folders from outside the workspace, as a drop or a paste hands them over. A dropped file is read through
  * `read`; a pasted one is a path on disk (`source`), copied by path. `path` is where it is on disk when known, which
@@ -61,4 +64,15 @@ export async function outsideItemsAt(paths: string[]): Promise<OutsideItem[]> {
         return {name, isFolder: info.isDirectory, size: info.size, modified, children: () => children, source: path, path}
     }
     return (await Promise.all(paths.map(p => at(p, p.split(/[\\/]/).pop() ?? p)))).filter(i => !!i)
+}
+
+/** Image data with no file behind it (a screenshot), named as Obsidian names a pasted image: `Pasted image 20261111143012.png`. */
+export function pastedImage(file: File, at = new Date()): OutsideItem {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const stamp = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`
+    const ext = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1] || 'png'
+    return {
+        name: `Pasted image ${stamp}.${ext}`, isFolder: false, size: file.size, modified: at.getTime(), children: () => [],
+        read: async () => new Uint8Array(await file.arrayBuffer()),
+    }
 }

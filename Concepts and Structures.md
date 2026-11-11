@@ -134,7 +134,9 @@ Files from the OS (Finder or Explorer) drop onto the tree like rows, with the sa
 - **Already the workspace's:** an item with the same path when the webview gives one, or else the only one with the same name, size and modified time, moves instead (as on the same disk). Option/Alt copies it anyway.
 - **Everything else** is copied in through the same planner and clash dialog, written with plugin-fs and indexed parent-first. What arrives is selected, with one "Added N item(s)." toast.
 
-An OS file dropped anywhere else is refused: a window guard in `app.vue`, and `refuseOsFiles` in the editor, whose CodeMirror would otherwise insert the file's bytes as text. Before, the webview could navigate to the file or the note got its contents.
+An OS file dropped anywhere else is refused by a window guard in `app.vue`; before, the webview could navigate to the file. Files dropped or pasted into a note go through `useEditorFileDrops` (below), so CodeMirror never puts a file's bytes in as text.
+
+Files into a note (`useEditorFileDrops`, in `useActiveEditorExtensions`): rows dragged from Files become links at the drop point (with a drop cursor). Files dropped from Finder or Explorer, or pasted, are copied into `fileConfig.attachmentsFolder` without asking and then linked; ones the workspace already has are linked as they are. A paste takes the system clipboard's files first, else image data, saved as `Pasted image YYYYMMDDHHmmss.png`. Several go in one per line. A note is linked by its name without `.md` when that finds it, else by its path. Anything else is linked by its path with the extension (`![[…]]` for an image), because the editor finds embeds by full path or by a name without extension. `linkKeys` also indexes a name with its extension (`cat.png`), so Obsidian's `![[cat.png]]` counts as a link and is renamed with the file.
 
 Copy and paste in Files go through the system clipboard's file list (Rust `clipboard_files_get`/`clipboard_files_set`, `arboard`), so there's one clipboard shared with Finder and Explorer:
 - **Copy** (Cmd/Ctrl+C, or the menu) puts the selected rows there as files.

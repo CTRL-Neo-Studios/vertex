@@ -47,7 +47,7 @@ describe('getInternalLinks', () => {
 
 describe('renameTargets', () => {
     it('maps each link form to its renamed equivalent', () => {
-        const m = renameTargets(['B', 'notes/B', 'notes/B.md'], 'notes/B.md', 'archive/Renamed.md')
-        expect(Object.fromEntries(m)).toEqual({'B': 'Renamed', 'notes/B': 'archive/Renamed', 'notes/B.md': 'archive/Renamed.md'})
+        const m = renameTargets(['B', 'notes/B', 'notes/B.md', 'B.md'], 'notes/B.md', 'archive/Renamed.md')
+        expect(Object.fromEntries(m)).toEqual({'B': 'Renamed', 'notes/B': 'archive/Renamed', 'notes/B.md': 'archive/Renamed.md', 'B.md': 'Renamed.md'})
     })
 })

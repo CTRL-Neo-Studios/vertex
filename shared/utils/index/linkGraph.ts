@@ -16,13 +16,17 @@ export interface LinkGraphFile {
     relativePath: string
 }
 
+/**
+ * The link targets that find a file: its name without and with its extension (`[[cat]]`, `[[cat.png]]`, which
+ * Obsidian writes for anything but a note), and its path without and with it.
+ */
 export function linkKeys(relativePath: string): string[] {
     const fileName = relativePath.slice(relativePath.lastIndexOf('/') + 1)
     const dot = fileName.lastIndexOf('.')
     const baseName = dot > 0 ? fileName.slice(0, dot) : fileName
     const relDot = relativePath.lastIndexOf('.')
     const relNoExt = dot > 0 ? relativePath.slice(0, relDot) : relativePath
-    return [...new Set([baseName, relNoExt, relativePath])]
+    return [...new Set([baseName, relNoExt, relativePath, fileName])]
 }
 
 export class LinkGraph {

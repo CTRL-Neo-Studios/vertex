@@ -96,7 +96,7 @@ export function rewriteLinks(text: string, rename: Map<string, string>): {text: 
 
 /**
  * For a file moving from `oldRel` to `newRel`, maps each link target that resolved to it onto the
- * equivalent target for the new location (basename → new basename, relative path → new relative path).
+ * equivalent target for the new location (each `linkKeys` form: path or name, with or without the extension).
  */
 export function renameTargets(targets: string[], oldRel: string, newRel: string): Map<string, string> {
     const stripExt = (p: string) => {
@@ -105,11 +105,13 @@ export function renameTargets(targets: string[], oldRel: string, newRel: string)
         return dot > 0 ? p.slice(0, p.length - (name.length - dot)) : p
     }
     const base = (p: string) => stripExt(p).slice(stripExt(p).lastIndexOf('/') + 1)
+    const name = (p: string) => p.slice(p.lastIndexOf('/') + 1)
     const map = new Map<string, string>()
     for (const t of targets) {
         if (t === oldRel) map.set(t, newRel)
         else if (t === stripExt(oldRel)) map.set(t, stripExt(newRel))
         else if (t === base(oldRel)) map.set(t, base(newRel))
+        else if (t === name(oldRel)) map.set(t, name(newRel))
     }
     return map
 }

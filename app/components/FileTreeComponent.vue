@@ -20,8 +20,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
-import {FILES_DRAG} from "~/composables/ai/useChatAttach";
+import {FILES_DRAG, outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
 
 const {t} = useI18n()
 

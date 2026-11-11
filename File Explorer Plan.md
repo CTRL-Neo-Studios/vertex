@@ -430,6 +430,45 @@ Unverified:
 - Dragging two notes from Files inserts two links; a note with a duplicate name gets its path.
 - Text paste and the editor's own drags (tables, text) behave as before.
 
+### As built
+- **`useEditorFileDrops(session)`** (`app/composables/active/editor/useEditorFileDrops.ts`) replaces F5's `refuseOsFiles` in `useActiveEditorExtensions`. It's CodeMirror's `dropCursor()` plus `domEventHandlers`:
+  - **`dragover`:** accepts rows from Files (`FILES_DRAG`, now in `outsideItems.ts`) and OS files, but doesn't claim the event, so the drop cursor follows.
+  - **`drop`:**
+    - Rows become links at `posAtCoords`; folders are left out.
+    - OS files the workspace already has (`indexedMatch`) are linked as they are. The rest are copied into the attachments folder with `importItems({copy: true})` and `ensureFolder`, without a dialog, then linked.
+  - **`paste`:** only one carrying files or image data. The system clipboard's files go first (`clipboard_files_get`), else the image data, as a pasted image (`pastedImage`, moved to `outsideItems.ts` and shared with chat). If there turn out to be no files, the text goes in.
+  - **Without a workspace:** OS files are refused, as F5 did.
+- **Link text** (`linkTo`):
+  - A note gets its name without `.md` when `resolveLink(name)` finds that very note, else its path without `.md`.
+  - Anything else gets its path with the extension, `![[…]]` for an image.
+  - Why paths for non-notes: the editor finds an embed by `name === target || filePath === target`, and Vertex hands it images under their base name (`cat`). `![[cat.png]]`, as Obsidian writes it, therefore doesn't render in Vertex. The path renders in both.
+  - Giving the editor images under their name with extension would fix that, but would break the `![[cat]]` embeds that Vertex's own autocomplete has written. **Left as it is, a question for later.**
+- **Links with extensions:**
+  - `linkKeys` now also indexes a file by its name with extension (`cat.png`, `B.md`), so an Obsidian-written `![[cat.png]]` counts as a link (backlinks, rename impact).
+  - `renameTargets` maps that form too, so renaming `cat.png` rewrites `![[cat.png]]`.
+  - Tests in `linkGraph.test.ts` and `rewriteLinks.test.ts` were updated.
+- **Several items** go in one per line, at the drop point or over the selection, with the cursor after them.
+
+### Results (done)
+Checked on the stubbed production build (dispatched drags and pastes, real clicks), reading the document from CodeMirror's state:
+- **Rows from Files:**
+  - Hub.md and Links.md selected and dragged onto "Intro line." inserted `[[Hub]]\n[[Links]]` there.
+  - Of two notes named Other, the top-level one (whose name finds it) went in as `[[Other]]` and Pics/Other.md as `[[Pics/Other]]`.
+  - Pics/cat.png went in as `![[Pics/cat.png]]` and rendered as an embed (`asset://localhost/vault/Pics/cat.png`).
+  - The drop cursor showed.
+- **From Finder:** a JPEG and a PDF dropped on a line made `mkdir Attachments`, `Attachments/beach.jpg` and `Attachments/paper.pdf`, with no dialog, and inserted `![[Attachments/beach.jpg]]\n[[Attachments/paper.pdf]]` at the drop.
+- **Pastes:**
+  - A screenshot became `Attachments/Pasted image 20261111021825.png`, embedded at the cursor.
+  - With `/vault/Links.md` and a Desktop `Ext.md` on the clipboard, the paste linked `[[Links]]` and copied Ext.md into Attachments, linked `[[Ext]]`.
+  - Plain text was left to CodeMirror.
+  - A URL (`text/uri-list` without files) went in as its text.
+
+Unverified:
+- real Finder drops and pastes (WebKit's paste types for a Finder copy);
+- a singlespace window (refusal);
+- the drop cursor's look in WKWebView;
+- the editor's own block-handle drags beside this.
+
 ## F9: Drag out
 
 ### Change

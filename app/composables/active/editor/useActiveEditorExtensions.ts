@@ -1,32 +1,17 @@
 import type {EditorState, Extension} from "@codemirror/state";
-import {EditorView, ViewPlugin} from "@codemirror/view";
+import {ViewPlugin, type EditorView} from "@codemirror/view";
 import {editorLabels, headingAt, headingsField, type Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {blockDragHandle, selectionToolbar, slashMenu} from "@type32/codemirror-rich-obsidian-editor/ext";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAiEditorExtension} from "~/composables/ai/useAiEditorExtension";
+import {useEditorFileDrops} from "~/composables/active/editor/useEditorFileDrops";
 
 // Plugins must be stable objects (package README), so they are built once and only picked per settings.
 const toolbarExt = selectionToolbar()
 const slashExt = slashMenu()
 const blockHandleExt = blockDragHandle()
-// OS files dropped on a note: CodeMirror would put their bytes in as text (an image as garbage). Refused like anywhere
-// else that doesn't take files (the "not allowed" cursor) until the editor takes them (File Explorer Plan, F8).
-const osFiles = (event: DragEvent) => !!event.dataTransfer?.types.includes('Files')
-const refuseOsFiles = EditorView.domEventHandlers({
-    dragover(event) {
-        if (!osFiles(event)) return false
-        event.preventDefault()
-        event.dataTransfer!.dropEffect = 'none'
-        return true
-    },
-    drop(event) {
-        if (!osFiles(event)) return false
-        event.preventDefault()
-        return true
-    },
-})
 
 /** Editor package label keys (its README, "Labels / localization"); each maps to `app.editor.labels.<key>`. */
 const LABEL_KEYS = [
@@ -88,6 +73,7 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
     const {effective} = useSettingsScope()
     const {t, locale} = useI18n()
     const ai = useAiEditorExtension()
+    const fileDrops = useEditorFileDrops(session)
     // `{n}`/`{total}` are the package's own placeholders: pass them through vue-i18n untouched.
     const labels = computed(() => {
         void locale.value
@@ -121,7 +107,7 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
             labels.value,
             headingsField,
             tracker,
-            refuseOsFiles,
+            fileDrops,
             panel?.selectionToolbar ?? true ? toolbarExt : [],
             panel?.slashMenu ?? true ? slashExt : [],
             panel?.blockHandle ?? true ? blockHandleExt : [],

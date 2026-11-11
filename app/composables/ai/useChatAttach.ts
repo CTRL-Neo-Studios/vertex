@@ -6,21 +6,11 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useChats} from "~/composables/ai/useChats";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
+import {outsideItemsAt, pastedImage, type OutsideItem} from "~/utils/outsideItems";
 import ImportToChatModal from "~/components/Modals/ImportToChatModal.vue";
-
-/** What a drag from the Files tree carries besides its own state: the rows' workspace-relative paths, a folder's ending in `/`. */
-export const FILES_DRAG = 'application/x-vertex-files'
 
 /** Common provider limits on one image. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-/** A pasted screenshot's name, as Obsidian names one: `Pasted image 20261111143012.png`. */
-export function pastedImageName(type: string, at = new Date()) {
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const stamp = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`
-    return `Pasted image ${stamp}.${type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1] || 'png'}`
-}
 
 /**
  * What chat can attach from a drop or a paste, as attachment refs (workspace-relative; a folder's ends in `/`): notes,
@@ -104,10 +94,7 @@ export function useChatAttach(session: ActiveSession | undefined, chatId: () => 
             const outside = paths.filter(p => !getFileByPath(p))
             return [...fromWorkspace(inside), ...outside.length ? await fromOutside(await outsideItemsAt(outside)) : []]
         }
-        return fromOutside(images.map(file => ({
-            name: pastedImageName(file.type), isFolder: false, size: file.size, modified: Date.now(), children: () => [],
-            read: async () => new Uint8Array(await file.arrayBuffer()),
-        })))
+        return fromOutside(images.map(file => pastedImage(file)))
     }
 
     return {fromWorkspace, fromOutside, fromPaste}
