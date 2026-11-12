@@ -29,7 +29,7 @@
         "@tiptap/extension-node-range": "^3.33.1",
         "@type32/codemirror-rich-obsidian-editor": "^0.3.7",
         "@type32/dispatcher": "^0.1.2",
-        "@type32/jsoncanvas-editor": "^0.1.1",
+        "@type32/jsoncanvas-editor": "^0.1.2",
         "@type32/latex2vue": "^3.1.18",
         "@type32/nuxt-predicates": "^1.1.0",
         "@type32/obsidian-bases-parser": "^0.4.0",
@@ -931,7 +931,7 @@
 
     "@type32/dispatcher": ["@type32/dispatcher@0.1.2", "", { "dependencies": { "@nuxt/kit": "^4.2.2", "mitt": "^3.0.1" } }, "sha512-jN/r9L7CkwLi/HkK5fJ7ant8WmC3HbZq2K95/SB7FN97yU/wC7wOakLpmLzP/aKVORHbweTGw/UDjhvEbjcipA=="],
 
-    "@type32/jsoncanvas-editor": ["@type32/jsoncanvas-editor@0.1.1", "", { "dependencies": { "@comark/vue": "^0.9.1", "@nuxt/kit": "^4.6.4", "@vueuse/core": "^15.0.0", "comark": "^0.9.1" }, "peerDependencies": { "@nuxt/ui": "^4.12.0", "vue": "^3.5.0" } }, "sha512-P6EmPl1A2xAOml1FpMeh/yv27uj3W13mkqgKciyLM+Rgy7fUYkW+52pCcsCbyWLRf1XYHu9RGDgRXjiDQ0sfjA=="],
+    "@type32/jsoncanvas-editor": ["@type32/jsoncanvas-editor@0.1.2", "", { "dependencies": { "@comark/vue": "^0.9.1", "@nuxt/kit": "^4.6.4", "@vueuse/core": "^15.0.0", "comark": "^0.9.1" }, "peerDependencies": { "@nuxt/ui": "^4.12.0", "vue": "^3.5.0" } }, "sha512-bkY1LPOgBJ3OGj8fKaLc3vkjuund6FPW0kwYYEA3kDJOC0vJI7Hxqtg8X0oCcIZ+xAlJOGYpqzc5NtuMnss+QQ=="],
 
     "@type32/latex2vue": ["@type32/latex2vue@3.1.18", "", { "dependencies": { "@latex2js/macros": "3.0.10", "@latex2js/pstricks": "3.1.4", "@latex2js/utils": "3.0.12", "latex2js": "^3.1.4", "mathjaxjs": "3.0.10", "vue": "3.5.27" } }, "sha512-jPL1U416HGOWZzVmAlWMkMcs+dUTl+KvVom9T/vTbRTAJQFeN14bmRGHlumGiQep8CexioshsDK6yrEumDZwZw=="],
 
