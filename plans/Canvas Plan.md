@@ -38,7 +38,8 @@ flowchart LR
   C7 --> C9
   C8 --> C9
   C9 --> C10
-  C10 --> V1
+  C10 --> C11
+  C11 --> V1
 ```
 
 ## C0: Repo reset
@@ -494,11 +495,39 @@ Not yet probed, risks from reading the code:
 - [x] Budgets at 5k / 20k, production: pan p95 16.8 at any zoom; drag one card and drag every card 16.7 per frame; drop 78; load 109. Close but over: one edit 18.7 (one frame plus the measure's granularity), undo 27–46 across runs, DOM fitted 21,040 (4 elements per card). Pan starts with one long frame (131) as the world gets its own layer. 10k / 30k usable: pan 23 avg, edits 27–65, drops 63. 100k opens, edits and saves. Not budgeted and slow: dragging a card with 5,000 edges (44 / 117 per frame).
 - [x] Fuzz suite: 400 seeds in CI; 3 × 20,000 local runs passed after fixing −0 rounding.
 - [x] Chaos canvas (production playground): no unhandled errors or rejections, no script ran (`window.__pwned` unset), the throwing card shows its failure, host failures arrive as `error` events (toasts), an edit, a nudge, a delete and Export (which reports `saveImage` failing) all work, and the document keeps its `null`/number/array entries and its unknown top-level key. The one console error is the throwing card's own, logged by its boundary. Component tests: `hostile canvases`, `lifecycle`, the inline-props loop, and `fuzz`.
-- [ ] Published (`v0.2.0`); Vertex installs it.
+- [x] Published (as `v0.1.1`); Vertex installs it.
+
+## C11: Note cards edit in place
+
+Blocked by C10.
+
+### Change
+- `CanvasHost.writeText(path, text)`: with it (and not read-only), a note card (`.md` file card) edits in place like a text card: double-click its content, or Edit in the toolbar; Esc or a click elsewhere ends it; one card edits at a time (the same `editing` key).
+- `#note-editor` slot (`{ node, path, text, update, done }`), else the text card's textarea.
+- Saves as typed (debounced) and when editing ends; the readText cache takes the new text and every card of that note shows it. A failed write is an `error` event; the editor keeps the text.
+- A card narrowed to `#Heading` or `#^block` edits only that section, spliced back at its range (`markdownSectionRange`, core). No such section: not editable.
+- Not a canvas undo step: the note changes, not the canvas.
+- `CanvasHost.openUrl(url)`: web addresses (link cards' Open in browser, Markdown links) go to the host, else `window.open` (a Tauri webview's `window.open` doesn't reach the system browser).
+
+### As built
+- **Core:** `markdownSectionRange(text, subpath) → { from, to } | undefined`; the section helpers return line ranges and `markdownSection` slices by them (behavior unchanged, CRLF still joined as `\n`). A block's range stops before its ` ^id`, so the id survives an edit.
+- **Host:** `guardHost` wraps `writeText` (reports, then rejects) and `openUrl` (reports).
+- **Interaction:** `canEdit(item)` (text, custom, or a `.md` file card with `writeText`) gates double-click, `startEditing` and the toolbar's Edit; `openUrl` holds the `window.open` fallback.
+- **FileCard:** takes `editing`; on start it snapshots the note and the section's range, and every save writes `before + typed + after` of that snapshot, 300 ms after the last keystroke and on end/unmount, one write at a time in order. The editor renders ahead of the file branches, so a `refreshFiles` mid-edit doesn't drop it. A missing, unreadable or section-less note ends editing at once.
+- **Content:** `writeText` writes through the host, then sets the readText cache and `written`; cards of that path take the text (no reload, no flicker).
+- ponytail: the toolbar offers Edit on any `.md` card when the host can write, even if its section is missing (the edit then ends at once); a note changed outside the canvas mid-edit is overwritten by the snapshot.
+- **New nodes in Obsidian's key order** (found by V1: a dropped file wrote `id, type, file, width, height, x, y`). Obsidian 1.15.1, observed in a scratch canvas: nodes it creates are written `id, x, y, width, height, [color], type, …` (`file` then `subpath`; a group's `label`, `background`, `backgroundStyle`); nodes it loaded keep their order. `obsidianKeyOrder(node)` (core) puts those keys first; `insert` (bar, menus, templates, Create group, drops, pastes) and `addNode` apply it. Loaded nodes and copies keep theirs.
+- **`.jc-canvas` is `overflow: clip`** (found by V1): with `hidden`, opening Export scrolled the canvas element itself by a few hundred px (the export copy is larger than the view), shifting everything until reload.
+
+### Acceptance
+- [x] Component tests: double-click → textarea with the note; type + Esc → one `writeText` with the full text; a second card of the note shows it; not an undo step, no document emitted; `#A` edits only its section and the written note keeps frontmatter and the rest byte-for-byte; no `writeText` → no editor, no Edit; `#note-editor` replaces the textarea and its `update`/`done` save and end; a rejecting `writeText` emits `error` (`writeText`) and the textarea keeps the text; a Markdown http link calls `host.openUrl`.
+- [x] Core: `markdownSectionRange` slices to `markdownSection` for headings, heading paths and blocks (LF and CRLF), keeps a block's id, undefined when missing.
+- [x] `bun run test` (154), `test:types`, `lint` (0 errors, 1 old warning in `playground/app/pages/test.vue`), `prepack`. A test pins the written key order of a created text card, colored template card, group, pasted URL and dropped file.
+- [ ] Published (`v0.1.2`): Vertex's V1 needs `writeText`, `openUrl`, `#note-editor`, the key order and the clip fix.
 
 ## V1: Canvas in Vertex
 
-Blocked by C10.
+Blocked by C11 (its release).
 
 ### Change
 - **Viewer:** `{id: 'canvas', loadsText: true, modes: ['workspace']}` in `app/utils/viewers.ts` + `viewerComponents.ts`.
@@ -515,10 +544,25 @@ Blocked by C10.
 - **Commands:** New Canvas (File menu, Files' context menu, command palette); Export as image saves through the Tauri dialog.
 - **Settings:** View → Canvas (wheel behaviour, Mod+drag behaviour, card names, snap defaults, zoom threshold), overridable per workspace.
 
+### As built
+- **Package:** `@type32/jsoncanvas-editor` in `modules` (registers `<JsonCanvas>`, adds its CSS). `0.1.1` was published (not `0.2.0`); V1 needs C11, so it's `^0.1.2` once that's out (until then the built `dist` was copied into `node_modules` to develop against).
+- **Viewer:** `CanvasViewer.vue` (`viewers.ts`: `canvas`, extras `internalLinks` + `sessionId`, workspace only; a singlespace opens a `.canvas` as JSON in the code editor). Text is parsed once, each edit is written back with `stringifyCanvas` (a `written` guard, as WorkflowViewer's, so its own saves don't reload it). A file that isn't a canvas shows why (`UAlert`) and is never written. The canvas runs under the tab header's gradient (no top spacing, no border, as notes scroll under it); its controls start below the header so they stay clickable. Opening a canvas writes it back byte-identical (SessionTab's first autosave).
+- **Host** (`composables/canvas/useCanvasHost.ts`): `resolveFile` from the index (`convertFileSrc`); `readText` from disk; `writeText` through `saveContent` (index updated); `pickFile` with the vault picker (`WorkflowPickModal`), filtered to the extensions of the asked kinds present in the workspace; `importFiles` as `useEditorFileDrops`' `bringIn` (the workspace's own files as they are, the rest into `fileConfig.attachmentsFolder`, one Files undo step); `filesIn` from `draggedRows` (folders left out); `listLinks` from the note's wiki links resolved through the link graph (subpaths as `#…`); `openFile` / `openLink` open tabs (subpaths aren't scrolled to: tabs can't yet); `openUrl` the system browser; `saveImage` through the save dialog, defaulting to `<canvas name>.png` beside the canvas. Host failures are toasts ("Canvas: readText failed"). Index events (create, modify, rename, remove) call `refreshFiles` for those paths.
+- **Editing:** `#text-editor` and `#note-editor` render `CanvasCardEditor.vue`: the markdown `<Editor>` with the workspace's internal links (link clicks open the note), without the tab's extensions (outline, toolbars, AI, which belong to a note's tab). Focused at the end without scrolling (a plain `focus()` scrolled the canvas out of its tab); padded so text stays where the card shows it.
+- **Index and rename:** `parseLinkTargets` reads canvases (`canvasLinkTargets`: file cards, group backgrounds, wiki links in text cards), and the index reads `.canvas` files like notes, so canvases are backlinks. `relocateFiles` rewrites canvases with `rewriteCanvasLinks` (file paths, backgrounds, text cards' links; written in Obsidian's format only when something changed; a broken canvas is left alone); Files' undo restores them like notes.
+- **Commands:** `file.newCanvas` (File menu, workspace windows), New Canvas in Files' row and empty-space menus (the row one was a disabled placeholder) and the palette, through `NewFileModal` (an empty file opens as an empty canvas). Canvases get `i-lucide-layout-dashboard` in Files.
+- **Settings:** `viewConfig.canvas` (`AppCanvasConfig`: `wheelBehavior`, `modDragBehavior`, `cardLabels`, `snapToGrid`, `snapToObjects`, `zoomBreakpoint` −2…2), defaults Obsidian's; Settings → View → Canvas; workspace-overridable like the rest of `viewConfig`. The canvas's own snap switches write the window's scope (the workspace's, in a workspace window), as Obsidian keeps them per vault. Read-only is per tab.
+- **Strings:** every canvas string under `app.editor.ui.jsonCanvas` (passed as `messages`, `{file}`-style placeholders handed through), plus `app.editor.ui.canvas`, `app.settings.view.canvasOptions`, `app.commands.newCanvas`; en and zh-CN (画布, as Vertex already called it).
+- **Tauri:** `.canvas` file association (`application/json`, "JSON Canvas").
+- Not done: `.base` file cards render as generic cards (no Bases renderer); the export has no watermark slot (Vertex has no logo for it yet).
+
 ### Acceptance
-- [ ] Obsidian's test vault canvases open, edit and save in Vertex and reopen in Obsidian unchanged apart from the edits.
-- [ ] Renaming a note updates every canvas that shows it; a canvas card shows in the note's backlinks.
-- [ ] SMOKE rows; Concepts doc; en + zh-CN strings.
+- [x] Browser against the dev server with Tauri's IPC answered over the real "Miscellaneous Vault" (a throwaway stub): `Canvas.canvas` and `Untitled.canvas` open with every card (notes, images, the canvas minimap, the group) and opening writes them back byte-identical; a text card edited in CodeMirror (a `[[Welcome]]` link typed, then clicked: the note's tab opened), a note card edited in place (written to the note), a card nudged, a card added; the canvas file changed only on those lines. In Obsidian 1.15.1 the edited canvas opens with all 13 cards and the edits. Obsidian's own re-save of it differs only as it differs for its own untouched file (it moves one card to the end on every save) and in writing the reloaded new card as `id, type, text, x, …`. Vault restored afterwards.
+- [x] Renaming `Welcome.md` asked to update "2 link(s) in 1 note(s)" (the file card and the text card's `[[Welcome]]`); accepted, `Canvas.canvas` got both, the open canvas showed the renamed card. Welcome's backlinks listed `Canvas.canvas`. Unit tests (`canvasLinks.test.ts`): targets, a broken canvas, a moved note and a moved background, written byte-for-byte apart from the changed paths.
+- [x] Rows dragged from Files (a note and a folder) dropped on the canvas: one file card (folders skipped). An OS image dropped: copied to `Attachments/`, a file card, "Added 1 item" with Undo. Add file: the vault picker with notes and canvases only; the pick became a card. Export: the save dialog at `Canvas.png` beside the canvas, a 4013 × 2575 PNG written.
+- [x] Settings → View → Canvas shows the six rows; zh-CN: the canvas menus and the Files menu's 新建画布; the menu's Snap to grid wrote `viewConfig.canvas.snapToGrid: false` to the workspace's settings and the menu showed it off. New Canvas (Files' empty space) created `Board.canvas`; a double-clicked card was written to it.
+- [x] Concepts doc; en + zh-CN strings (`i18n.test.ts` parity); `bun run test` (234), `typecheck` (only `latex2vue`'s old errors), `lint` (only BasesViewer's old error and old warnings).
+- [ ] SMOKE rows 108–110 in `tauri:dev` (native menu, file association, WKWebView).
 
 ## Reference values (Obsidian 1.15.1)
 

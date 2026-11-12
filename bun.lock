@@ -29,6 +29,7 @@
         "@tiptap/extension-node-range": "^3.33.1",
         "@type32/codemirror-rich-obsidian-editor": "^0.3.7",
         "@type32/dispatcher": "^0.1.2",
+        "@type32/jsoncanvas-editor": "^0.1.1",
         "@type32/latex2vue": "^3.1.18",
         "@type32/nuxt-predicates": "^1.1.0",
         "@type32/obsidian-bases-parser": "^0.4.0",
@@ -929,6 +930,8 @@
     "@type32/codemirror-rich-obsidian-editor": ["@type32/codemirror-rich-obsidian-editor@0.3.7", "", { "dependencies": { "@catppuccin/codemirror": "^1.0.3", "@nuxt/kit": "^4.6.4", "alfaaz": "^1.1.0", "diff": "^9.0.0", "js-yaml": "^5.5.0", "lezer-markdown-obsidian": "^0.0.3", "markdown-it": "^15.0.3", "markdown-it-obsidian-callouts": "^0.3.5" }, "peerDependencies": { "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/vue": "^4.0.0", "@codemirror/autocomplete": "^6.20.0", "@codemirror/commands": "^6.11.1", "@codemirror/lang-markdown": "^6.5.0", "@codemirror/language": "^6.12.2", "@codemirror/language-data": "^6.5.2", "@codemirror/lint": "^6.9.7", "@codemirror/search": "^6.7.2", "@codemirror/state": "^6.5.4", "@codemirror/view": "^6.0.0", "@lezer/common": "^1.0.0", "@lezer/highlight": "^1.2.5", "@lezer/markdown": "^1.6.3", "@nuxt/ui": "^4.12.0", "ai": "^7.0.0", "codemirror": "^6.0.2", "katex": "^0.16.33", "tailwindcss": "^4.2.1", "vue-codemirror6": "^1.4.2" }, "optionalPeers": ["@ai-sdk/openai-compatible", "@ai-sdk/vue", "ai", "katex"] }, "sha512-tQcJMVmVnT89swV5QpaP83PP6bDZv8O0/idOYQV3Vtksh4zHoiwUNHnnGJb/NmksZONoL0zCaSwxMY8K09rptg=="],
 
     "@type32/dispatcher": ["@type32/dispatcher@0.1.2", "", { "dependencies": { "@nuxt/kit": "^4.2.2", "mitt": "^3.0.1" } }, "sha512-jN/r9L7CkwLi/HkK5fJ7ant8WmC3HbZq2K95/SB7FN97yU/wC7wOakLpmLzP/aKVORHbweTGw/UDjhvEbjcipA=="],
+
+    "@type32/jsoncanvas-editor": ["@type32/jsoncanvas-editor@0.1.1", "", { "dependencies": { "@comark/vue": "^0.9.1", "@nuxt/kit": "^4.6.4", "@vueuse/core": "^15.0.0", "comark": "^0.9.1" }, "peerDependencies": { "@nuxt/ui": "^4.12.0", "vue": "^3.5.0" } }, "sha512-P6EmPl1A2xAOml1FpMeh/yv27uj3W13mkqgKciyLM+Rgy7fUYkW+52pCcsCbyWLRf1XYHu9RGDgRXjiDQ0sfjA=="],
 
     "@type32/latex2vue": ["@type32/latex2vue@3.1.18", "", { "dependencies": { "@latex2js/macros": "3.0.10", "@latex2js/pstricks": "3.1.4", "@latex2js/utils": "3.0.12", "latex2js": "^3.1.4", "mathjaxjs": "3.0.10", "vue": "3.5.27" } }, "sha512-jPL1U416HGOWZzVmAlWMkMcs+dUTl+KvVom9T/vTbRTAJQFeN14bmRGHlumGiQep8CexioshsDK6yrEumDZwZw=="],
 
@@ -2542,6 +2545,8 @@
 
     "@tailwindcss/oxide-wasm32-wasi/tslib": ["tslib@2.9.1", "", { "bundled": true }, "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="],
 
+    "@type32/jsoncanvas-editor/@vueuse/core": ["@vueuse/core@15.0.0", "", { "dependencies": { "@types/web-bluetooth": "^0.0.21", "@vueuse/metadata": "15.0.0", "@vueuse/shared": "15.0.0" }, "peerDependencies": { "vue": "^3.5.0" } }, "sha512-Zv67h5mrk7YHDJsRObx+DXaCBz6RKBUpxqLesJ+3xZNPG6yuQs7ja7kg3veFrrouYLWAqydQ7CwGEbLVxB43Ng=="],
+
     "@type32/latex2vue/vue": ["vue@3.5.27", "", { "dependencies": { "@vue/compiler-dom": "3.5.27", "@vue/compiler-sfc": "3.5.27", "@vue/runtime-dom": "3.5.27", "@vue/server-renderer": "3.5.27", "@vue/shared": "3.5.27" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-aJ/UtoEyFySPBGarREmN4z6qNKpbEguYHMmXSiOGk69czc+zhs0NF6tEFrY8TZKAl8N/LYAkd4JHVd5E/AsSmw=="],
 
     "@type32/yaml-editor-form/js-yaml": ["js-yaml@4.3.2", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA=="],
@@ -2875,6 +2880,8 @@
     "@rolldown/binding-wasm32-wasi/@emnapi/core/@emnapi/wasi-threads": ["@emnapi/wasi-threads@2.2.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-JP7OYH38Q7+pyTAe14raZHLQIK7BDKbdwji+Xi3pcd/6QkJYQH3SX4wu6EplGrGJWRepoNzedfm0G3B9Z4e9Rw=="],
 
     "@rollup/plugin-yaml/js-yaml/argparse": ["argparse@2.0.1", "", {}, "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="],
+
+    "@type32/jsoncanvas-editor/@vueuse/core/@vueuse/shared": ["@vueuse/shared@15.0.0", "", { "peerDependencies": { "vue": "^3.5.0" } }, "sha512-vbNXhGrbV53xPOMSyOzMHQRvhMgZf7oNDw2RChUetVxwTIEkInQ1joZ9JbT0G3z2n2AJNjvmCWeM9ySYrnvogA=="],
 
     "@type32/latex2vue/vue/@vue/compiler-dom": ["@vue/compiler-dom@3.5.27", "", { "dependencies": { "@vue/compiler-core": "3.5.27", "@vue/shared": "3.5.27" } }, "sha512-oAFea8dZgCtVVVTEC7fv3T5CbZW9BxpFzGGxC79xakTr6ooeEqmRuvQydIiDAkglZEAd09LgVf1RoDnL54fu5w=="],
 

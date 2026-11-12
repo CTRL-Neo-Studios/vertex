@@ -29,6 +29,7 @@ export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, labe
 
     {id: 'file.newFile', section: 'file', group: 0, label: 'app.commands.newFile', accelerator: 'CmdOrCtrl+N'},
     {id: 'file.newFolder', section: 'file', group: 0, label: 'app.commands.newFolder', accelerator: 'CmdOrCtrl+Shift+N'},
+    {id: 'file.newCanvas', section: 'file', group: 0, label: 'app.commands.newCanvas'},
     {id: 'file.newWorkflow', section: 'file', group: 0, label: 'app.commands.newWorkflow'},
     {id: 'file.newChat', section: 'file', group: 0, label: 'app.commands.newChat', accelerator: 'CmdOrCtrl+Shift+L'},
     {id: 'file.newWorkspace', section: 'file', group: 1, label: 'app.commands.newWorkspace'},

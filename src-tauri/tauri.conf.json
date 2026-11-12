@@ -84,6 +84,15 @@
 			},
 			{
 				"ext": [
+					"canvas"
+				],
+				"mimeType": "application/json",
+				"name": "JSON Canvas",
+				"description": "The JSON Canvas Format",
+				"role": "Editor"
+			},
+			{
+				"ext": [
 					"txt"
 				],
 				"mimeType": "text/plain",

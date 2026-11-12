@@ -103,6 +103,19 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             },
             {
+                label: t('app.editor.ui.filetree.newCanvas'),
+                description: t('app.editor.ui.palette.newCanvasDescription'),
+                icon: 'i-lucide-layout-dashboard',
+                onSelect() {
+                    newFileModal.open({
+                        modalTitle: t('app.editor.ui.filetree.newCanvas'),
+                        asFolder: false,
+                        asLevel: 'same',
+                        fileExt: 'canvas'
+                    })
+                }
+            },
+            {
                 label: t('app.editor.ui.filetree.newWorkflow'),
                 description: t('app.editor.ui.palette.newWorkflowDescription'),
                 icon: 'i-lucide-workflow',

@@ -6,7 +6,7 @@ import {invoke} from "@tauri-apps/api/core"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
+import {getFileExtensionFromPath, isCanvasFile, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
 import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseProperties} from "#shared/utils/index/parse";
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
@@ -44,7 +44,7 @@ const parsers: ContentParsers = {parseYaml, parseFrontmatter, getInternalLinks}
 /** Only formats that carry properties or links are read during indexing. */
 const isIndexedText = (path: string) => {
     const ext = getFileExtensionFromPath(path)
-    return isPlainTextFile(ext) || isYamlFile(ext)
+    return isPlainTextFile(ext) || isYamlFile(ext) || isCanvasFile(ext)
 }
 
 function fileExtOf(fileName: string) {

@@ -52,7 +52,8 @@ export interface OutsideItem {
 /** System clutter a folder drop brings along. */
 const SKIPPED = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini'])
 
-function fromFile(file: File): OutsideItem {
+/** A `File` from a drop or paste, read when it's copied. */
+export function fromFile(file: File): OutsideItem {
     return {name: file.name, isFolder: false, size: file.size, modified: file.lastModified, children: () => [], read: async () => new Uint8Array(await file.arrayBuffer())}
 }
 

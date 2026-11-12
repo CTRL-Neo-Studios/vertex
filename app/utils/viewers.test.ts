@@ -7,6 +7,7 @@ describe('viewerFor', () => {
         ['png', 'workspace', 'image'],
         ['base', 'workspace', 'bases'],
         ['workflow', 'workspace', 'workflow'],
+        ['canvas', 'workspace', 'canvas'],
         ['yml', 'singlespace', 'yaml'],
         ['tex', 'workspace', 'latex'],
         ['ts', 'singlespace', 'code'],
@@ -14,9 +15,10 @@ describe('viewerFor', () => {
         expect(viewerFor(ext, mode)?.id).toBe(id)
     })
 
-    it('bases and workflows need a workspace; in a singlespace they fall back to the code editor', () => {
+    it('bases, workflows and canvases need a workspace; in a singlespace they fall back to the code editor', () => {
         expect(viewerFor('base', 'singlespace')?.id).toBe('code')
         expect(viewerFor('workflow', 'singlespace')?.id).toBe('code')
+        expect(viewerFor('canvas', 'singlespace')?.id).toBe('code')
     })
 
     it('binary formats without a viewer get none', () => {

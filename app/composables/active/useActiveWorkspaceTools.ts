@@ -7,7 +7,8 @@ import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
 import {parentPathOf} from "#shared/utils/index/parse";
-import {fileNameFromPath, freeName} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, freeName, getFileExtensionFromPath, isCanvasFile} from "#shared/utils/fs/filenames";
+import {rewriteCanvasLinks} from "#shared/utils/index/canvasLinks";
 import UpdateLinksModal from "~/components/Modals/UpdateLinksModal.vue";
 import FileConflictModal, {type ConflictAction} from "~/components/Modals/FileConflictModal.vue";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -485,7 +486,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             if (!ref) continue
             try {
                 const before = await readTextFile(ref.fullPath)
-                const result = rewriteLinks(before, targets)
+                const result = (isCanvasFile(getFileExtensionFromPath(ref.fileName)) ? rewriteCanvasLinks : rewriteLinks)(before, targets)
                 if (result.count === 0) continue
                 markSelfWrite(ref.fullPath)
                 await writeTextFile(ref.fullPath, result.text)

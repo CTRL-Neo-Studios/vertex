@@ -105,8 +105,23 @@ export interface AppViewConfig {
         headerHistory: HeaderToolsPosition,
         headerFormatting: HeaderToolsPosition,
     },
+    /** `.canvas` tabs (`@type32/jsoncanvas-editor`); the snap switches are also the canvas's own settings menu. */
+    canvas: AppCanvasConfig,
     /** The side panels' views: which side each sits on, in what order (with separators), or hidden; and how they're switched. */
     panels: AppPanelsConfig,
+}
+
+export interface AppCanvasConfig {
+    /** What a plain mouse wheel does; the other happens with Mod or Space held. */
+    wheelBehavior: 'pan' | 'zoom',
+    /** What Mod+drag on empty canvas creates at the drawn size. */
+    modDragBehavior: 'menu' | 'card' | 'file' | 'media' | 'webpage' | 'group',
+    /** File names and URLs above file and link cards. */
+    cardLabels: 'always' | 'hover' | 'never',
+    snapToGrid: boolean,
+    snapToObjects: boolean,
+    /** How much further out (log2 units, −2…2) cards keep their content before showing placeholders. */
+    zoomBreakpoint: number,
 }
 
 export type HeaderToolsPosition = 'left' | 'right' | 'hidden'

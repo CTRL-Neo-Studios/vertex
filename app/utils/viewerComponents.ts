@@ -4,6 +4,7 @@ import RichText from "~/components/ViewerEditor/RichText.vue";
 import ImageViewer from "~/components/ViewerEditor/ImageViewer.vue";
 import BasesViewer from "~/components/ViewerEditor/BasesViewer.vue";
 import WorkflowViewer from "~/components/ViewerEditor/WorkflowViewer.vue";
+import CanvasViewer from "~/components/ViewerEditor/CanvasViewer.vue";
 import YamlDataForm from "~/components/ViewerEditor/YamlDataForm.vue";
 import LatexDoc from "~/components/ViewerEditor/LatexDoc.vue";
 import CodeText from "~/components/ViewerEditor/CodeText.vue";
@@ -14,6 +15,7 @@ export const viewerComponents: Record<ViewerId, Component> = {
     image: ImageViewer,
     bases: BasesViewer,
     workflow: WorkflowViewer,
+    canvas: CanvasViewer,
     yaml: YamlDataForm,
     latex: LatexDoc,
     code: CodeText,

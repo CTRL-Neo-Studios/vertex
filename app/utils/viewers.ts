@@ -1,4 +1,4 @@
-import {isBasesFile, isImage, isLatexFile, isPlainTextFile, isUnreadableAsText, isWorkflowFile, isYamlFile} from "#shared/utils/fs/filenames";
+import {isBasesFile, isCanvasFile, isImage, isLatexFile, isPlainTextFile, isUnreadableAsText, isWorkflowFile, isYamlFile} from "#shared/utils/fs/filenames";
 
 /**
  * Which viewer opens which file. The tab page renders the first match; add new file types here and map
@@ -8,7 +8,7 @@ import {isBasesFile, isImage, isLatexFile, isPlainTextFile, isUnreadableAsText, 
  * - `extras`: inputs beyond the common ones (`fileName`, `filePath`, `renaming`, `disabled`,
  *   `contentSaved`, `onRename`) that the tab page should pass to this viewer.
  */
-export type ViewerId = 'markdown' | 'image' | 'bases' | 'workflow' | 'yaml' | 'latex' | 'code'
+export type ViewerId = 'markdown' | 'image' | 'bases' | 'workflow' | 'canvas' | 'yaml' | 'latex' | 'code'
 export type ViewerExtra = 'editorInstance' | 'internalLinks' | 'codeBlocks' | 'sessionId' | 'imageSrc' | 'extensions'
 
 export interface ViewerDefinition {
@@ -25,6 +25,8 @@ export const viewers: ViewerDefinition[] = [
     {id: 'image', loadsText: false, extras: ['imageSrc'], match: isImage},
     {id: 'bases', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
     {id: 'workflow', loadsText: true, extras: ['sessionId'], modes: ['workspace'], match: isWorkflowFile},
+    // Cards show workspace files, so a canvas needs the index; in a singlespace it opens as JSON.
+    {id: 'canvas', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isCanvasFile},
     {id: 'yaml', loadsText: true, extras: [], match: isYamlFile},
     // Only the markdown editor exposes its CodeMirror view (`editorInstance`, for the outline's jumps).
     {id: 'latex', loadsText: true, extras: [], match: isLatexFile},

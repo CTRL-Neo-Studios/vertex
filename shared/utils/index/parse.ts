@@ -1,5 +1,6 @@
 import type {YamlFormData} from "@type32/yaml-editor-form";
-import {getFileExtensionFromPath, isPlainTextFile, isYamlFile} from "#shared/utils/fs/filenames";
+import {getFileExtensionFromPath, isCanvasFile, isPlainTextFile, isYamlFile} from "#shared/utils/fs/filenames";
+import {canvasLinkTargets} from "#shared/utils/index/canvasLinks";
 
 /** Parsers injected by the caller (the editor package's auto-imported utils in the app; stubs in tests). */
 export interface ContentParsers {
@@ -36,8 +37,10 @@ export function parseProperties(path: string, content: string, parsers: ContentP
     }
 }
 
-/** Raw `[[target]]` link targets in a document (only md/txt carry links). */
+/** Raw link targets in a document: `[[target]]`s in md/txt, file cards and text cards' links in a canvas. */
 export function parseLinkTargets(path: string, content: string, parsers: ContentParsers): string[] {
-    if (!isPlainTextFile(getFileExtensionFromPath(path))) return []
+    const ext = getFileExtensionFromPath(path)
+    if (isCanvasFile(ext)) return canvasLinkTargets(content, parsers.getInternalLinks)
+    if (!isPlainTextFile(ext)) return []
     return parsers.getInternalLinks(content).map(l => l.path)
 }

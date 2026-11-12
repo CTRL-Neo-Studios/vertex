@@ -14,6 +14,7 @@ export default defineNuxtConfig({
       "@type32/yaml-editor-form",
       "@nuxt/eslint",
       "@comark/vue",
+      "@type32/jsoncanvas-editor",
     ],
 
 	i18n: {

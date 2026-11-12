@@ -119,6 +119,10 @@ export function isWorkflowFile(extension: PossiblyRef<string>) {
     return ['workflow'].includes(unref(extension))
 }
 
+export function isCanvasFile(extension: PossiblyRef<string>) {
+    return ['canvas'].includes(unref(extension))
+}
+
 export function isPdf(extension: PossiblyRef<string>) {
     return ['pdf'].includes(unref(extension))
 }
