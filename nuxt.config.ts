@@ -105,6 +105,8 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/window",
                 "@tauri-apps/plugin-process",
                 "@tauri-apps/plugin-updater",
+                // Files' native drag (app/utils/outsideItems.ts); found at runtime otherwise, which reloads the window.
+                "@crabnebula/tauri-plugin-drag",
                 // Nuxt DevTools' client; discovered late otherwise, which reloads the page.
                 "@vue/devtools-core",
                 "@tauri-apps/api/event",
