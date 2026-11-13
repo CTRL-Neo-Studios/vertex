@@ -554,6 +554,9 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - Cards use `content-visibility: auto` instead of windowing, so the browser skips laying out cards off screen.
 - **`Bases/List.vue`:** markers, the primary property, then inline properties with the separator or indented bulleted lines; empty values left out; numbers per group.
 - `BasesViewer` routes `cards` and `list`; kanban and map still show the table until V4 and V5.
+- **Fixes after review:**
+  - The view now reaches the bottom of its pane: V0's `pb-10` padding on the viewer was removed.
+  - Opening the first base reloaded the window in dev: Vite found `xss` (`Value.vue`) at runtime. The `head.hooks` error and the "called without an active session" errors in the log came from that reload. `xss` and `@codemirror/autocomplete` (the formula field) are now in `optimizeDeps.include`. Checked on a clean Vite cache: opening a base and a formula field discovers nothing and doesn't reload.
 
 ### Acceptance
 - [x] Checked in a browser against the dev server with Tauri stubbed, on a snapshot of the real test vault (images served locally for `convertFileSrc`), against Obsidian's screenshots at the same size:

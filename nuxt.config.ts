@@ -127,6 +127,10 @@ export default defineNuxtConfig({
                 // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
                 "katex",
                 "@type32/obsidian-bases-parser",
+                // Bases: cell HTML (Value.vue) and the formula field's completion; found when a base first opens otherwise,
+                // which reloads the window.
+                "xss",
+                "@codemirror/autocomplete",
                 "@type32/latex2vue",
                 "zod",
                 "@vue-flow/core",

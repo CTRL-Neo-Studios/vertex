@@ -72,7 +72,7 @@ const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null
             <UAlert color="error" variant="subtle" icon="i-lucide-file-x" :title="t('app.editor.ui.bases.invalid')"/>
             <p class="mt-3 font-mono text-xs text-muted whitespace-pre-wrap">{{ problem }}</p>
         </div>
-        <div v-else class="w-full flex flex-col flex-1 h-full pb-10">
+        <div v-else class="w-full flex flex-col flex-1 h-full">
             <ViewerEditorBasesToolbar/>
             <div v-if="unknownType !== null" class="p-6 text-sm text-muted">
                 {{ t('app.editor.ui.bases.unknownViewType', {type: unknownType}) }}
