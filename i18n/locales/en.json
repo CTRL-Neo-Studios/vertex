@@ -775,7 +775,15 @@
 						"Empty": "Empty",
 						"Filled": "Filled",
 						"Unique": "Unique"
-					}
+					},
+					"createNote": "Create new note",
+					"addItem": "Add item",
+					"addColumns": "Add columns",
+					"addColumnsHint": "Choose a property to group by.",
+					"chooseProperty": "Choose property",
+					"noColumns": "No columns",
+					"noColumnsHint": "Select groups to show as columns.",
+					"editGroups": "Edit groups..."
 				},
 				"canvas": {
 					"invalid": "This canvas can’t be opened",

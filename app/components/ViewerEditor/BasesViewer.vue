@@ -79,7 +79,8 @@ const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null
             </div>
             <ViewerEditorBasesCards v-else-if="ctx.view.value.type === 'cards'"/>
             <ViewerEditorBasesList v-else-if="ctx.view.value.type === 'list'"/>
-            <!-- ponytail: kanban and map show as a table until V4–V5 build them. -->
+            <ViewerEditorBasesKanban v-else-if="ctx.view.value.type === 'kanban'"/>
+            <!-- ponytail: map shows as a table until V5 builds it. -->
             <ViewerEditorBasesTable v-else/>
         </div>
     </ViewerEditorLayoutWrapper>

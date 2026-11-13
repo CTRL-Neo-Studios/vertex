@@ -578,9 +578,35 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - The column menu has Hide column and Edit groups…
 - Empty states: "Add columns / Choose a property to group by" and "No columns / Select groups to show as columns".
 
+### As built
+- **Observed first** (Obsidian 1.15.1: Kthalatir's kanban, grouped by `file.tags`; probe `zz-v4` with views K, KE, KH and KM):
+  - **Columns:** one per group key. A list key is one column per combination; the empty group comes first unless `groupOrder` orders them, and a manual `groupOrder` shows only its keys. Columns are `columnWidth` (280) wide, 16 px rounded panels each with its own scroll. A header has the value (list keys as tag pills, no label for an empty list) and a muted count. A "+" ("Create new note") shows on hover, and "New" sits at the bottom.
+  - **Cards:** like the cards layout, with covers 0.5 of the width by default.
+  - **Column menu:** Add item, then Hide column and Edit groups....
+  - **Empty states:** no `groupBy` shows "Add columns / Choose a property to group by." with "Choose property"; `groupOrder: []` shows "No columns / Select groups to show as columns." with "Edit groups...".
+  - **New in a column:** in "doing" it wrote `zz-v4/Untitled.md` as `n:` then `status: doing`. So new notes get the view's note properties as empty keys, then the column's value, in the folder a `file.inFolder(…)` filter names. In V1's probe there was no such filter and the note went to the vault root.
+  - **Not movable:** a kanban grouped by `file.tags` has nothing draggable (`draggable="false"`).
+- **`Bases/Card.vue`** (split out of `Cards.vue`): the card shared by cards and kanban, with the cover ratio defaulting to 1 or 0.5. Each layout sets the bottom padding Obsidian gives it.
+- **`Bases/Kanban.vue`:**
+  - **Columns and order:** from the query's groups, with the empty group first without a manual order. Each has a header (pills for list keys, count, a hover "+"), a scrolling list of cards (`content-visibility: auto`), and "New".
+  - **Movable** when grouped by a note property or `file.folder`:
+    - dropping a card writes the column's value through `useNoteProperties` (only that key; a list key writes the whole list, tags without `#`, the empty group writes empty), or, for `file.folder`, moves the file with `moveFiles` (one undo step);
+    - dragging a column writes `groupOrder` with every shown column.
+  - **Column menu (right click):** Add item (movable only), Hide column (`groupOrder` without it), and Edit groups... (opens the Group menu).
+  - **Empty states:** Obsidian's two.
+- **New:** `newItemFrontmatter` now adds the view's `order` note properties as empty keys and a preset value last. It's written with the library's `writeYaml`, which replaced the hand-written YAML quoting. `newItemFolder` reads `file.inFolder(…)`. The toolbar's New uses both, and `ctx.newItemPreset` carries a column's value or folder into it. Both observed Obsidian outputs are in `basesNewItem.test.ts`.
+- `BasesViewer` routes `kanban`; only map still shows the table (V5).
+
 ### Acceptance
-- [ ] Kthalatir's kanban view shows 407 cards in Obsidian's columns.
-- [ ] Moving a probe card from None to doing writes `status: doing` to the note.
+- [x] Kthalatir's kanban, in a browser against the dev server with Tauri stubbed on a snapshot of the real test vault, against Obsidian's grouped data:
+  - the same 84 columns in the same order;
+  - 83 with the same key and count;
+  - the empty-tags column with 199 cards against Obsidian's 194. The extra 5 are the probe folder's files (four notes and `P.base`), made after Obsidian's capture; without them it's 407 cards, as in Obsidian.
+- [x] Moving probe card C from None to doing wrote `status: doing` to the note (`n: 3` kept), and the board regrouped. Also through the UI:
+  - New in todo wrote `zz-v4/Untitled.md` as `n:` / `status: todo` (Obsidian's shape);
+  - dragging todo before doing wrote `groupOrder: [todo, doing]`, and Hide column on doing left `[todo]`;
+  - the column menu items and both empty states match Obsidian.
+  - 259 tests pass; `typecheck` and `lint` pass. SMOKE row 115; the folder move and `tauri dev` unverified.
 
 ## V5: Map
 

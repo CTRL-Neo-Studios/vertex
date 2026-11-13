@@ -28,6 +28,8 @@ export interface BaseContext {
     open: Ref<string | null>
     /** A property whose page the Properties menu opens on (with `open` set to `properties`): "Edit property…". */
     propertyPage: Ref<string | null>
+    /** A property and value New writes last (a kanban column's), read once when New next creates a note. */
+    newItemPreset: Ref<{ key: string, value: unknown } | null>
     result: ComputedRef<QueryResult>
     /** Every property a menu offers: file properties, formulas, then the workspace's note properties. */
     properties: ComputedRef<BaseProperty[]>
@@ -93,6 +95,7 @@ export function createBaseContext(options: {
     const search = ref('')
     const open = ref<string | null>(null)
     const propertyPage = ref<string | null>(null)
+    const newItemPreset = ref<{ key: string, value: unknown } | null>(null)
     const searchTerm = refDebounced(search, 200)
     const result = computed(() => runQuery(base.value, view.value.name, {host, paths: paths.value, now: Date.now(), thisPath, search: searchTerm.value}))
 
@@ -145,5 +148,5 @@ export function createBaseContext(options: {
         ...[...noteKinds.value.keys()].sort((a, b) => a.localeCompare(b)).map(property),
     ])
 
-    return {base, viewName, view, commit: options.commit, search, open, propertyPage, result, properties, property, host, paths, thisPath, session}
+    return {base, viewName, view, commit: options.commit, search, open, propertyPage, newItemPreset, result, properties, property, host, paths, thisPath, session}
 }

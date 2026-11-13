@@ -775,7 +775,15 @@
 						"Empty": "空",
 						"Filled": "已填",
 						"Unique": "唯一值"
-					}
+					},
+					"createNote": "新建笔记",
+					"addItem": "添加条目",
+					"addColumns": "添加列",
+					"addColumnsHint": "选择用于分组的属性。",
+					"chooseProperty": "选择属性",
+					"noColumns": "没有列",
+					"noColumnsHint": "选择要显示为列的分组。",
+					"editGroups": "编辑分组…"
 				},
 				"canvas": {
 					"invalid": "无法打开此画布",
