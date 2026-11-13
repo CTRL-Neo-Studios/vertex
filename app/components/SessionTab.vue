@@ -107,12 +107,19 @@ async function onInternalLinkClick({referenceId}: InternalLinkClickDetail) {
     if (mode === 'workspace' && referenceId) await goToTab(openTab(referenceId).fileUuid)
 }
 
+// The file's text as this tab last read or wrote it. Loading and reloading set `content` too; only a change is written,
+// so opening a file never rewrites it.
+let diskText: string | undefined
+
 debouncedWatch(content, async () => {
     if (!isContentLoaded.value || !viewer.value?.loadsText) return
+    if (content.value === diskText) return void (isContentSaved.value = true)
     isContentSaved.value = false
     await until(renaming).toBe(false)
     try {
-        await $tools.saveContent(tabId.value, content.value)
+        const text = content.value
+        await $tools.saveContent(tabId.value, text)
+        diskText = text
         isContentSaved.value = true
     } catch (error) {
         // Keep the tab marked unsaved so the user knows; previously a failed write was silent.
@@ -123,7 +130,7 @@ debouncedWatch(content, async () => {
 
 onMounted(async () => {
     if (!isTabOpened(tabId.value)) return goToTab()
-    if (viewer.value?.loadsText && fullFilePath.value) content.value = await readTextFile(fullFilePath.value)
+    if (viewer.value?.loadsText && fullFilePath.value) content.value = diskText = await readTextFile(fullFilePath.value)
     isContentLoaded.value = true
 })
 
@@ -140,7 +147,7 @@ const unsubscribe = $index.on(async (event) => {
         const fresh = await readTextFile(event.path)
         if (fresh === content.value) return
         isContentLoaded.value = false
-        content.value = fresh
+        content.value = diskText = fresh
         await nextTick()
         isContentLoaded.value = true
     } else if (event.type === 'rename' && event.newPath === current) {

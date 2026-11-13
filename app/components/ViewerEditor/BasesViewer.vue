@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types";
-import type {DropdownMenuItem, TableColumn} from "@nuxt/ui";
-import {parseBase, runQuery, toDisplay, type RowScope} from "@type32/obsidian-bases-parser";
+import type {TableColumn} from "@nuxt/ui";
+import {parseBase, stringifyBase, toDisplay, type Base, type RowScope} from "@type32/obsidian-bases-parser";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import {registerBaseCommands} from "~/composables/bases/useBaseCommands";
+import {BASE_CONTEXT, createBaseContext} from "~/composables/bases/useBaseContext";
 import {useBaseHost} from "~/composables/bases/useBaseHost";
 
 /**
- * A `.base` file: its views over the workspace's files, queried with `@type32/obsidian-bases-parser`. The rows follow
- * the index live. Nothing is written yet (the toolbar's edits come with V1 of the Bases plan).
+ * A `.base` file: its views over the workspace's files, queried with `@type32/obsidian-bases-parser`. The text is
+ * parsed once; the toolbar's edits are written back as Obsidian writes them (the tab autosaves), and nothing is written
+ * until something changes. A file that doesn't parse shows why and is never written. The view, the search and group
+ * folds belong to the tab.
  */
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({default: ''})
@@ -25,37 +29,43 @@ const {t} = useI18n()
 const session = useActiveSessions().getSession(props.sessionId)!
 const {host, paths} = useBaseHost(session)
 
-const parsed = computed(() => parseBase(content.value))
-const base = computed(() => parsed.value.base)
+// Text ↔ base. `written` is the last text this viewer produced, so its own saves don't parse again.
+let written = content.value
+const initial = parseBase(content.value)
+const problem = ref(initial.error)
+const base = shallowRef<Base>(initial.base ?? {views: []})
+watch(content, (text) => {
+    if (text === written) return
+    written = text
+    const next = parseBase(text)
+    problem.value = next.error
+    if (next.base) base.value = next.base
+})
 
-const activeView = ref('')
-const view = computed(() => base.value?.views?.find(v => v.name === activeView.value) ?? base.value?.views?.[0])
+function commit(next: Base) {
+    if (problem.value !== null) return
+    base.value = next
+    const text = stringifyBase(next)
+    if (text === content.value) return
+    written = text
+    content.value = text
+}
 
-const search = ref('')
-// Each keystroke re-runs the query: once typing pauses.
-const searchTerm = refDebounced(search, 200)
-const result = computed(() => base.value && view.value
-    ? runQuery(base.value, view.value.name, {host, paths: paths.value, now: Date.now(), thisPath: props.filePath, search: searchTerm.value})
-    : undefined)
+const ctx = createBaseContext({base, commit, host, paths, thisPath: props.filePath, session})
+provide(BASE_CONTEXT, ctx)
+registerBaseCommands(ctx)
 
-const viewItems = computed<DropdownMenuItem[]>(() => (base.value?.views ?? []).map(v => ({
-    label: v.name,
-    type: 'checkbox' as const,
-    checked: v.name === view.value?.name,
-    onSelect: () => void (activeView.value = v.name),
+const LAYOUTS = ['table', 'cards', 'list', 'kanban', 'map']
+const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null : ctx.view.value.type))
+
+const columns = computed<TableColumn<RowScope>[]>(() => (ctx.view.value.order ?? ['file.name']).map(id => ({
+    id,
+    header: ctx.property(id).label,
+    accessorFn: (row) => {
+        const value = row.property(id)
+        return value.type === 'Null' ? '' : toDisplay(value)
+    },
 })))
-
-const columns = computed<TableColumn<RowScope>[]>(() => (view.value?.order ?? ['file.name']).map((id) => {
-    const displayName = base.value?.properties?.[id]?.displayName
-    return {
-        id,
-        header: typeof displayName === 'string' ? displayName : id.replace(/^(note|formula)\./, ''),
-        accessorFn: (row) => {
-            const value = row.property(id)
-            return value.type === 'Null' ? '' : toDisplay(value)
-        },
-    }
-}))
 
 // Stable objects: a new one on each render (inline in the template) re-renders the table, and its virtualizer then
 // re-estimates every row (Nuxt UI recomputes its options per row).
@@ -78,27 +88,21 @@ const TABLE_UI = {
         :showStatusBar="false"
         :bottomSpacing="false"
     >
-        <div v-if="parsed.error !== null" class="w-full p-6 pt-12">
+        <div v-if="problem !== null" class="w-full p-6 pt-12">
             <UAlert color="error" variant="subtle" icon="i-lucide-file-x" :title="t('app.editor.ui.bases.invalid')"/>
-            <p class="mt-3 font-mono text-xs text-muted whitespace-pre-wrap">{{ parsed.error }}</p>
+            <p class="mt-3 font-mono text-xs text-muted whitespace-pre-wrap">{{ problem }}</p>
         </div>
         <div v-else class="w-full flex flex-col flex-1 h-full pb-10">
-            <div class="w-full flex items-center p-1 px-2">
-                <UDropdownMenu :items="viewItems" size="sm">
-                    <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" :label="view?.name ?? t('app.editor.ui.bases.views')"/>
-                </UDropdownMenu>
-                <UInput
-                    v-model="search"
-                    icon="i-lucide-search"
-                    size="sm"
-                    :placeholder="t('app.editor.ui.bases.search', {count: result?.rows.length ?? 0})"
-                    variant="ghost"
-                />
+            <ViewerEditorBasesToolbar/>
+            <div v-if="unknownType !== null" class="p-6 text-sm text-muted">
+                {{ t('app.editor.ui.bases.unknownViewType', {type: unknownType}) }}
             </div>
+            <!-- ponytail: every known layout shows as this table until V2–V5 build them. -->
             <UTable
+                v-else
                 sticky
                 :columns="columns"
-                :data="result?.rows ?? []"
+                :data="ctx.result.value.rows"
                 class="flex-1 min-h-0"
                 :virtualize="TABLE_VIRTUALIZE"
                 :watch-options="TABLE_WATCH"

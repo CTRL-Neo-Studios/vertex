@@ -9,6 +9,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {StateKey} from "#shared/constants/app";
+import {useBaseCommandItems} from "~/composables/bases/useBaseCommands";
 
 const { t } = useI18n()
 
@@ -30,6 +31,8 @@ const session = $sesh.getSession(sessionId)
 const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 // Shared so the left sidebar's Search item can open it.
 const open = useState<boolean>(StateKey.fileSearchOpen(sessionId.value), () => false)
+// The open base's commands, while one is open.
+const baseCommands = useBaseCommandItems()
 
 async function onClickFile(item: Partial<UITreeNode>) {
     if (!item || !item.uuid) return;
@@ -129,6 +132,11 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             }
         ]
+    },
+    {
+        id: 'bases',
+        label: t('app.editor.ui.bases.commands.group'),
+        items: baseCommands.value,
     },
     {
         id: 'workflows',

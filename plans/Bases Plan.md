@@ -421,8 +421,48 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - Group headings fold per tab.
 - Commands: Bases: Add view; Switch view…; Copy table; Add item.
 
+### As built
+- **Observed first** (Obsidian 1.15.1, probe bases in `zz-v1`, deleted after):
+  - Toolbar order: views menu, results count, Sort, Group, Filter, Properties, Search, New. Each menu's structure and exact strings went into the i18n keys.
+  - **Views:** Add view opens Configure view on a table named "View" and creates it only on commit (closing the untouched form creates nothing). It's appended as `{type: table, name: View}`. Configure view has name, Layout and the layout's options with Obsidian's labels and ranges (Reference values). Its ⋯ menu has Default view, Duplicate view and Delete view.
+  - **Defaults:** choosing a layout option's default (Short, Cover) removes the key.
+  - **Results:** "1 result" / "411 results", accent-coloured when a limit hides rows. The menu has Limit number of results, Show all (N), Copy to clipboard and Export CSV....
+  - **Copy:** writes TSV text (header of display names, values as text) plus Markdown and HTML tables.
+  - **Sort:** direction labels by type (A → Z, 0 → 1, Old to new).
+  - **Group:** adds Manual, which writes `groupOrder: []` (every group hidden until checked), with checkboxes, counts, Add group and Show all.
+  - **Filter:** "All views" / "This view"; conjunctions "All / Any / None of the following are true"; rows say "where", then "and" or "or" ("or" in None groups).
+  - **Properties:** shown properties in `order`, then file properties by id, formulas and note properties. "Find or create..." offers `Add "x" property`. A property's page has Display name (and Formula), plus a ⋯ menu with Show property and Delete formula.
+  - **New:** creates `Untitled.md` with the filters' keys (`status == "todo"`, `n > 1`, `file.hasTag("x")`, `due.isEmpty()` → `status: todo`, `tags: [x]`, `n:`) and opens it in a popover. No "filtered out" warning appeared, so there's none.
+- **Shell** (`BasesViewer.vue`):
+  - Parses once, with a `written` guard as in CanvasViewer. `commit(base)` writes `stringifyBase`, and the tab autosaves.
+  - An invalid file shows its error and is never written. A view of an unknown type shows "Unknown view type: x".
+  - Every known layout shows the V0 table until V2–V5.
+- **Context** (`app/composables/bases/useBaseContext.ts`), provided to the toolbar:
+  - the base, the tab's view and search, the open menu (`open`: one at a time; commands open menus through it), the live query, paths and session;
+  - the property catalogue: file properties in Obsidian's picker order, formulas, the workspace's note properties. Kinds are inferred from values: notes' first values, formulas' first row values. Labels honour `displayName`, and each property has an icon.
+- **Shared pieces:**
+  - `PropertySelect` (`withFile` adds `file` for the Filter menu) and `MenuHeader`;
+  - `useListDrag`: HTML5 drag, as the tree uses;
+  - `FormulaInput`: a one-line CodeMirror with completion of functions, methods after `.`, and properties under `file.`, `formula.` and `note.`, plus the "✓ Valid formula" / error line.
+- **Library:** `FUNCTION_NAMES` (`{globals, methods}`) is exported for autocomplete, with README and `llms.txt` lines. The library needs a release (0.5.1) before Vertex can install it; the dev setup uses its local build.
+- **Menus:** `ViewsMenu` + `ViewOptions`, `ResultsMenu`, `SortMenu`, `GroupMenu`, `FilterMenu` + `FilterGroupEditor` + `FilterRuleRow`, `PropertiesMenu` + `PropertyPage` + `FormulaPage`, `Search`, `NewItem` (all in `app/components/ViewerEditor/Bases/`). Every write goes through the library's edit functions.
+- **Pure parts with tests:**
+  - `app/utils/basesTable.ts`: cells, TSV, and RFC 4180 CSV (Obsidian's CSV couldn't be captured, so its exact format is inferred);
+  - `app/utils/basesNewItem.ts`: frontmatter from filters, with a `ponytail:` note on its plain YAML quoting.
+- **Commands:** while a base is open, the palette has a "Bases" group: Add view, Switch view…, Copy table, Add item (`useBaseCommands.ts`; `useCopyTable` is shared with the Results menu). A menu opened from the palette waits until the palette's dialog is gone, because its focus return would close it.
+- **Saving:** `SessionTab` wrote a file's unchanged text back after loading it, or after an outside reload, because its debounced autosave saw the load as an edit. It now remembers the text it read or wrote last and saves only a change. That fixes the V0 note too.
+- **Strings:** `app.editor.ui.bases` was rewritten (en + zh-CN), with Obsidian's wording. The old column labels and `NewBaseViewModal.vue` were removed.
+- **Not done:**
+  - "Group headings fold per tab" moves to V2, which draws the group headings.
+  - The note-property page's "Property type" is out of scope (decisions table).
+  - Export CSV's save dialog wasn't exercised (the browser has no Tauri).
+
 ### Acceptance
-- [ ] On a copy of Kthalatir for Testing: each toolbar action writes the same `.base` text that Obsidian writes for it (compared against B4's fixtures), and opening and closing without changes writes nothing.
+- [x] Each toolbar action writes the text Obsidian writes. Checked in a browser against the dev server with Tauri stubbed: B4's captured "before" texts were loaded, the action was done through the menus, and the written file was compared byte for byte with Obsidian's "after".
+  - 17 cases pass: sort DESC existing, sort NONE existing, sort ASC formula on C, group by status, group by then change, group order empty, limit, limit then clear null, order empty, rowHeight, cardSize change, image option, default view, delete view, formula change text, formula remove, and formula add text. The last one also adds the new formula's column, as Obsidian's Add formula is inferred to do (B4 captured it through the API).
+  - The other B4 cases are header clicks, summaries and column widths (V2), or orders Obsidian's API wrote that no menu produces (`groupOrder: [todo, "", false, 3]`).
+  - Also checked through the UI: a This view filter (`status == "todo"`) and Add view with a typed name equal the library's output; New creates `Untitled.md` and saves what's typed in its popover; the palette's four commands open their menus or copy (TSV `file name\tNumber\tf\nA\t1\t2…`).
+- [x] Opening a base (`Kthalatir Entries.base`) and opening and closing every menu and page without changes writes nothing. An outside reload writes nothing either, and an edit still writes. 241 tests pass, plus the library's 2486; `typecheck` (apart from `latex2vue`'s own errors in `node_modules`) and `lint` pass (no warnings in the new files). SMOKE row 112; unverified in `tauri dev`.
 
 ## V2: Table
 
@@ -442,7 +482,7 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - File and formula cells are read-only; Enter on a formula cell opens its editor.
   - Undo and redo cover property changes.
 - **Selection and keyboard** follow Obsidian's table keys (`bases-docs.md` §7.1): copy/paste cells, select row, column or all, Tab, Home/End, Esc, and Backspace to clear values.
-- **Groups:** a heading (`status doing`) with that group's summary row on top. The grand-total summary row is at the bottom. Clicking a summary cell adds a summary for that column.
+- **Groups:** a heading (`status doing`) with that group's summary row on top. The grand-total summary row is at the bottom. Clicking a summary cell adds a summary for that column. Headings fold per tab (moved from V1).
 
 ### Acceptance
 - [ ] Kthalatir Entries' All Entries matches Obsidian's screenshot: column order, widths, display names ("Last Time of Edit"), humanized formulas, backlinks as links, and 213 rows.
