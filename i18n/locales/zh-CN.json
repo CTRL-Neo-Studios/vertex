@@ -580,7 +580,8 @@
 						"ext": "文件扩展名",
 						"tags": "标签"
 					},
-					"search": "在 {count} 个结果中搜索…"
+					"search": "在 {count} 个结果中搜索…",
+					"invalid": "无法解析数据库文件"
 				},
 				"canvas": {
 					"invalid": "无法打开此画布",

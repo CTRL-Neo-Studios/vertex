@@ -1,375 +1,62 @@
 <script setup lang="ts">
-import type {
-	InternalLink,
-	InternalLinkClickDetail,
-	InternalLinkNode
-} from "#codemirror-rich-obsidian-editor/editor-types";
-import {type BaseSource, type SortConfig, useBase} from "@type32/obsidian-bases-parser";
-import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
+import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {DropdownMenuItem, TableColumn} from "@nuxt/ui";
+import {parseBase, runQuery, toDisplay, type RowScope} from "@type32/obsidian-bases-parser";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import type {YamlFormData} from "@type32/yaml-editor-form";
-import type {DropdownMenuItem, TableColumn, TableData} from "@nuxt/ui";
-import {h, resolveComponent, type VNode} from 'vue'
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {toLargestFileSizeUnit} from "#shared/utils/fs/filestats";
-import NewBaseViewModal from "~/components/Modals/Bases/NewBaseViewModal.vue";
-import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
-import {parentPathOf} from "#shared/utils/index/parse";
-import {EditorProseEmbedImageDisplay} from "#components";
-import {convertFileSrc} from "@tauri-apps/api/core";
+import {useBaseHost} from "~/composables/bases/useBaseHost";
 
-/** The `column` a header callback gets (Nuxt UI doesn't re-export TanStack's `Column`). */
-type HeaderColumn<T extends TableData> = Parameters<Extract<TableColumn<T>['header'], (...args: never[]) => unknown>>[0]['column']
-
-const {t} = useI18n()
-const $ovl = useOverlay()
-const loadingData = ref(false)
-
-const UBadge = resolveComponent('UBadge')
-const UButton = resolveComponent('UButton')
-const UScrollArea = resolveComponent('UScrollArea')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
-const UPopover = resolveComponent('UPopover')
-const UTooltip = resolveComponent('UTooltip')
-const ModalNewBaseView = $ovl.create(NewBaseViewModal)
-
+/**
+ * A `.base` file: its views over the workspace's files, queried with `@type32/obsidian-bases-parser`. The rows follow
+ * the index live. Nothing is written yet (the toolbar's edits come with V1 of the Bases plan).
+ */
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({default: ''})
-const contentSaved = defineModel<boolean>('contentSaved', {default: false})
-const activeView = defineModel<string>('activeView', {required: false, default: ''})
-
+defineModel<boolean>('contentSaved', {default: false})
 const props = withDefaults(defineProps<{
-    internalLinkList: InternalLink[],
     renaming: boolean,
     filePath?: string,
     sessionId: string,
-    disabled?: boolean
-}>(), {
-    renaming: false,
-    filePath: '',
-    disabled: false
-})
+    internalLinkList?: InternalLink[],
+    disabled?: boolean,
+}>(), {filePath: '', internalLinkList: () => [], disabled: false})
+const emit = defineEmits<{ 'on-rename': [oldValue: string, newValue: string] }>()
 
-const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
-    (e: 'on-clicked-internal-link', detail: InternalLinkClickDetail): void
-}>()
+const {t} = useI18n()
+const session = useActiveSessions().getSession(props.sessionId)!
+const {host, paths} = useBaseHost(session)
 
-const $session = computed(() => $sesh.getSession(props.sessionId))
-const $sesh = useActiveSessions()
-const {
-    getFileByUuid,
-    fileIndex,
-} = useActiveWorkspaceIndex(unref($session))
-const $tab = useActiveTabs(unref($session))
-const $navi = useAppNavigator()
+const parsed = computed(() => parseBase(content.value))
+const base = computed(() => parsed.value.base)
 
-// Every file under its path and each shorter path it ends with (`a/b.png`, `b.png`): a cell's link finds its file in
-// one lookup instead of scanning the whole list per cell.
-const linksBySuffix = computed(() => {
-    const map = new Map<string, InternalLink[]>()
-    for (const link of props.internalLinkList) {
-        const parts = (link.filePath ?? '').split('/')
-        for (let i = 0; i < parts.length; i++) {
-            const key = parts.slice(i).join('/')
-            const list = map.get(key)
-            if (list) list.push(link)
-            else map.set(key, [link])
-        }
-    }
-    return map
-})
+const activeView = ref('')
+const view = computed(() => base.value?.views?.find(v => v.name === activeView.value) ?? base.value?.views?.[0])
 
-function getHeader(column: HeaderColumn<BaseSource<YamlFormData>>, label: string) {
-    const isSorted = column.getIsSorted()
+const search = ref('')
+// Each keystroke re-runs the query: once typing pauses.
+const searchTerm = refDebounced(search, 200)
+const result = computed(() => base.value && view.value
+    ? runQuery(base.value, view.value.name, {host, paths: paths.value, now: Date.now(), thisPath: props.filePath, search: searchTerm.value})
+    : undefined)
 
-    return h(
-        UDropdownMenu,
-        {
-            content: {
-                align: 'start'
-            },
-            'aria-label': 'Actions dropdown',
-            size: 'sm',
-            items: [[
-                {
-                    label: t('app.editor.ui.bases.sortAscending'),
-                    type: 'checkbox',
-                    icon: 'i-lucide-arrow-up-narrow-wide',
-                    checked: isSorted === 'asc',
-                    onSelect: () => {
-                        if (isSorted === 'asc') {
-                            $base.removeViewSort(unref(activeView), column.id)
-                            column.clearSorting()
-                        } else {
-                            $base.addViewSort(unref(activeView), column.id, 'ASC')
-                            column.toggleSorting(false)
-                        }
-                    }
-                },
-                {
-                    label: t('app.editor.ui.bases.sortDescending'),
-                    icon: 'i-lucide-arrow-down-wide-narrow',
-                    type: 'checkbox',
-                    checked: isSorted === 'desc',
-                    onSelect: () => {
-                        if (isSorted === 'desc') {
-                            $base.removeViewSort(unref(activeView), column.id)
-                            column.clearSorting()
-                        } else {
-                            $base.addViewSort(unref(activeView), column.id, 'DESC')
-                            column.toggleSorting(true)
-                        }
-                    }
-                }
-            ], [{
-                label: t('app.editor.ui.bases.clearSorting'),
-                icon: 'i-lucide-trash',
-                color: 'error',
-                onSelect: () => {
-                    $base.removeViewSort(unref(activeView), column.id)
-                    column.clearSorting()
-                }
-            }]]
-        },
-        () =>
-            h(UButton, {
-                color: 'neutral',
-                variant: 'ghost',
-                label,
-                size: 'sm',
-                icon: isSorted
-                    ? isSorted === 'asc'
-                        ? 'i-lucide-arrow-up-narrow-wide'
-                        : 'i-lucide-arrow-down-wide-narrow'
-                    : 'i-lucide-arrow-up-down',
-                class: '-mx-2.5 data-[state=open]:bg-elevated',
-                'aria-label': `Sort by ${isSorted === 'asc' ? 'descending' : 'ascending'}`
-            })
-    )
-}
-
-type Row = BaseSource<YamlFormData>
-
-/** Horizontally scrolling strip of badges with faded edges. */
-function badgeStrip(badges: VNode[]) {
-    return h('div', {class: 'relative max-w-96'}, [
-        h('div', {class: 'absolute left-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r to-default/0 from-default z-10'}),
-        h(UScrollArea, {orientation: 'horizontal', class: 'no-scrollbar max-w-96 w-full px-2'}, {
-            default: () => h('div', {class: 'flex gap-1.5 items-center w-fit'}, badges),
-        }),
-        h('div', {class: 'absolute right-0 top-0 bottom-0 h-full w-4 pointer-events-none bg-linear-to-r from-default/0 to-default z-10'}),
-    ])
-}
-
-const getFileLinkBadgeList = (ids: string[]) => badgeStrip(ids.map(id => h(UBadge, {
-    label: `${getFileByUuid(id)?.fileName}`,
-    variant: 'soft',
-    class: 'cursor-pointer',
-    size: 'md',
-    onClick: () => $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(id)),
+const viewItems = computed<DropdownMenuItem[]>(() => (base.value?.views ?? []).map(v => ({
+    label: v.name,
+    type: 'checkbox' as const,
+    checked: v.name === view.value?.name,
+    onSelect: () => void (activeView.value = v.name),
 })))
 
-const getTagsBadgeList = (tags: string[]) => badgeStrip(tags.map(tag => h(UBadge, {label: `${tag}`, variant: 'subtle', size: 'md'})))
-
-const formatTime = (value: unknown) => new Date(value as string).toLocaleString('en-US', {
-    day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-})
-
-/** A built-in column: `id` is the Bases property name, `labelKey` its i18n header. */
-function fileColumn(id: string, accessorKey: keyof Row, labelKey: string, cell: (value: unknown, row: Row) => unknown): TableColumn<Row> {
+const columns = computed<TableColumn<RowScope>[]>(() => (view.value?.order ?? ['file.name']).map((id) => {
+    const displayName = base.value?.properties?.[id]?.displayName
     return {
         id,
-        accessorKey,
-        header: ({column}) => getHeader(column, t(labelKey)),
-        cell: ({row}) => cell(row.getValue(id), row.original),
-    } as TableColumn<Row>
-}
-
-function propogateFileIndexToSourceArray(): Row[] {
-    return Object.values(unref(fileIndex)).filter(file => !file.isFolder).map(file => ({
-        data: file.properties,
-        id: file.uuid,
-        name: fileNameFromPath(file.fileName, true),
-        basename: file.fileName,
-        path: file.relativePath,
-        folder: parentPathOf(file.relativePath.replace(/\\/g, '/')) || '/',
-        ext: getFileExtensionFromPath(file.fileName),
-        ctime: file.createdTime,
-        mtime: file.modifiedTime,
-        tags: file.properties.tags,
-        backlinks: file.backlinks,
-        properties: file.properties,
-        size: file.size,
-        links: file.forelinks,
-    }) satisfies Row)
-}
-
-function propogateDisplayDataColumns(): TableColumn<Row>[] {
-    const cols = 'app.editor.ui.bases.columns'
-    const originals: TableColumn<Row>[] = [
-        {id: '#id', accessorKey: 'id', header: '#', cell: ({row}) => `#${row.getValue<string>('#id').slice(0, 4)}`},
-        fileColumn('file.name', 'name', `${cols}.name`, (name, row) => h(UButton, {
-            variant: 'link',
-            class: 'cursor-pointer',
-            label: name,
-            size: 'sm',
-            onClick: () => $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(row.id as string)),
-        })),
-        fileColumn('file.ctime', 'ctime', `${cols}.ctime`, formatTime),
-        fileColumn('file.mtime', 'mtime', `${cols}.mtime`, formatTime),
-        fileColumn('file.size', 'size', `${cols}.size`, size => toLargestFileSizeUnit(size as number)),
-        fileColumn('file.basename', 'basename', `${cols}.basename`, v => v),
-        fileColumn('file.path', 'path', `${cols}.path`, v => v),
-        fileColumn('file.folder', 'folder', `${cols}.folder`, v => v),
-        fileColumn('file.ext', 'ext', `${cols}.ext`, ext => h(UBadge, {label: `.${ext}`, variant: 'soft', color: 'neutral', size: 'md'})),
-        fileColumn('file.links', 'links', 'app.editor.ui.forelinks', ids => getFileLinkBadgeList(ids as string[])),
-        fileColumn('file.backlinks', 'backlinks', 'app.editor.ui.backlinks', ids => getFileLinkBadgeList(ids as string[])),
-        fileColumn('tags', 'tags', `${cols}.tags`, tags => getTagsBadgeList((tags as string[] | undefined) ?? [])),
-    ]
-
-    const columnIds = originals.map(v => v.id).filter(i => i != undefined)
-    const datas = unref(currentViewResults).map(i => i.data).filter(i => i != undefined)
-	const columnMap = new Map<string, string>()
-	datas.forEach((value) => {
-		Object.keys(value).forEach((key) => {
-			if (!columnMap.has(key)) {
-				const val = value[key]
-
-				if (Array.isArray(val)) {
-					const itemType = val.length > 0 ? typeof val[0] : 'unknown'
-					columnMap.set(key, `array[${itemType}]`)
-				} else if (val instanceof Date) {
-					columnMap.set(key, 'date')
-				} else if (val === null || val === undefined) {
-					columnMap.set(key, 'null')
-				} else {
-					columnMap.set(key, typeof val)
-				}
-			}
-		})
-	})
-
-	const propCols: TableColumn<BaseSource<YamlFormData>>[] = columnMap.keys().toArray().map((key) => {
-		const keyType = columnMap.get(key)
-		if (!keyType || columnIds.includes(key)) return;
-
-		const col: TableColumn<BaseSource<YamlFormData>> = {
-			accessorFn: (originalRow) => originalRow.properties || originalRow.data,
-			id: key,
-			header: ({column}) => getHeader(column, key),
-			cell: ({row}) => {
-				const value = (row.getValue(key) as Record<string, unknown> | undefined)?.[key]
-				if (value === null || value === undefined) return
-
-				if (keyType === 'array[string]') {
-					return getTagsBadgeList(value as string[])
-				} else if (keyType === 'array[object]' || keyType === 'object') {
-					return JSON.stringify(value)
-				} else if (keyType === 'string') {
-					const text = String(value)
-					const links = getInternalLinks(text)
-					// Plain text, or links that don't resolve, show as the text itself.
-					if (links.length <= 0) return text
-					else if (links.length == 1) {
-						const [link]: InternalLinkNode[] = links
-						if (!link) return text;
-						const internalLink = linksBySuffix.value.get(link.path)?.[0]
-						if (!internalLink) return text;
-						if (isImage(getFileExtensionFromPath(`${internalLink.filePath}`)))
-							return h(UPopover, {}, {
-								default: () => h(UTooltip, { text: t('app.editor.ui.viewImage') }, () => h(UButton, { color: 'neutral', variant: 'ghost', size: 'xs', icon: 'i-lucide-image' })),
-								content: () => h(EditorProseEmbedImageDisplay, { srcPath: convertFileSrc(`${getFileByUuid(internalLink.referenceId)?.fullPath}`), display: internalLink.name })
-							})
-						else
-							return h(UButton, {
-								variant: 'link',
-								class: 'cursor-pointer',
-								label: internalLink.name,
-								async onClick() {
-									await $navi.toWorkspaceTab(unref($session)?.uuid, $tab.openTab(internalLink.referenceId))
-								},
-								size: 'sm'
-							})
-					} else {
-						const [link]: InternalLinkNode[] = links
-						if (!link) return text;
-						const internalLinkIds = linksBySuffix.value.get(link.path)?.map(value => value.referenceId) ?? []
-						return internalLinkIds.length ? getFileLinkBadgeList(internalLinkIds) : text
-					}
-				} else {
-					return value instanceof Date ? formatTime(value) : String(value)
-				}
-			}
-		} satisfies TableColumn<BaseSource<YamlFormData>>
-
-		return col
-	}).filter((value) => value != undefined)
-
-	originals.push(...propCols)
-
-    return originals
-}
-
-const BASE_TYPE_ICONS: Record<string, string> = {list: 'i-lucide-rows-3', table: 'i-lucide-sheet', cards: 'i-lucide-layout-grid', map: 'i-lucide-map'}
-function getIconFromBaseType(baseType: string) {
-    return BASE_TYPE_ICONS[baseType]
-}
-
-function setBaseColumnVisibility(columnId: string, visible: boolean) {
-    if (columnId !== 'id') {
-        if (visible)
-            $base.addViewOrder(unref(activeView), columnId)
-        else
-            $base.removeViewOrder(unref(activeView), columnId)
+        header: typeof displayName === 'string' ? displayName : id.replace(/^(note|formula)\./, ''),
+        accessorFn: (row) => {
+            const value = row.property(id)
+            return value.type === 'Null' ? '' : toDisplay(value)
+        },
     }
-}
+}))
 
-function loadColumnsVisibilityFromBase() {
-	console.log('load cols visibility from base')
-    unref(columns).forEach((column) => {
-		const exists = ($base.getView(unref(activeView))?.order || [])?.includes(`${column.id}`)
-		unref(table)?.tableApi?.getColumn(`${column.id}`)?.toggleVisibility(exists)
-	})
-}
-
-function loadColumnsSortingFromBase() {
-    $base.getView(unref(activeView))?.sort?.forEach((i: SortConfig) => {
-        sorting.value.push({
-            id: i.property,
-            desc: i.direction === "DESC"
-        })
-    })
-}
-
-function setAllColumnsVisibility(visible: boolean) {
-    unref(table)?.tableApi?.getAllColumns()
-        .filter((column) => column.getCanHide())
-        .forEach((column) => {
-            setBaseColumnVisibility(column.id, visible)
-            unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(visible)
-        })
-}
-
-const baseSource = computed<BaseSource<YamlFormData>[]>(() => propogateFileIndexToSourceArray())
-const $base = useBase({
-    base: unref(content),
-    source: unref(baseSource),
-    trackChanges: true,
-})
-
-watch($base.hasChanges, (newValue) => {
-    if (newValue)
-        content.value = $base.save()
-})
-
-watch(activeView, loadColumnsVisibilityFromBase)
-
-const searchTerm = ref('')
-// TanStack filters every row on each change: once typing pauses.
-const filterTerm = refDebounced(searchTerm, 200)
 // Stable objects: a new one on each render (inline in the template) re-renders the table, and its virtualizer then
 // re-estimates every row (Nuxt UI recomputes its options per row).
 const TABLE_VIRTUALIZE = {estimateSize: 37}
@@ -379,116 +66,6 @@ const TABLE_UI = {
     td: 'py-1',
     th: 'py-2 pt-0 text-xs',
 }
-const table = useTemplateRef('table')
-const currentViewResults = computed(() => unref($base.query.getViewResults(unref(activeView))).items)
-const baseViewsItems = computed<DropdownMenuItem[][]>(() => [
-    [
-        ...unref($base.views).map(i => ({
-            label: i.name,
-            icon: getIconFromBaseType(i.type),
-            checked: unref(activeView).includes(i.name),
-            active: unref(activeView).includes(i.name),
-            slot: 'view' as const,
-            children: [[{
-                label: t('app.editor.ui.bases.view'),
-                icon: 'i-lucide-eye',
-                onSelect() {
-                    activeView.value = i.name
-                }
-            }], [{
-                label: t('app.editor.ui.bases.remove'),
-                icon: 'i-lucide-trash',
-                color: 'error',
-				onSelect() {
-					if (unref($base.viewNames).length <= 1) return;
-					const baseName = i.name
-					$base.removeView(baseName)
-					if (baseName === unref(activeView))
-						activeView.value = unref($base.viewNames)[0] || ''
-				},
-				disabled: unref($base.viewNames).length <= 1
-            }]]
-        } satisfies DropdownMenuItem))
-    ],
-    [
-        {
-            label: t('app.editor.ui.bases.addView'),
-            icon: 'i-lucide-grid-2x2-plus',
-            async onSelect() {
-                const view = await ModalNewBaseView.open()
-                if (view) {
-                    $base.addView(view)
-					if (view?.name) {
-						$base.addViewOrder(view.name, 'file.name')
-						activeView.value = view.name
-					}
-                }
-            }
-        }
-    ]
-])
-const columns = computed<TableColumn<BaseSource<YamlFormData>>[]>(() => propogateDisplayDataColumns())
-const columnsDropdownItems = computed<DropdownMenuItem[][]>(() => {
-    const cols: DropdownMenuItem[] = unref(table)?.tableApi?.getAllColumns()
-        .filter((column) => column.getCanHide() && column.id != '#id')
-        .map((column) => ({
-            label: column.id || '',
-            type: 'checkbox' as const,
-            checked: column.getIsVisible(),
-            onUpdateChecked(checked: boolean) {
-                setBaseColumnVisibility(column.id, checked)
-                unref(table)?.tableApi?.getColumn(column.id)?.toggleVisibility(checked)
-            },
-            onSelect(e: Event) {
-                e.preventDefault()
-            }
-        } satisfies DropdownMenuItem)) || []
-    return [cols,
-        [
-            {
-                label: t('app.editor.ui.bases.hideAll'),
-                icon: 'i-lucide-eye-off',
-                onSelect() {
-                    setAllColumnsVisibility(false)
-                }
-            },
-            {
-                label: t('app.editor.ui.bases.addFormula'),
-                icon: 'i-lucide-square-function',
-                disabled: true, // not implemented yet
-            }
-        ]
-    ]
-})
-
-onMounted(async () => {
-	loadingData.value = true
-    await until($session).toMatch(v => !!v)
-
-    if (!unref(activeView) || unref(activeView) == '')
-        activeView.value = unref($base.viewNames)[0] || ''
-
-    $base.setSource(unref(baseSource))
-
-	// Note on this part: for some weird reason, the `columns` field of the UTable tends to fetch the static columns first, which were the
-	// `originals` in the propogate columns function. Then, as the data is "gradually fetched" (which isn't but UTable or the Tanstack Table somehow thinks it is),
-	// the columns would THEN propogate to its full form. I absolutely despise Tanstack Tables for making such an appaling
-	// fucking table framework with weird as fuck APIs and hard to understand documentations that gives me a fucking headache
-	// instead of the functions that I want to work with.
-	//
-	// Because of this 'delayed' column propogation perceived by the Tanstack table, I have to manually wait for the table to load all the columns
-	// in its first phrase of fetching the static cols and the phrase of fetching & processing the dynamic cols and then have it put into the damn table.
-	// God I hate it when frameworks work in weird and unexpected ways.
-	await until(table).toMatch(v => !!v)
-	await until(() => unref(table)?.tableApi?.getAllColumns().length).toMatch(v => v === unref(columns).length)
-
-	loadingData.value = false
-    loadColumnsVisibilityFromBase()
-    loadColumnsSortingFromBase()
-})
-
-const sorting = ref<{ id: string, desc: boolean }[]>([])
-
 </script>
 
 <template>
@@ -501,68 +78,32 @@ const sorting = ref<{ id: string, desc: boolean }[]>([])
         :showStatusBar="false"
         :bottomSpacing="false"
     >
-        <template #default>
-            <div class="w-full flex flex-col flex-1 h-full pb-10">
-                <div class="w-full">
-                    <div class="w-full flex items-center justify-center p-1 px-2">
-                        <UDropdownMenu
-                            :items="baseViewsItems"
-                            size="sm"
-                        >
-                            <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" :label="$t('app.editor.ui.bases.views')">
-                                <template #trailing>
-                                    <UBadge :label="activeView" size="xs" variant="subtle" color="neutral"/>
-                                </template>
-                            </UButton>
-                        </UDropdownMenu>
-						<UInput
-							v-model="searchTerm"
-							icon="i-lucide-search"
-							size="sm"
-							:placeholder="$t('app.editor.ui.bases.search', {count: currentViewResults.length})"
-							:ui="{ trailing: 'pr-0.5' }"
-							variant="ghost"
-						>
-							<template #trailing v-if="searchTerm != ''">
-								<UButton size="sm" variant="link" @click="searchTerm = ''" color="neutral" icon="i-lucide-x"/>
-							</template>
-						</UInput>
-						<div class="grow"/>
-                        <UDropdownMenu
-                            :items="columnsDropdownItems"
-                            :content="{ align: 'end' }"
-                        >
-                            <UButton
-                                size="sm"
-                                :label="$t('app.generic.properties')"
-                                icon="i-lucide-table-properties"
-                                color="neutral"
-                                variant="ghost"
-                            />
-                        </UDropdownMenu>
-                    </div>
-                </div>
-                <!-- Hidden, not unmounted, while loading: onMounted waits on the table's ref. Invisible rather than
-                     `display: none`, which gave every row a height of 0, so the virtual table drew thousands of them. -->
-                <div :class="['flex-1 min-h-0 flex flex-col', loadingData && 'invisible']">
-                    <UTable
-                        v-model:sorting="sorting"
-                        :columns="columns"
-                        ref="table"
-                        sticky
-                        :data="currentViewResults"
-                        class="flex-1 min-h-0"
-                        :global-filter="filterTerm"
-                        :virtualize="TABLE_VIRTUALIZE"
-                        :watch-options="TABLE_WATCH"
-                        :ui="TABLE_UI"
-                    />
-                </div>
+        <div v-if="parsed.error !== null" class="w-full p-6 pt-12">
+            <UAlert color="error" variant="subtle" icon="i-lucide-file-x" :title="t('app.editor.ui.bases.invalid')"/>
+            <p class="mt-3 font-mono text-xs text-muted whitespace-pre-wrap">{{ parsed.error }}</p>
+        </div>
+        <div v-else class="w-full flex flex-col flex-1 h-full pb-10">
+            <div class="w-full flex items-center p-1 px-2">
+                <UDropdownMenu :items="viewItems" size="sm">
+                    <UButton size="sm" variant="ghost" color="neutral" icon="i-lucide-layout-dashboard" :label="view?.name ?? t('app.editor.ui.bases.views')"/>
+                </UDropdownMenu>
+                <UInput
+                    v-model="search"
+                    icon="i-lucide-search"
+                    size="sm"
+                    :placeholder="t('app.editor.ui.bases.search', {count: result?.rows.length ?? 0})"
+                    variant="ghost"
+                />
             </div>
-        </template>
+            <UTable
+                sticky
+                :columns="columns"
+                :data="result?.rows ?? []"
+                class="flex-1 min-h-0"
+                :virtualize="TABLE_VIRTUALIZE"
+                :watch-options="TABLE_WATCH"
+                :ui="TABLE_UI"
+            />
+        </div>
     </ViewerEditorLayoutWrapper>
 </template>
-
-<style scoped>
-
-</style>

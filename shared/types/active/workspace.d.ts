@@ -1,4 +1,5 @@
 import type {YamlFormData} from "@type32/yaml-editor-form";
+import type {NoteMeta} from "#shared/utils/index/parse";
 
 /*
 Usage Scope: Active Workspaces
@@ -15,6 +16,8 @@ export interface ActiveWorkspaceFileIndex {
     properties: YamlFormData,
     forelinks: string[]
     backlinks: string[]
+    /** Body tags, link texts and embeds of a note, for Bases; empty for other files. */
+    meta: NoteMeta
     createdTime: Date,
     modifiedTime: Date,
 }

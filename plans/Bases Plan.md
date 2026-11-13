@@ -369,9 +369,42 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - **Live:** the rows follow index changes (create, edit, rename, delete). Each change re-runs the query (B3: about 9 ms for 5 000 notes).
 - `this` is the base file, or the note that embeds it.
 
+### As built
+- **Observed first** (Obsidian 1.15.1, probe notes `zz-v0/A.md`, B, C and a base with `file.tags`, `file.links`, `file.embeds` and `file.backlinks` formulas):
+  - **Body tags:** a `#tag` counts at the start of a line or after whitespace (`a#notag` and `(#paren)` don't), needs a non-digit (`#123` doesn't), and follows the editor's hashtag characters (`#a-b/c_d`, `#émoji`). Tags in headings and `%% comments %%` count; tags in code, fenced code, HTML comments and math don't. `file.tags` is body tags, then frontmatter tags.
+  - **Links:**
+    - `file.links` is frontmatter links, then body wiki and markdown links in document order, then embeds.
+    - A link keeps its subpath (`C#Sec`). Its display is the alias, or `C > Sec` without one.
+    - `[[ B ]]` is trimmed. Markdown links count (`[md](B.md)` → `B.md`, shown "md").
+    - Links in `%% %%` count; links in HTML comments don't.
+    - Frontmatter links are whole values only (`rel: "[[C]]"`; `see [[D]] here` isn't one).
+- **Index** (`useActiveWorkspaceIndex`): every entry gets `meta: NoteMeta` (`{tags, links, embeds}`). It's filled for notes by `parseNoteMeta(content, properties)` (`shared/utils/index/parse.ts`) wherever properties are parsed (scan, in-app save, outside edit, workflow writes), and written only when it changed. `scanLinks` (`rewriteLinks.ts`) is exported and reports embeds. The link graph (and so backlinks and rename) is unchanged.
+- **Host:**
+  - `baseFile(node)` (`shared/utils/index/baseFile.ts`) turns an index entry into the library's `BaseFile`.
+  - `useBaseHost(session)` (`app/composables/bases/useBaseHost.ts`) returns `{host, paths}` over every file (not only notes), keyed by workspace-relative path.
+  - Links resolve as the link graph does; backlinks come from it.
+  - It's a `computed` over the index, so a query run in a `computed` re-runs when a file is created, edited, renamed or deleted.
+  - The plan's `useBaseRows` became this host: the library's `runQuery` builds the rows.
+- **Dates:** the index reads frontmatter with js-yaml's default schema, which turns `2026-11-20` and `2026-10-01T10:30:00` into Dates. `baseFile` writes them back as text, as Obsidian has them. Obsidian's own datetime format (`2026-10-01T10:30`) stays text anyway. `ponytail:` a Date doesn't keep its text, so `…T00:00:00` reads as a date and `…Z` / `+02:00` as local time. If those show up, re-read frontmatter with `CORE_SCHEMA` for Bases.
+- **Viewer:** with 0.5.0, `useBase` is gone, so `BasesViewer.vue` was cut down to the new engine's core:
+  - `parseBase` on the tab's text; an invalid file shows "Unable to parse your base file" (new key `app.editor.ui.bases.invalid`, en + zh-CN) and the error;
+  - a views menu, and search passed to `runQuery`;
+  - a virtualized table of the view's `order` (display names, `toDisplay` text, empty for null);
+  - `this` is the base file.
+  - It writes nothing. Header sort, column visibility, add/remove view and link/tag cells are gone until V1/V2 rebuild them. `NewBaseViewModal.vue` takes `BaseView` (rewritten in V1).
+- **Not done:**
+  - Links resolve by name or path globally, not relative to the linking note (`../x.md` doesn't resolve).
+  - `$math$` isn't skipped for tags and links.
+  - Canvases and other files have no tags or links in Bases.
+
 ### Acceptance
-- [ ] Unit test: a fixture workspace gives `BaseRow`s matching what Obsidian reports for the probe notes: `file.tags` with the inline tag, `file.links` `[B, C]`, `file.embeds` `[B]`.
-- [ ] Editing a note's property while its base is open updates the row without reopening the tab.
+- [x] `shared/utils/index/baseFile.test.ts`: the probe notes go through Vertex's own parsing, `baseFile` and the link graph. They give, through the library's `RowScope`, exactly what Obsidian showed: `file.tags` with the inline tags in order then `#fm`; `file.links` (12, frontmatter `C` first, embeds last); `file.embeds` `[B, img.png|300]`; B's and C's backlinks `[[zz-v0/A.md|A]]`; `note.due` / `note.dt`; `file.hasLink("B")`. Not blanking HTML comments fails it, and so does dropping markdown links. 235 tests pass; `typecheck` (apart from `latex2vue`'s own errors in `node_modules`) and `lint` pass.
+- [x] Live rows: every write to a note goes through `updateIndex` (in-app save `useActiveWorkspaceTools.ts:542`, the watcher's `reparse`, workflows). A throwaway test drove the index the way it changes (`ref` record → `useBaseHost`'s `computed` → the viewer's `runQuery` `computed`). A property edit, a create, a delete and a rename each re-ran the query once and changed the rows.
+- [x] Editing a note's property while its base is open updates the row without reopening the tab. Checked in a browser against the dev server with Tauri stubbed (`/ws` with `Tasks.base`, A, B, C):
+  - a watcher `modify` event for B (`status: done` → `todo`, plus `#fromdisk`) added B's row to the open "Todo" view, with formula `20` and the tag;
+  - the views menu switched to "All", with links (`[[B|B]]`) and backlinks (`[[A.md|A]], [[C.md|C]]`);
+  - breaking the YAML on disk showed "Unable to parse your base file" and js-yaml's message.
+  - SMOKE row 111; unverified in `tauri dev`.
 
 ## V1: Viewer and toolbar
 

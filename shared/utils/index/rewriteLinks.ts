@@ -1,11 +1,13 @@
 /** One `[[target#subpath|display]]` or `![[embed]]` link, with where its target text sits in the document. */
-interface ScannedLink {
+export interface ScannedLink {
     /** Target as written, without `#subpath` and `|display`; untrimmed. */
     pathPart: string
     /** Offset of `pathPart`'s first character. */
     pathStart: number
     subpath?: string
     display?: string
+    /** `![[…]]`. */
+    embed: boolean
 }
 
 /**
@@ -13,7 +15,7 @@ interface ScannedLink {
  * package no longer exports): code spans and fenced blocks are skipped; an empty `[[]]` or an unclosed one
  * isn't a link; `[[` inside a link starts over.
  */
-function scanLinks(text: string, visit: (link: ScannedLink) => void) {
+export function scanLinks(text: string, visit: (link: ScannedLink) => void) {
     let i = 0
     const len = text.length
     while (i < len) {
@@ -52,7 +54,7 @@ function scanLinks(text: string, visit: (link: ScannedLink) => void) {
         const pipe = inner.indexOf('|')
         const pathRaw = pipe === -1 ? inner : inner.slice(0, pipe)
         const hash = pathRaw.indexOf('#')
-        const link: ScannedLink = {pathPart: hash === -1 ? pathRaw : pathRaw.slice(0, hash), pathStart: contentStart}
+        const link: ScannedLink = {pathPart: hash === -1 ? pathRaw : pathRaw.slice(0, hash), pathStart: contentStart, embed: isEmbed}
         if (hash !== -1) link.subpath = pathRaw.slice(hash + 1).trim()
         if (pipe !== -1) link.display = inner.slice(pipe + 1).trim()
         visit(link)

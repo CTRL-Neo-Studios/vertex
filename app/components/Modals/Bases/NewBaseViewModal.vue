@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FormSubmitEvent,SelectItem } from '@nuxt/ui'
-import type {View} from "@type32/obsidian-bases-parser";
+import type {BaseView as View} from "@type32/obsidian-bases-parser";
 import {z} from 'zod'
 
 const schema = z.custom<View>()

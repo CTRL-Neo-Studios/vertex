@@ -580,7 +580,8 @@
 						"ext": "File Extension",
 						"tags": "Tags"
 					},
-					"search": "Search in {count} results..."
+					"search": "Search in {count} results...",
+					"invalid": "Unable to parse your base file"
 				},
 				"canvas": {
 					"invalid": "This canvas can’t be opened",

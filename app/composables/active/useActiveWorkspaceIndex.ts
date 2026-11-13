@@ -7,7 +7,7 @@ import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {getFileExtensionFromPath, isCanvasFile, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
-import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseProperties} from "#shared/utils/index/parse";
+import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseNoteMeta, parseProperties} from "#shared/utils/index/parse";
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
 import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
@@ -113,6 +113,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return Object.keys(index).filter(p => !index[parentPathOf(p)]).sort().map(p => toNode(index[p]!))
     })
 
+    /** Properties, and for notes the tags and links Bases reads; what didn't change isn't written. */
     function applyProperties(path: string, content: string) {
         const node = unref(fileIndex)[path]
         if (!node || node.isFolder) return
@@ -125,6 +126,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const parent = unref(fileIndex)[parentPathOf(path)]
             if (parent?.isFolder) parent.properties = properties
         }
+        if (!isPlainTextFile(getFileExtensionFromPath(path))) return
+        const meta = parseNoteMeta(content, properties)
+        if (JSON.stringify(meta) !== JSON.stringify(node.meta)) node.meta = meta
     }
 
     /** Full scan. Used once per window open; everything after is incremental. */
