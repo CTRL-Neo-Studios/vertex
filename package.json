@@ -41,7 +41,7 @@
     "@tauri-apps/plugin-updater": "~2.14.1",
     "@tiptap/extension-collaboration": "^3.33.1",
     "@tiptap/extension-node-range": "^3.33.1",
-    "@type32/codemirror-rich-obsidian-editor": "^0.3.7",
+    "@type32/codemirror-rich-obsidian-editor": "^0.3.8",
     "@type32/dispatcher": "^0.1.2",
     "@type32/jsoncanvas-editor": "^0.1.2",
     "@type32/latex2vue": "^3.1.18",
