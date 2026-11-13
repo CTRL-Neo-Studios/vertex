@@ -77,7 +77,9 @@ const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null
             <div v-if="unknownType !== null" class="p-6 text-sm text-muted">
                 {{ t('app.editor.ui.bases.unknownViewType', {type: unknownType}) }}
             </div>
-            <!-- ponytail: cards, list, kanban and map show as a table until V3–V5 build them. -->
+            <ViewerEditorBasesCards v-else-if="ctx.view.value.type === 'cards'"/>
+            <ViewerEditorBasesList v-else-if="ctx.view.value.type === 'list'"/>
+            <!-- ponytail: kanban and map show as a table until V4–V5 build them. -->
             <ViewerEditorBasesTable v-else/>
         </div>
     </ViewerEditorLayoutWrapper>

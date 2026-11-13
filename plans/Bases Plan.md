@@ -533,8 +533,35 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - **List:** `markers` bullet, number or none. Properties go inline with the `separator`, or indented as sub-bullets when `indentProperties` is on.
 - Both group like the table (headings, folding).
 
+### As built
+- **Observed first** (Obsidian 1.15.1: Kthalatir Races and Characters, and probe `zz-v3` with cards C and CG and lists L, L2, L3 and LG):
+  - **Grid:** cards fill the row: `minmax(cardSize, 1fr)` columns with 12 px gaps (225 px cards for 210 at that width).
+  - **Card:** 16 px radius, a 1 px ring, a slightly raised background.
+  - **Cover:** `imageAspectRatio` of the card's width, `background-size` cover or contain. It's a data URL for a vault file, the address for a URL, `background-color` for a `#hex`, and empty for a failed URL or no value.
+  - **No `image` setting:** no cover area at all. With one, every card has the area, including cards without an image (Demon-born).
+  - **Text:** the first property is the title (15 px semibold, label hidden). The others show a 12 px muted label over the value, one line each, and empty values show "—" (a CSS `::before`).
+  - **Click:** clicking a card opens its note.
+  - **Lists:** the first property leads (an internal link), then the others joined by `separator` (default ", "), with empty values and their separators left out. Markers are a small muted bullet, `1.` or nothing. `indentProperties` puts the others on bulleted lines under the item; numbers count items.
+  - **Groups:** in both layouts, the table's heading and a divider under each group.
+- **Shared:**
+  - `Bases/Value.vue` is the read-only value renderer, split out of `TableCell` (links, pills, checkboxes, text, HTML, images, icons, errors; `oneLine`, `editable`). The table, cards and lists all use it; `TableCell` keeps only the inline editors and right-aligns numbers.
+  - `Bases/GroupHeading.vue` and `useGroupFolds` (folds in the tab) are used by all three layouts.
+- **`Bases/Cards.vue`:**
+  - a CSS grid of `repeat(auto-fill, minmax(cardSize px, 1fr))`;
+  - covers via `coverStyle` (a resolved link through `convertFileSrc`, a URL, an `Image` value, or a `#hex` colour) with `aspect-ratio` and `background-size`;
+  - title, label and value lines with "—";
+  - a card click opens its note in a tab; links inside cards open their own note.
+  - Cards use `content-visibility: auto` instead of windowing, so the browser skips laying out cards off screen.
+- **`Bases/List.vue`:** markers, the primary property, then inline properties with the separator or indented bulleted lines; empty values left out; numbers per group.
+- `BasesViewer` routes `cards` and `list`; kanban and map still show the table until V4 and V5.
+
 ### Acceptance
-- [ ] Kthalatir Races (15 cards, `cover` images, 0.55 ratio) and Kthalatir Characters (36 cards, 1.4 ratio) match Obsidian's screenshots. The probe list views L and L2 match too.
+- [x] Checked in a browser against the dev server with Tauri stubbed, on a snapshot of the real test vault (images served locally for `convertFileSrc`), against Obsidian's screenshots at the same size:
+  - **Kthalatir Races:** 15 cards, five per row, 0.55 covers, the same cards with the landscape and Demon-born empty, titles and modified times.
+  - **Kthalatir Characters:** 36 cards, four per row, 1.4 covers, the same cards with and without portraits. Cards are 305 px against Obsidian's 284 because Vertex's content area is wider; both stretch to fill the row.
+  - **Probe views:** C (contain, the red `#ff0000` cover, an empty cover for the failed URL and for none, "—", tag pills), CG (no cover area; headings and dividers), L ("A, todo, 1, x y"), L2 (numbered, nested bullets), L3 (no markers, " · ") and LG (grouped).
+  - A card click opened its note.
+- [x] 257 tests pass; `typecheck` and `lint` pass (no warnings in Bases files). SMOKE row 114; unverified in `tauri dev`.
 
 ## V4: Kanban
 

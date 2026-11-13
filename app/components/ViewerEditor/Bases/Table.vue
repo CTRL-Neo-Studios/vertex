@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager";
-import {setColumnSize, toDisplay, toText, type QueryGroup} from "@type32/obsidian-bases-parser";
+import {setColumnSize, toDisplay} from "@type32/obsidian-bases-parser";
 import {bareId, fullId, useBaseContext} from "~/composables/bases/useBaseContext";
+import {useGroupFolds} from "~/composables/bases/useGroupFolds";
 import {useNoteProperties} from "~/composables/bases/useNoteProperties";
 import {cellEditable, cellText, cellValue} from "~/utils/basesCells";
 import {layoutItems, LINE_HEIGHT, parseTsv, ROW_HEIGHTS, selectionRect, visibleRange, type Cell, type RowHeight} from "~/utils/basesGrid";
@@ -12,7 +13,6 @@ import {layoutItems, LINE_HEIGHT, parseTsv, ROW_HEIGHTS, selectionRect, visibleR
  * Obsidian's table keys; group folds belong to the tab.
  * ponytail: rows are windowed, columns aren't (Obsidian windows both); window columns too if wide views get slow.
  */
-const {t} = useI18n()
 const ctx = useBaseContext()
 const notes = useNoteProperties(ctx.session)
 
@@ -23,19 +23,12 @@ const rowHeight = computed(() => ROW_HEIGHTS[rowHeightKey.value])
 const grouped = computed(() => !!view.value.groupBy)
 const hasSummaries = computed(() => Object.keys(view.value.summaries ?? {}).length > 0)
 
-// Folded groups, by their value's text.
-const folded = ref(new Set<string>())
-const groupKey = (group: QueryGroup) => (group.key === null ? '' : toText(group.key))
-function toggleFold(group: QueryGroup) {
-    const key = groupKey(group), next = new Set(folded.value)
-    if (!next.delete(key)) next.add(key)
-    folded.value = next
-}
+const folds = useGroupFolds()
 
 const layout = computed(() => layoutItems(ctx.result.value.groups, {
     grouped: grouped.value,
     summaries: hasSummaries.value,
-    folded: i => folded.value.has(groupKey(ctx.result.value.groups[i]!)),
+    folded: i => folds.isFolded(ctx.result.value.groups[i]!),
     rowHeight: rowHeight.value,
 }))
 
@@ -247,7 +240,6 @@ function onKeydown(event: KeyboardEvent) {
     if (handled !== false) event.preventDefault()
 }
 
-const groupLabel = computed(() => (view.value.groupBy ? ctx.property(view.value.groupBy.property).label : ''))
 </script>
 
 <template>
@@ -276,15 +268,13 @@ const groupLabel = computed(() => (view.value.groupBy ? ctx.property(view.value.
                     class="absolute left-0 flex"
                     :style="{top: `${top}px`, height: `${item.kind === 'row' ? rowHeight : LINE_HEIGHT}px`, width: `${totalWidth}px`}"
                 >
-                    <button
+                    <ViewerEditorBasesGroupHeading
                         v-if="item.kind === 'heading'"
-                        class="sticky left-0 flex items-center gap-1.5 px-2 h-full text-sm"
-                        @click="toggleFold(item.group)"
-                    >
-                        <span class="text-muted">{{ groupLabel }}</span>
-                        <span class="font-semibold">{{ item.group.key === null ? t('app.editor.ui.bases.none') : toText(item.group.key) }}</span>
-                        <UIcon name="i-lucide-chevron-down" class="size-4 text-dimmed transition-transform" :class="{'-rotate-90': folded.has(groupKey(item.group))}"/>
-                    </button>
+                        class="sticky left-0"
+                        :group="item.group"
+                        :folded="folds.isFolded(item.group)"
+                        @toggle="folds.toggle(item.group)"
+                    />
                     <template v-else-if="item.kind === 'summary'">
                         <div v-for="id in columns" :key="id" class="h-full border-b border-default shrink-0" :style="{width: `${width(id)}px`}">
                             <ViewerEditorBasesSummaryCell :id="id" :summaries="item.group.summaries" :rows="item.group.rows"/>
