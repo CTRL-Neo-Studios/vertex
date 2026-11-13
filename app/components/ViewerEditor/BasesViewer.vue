@@ -80,7 +80,8 @@ const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null
             <ViewerEditorBasesCards v-else-if="ctx.view.value.type === 'cards'"/>
             <ViewerEditorBasesList v-else-if="ctx.view.value.type === 'list'"/>
             <ViewerEditorBasesKanban v-else-if="ctx.view.value.type === 'kanban'"/>
-            <!-- ponytail: map shows as a table until V5 builds it. -->
+            <!-- A map per view: each places its own camera when it opens. -->
+            <ViewerEditorBasesMap v-else-if="ctx.view.value.type === 'map'" :key="ctx.viewName.value"/>
             <ViewerEditorBasesTable v-else/>
         </div>
     </ViewerEditorLayoutWrapper>

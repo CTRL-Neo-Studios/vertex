@@ -783,7 +783,11 @@
 					"chooseProperty": "选择属性",
 					"noColumns": "没有列",
 					"noColumnsHint": "选择要显示为列的分组。",
-					"editGroups": "编辑分组…"
+					"editGroups": "编辑分组…",
+					"newNote": "新建笔记",
+					"copyCoordinates": "复制坐标",
+					"setDefaultCenter": "设为默认中心点",
+					"setDefaultZoom": "设为默认缩放（{zoom}）"
 				},
 				"canvas": {
 					"invalid": "无法打开此画布",

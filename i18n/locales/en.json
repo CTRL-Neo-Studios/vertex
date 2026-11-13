@@ -783,7 +783,11 @@
 					"chooseProperty": "Choose property",
 					"noColumns": "No columns",
 					"noColumnsHint": "Select groups to show as columns.",
-					"editGroups": "Edit groups..."
+					"editGroups": "Edit groups...",
+					"newNote": "New note",
+					"copyCoordinates": "Copy coordinates",
+					"setDefaultCenter": "Set default center point",
+					"setDefaultZoom": "Set default zoom ({zoom})"
 				},
 				"canvas": {
 					"invalid": "This canvas can’t be opened",

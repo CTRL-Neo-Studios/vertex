@@ -110,6 +110,8 @@ export default defineNuxtConfig({
                 // Nuxt DevTools' client; discovered late otherwise, which reloads the page.
                 "@vue/devtools-core",
                 "@tauri-apps/api/event",
+                // Bases maps (its worker is set by URL in Bases/Map.vue).
+                "maplibre-gl",
                 "@tauri-apps/api/core",
                 "@tauri-apps/api/dpi",
                 // Imported by pages/settings/index.vue; found at runtime otherwise, which reloads the page mid-load ("head.hooks").

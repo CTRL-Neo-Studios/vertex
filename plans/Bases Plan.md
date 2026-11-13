@@ -617,8 +617,41 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - `mapHeight` applies only when embedded.
 - **Markers** come from `coordinates` (a `[lat, lng]` list or a `"lat, lng"` string), with `markerIcon` and `markerColor` properties. Clicking a marker opens a popup with the note. The map fits to the markers when there is no `center`.
 
+### As built
+- **Observed first** (Obsidian 1.15.1 with its Maps plugin 0.2.2; probe `zz-v5` with London as `[51.5074, -0.1278]`, landmark icon and `red`; Paris as `"48.8566, 2.3522"` and `#0000ff`; `["50.0", "1.5"]`; `nope`; none; probe bases P–U):
+  - **Tiles:** MapLibre with OpenFreeMap `bright` (light) or `dark`, matched by layer count and background (120 and 48 layers, each 119/47 plus the marker layer). `mapTiles` is used in dark mode too when `mapTilesDark` is empty. A `{z}/{x}/{y}` URL becomes a raster source; the plugin has no tile settings of its own. Zoom in and out buttons (no compass); compact attribution.
+  - **Markers:** one per row whose `coordinates` reads as a point (a list of numbers or numeric text, or `"lat, lng"`); `nope` and missing values have none. They're a canvas symbol layer, not DOM markers: 192 px images drawn as a disc of radius 48 in `markerColor` (the accent by default), a 4 px stroke of 30 % white, and a white Lucide `markerIcon` in a 64 px box or a white dot of radius 16. `icon-size` goes 0.12, 0.18, 0.22, 0.24 at zoom 0, 4, 14, 18.
+  - **Camera:** without `defaultZoom` the map fits its markers with 20 px padding (`center` is ignored then, even when set); one marker fits to `maxZoom`. With `defaultZoom`, the camera is `center` or the markers' bounds center at that zoom. No markers: [0, 0] at zoom 4. Switching views in the same tab kept the last view's markers and camera (an Obsidian bug, not copied).
+  - **Hover:** a popup 25 px from the marker, 200 px wide (max 240). It shows the note's name as a link, then each `order` property with a value (label over value; empty ones left out). Clicking a marker opens the note.
+  - **Right click** (map or marker): New note, Copy coordinates, Set default center point, and Set default zoom (N), N being the zoom rounded.
+    - Copy gives `"50.20906, 1.12032"`;
+    - Set default center point writes `center: "[50.20906, 1.12032]"`;
+    - Set default zoom writes `defaultZoom: 7` and snaps to it;
+    - New note wrote `zz-v5/Untitled.md` as `kind:` then `coordinates` as the two numbers in quoted text, opened like the toolbar's New.
+- **`app/utils/basesMap.ts`** (tested): `latLng` (the points Obsidian marks), `mapStyle` (default, style URL or raster layers), and `pointText` (five decimals).
+- **`Bases/Map.vue`:** a `maplibre-gl` map (a new dependency, loaded when a map opens).
+  - **Worker:** set by URL from a `?url` import, since its default only works over http(s) and Tauri serves `tauri://`. `maplibre-gl` is in `optimizeDeps.include`.
+  - **Markers:** Obsidian's symbol layer and its images, drawn on a canvas; Lucide icons come from `@iconify-json/lucide`, loaded on first use.
+  - **Camera:** placed by the observed rules when the view opens (`BasesViewer` keys the map by view name). Later `center` and `defaultZoom` edits move it, and a new `coordinates` property fits it again. `minZoom`/`maxZoom` are applied as set.
+  - **Theme:** the style follows the app's color mode, keeping the camera.
+  - **Popup:** Vue content teleported into a MapLibre popup, staying while hovered. Clicking a marker opens its note in a tab, as cards do.
+  - **Right click:** MapLibre cancels every right click, and Nuxt UI's menu ignores cancelled ones. So the map box takes the click on its way down and sends a copy to the menu's box, the map's parent; a template ref there is dropped when the menu re-renders.
+  - **Rotation** is off; there's no compass to undo it.
+  - **New note** reuses New with a `newItemPreset` of the coordinates property, offered only when that property is a note property.
+- **Not built:** `mapHeight` (embeds only, V6).
+
 ### Acceptance
-- [ ] The probe base's map shows London and Paris markers; Kthalatir's "View 2" (no coordinates) shows the default map at zoom 4.
+- [x] The probe's map shows London (red, landmark) and Paris (blue dot), plus the two other points, as Obsidian draws them. This and the rest were checked in a browser against the dev server with Tauri stubbed on a snapshot of the real test vault. Kthalatir's "View 2" (no coordinates, `mapTiles: []`) shows the default map at zoom 4 over [0, 0], in dark and light.
+- [x] **Camera** (read back through the menu's zoom and Copy coordinates):
+  - no zoom: fits (S: 7 at 50.198, 0.9164, against Obsidian's 7.02 at 50.2004, 0.9164);
+  - `defaultZoom: 9`: the markers' center (R: 50.1816, 0.9164 at 9);
+  - one marker: 18;
+  - custom raster tiles (U): OSM raster in place of the default style.
+- [x] **Popup, click and menu:**
+  - the popup is "Paris / kind / city", and clicking London's marker opened `London.md`;
+  - the menu items match; Copy gave `49.90399, -0.13212`; center and zoom writes match Obsidian's;
+  - New note wrote `zz-v5/Untitled 1.md` as `kind:` / `coordinates: ["50.70044", "-4.83427"]`.
+- [x] 261 tests pass; `typecheck` and `lint` pass. `nuxt generate` emits the worker as a self-contained asset. SMOKE row 116; WKWebView tiles and the worker under `tauri://` unverified.
 
 ## V6: Embeds
 

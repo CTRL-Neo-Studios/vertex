@@ -28,7 +28,7 @@ export interface BaseContext {
     open: Ref<string | null>
     /** A property whose page the Properties menu opens on (with `open` set to `properties`): "Edit property…". */
     propertyPage: Ref<string | null>
-    /** A property and value New writes last (a kanban column's), read once when New next creates a note. */
+    /** A property and value New writes last (a kanban column's, a map point's), read once when New next creates a note. */
     newItemPreset: Ref<{ key: string, value: unknown } | null>
     result: ComputedRef<QueryResult>
     /** Every property a menu offers: file properties, formulas, then the workspace's note properties. */
