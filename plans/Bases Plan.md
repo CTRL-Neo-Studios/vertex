@@ -339,7 +339,7 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - [x] `bun pm pack` (running `prepack`) builds `dist` (ESM, CJS, `.d.mts`, `.d.ts`) and packs 22 files (93 KB).
 - [x] In an empty project with the tarball installed, the README's examples typecheck under `moduleResolution` `bundler` and `nodenext` (strict, full library type checks on). They run as ESM, giving the README's results ("2", "a year", grouped rows and the written base), and as CommonJS (`require`).
 - [x] Tests (2486, 5 skipped), `lint` and `test:types` pass.
-- [ ] Published as `0.5.0`.
+- [x] Published as `0.5.0`. V1–V2's additions (`FUNCTION_NAMES`, `readYaml`/`writeYaml`) are still to be released as `0.5.1`; Vertex imports them.
 
 ## E1: Embed subpaths in `codemirror-rich-obsidian`
 
@@ -357,7 +357,7 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - `![[x.base#My view|Alias]]` → `subpath: 'My view'`, `display: 'Alias'`;
   - `![[x.png]]` and `![[x.png|300]]` → unchanged (no `subpath`).
 - [x] Tests (62) and `vue-tsc` pass. The repo has no ESLint config, so `lint` doesn't run.
-- [ ] Published as `0.3.8`.
+- [x] Published as `0.3.8`; the V6 parse fix followed as `0.3.9`.
 
 ## V0: Rows from the index
 
@@ -680,7 +680,7 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
     - The shown view lives in `useState('bases-embed-views')`, keyed by `this` plus the link and subpath, the card's id, or the block's text. Identical links or blocks in one note share it (`ponytail:`).
     - Each file's last text lives in `useState('bases-embed-texts')`, so a remount draws at full height at once.
     - Cards and kanban cards skip `content-visibility` in a note (`ctx.embed`). Its placeholder size (240 px a card) became the note's height on every remount, so CodeMirror re-anchored the scroll by thousands of pixels.
-  - **Editor fix** (`codemirror-rich-obsidian`, `createProsePlugin.ts`, unreleased): prose decorations also rebuild when the parser gets further without a doc change. Before, a long note's embeds past the first few thousand characters never rendered until the note was edited. `test/prose-plugin.test.ts` fails without the fix.
+  - **Editor fix** (`codemirror-rich-obsidian` 0.3.9, `createProsePlugin.ts`; Vertex depends on `^0.3.9`): prose decorations also rebuild when the parser gets further without a doc change. Before, a long note's embeds past the first few thousand characters never rendered until the note was edited. `test/prose-plugin.test.ts` fails without the fix.
 - **Wiring:**
   - `SessionTab` lists `.base` files as links by their full name (`Probe.base`, as Obsidian links non-notes), with `Embed` as the embed component;
   - `useActiveEditorCodeblockMappings` maps `base` to `Embed`;
