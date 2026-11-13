@@ -14,6 +14,7 @@
 			"newFile": "New File…",
 			"newFolder": "New Folder…",
 			"newCanvas": "New Canvas…",
+			"newBase": "New Base…",
 			"newWorkflow": "New Workflow…",
 			"openFile": "Open File…",
 			"openFolder": "Open Folder…",
@@ -549,6 +550,7 @@
 					"newFileDescription": "Creates a new Markdown file in the workspace root.",
 					"newFolderDescription": "Creates a new folder in the workspace root.",
 					"newCanvasDescription": "Creates a new canvas in the workspace root.",
+					"newBaseDescription": "Creates a new base in the workspace root.",
 					"newWorkflowDescription": "Creates a new workflow in the workspace root.",
 					"files": "Files ({count})",
 					"workflows": "Run workflow",
@@ -746,7 +748,8 @@
 						"addView": "Bases: Add view",
 						"switchView": "Bases: Switch view…",
 						"copyTable": "Bases: Copy table",
-						"addItem": "Bases: Add item"
+						"addItem": "Bases: Add item",
+						"insert": "Bases: Insert new base"
 					},
 					"editStep": "Edit {name}",
 					"hideColumn": "Hide column",

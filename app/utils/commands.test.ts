@@ -26,7 +26,7 @@ describe('menuSections', () => {
     it('inserts a separator only between groups', () => {
         const file = menuSections(resolveMenu({})).get('file')!
         expect(file.map(e => e?.id ?? '---')).toEqual([
-            'file.newFile', 'file.newFolder', 'file.newCanvas', 'file.newWorkflow', 'file.newChat', '---', 'file.newWorkspace', 'file.openFile', 'file.openFolder', '---', 'file.save',
+            'file.newFile', 'file.newFolder', 'file.newCanvas', 'file.newBase', 'file.newWorkflow', 'file.newChat', '---', 'file.newWorkspace', 'file.openFile', 'file.openFolder', '---', 'file.save',
         ])
     })
 })

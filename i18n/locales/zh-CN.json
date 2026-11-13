@@ -14,6 +14,7 @@
 			"newFile": "新建文件…",
 			"newFolder": "新建文件夹…",
 			"newCanvas": "新建画布…",
+			"newBase": "新建数据库…",
 			"newWorkflow": "新建工作流…",
 			"openFile": "打开文件…",
 			"openFolder": "打开文件夹…",
@@ -549,6 +550,7 @@
 					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
 					"newFolderDescription": "在工作区根目录新建文件夹。",
 					"newCanvasDescription": "在工作区根目录新建画布。",
+					"newBaseDescription": "在工作区根目录新建数据库。",
 					"newWorkflowDescription": "在工作区根目录新建工作流。",
 					"files": "文件（{count}）",
 					"workflows": "运行工作流",
@@ -746,7 +748,8 @@
 						"addView": "数据库：添加视图",
 						"switchView": "数据库：切换视图…",
 						"copyTable": "数据库：复制表格",
-						"addItem": "数据库：添加条目"
+						"addItem": "数据库：添加条目",
+						"insert": "数据库：插入新数据库"
 					},
 					"editStep": "编辑 {name}",
 					"hideColumn": "隐藏列",

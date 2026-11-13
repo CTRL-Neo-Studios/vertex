@@ -93,6 +93,15 @@
 			},
 			{
 				"ext": [
+					"base"
+				],
+				"mimeType": "application/yaml",
+				"name": "Obsidian Base",
+				"description": "The Obsidian Bases Format",
+				"role": "Editor"
+			},
+			{
+				"ext": [
 					"txt"
 				],
 				"mimeType": "text/plain",

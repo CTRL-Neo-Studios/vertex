@@ -190,6 +190,18 @@ function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryPr
 }
 
 editorDispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
+
+/** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
+function insertBlock({text}: { text: string }) {
+    const view = unref(editorRef.value?.view) as EditorView | undefined
+    if (!view) return
+    const {from, to} = view.state.selection.main
+    const line = view.state.doc.lineAt(from)
+    const insert = `${from > line.from ? '\n' : ''}${text}\n`
+    view.dispatch({changes: {from, to, insert}, selection: {anchor: from + insert.length - 1}, scrollIntoView: true})
+    view.focus()
+}
+editorDispatcher.on('editor.insertBlock', insertBlock)
 </script>
 
 <template>

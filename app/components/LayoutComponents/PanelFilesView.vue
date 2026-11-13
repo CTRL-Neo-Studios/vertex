@@ -33,6 +33,7 @@ const contextMenuItems: ContextMenuItem[][] = [[
     newItem('app.editor.ui.filetree.newMarkdownFile', 'i-lucide-file-plus', {asFolder: false, fileExt: 'md'}),
     newItem('app.editor.ui.filetree.newFolder', 'i-lucide-folder-dot', {asFolder: true}),
     newItem('app.editor.ui.filetree.newCanvas', 'i-lucide-layout-dashboard', {asFolder: false, fileExt: 'canvas'}),
+    newItem('app.editor.ui.filetree.newBase', 'i-lucide-table', {asFolder: false, fileExt: 'base'}),
     newItem('app.editor.ui.filetree.newWorkflow', 'i-lucide-workflow', {asFolder: false, fileExt: 'workflow'}),
 ]]
 // Like Chats' New chat and New folder.

@@ -55,6 +55,7 @@ export function useSessionCommands(session?: ActiveSession) {
         ...(isWorkspace ? {
             'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
             'file.newCanvas': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'canvas', modalTitle: t('app.editor.ui.filetree.newCanvas')})},
+            'file.newBase': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'base', modalTitle: t('app.editor.ui.filetree.newBase')})},
             'file.newWorkflow': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'workflow', modalTitle: t('app.editor.ui.filetree.newWorkflow')})},
             // Opens it in a tab; a locked vault or a failure shows as a toast (useChatActions.run).
             'file.newChat': {run: () => newChat(), enabled: () => aiFeatureOn(effective.value?.aiConfig, 'chat')},

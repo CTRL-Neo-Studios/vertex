@@ -713,9 +713,26 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - **Strings:** en and zh-CN under `app.editor.ui.bases` (`i18n.test.ts` parity).
 - **Docs:** a `### Bases` section in `Concepts and Structures.md`, and SMOKE rows (native menus, file association, Export CSV dialog, map tiles in WKWebView).
 
+### As built
+- **Observed first** (Obsidian 1.15.1):
+  - **Bases commands:** `bases:new-file` "Create new base", `bases:insert` "Insert new base", plus copy-table, change-view, add-view and add-item.
+  - **Create new base:** writes an **empty** `Untitled.base` at the vault root (the default new-file location; not the active file's folder), opens it with the title focused, and shows a table named "View" over every file with a "file name" column. The file stays empty until something is edited.
+  - **Insert new base:** creates another empty `Untitled N.base` at the root and puts `![[Untitled N.base]]` plus a line break at the cursor. When the cursor's line has text before it, a line break goes first (`L3\n![[…]]\n text here`); on an empty line it doesn't (`L1\n![[…]]\n\nL3`). The cursor ends after the embed.
+  - **Backlinks:** Obsidian doesn't index `.base` files: a base whose filter and formulas link A has an empty metadata cache and isn't among A's backlinks.
+- **New Base** (`file.newBase`): File menu (`commands.ts`, after New Canvas), Files' row and empty-space menus, and the palette's quick actions. It uses New Canvas's name modal. An empty file opens on Obsidian's default view, because the library reads `""` as one table "View", and Vertex writes nothing until an edit. This covers Obsidian's Create new base, so there's no second, unnamed variant.
+- **Insert new base** (palette, Bases group, while a note is open; `useBaseCommandItems(session)`): creates an empty `Untitled.base` at the root and emits the editor dispatcher's new `editor.insertBlock`, which `SessionTab` applies with Obsidian's line-break rule and cursor.
+  - **Naming:** Obsidian only avoids names used in the root. Vertex skips a name used anywhere in the workspace, because the editor resolves `![[name]]` to the first file of that name; the test vault's `Bases/Untitled.base` would have won.
+- **Files:** `.base` rows have `i-lucide-table`.
+- **Tauri:** `.base` association ("Obsidian Base", `application/yaml`). In a singlespace window a base opens as text in the code editor (the bases viewer needs a workspace).
+- **Index:** unchanged, as Obsidian: the index doesn't read `.base` files, so they make no backlinks.
+- **Strings:** `app.commands.newBase`, `palette.newBaseDescription` and `bases.commands.insert` in en and zh-CN (i18n parity test passes).
+- **Docs:** a `### Bases` section in `Concepts and Structures.md`; SMOKE row 118 (row 112 already has the Export CSV dialog, and 116 the map tiles).
+
 ### Acceptance
-- [ ] New Base from the File menu creates a base that opens with Obsidian's default view.
-- [ ] `bun run test`, `typecheck` and `lint` are clean for Bases files. The SMOKE rows pass in `tauri:dev`.
+- [x] New Base creates an empty base that opens on Obsidian's default view: `View | 410 results`, one "file name" column, nothing written. Checked in a browser against the dev server with Tauri stubbed, from Files' empty-space menu and the palette's New Base, which run the same modal as the File menu's `file.newBase`. `commands.test.ts` checks the File menu lists New Base after New Canvas; clicking the native menu item is SMOKE 118.
+- [x] Insert new base, mid-line and on an empty line, wrote Obsidian's text (`Fi\n![[Untitled 1.base]]\nller…`, `# Long\n![[Untitled 2.base]]\n\nFi`) with the cursor after the embed. The embeds show the new bases' default view.
+- [x] `bun run test` (261), `typecheck` and `lint` are clean for the changed files.
+- [ ] The SMOKE rows pass in `tauri:dev` (the user's run: native menus, file association, map tiles, embeds in WKWebView).
 
 ## Reference values (Obsidian 1.15.1)
 

@@ -281,6 +281,20 @@ Git runs in Rust (`src-tauri/src/git.rs`), which spawns the installed `git`, so 
 - **Settings:** `viewConfig.canvas` (Settings → View → Canvas, workspace-overridable): scroll wheel, Mod+drag, card names, snap to grid and objects, content zoom threshold. The canvas's own snap switches write the window's scope. Strings: `app.editor.ui.jsonCanvas.*` (every library string) in en and zh-CN.
 - **New Canvas:** File menu, Files' row and empty-space menus, the palette; an empty file is an empty canvas.
 
+### Bases
+
+`.base` files ([Obsidian Bases](https://help.obsidian.md/bases)) open in `BasesViewer` (workspace windows; a singlespace shows the YAML in the code editor). The engine is `@type32/obsidian-bases-parser`: it parses and writes `.base` files as Obsidian does, evaluates its expression language, and runs a view's query (filters, formulas, search, sort, groups, summaries). Plan and phases: `plans/Bases Plan.md`.
+
+- **Text ↔ base:** `Bases/Base.vue` parses the text once; toolbar edits go through the library's edit functions and come back as the text Obsidian would write, written only when something changes. A file that doesn't parse shows why and is never written. An empty file is Obsidian's default: one table view, "View", over every file.
+- **Context:** `createBaseContext` (`useBaseContext.ts`) is what the toolbar, menus and layouts share (`provide`d): the base, the shown view (never in the file), `commit`, the query result (a `computed`), the properties menus offer, and `this` (the base, or the note or canvas embedding it).
+- **Rows:** `useBaseHost` gives the library the workspace's files from the index (frontmatter, tags, links, backlinks), so a query re-runs when a file is created, edited, renamed or deleted. Bases read every file, not only notes.
+- **Writes to notes:** cell edits, kanban drops and New write frontmatter through `useNoteProperties` (YAML 1.2 core via the library's `readYaml`/`writeYaml`, as Obsidian), one Files undo step per edit (`editNotes`), and open tabs reload.
+- **Layouts:** `Table` (virtualized rows, column widths, summaries, selection and keyboard editing), `Cards`, `List`, `Kanban` and `Map` (`maplibre-gl`, OpenFreeMap tiles by default; its worker is set by URL so it loads under `tauri://`).
+- **Embeds:** `Bases/Embed.vue` takes each host's props: `![[x.base#View]]` (`.base` files in `SessionTab`'s link list, by full name), ` ```base ` blocks (`useActiveEditorCodeblockMappings`; edits rewrite the block) and canvas `.base` cards (`fileRenderers`). `SessionTab` provides `BASE_EMBED` (session, and its file as `this`). The editor unmounts embeds scrolled out of view, so their shown view and each file's text live in `useState`.
+- **Commands:** while a base is open, the palette's Bases group has Add view, Switch view, Copy table and Add item (`registerBaseCommands`); in a note, Insert new base (an empty `Untitled.base` at the root, embedded at the cursor through the editor dispatcher's `editor.insertBlock`). New Base: File menu, Files' row and empty-space menus, the palette.
+- **Links:** the index doesn't read `.base` files, so links in their filters or formulas make no backlinks; Obsidian doesn't count them either.
+- **Strings:** `app.editor.ui.bases.*` in en and zh-CN.
+
 ---
 
 ## Window Model

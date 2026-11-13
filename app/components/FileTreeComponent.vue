@@ -3,7 +3,7 @@ import {StateKey} from "#shared/constants/app";
 import type {TreeItem, TreeProps, ContextMenuItem} from '@nuxt/ui';
 import type {UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
-import {fileNameFromPath, getFileExtensionFromPath, isCanvasFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isCanvasFile, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import {invoke, isTauri} from "@tauri-apps/api/core"
 import {platform} from "@tauri-apps/plugin-os"
@@ -58,6 +58,7 @@ const formattedTreeData = computed<TreeItem[]>(() => {
         const icon = isPropertiesFile(node.fileName) ? 'i-lucide-file-cog'
             : isWorkflowFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-workflow'
             : isCanvasFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-layout-dashboard'
+            : isBasesFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-table'
             : node.icon
         const item: TreeItem = {
             id: node.uuid,
@@ -664,7 +665,7 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
             {label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', children: newAt(false, t('app.editor.ui.filetree.newMarkdownFile'))},
             {label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-file-plus', children: newAt(true, t('app.editor.ui.filetree.newFolder'))},
             {label: t('app.editor.ui.filetree.newCanvas'), icon: 'i-lucide-layout-dashboard', children: newAt(false, t('app.editor.ui.filetree.newCanvas'), 'canvas')},
-            {label: t('app.editor.ui.filetree.newBase'), icon: 'i-lucide-file-plus', disabled: true}, // not implemented yet
+            {label: t('app.editor.ui.filetree.newBase'), icon: 'i-lucide-table', children: newAt(false, t('app.editor.ui.filetree.newBase'), 'base')},
             {label: t('app.editor.ui.filetree.newWorkflow'), icon: 'i-lucide-workflow', children: newAt(false, t('app.editor.ui.filetree.newWorkflow'), 'workflow')},
             {
                 label: t('app.editor.ui.filetree.newOpenFolderProperties'),
