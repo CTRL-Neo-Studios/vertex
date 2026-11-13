@@ -542,6 +542,26 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         await updateIndex(path, content)
     }
 
+    /**
+     * Writes new text into notes (a base's property edits) as one undo step named `label`; open tabs of those notes
+     * reload. Unchanged notes are skipped.
+     */
+    async function editNotes(edits: { uuid: string, text: string }[], label: string) {
+        const change = newChange()
+        for (const {uuid, text} of edits) {
+            const note = getFileByUuid(uuid)
+            if (!note) continue
+            const before = await readTextFile(note.fullPath)
+            if (before === text) continue
+            markSelfWrite(note.fullPath)
+            await writeTextFile(note.fullPath, text)
+            await updateIndex(note.fullPath, text)
+            notifyModified(note.fullPath)
+            change.notes.push({uuid, before, after: text})
+        }
+        remember(change, label)
+    }
+
     /** The workspace folder at `relative` (`''`: the top level), created and indexed if missing. Returns its full path. */
     async function ensureFolder(relative: string) {
         const root = session!.rootPath!
@@ -556,5 +576,5 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         return path
     }
 
-    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
+    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
 }

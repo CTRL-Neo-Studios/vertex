@@ -21,10 +21,12 @@ const query = ref('')
 /** The property whose page is shown. */
 const editing = ref<string | null>(null)
 const adding = ref(false)
+// Opening starts on the list, or on the page "Edit property…" asked for (`ctx.propertyPage`).
 watch(open, (value) => {
     if (!value) return
     query.value = ''
-    editing.value = null
+    editing.value = ctx.propertyPage.value === null ? null : bareId(ctx.propertyPage.value)
+    ctx.propertyPage.value = null
     adding.value = false
 })
 

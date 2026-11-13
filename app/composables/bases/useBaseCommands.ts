@@ -3,6 +3,7 @@ import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {BaseContext} from "~/composables/bases/useBaseContext";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {tableCells, toTsv} from "~/utils/basesTable";
+import {afterOverlaysClose} from "~/utils/overlays";
 
 /** The base open in this window's tab (set while its `BasesViewer` is mounted), for the palette's Bases commands. */
 const active = shallowRef<BaseContext | null>(null)
@@ -33,12 +34,7 @@ export function useCopyTable() {
 export function useBaseCommandItems() {
     const {t} = useI18n()
     const copyTable = useCopyTable()
-    // The palette closes after a pick and, once its dialog is gone, gives focus back to its trigger: a menu opened
-    // before that closes on the focus change. Wait for the dialog to go (at most a second), then a frame.
-    async function openMenu(ctx: BaseContext, menu: string) {
-        for (let i = 0; i < 20 && document.querySelector('[role="dialog"]'); i++) await new Promise(r => setTimeout(r, 50))
-        requestAnimationFrame(() => ctx.open.value = menu)
-    }
+    const openMenu = (ctx: BaseContext, menu: string) => afterOverlaysClose(() => ctx.open.value = menu)
     return computed<CommandPaletteItem[]>(() => {
         const ctx = active.value
         if (!ctx) return []

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types";
-import type {TableColumn} from "@nuxt/ui";
-import {parseBase, stringifyBase, toDisplay, type Base, type RowScope} from "@type32/obsidian-bases-parser";
+import {parseBase, stringifyBase, type Base} from "@type32/obsidian-bases-parser";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {registerBaseCommands} from "~/composables/bases/useBaseCommands";
 import {BASE_CONTEXT, createBaseContext} from "~/composables/bases/useBaseContext";
@@ -57,25 +56,6 @@ registerBaseCommands(ctx)
 
 const LAYOUTS = ['table', 'cards', 'list', 'kanban', 'map']
 const unknownType = computed(() => (LAYOUTS.includes(ctx.view.value.type) ? null : ctx.view.value.type))
-
-const columns = computed<TableColumn<RowScope>[]>(() => (ctx.view.value.order ?? ['file.name']).map(id => ({
-    id,
-    header: ctx.property(id).label,
-    accessorFn: (row) => {
-        const value = row.property(id)
-        return value.type === 'Null' ? '' : toDisplay(value)
-    },
-})))
-
-// Stable objects: a new one on each render (inline in the template) re-renders the table, and its virtualizer then
-// re-estimates every row (Nuxt UI recomputes its options per row).
-const TABLE_VIRTUALIZE = {estimateSize: 37}
-const TABLE_WATCH = {deep: false}
-const TABLE_UI = {
-    thead: 'backdrop-blur-xs bg-linear-to-t from-transparent to-default',
-    td: 'py-1',
-    th: 'py-2 pt-0 text-xs',
-}
 </script>
 
 <template>
@@ -97,17 +77,8 @@ const TABLE_UI = {
             <div v-if="unknownType !== null" class="p-6 text-sm text-muted">
                 {{ t('app.editor.ui.bases.unknownViewType', {type: unknownType}) }}
             </div>
-            <!-- ponytail: every known layout shows as this table until V2–V5 build them. -->
-            <UTable
-                v-else
-                sticky
-                :columns="columns"
-                :data="ctx.result.value.rows"
-                class="flex-1 min-h-0"
-                :virtualize="TABLE_VIRTUALIZE"
-                :watch-options="TABLE_WATCH"
-                :ui="TABLE_UI"
-            />
+            <!-- ponytail: cards, list, kanban and map show as a table until V3–V5 build them. -->
+            <ViewerEditorBasesTable v-else/>
         </div>
     </ViewerEditorLayoutWrapper>
 </template>

@@ -484,10 +484,44 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - **Selection and keyboard** follow Obsidian's table keys (`bases-docs.md` §7.1): copy/paste cells, select row, column or all, Tab, Home/End, Esc, and Backspace to clear values.
 - **Groups:** a heading (`status doing`) with that group's summary row on top. The grand-total summary row is at the bottom. Clicking a summary cell adds a summary for that column. Headings fold per tab (moved from V1).
 
+### As built
+- **Observed first** (Obsidian 1.15.1, probe `zz-v2` with every value type, grouped with a Sum; Kthalatir Entries):
+  - Rows are 30 / 60 / 120 / 240 px for short / medium / tall / extra; the header, group headings and summary rows are 30 px.
+  - Obsidian windows rows and columns. A note property's cell is a live editor widget (text, number, checkbox, date, datetime, tag and list pills, links); formula and file cells are rendered values. A non-note row's note-property cells are empty and disabled.
+  - A mismatched value (`n: abc` in a number column) just shows as text: no orange. There's no third checkbox state.
+  - **Widths:** stored widths are exact. Unsized columns fit their content (40–300 px), but Obsidian also caches widths in memory (a `status` width removed from the file stayed at 120), so those aren't reproducible.
+  - **Header menu:** Hide column, Summarize..., Group by this property (not for file properties), Sort A → Z, Sort Z → A (those labels for every type), Clear sort (when sorted), Edit property... / Edit formula..., Property type. There's no "Resize column…" or "Reset column size", so the plan's two items were dropped.
+  - **Summaries:** the picker lists fitting summaries alphabetically with their values: numbers get Average…Unique, dates Earliest/Latest/Range, booleans Checked/Unchecked, everything else Empty/Filled/Unique. Then "Add summary".
+  - **Summary rows:** only when the view has summaries. A group's row sits under its heading and the totals are a footer; a cell shows its name (truncated "S…") and the value on the right, "Empty" for none, and "Summary" on hover.
+  - Headings read "status **done**", and fold.
+- **Grid** (`Bases/Table.vue`, with pure layout in `app/utils/basesGrid.ts` and a test):
+  - a sticky header, windowed rows over a flat line list (headings, summary rows, rows), and a sticky totals row;
+  - widths from `columnSize`, the column being resized, or fitted with a canvas over up to 1,000 rows, counting the header for file and note properties but not formulas;
+  - selection (anchor and focus) with Obsidian's keys: copy (TSV), paste (from the focused cell, into note properties only), Backspace clears, ⌘Z / ⌘⇧Z, ⌘A (the group), Shift+Space (row), Ctrl+Space (column), Enter (edit, toggle a checkbox, or open a formula's editor through `ctx.propertyPage`), Tab / Shift+Tab, arrows, Shift and Ctrl+Shift arrows, Home/End, PageUp/PageDown, Esc;
+  - group folds in the tab; a mousedown that selects keeps the focus on the table.
+  - `ponytail:` columns aren't windowed.
+- **Pieces** (parallel tasks, integrated and fixed in the browser):
+  - `TableHeader.vue`: icon, label, sort chevron, click to sort, drag to reorder, the resize handle, and the context menu.
+  - `TableCell.vue` and `app/utils/basesCells.ts` (with a test): rendering per type and inline editors by kind. Tags are accent pills, numbers sit right, HTML is sanitized with `xss` (now a direct dependency), and links and URLs open.
+  - `SummaryCell.vue`, `SummaryPicker.vue` and `app/utils/basesSummaries.ts` (with a test): the picker, "Add summary", and picking the current one again removes it [inferred].
+- **Note writes** (`useNoteProperties`): one undo step per change in the workspace's files history, via the new `editNotes` in `useActiveWorkspaceTools`; open tabs reload. The frontmatter is read and written with the library's newly exported `readYaml` / `writeYaml`. The editor's YAML 1.1 reader, which `setFrontmatterProperty` used, turned `due: 2026-02-03` into `2026-02-03T00:00:00.000Z` and quoted the key `n`.
+  - **Not fixed:** workflows still write frontmatter through that reader, so their property edits have the same date bug. It's a separate fix.
+- **Library:** `readYaml` and `writeYaml` exported, with README and `llms.txt` lines; part of the pending 0.5.1.
+- **Menus from menus:** `app/utils/overlays.ts` (`afterOverlaysClose`) opens a popover only once a closing menu or palette has handed focus back. The header's Summarize... and the palette commands use it.
+- **Not done:**
+  - Hover previews: decided with the user to do them app-wide later.
+  - Property type.
+  - Obsidian's cached unsized widths, and a "Summary" button in the footer's first cell.
+
 ### Acceptance
-- [ ] Kthalatir Entries' All Entries matches Obsidian's screenshot: column order, widths, display names ("Last Time of Edit"), humanized formulas, backlinks as links, and 213 rows.
-- [ ] The probe base's grouped view matches (headings, Sum 5 / Sum 2 / total 7, tall rows).
-- [ ] A status cell edited in Vertex is written to the note's frontmatter and the row re-sorts. Obsidian shows the new value.
+- [x] Kthalatir Entries' All Entries, in a browser against the dev server with Tauri stubbed and a snapshot of the real test vault, against Obsidian's screenshot at the same size:
+  - the same 213 rows in the same order and the same column order;
+  - the four stored widths exact (361 / 127 / 150 / 762); unsized ones fitted (file path, folder and backlinks 300 as in Obsidian; the formulas within ~10 px, or Obsidian's cached 138);
+  - "Last Time of Edit", humanized formulas ("a year", "2 months"), backlinks as links, and the same dates.
+- [x] The grouped probe matches Obsidian's screenshot: headings (status done / todo / None), the group Sums (2, 1, "Empty"), the total (Sum 3), and 120 px rows. Summarize... on `done` lists Obsidian's values (Empty 1, Filled 3, Unique 4); picking writes `done: Filled`.
+- [x] A status cell edited in Vertex (C: todo → done; B: done → review) is written to the note with only that key changed, and the rows regroup. Obsidian, given exactly those files, shows the new values and groups, and its metadata keeps `due: 2026-02-03` and `n: 2`.
+  - Also through the UI: copy (`todo\t1`), Backspace (`text:`), undo, paste, Enter on a formula ("Edit dur"), header sort and resize (`note.status: 128`), and folding.
+  - 257 Vertex tests and the library's 2486 pass; `typecheck` and `lint` pass. SMOKE row 113; unverified in `tauri dev`.
 
 ## V3: Cards and list
 

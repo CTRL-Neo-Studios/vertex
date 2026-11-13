@@ -26,6 +26,8 @@ export interface BaseContext {
      * `results`, `sort`, `group`, `filter`, `properties`, `new`. Commands open them through it.
      */
     open: Ref<string | null>
+    /** A property whose page the Properties menu opens on (with `open` set to `properties`): "Edit property…". */
+    propertyPage: Ref<string | null>
     result: ComputedRef<QueryResult>
     /** Every property a menu offers: file properties, formulas, then the workspace's note properties. */
     properties: ComputedRef<BaseProperty[]>
@@ -90,6 +92,7 @@ export function createBaseContext(options: {
     const view = computed(() => base.value.views?.find(v => v.name === viewName.value) ?? base.value.views?.[0] ?? {type: 'table', name: ''})
     const search = ref('')
     const open = ref<string | null>(null)
+    const propertyPage = ref<string | null>(null)
     const searchTerm = refDebounced(search, 200)
     const result = computed(() => runQuery(base.value, view.value.name, {host, paths: paths.value, now: Date.now(), thisPath, search: searchTerm.value}))
 
@@ -142,5 +145,5 @@ export function createBaseContext(options: {
         ...[...noteKinds.value.keys()].sort((a, b) => a.localeCompare(b)).map(property),
     ])
 
-    return {base, viewName, view, commit: options.commit, search, open, result, properties, property, host, paths, thisPath, session}
+    return {base, viewName, view, commit: options.commit, search, open, propertyPage, result, properties, property, host, paths, thisPath, session}
 }
