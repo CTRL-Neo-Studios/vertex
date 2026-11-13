@@ -27,7 +27,7 @@
         "@tauri-apps/plugin-updater": "~2.14.1",
         "@tiptap/extension-collaboration": "^3.33.1",
         "@tiptap/extension-node-range": "^3.33.1",
-        "@type32/codemirror-rich-obsidian-editor": "^0.3.8",
+        "@type32/codemirror-rich-obsidian-editor": "^0.3.9",
         "@type32/dispatcher": "^0.1.2",
         "@type32/jsoncanvas-editor": "^0.1.2",
         "@type32/latex2vue": "^3.1.18",
@@ -947,7 +947,7 @@
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.4", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="],
 
-    "@type32/codemirror-rich-obsidian-editor": ["@type32/codemirror-rich-obsidian-editor@0.3.8", "", { "dependencies": { "@catppuccin/codemirror": "^1.0.3", "@nuxt/kit": "^4.6.4", "alfaaz": "^1.1.0", "diff": "^9.0.0", "js-yaml": "^5.5.0", "lezer-markdown-obsidian": "^0.0.3", "markdown-it": "^15.0.3", "markdown-it-obsidian-callouts": "^0.3.5" }, "peerDependencies": { "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/vue": "^4.0.0", "@codemirror/autocomplete": "^6.20.0", "@codemirror/commands": "^6.11.1", "@codemirror/lang-markdown": "^6.5.0", "@codemirror/language": "^6.12.2", "@codemirror/language-data": "^6.5.2", "@codemirror/lint": "^6.9.7", "@codemirror/search": "^6.7.2", "@codemirror/state": "^6.5.4", "@codemirror/view": "^6.0.0", "@lezer/common": "^1.0.0", "@lezer/highlight": "^1.2.5", "@lezer/markdown": "^1.6.3", "@nuxt/ui": "^4.12.0", "ai": "^7.0.0", "codemirror": "^6.0.2", "katex": "^0.16.33", "tailwindcss": "^4.2.1", "vue-codemirror6": "^1.4.2" }, "optionalPeers": ["@ai-sdk/openai-compatible", "@ai-sdk/vue", "ai", "katex"] }, "sha512-hEqbX3CofSZIB0W8ZI1mT/Ss5Jm/ylSOPReAsSYZxVhfzDAhBpM9IV4oBfI11+PqAVT1WQp1U2ZkxuvTt0TpPg=="],
+    "@type32/codemirror-rich-obsidian-editor": ["@type32/codemirror-rich-obsidian-editor@0.3.9", "", { "dependencies": { "@catppuccin/codemirror": "^1.0.3", "@nuxt/kit": "^4.6.4", "alfaaz": "^1.1.0", "diff": "^9.0.0", "js-yaml": "^5.5.0", "lezer-markdown-obsidian": "^0.0.3", "markdown-it": "^15.0.3", "markdown-it-obsidian-callouts": "^0.3.5" }, "peerDependencies": { "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/vue": "^4.0.0", "@codemirror/autocomplete": "^6.20.0", "@codemirror/commands": "^6.11.1", "@codemirror/lang-markdown": "^6.5.0", "@codemirror/language": "^6.12.2", "@codemirror/language-data": "^6.5.2", "@codemirror/lint": "^6.9.7", "@codemirror/search": "^6.7.2", "@codemirror/state": "^6.5.4", "@codemirror/view": "^6.0.0", "@lezer/common": "^1.0.0", "@lezer/highlight": "^1.2.5", "@lezer/markdown": "^1.6.3", "@nuxt/ui": "^4.12.0", "ai": "^7.0.0", "codemirror": "^6.0.2", "katex": "^0.16.33", "tailwindcss": "^4.2.1", "vue-codemirror6": "^1.4.2" }, "optionalPeers": ["@ai-sdk/openai-compatible", "@ai-sdk/vue", "ai", "katex"] }, "sha512-1Ax0s6WGCyLCCt67u3x+u1wq6rQovj6hXkoTpHNPwTfe6MyL7NmaTGOTwqgUR11X1bU3JngoPD3u8vS8fRohGw=="],
 
     "@type32/dispatcher": ["@type32/dispatcher@0.1.2", "", { "dependencies": { "@nuxt/kit": "^4.2.2", "mitt": "^3.0.1" } }, "sha512-jN/r9L7CkwLi/HkK5fJ7ant8WmC3HbZq2K95/SB7FN97yU/wC7wOakLpmLzP/aKVORHbweTGw/UDjhvEbjcipA=="],
 
