@@ -346,8 +346,18 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 ### Change
 - `proseInternalLinkCodemirrorViewPlugin.ts` passes `subpath` (without `#`) to embed components as it already passes `display`. Release `0.3.8` (the user publishes).
 
+### As built
+- `proseInternalLinkCodemirrorViewPlugin.ts`: an embed's component also gets `subpath`, the text after `#` (`View` for `![[x.base#View]]`). It's absent when the link has no `#`. A changed subpath remounts the embed, because the widget compares props.
+- The `embedComponent` doc comment in `editor-types.d.ts` lists the props a component receives: `linkData`, `filePath`, `subpath`, `display` and `componentProps`.
+- **To release** (the user): `bun run release` (changelogen picks `0.3.8` from the `feat:` commit).
+
 ### Acceptance
-- [ ] `![[x.base#View]]` mounts the embed with `subpath: "View"`; `![[x.png]]` is unchanged.
+- [x] A throwaway test read the props of the plugin's widgets:
+  - `![[x.base#View]]` → `{filePath: 'x.base', subpath: 'View'}`;
+  - `![[x.base#My view|Alias]]` → `subpath: 'My view'`, `display: 'Alias'`;
+  - `![[x.png]]` and `![[x.png|300]]` → unchanged (no `subpath`).
+- [x] Tests (62) and `vue-tsc` pass. The repo has no ESLint config, so `lint` doesn't run.
+- [ ] Published as `0.3.8`.
 
 ## V0: Rows from the index
 
