@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
-import {MESSAGES, type CanvasError, type CanvasMessages} from "@type32/jsoncanvas-editor/vue"
+import {MESSAGES, type CanvasError, type CanvasMessages, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
 import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
 import {defaultAppCanvasConfig} from "#shared/utils/defaults/apps"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
@@ -10,6 +10,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator"
 import {useSettingsScope} from "~/composables/app/useSettingsScope"
 import {useCanvasHost} from "~/composables/canvas/useCanvasHost"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
+import {ViewerEditorBasesEmbed} from "#components"
 
 /**
  * A `.canvas` file (JSON Canvas, as Obsidian writes it), edited with `@type32/jsoncanvas-editor` (workspace mode
@@ -36,6 +37,9 @@ const {openTab} = useActiveTabs(session)
 const $navi = useAppNavigator()
 const scope = useSettingsScope()
 const host = useCanvasHost(session, () => props.filePath && `${session.rootPath}/${props.filePath}`)
+// `.base` cards show the base (its `#View`), with the canvas as `this`.
+// It takes `node` and leaves `file` and `host` as attributes.
+const fileRenderers: FileRenderers = {base: ViewerEditorBasesEmbed as FileRenderers[string]}
 const editor = useTemplateRef<{ refreshFiles: (paths?: string[]) => void }>('editor')
 
 function read(text: string): { canvas?: CanvasDocument, problem?: string } {
@@ -139,6 +143,7 @@ onBeforeUnmount(unsubscribe)
                 :mod-drag-behavior="config.modDragBehavior"
                 :card-labels="config.cardLabels"
                 :zoom-breakpoint="config.zoomBreakpoint"
+                :file-renderers="fileRenderers"
                 @error="onError"
             >
                 <template #text-editor="{text, update, done}">

@@ -12,10 +12,10 @@ export interface BaseProperty {
     icon: string
 }
 
-/** What the viewer shares with its toolbar, menus and layouts (`provide`d by `BasesViewer`). */
+/** What a base shares with its toolbar, menus and layouts (`provide`d by `Bases/Base.vue`). */
 export interface BaseContext {
     base: ShallowRef<Base>
-    /** The tab's view (its name lives in the tab, never in the file). */
+    /** The view shown (its name lives in the tab or the embed, never in the file). */
     viewName: Ref<string>
     view: ComputedRef<BaseView>
     /** Applies an edit (the library's `edit` functions); the tab saves the file. */
@@ -38,7 +38,7 @@ export interface BaseContext {
     host: BaseHost
     /** Every file the query runs over (workspace-relative paths). */
     paths: ComputedRef<string[]>
-    /** Workspace-relative path of the base (`this`). */
+    /** Workspace-relative path of `this`: the base, or the note or canvas embedding it. */
     thisPath: string
     session: ActiveSession
 }
@@ -47,9 +47,12 @@ export const BASE_CONTEXT: InjectionKey<BaseContext> = Symbol('bases')
 
 export function useBaseContext(): BaseContext {
     const context = inject(BASE_CONTEXT)
-    if (!context) throw new Error('useBaseContext() outside a BasesViewer')
+    if (!context) throw new Error('useBaseContext() outside a base')
     return context
 }
+
+/** What a tab gives the bases embedded in it (`![[x.base]]`, ` ```base `, canvas cards): its session and file (`this`). */
+export const BASE_EMBED: InjectionKey<{ session: ActiveSession, thisPath: () => string }> = Symbol('bases-embed')
 
 /** In the order Obsidian's property pickers list them. */
 export const FILE_PROPERTIES = ['name', 'basename', 'fullname', 'path', 'folder', 'ext', 'ctime', 'mtime', 'size', 'links', 'embeds', 'tags', 'backlinks'] as const
@@ -87,10 +90,12 @@ export function createBaseContext(options: {
     paths: ComputedRef<string[]>
     thisPath: string
     session: ActiveSession
+    /** The shown view's name, when its owner keeps it (an embed redrawn after its own edit). */
+    viewName?: Ref<string>
 }): BaseContext {
     const {base, host, paths, thisPath, session} = options
     const {t} = useI18n()
-    const viewName = ref('')
+    const viewName = options.viewName ?? ref('')
     const view = computed(() => base.value.views?.find(v => v.name === viewName.value) ?? base.value.views?.[0] ?? {type: 'table', name: ''})
     const search = ref('')
     const open = ref<string | null>(null)

@@ -6,8 +6,8 @@ import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsid
 import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit"
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {SessionMode} from "#shared/constants/app";
-import {fileNameFromPath, getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
-import {EditorProseEmbedImageDisplay} from "#components";
+import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
+import {EditorProseEmbedImageDisplay, ViewerEditorBasesEmbed} from "#components";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
@@ -16,6 +16,7 @@ import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEd
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import {BASE_EMBED} from "~/composables/bases/useBaseContext";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -59,6 +60,8 @@ const editorRef = ref()
 const INVALID_CHARS = /[\\/:*?"<>|]/
 
 watch(isContentSaved, v => setTabSavedState(tabId, v))
+// Bases embedded in this file (`![[x.base]]`, ` ```base `, canvas cards) query this workspace, with this file as `this`.
+if (mode === 'workspace') provide(BASE_EMBED, {session: session!, thisPath: () => file.value?.relativePath ?? ''})
 
 const internalLinkList = computed<InternalLink[]>(() => {
     if (mode !== 'workspace') return []
@@ -71,6 +74,8 @@ const internalLinkList = computed<InternalLink[]>(() => {
             embedComponent: EditorProseEmbedImageDisplay,
             componentProps: {srcPath: convertFileSrc(f.fullPath), display: name},
         } satisfies InternalLink]
+        // Linked by their full name, as Obsidian links files other than notes (`![[x.base#View]]`).
+        if (isBasesFile(ext)) return [{name: f.fileName, filePath: f.relativePath, referenceId: f.uuid, embedComponent: ViewerEditorBasesEmbed} satisfies InternalLink]
         return []
     })
 })

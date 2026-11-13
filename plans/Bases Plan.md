@@ -661,9 +661,38 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
 - **Canvas:** a `fileRenderers.base` entry for `JsonCanvas` reusing the embed component.
 - **Shared component:** `BaseEmbed.vue` takes `{source: path | text, view?, thisPath}` and is used by all three.
 
+### As built
+- **Observed first** (Obsidian 1.15.1; probe `zz-v6`: A todo, B doing, C, and `Host.md` with `status: todo` containing `![[Probe.base#K]]`, `![[Probe.base]]` and a ` ```base ` block; `Cv.canvas` with `Probe.base` cards, one with `subpath: "#K"`; a `formula.me: this.file.name` column):
+  - **Every embed:** shows the full toolbar.
+  - **`this`:** the embedding note (`me` = Host, and Host is counted: K has 4 results), or the canvas on a canvas (`me` = Cv.canvas).
+  - **Views:** `#K` and a card's `subpath` pick the view; otherwise the first view.
+  - **Height:** embeds are content-height (table: 190 px for 4 rows, 250 for 6), kanban at least 500 px (`min-height`), maps `--bases-map-embed-height` (400 px) or `mapHeight`.
+  - **Writes:** a block's toolbar edit rewrites the block as the base's text followed by a blank line before the closing fence (keys re-ordered, `formulas` before `views`). An `![[x.base]]` edit writes `x.base`.
+- **`Bases/Base.vue`:** `BasesViewer`'s body (parse, commit, context, toolbar, layout), with `v-model` for the text and `v-model:view`. `embed: 'note'` sizes as Obsidian's embeds (so `mapHeight` now applies). `embed: 'card'` fills the card. Embeds skip the palette commands. `BasesViewer` is now the tab wrapper around it. `createBaseContext` takes an optional `viewName` ref.
+- **`Bases/Embed.vue`:** one component for the three hosts, taking each one's props:
+  - `linkData`/`subpath` for a note embed (the file, read and re-read on `modify`, written with `editNotes`: one undo step, open tabs reload);
+  - `codeContent` for a block;
+  - `node` for a canvas card.
+  - **`this` and session:** from `BASE_EMBED`, which `SessionTab` provides in workspace mode.
+  - **Width:** `contain: inline-size`, so a kanban's columns scroll inside instead of widening the note.
+  - **Block writes:** through CodeMirror. The block is found from the widget's DOM (`EditorView.findFromDOM`, `posAtDOM`, its fences), with no editor change. A write redraws the block, so the embed waits for the edit's handler (which may switch the view) and remembers the shown view by note and block position. Menus close on that redraw.
+- **Wiring:**
+  - `SessionTab` lists `.base` files as links by their full name (`Probe.base`, as Obsidian links non-notes), with `Embed` as the embed component;
+  - `useActiveEditorCodeblockMappings` maps `base` to `Embed`;
+  - `CanvasViewer` passes `fileRenderers: {base: Embed}`.
+
 ### Acceptance
-- [ ] A probe note with `![[Probe.base#K]]` and a ` ```base ` block matches Obsidian: kanban K with the note itself counted (4 results), and the inline table.
-- [ ] A canvas card of `Kthalatir Entries.base` shows its first view.
+- [x] `Host.md` in a browser against the dev server with Tauri stubbed on a snapshot of the real test vault:
+  - `![[Probe.base#K]]` is kanban K with 4 results (None C, doing B, todo A and Host), 538 px high against Obsidian's 540;
+  - `![[Probe.base]]` is table T, 4 rows with `me` = Host (188 against 190);
+  - the ` ```base ` block is the Inline table with 6 rows (248 against 250).
+- [x] **Writes:**
+  - a header click in the block rewrote it in Obsidian's format;
+  - the same in `![[Probe.base]]` wrote `Probe.base`;
+  - typing in an embed's Search stays in the input (nothing reaches the note);
+  - adding a cards view in the block wrote it, and the redrawn block shows the new view.
+- [x] **Canvas:** `Cv.canvas` shows T (`me` = Cv.canvas), K for the `#K` card, and a `Kthalatir Entries.base` card on its first view, All Entries (213 results).
+- [x] 261 tests pass; `typecheck` and `lint` pass. SMOKE row 117; `tauri dev` unverified.
 
 ## V7: Wiring and docs
 
