@@ -32,7 +32,7 @@
         "@type32/jsoncanvas-editor": "^0.1.2",
         "@type32/latex2vue": "^3.1.18",
         "@type32/nuxt-predicates": "^1.1.0",
-        "@type32/obsidian-bases-parser": "^0.4.0",
+        "@type32/obsidian-bases-parser": "^0.5.0",
         "@type32/workflows": "^0.1.3",
         "@type32/yaml-editor-form": "0.2.4",
         "@vue-flow/core": "^1.48.2",
@@ -937,7 +937,7 @@
 
     "@type32/nuxt-predicates": ["@type32/nuxt-predicates@1.1.0", "", { "dependencies": { "@nuxt/kit": "^4.2.2" } }, "sha512-ATm2t0tFWKXTnrBBzN/du70pIGdxfWs8uDmFytcy57QtbZNkSrsBPVm9dHH1TfXPsOak2Isz5ZYavjP688xEmQ=="],
 
-    "@type32/obsidian-bases-parser": ["@type32/obsidian-bases-parser@0.4.0", "", { "dependencies": { "js-yaml": "^5.5.0" }, "peerDependencies": { "vue": "^3.5.0" } }, "sha512-9Wkv484FzFILagn23qoEGU8h+/smsY3dSVtxcE6ugHi1+ypFUcSniikDlbCvMynVcVaIB1x/1uos2Tp2hPaYHQ=="],
+    "@type32/obsidian-bases-parser": ["@type32/obsidian-bases-parser@0.5.0", "", { "dependencies": { "dayjs": "^1.11.23", "js-yaml": "^5.5.0" } }, "sha512-4KKWhVMuzrdES89i2AGIiwxjFnzIt5LLWKcmXDtJYyIWrS4Y/3cSixbHO9QpI5BrRvoY8ImcpnLRXm8w708/XA=="],
 
     "@type32/workflows": ["@type32/workflows@0.1.3", "", { "peerDependencies": { "@nuxt/ui": "^4.12.0", "@vue-flow/core": "^1.48.2", "typescript": ">=6.0.3", "vue": "^3.5.0" }, "optionalPeers": ["@nuxt/ui", "@vue-flow/core", "typescript", "vue"] }, "sha512-hZQT6GZnsJKWTrX+96dIFCZo2Zmw4LVG+T4b63rjwr4pRV2qOr/CGB0U94Xrtm/elnIQNQwGe0ua+JYLCDQMbQ=="],
 
@@ -1304,6 +1304,8 @@
     "d3-transition": ["d3-transition@3.0.2", "", { "dependencies": { "d3-color": "1 - 3", "d3-dispatch": "1 - 3", "d3-ease": "1 - 3", "d3-interpolate": "1 - 3", "d3-timer": "1 - 3" }, "peerDependencies": { "d3-selection": "2 - 3" } }, "sha512-RcjCsdFgyFoDB+QXLC5m60ZkTN0k9zH+ovoLlTdJnDS1AbfbcuowiM4pCKSTOclNibS4f4J4cbv2m7O7y8NTOQ=="],
 
     "d3-zoom": ["d3-zoom@3.0.1", "", { "dependencies": { "d3-dispatch": "1 - 3", "d3-drag": "2 - 3", "d3-interpolate": "1 - 3", "d3-selection": "2 - 3", "d3-transition": "2 - 3" } }, "sha512-kfjD3BDQu/FOatpZ6JdMSyIoDwTxIpI29ySTI2J5ZlDaH1WbuJGQJ2Q9oJkWTEZEW98j6idezoomSD3Cn2zwiw=="],
+
+    "dayjs": ["dayjs@1.11.23", "", {}, "sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ=="],
 
     "db0": ["db0@0.3.4", "", { "peerDependencies": { "@electric-sql/pglite": "*", "@libsql/client": "*", "better-sqlite3": "*", "drizzle-orm": "*", "mysql2": "*", "sqlite3": "*" }, "optionalPeers": ["@electric-sql/pglite", "@libsql/client", "better-sqlite3", "drizzle-orm", "mysql2", "sqlite3"] }, "sha512-RiXXi4WaNzPTHEOu8UPQKMooIbqOEyqA1t7Z6MsdxSCeb8iUC9ko3LcmsLmeUt2SM5bctfArZKkRQggKZz7JNw=="],
 
