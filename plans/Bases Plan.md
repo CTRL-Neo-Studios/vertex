@@ -675,7 +675,12 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - `node` for a canvas card.
   - **`this` and session:** from `BASE_EMBED`, which `SessionTab` provides in workspace mode.
   - **Width:** `contain: inline-size`, so a kanban's columns scroll inside instead of widening the note.
-  - **Block writes:** through CodeMirror. The block is found from the widget's DOM (`EditorView.findFromDOM`, `posAtDOM`, its fences), with no editor change. A write redraws the block, so the embed waits for the edit's handler (which may switch the view) and remembers the shown view by note and block position. Menus close on that redraw.
+  - **Block writes:** through CodeMirror. The block is found from the widget's DOM (`EditorView.findFromDOM`, `posAtDOM`, its fences), with no editor change. A write redraws the block, so the embed waits for the edit's handler (which may switch the view) and carries the shown view over to the block's new text. Menus close on that redraw.
+  - **Surviving redraws:** CodeMirror unmounts widgets scrolled out of view and mounts new ones on the way back, so an embed keeps nothing it needs in its own refs.
+    - The shown view lives in `useState('bases-embed-views')`, keyed by `this` plus the link and subpath, the card's id, or the block's text. Identical links or blocks in one note share it (`ponytail:`).
+    - Each file's last text lives in `useState('bases-embed-texts')`, so a remount draws at full height at once.
+    - Cards and kanban cards skip `content-visibility` in a note (`ctx.embed`). Its placeholder size (240 px a card) became the note's height on every remount, so CodeMirror re-anchored the scroll by thousands of pixels.
+  - **Editor fix** (`codemirror-rich-obsidian`, `createProsePlugin.ts`, unreleased): prose decorations also rebuild when the parser gets further without a doc change. Before, a long note's embeds past the first few thousand characters never rendered until the note was edited. `test/prose-plugin.test.ts` fails without the fix.
 - **Wiring:**
   - `SessionTab` lists `.base` files as links by their full name (`Probe.base`, as Obsidian links non-notes), with `Embed` as the embed component;
   - `useActiveEditorCodeblockMappings` maps `base` to `Embed`;
@@ -692,7 +697,8 @@ Vertex phases may develop against the library's local build (as with Canvas: cop
   - typing in an embed's Search stays in the input (nothing reaches the note);
   - adding a cards view in the block wrote it, and the redrawn block shows the new view.
 - [x] **Canvas:** `Cv.canvas` shows T (`me` = Cv.canvas), K for the `#K` card, and a `Kthalatir Entries.base` card on its first view, All Entries (213 results).
-- [x] 261 tests pass; `typecheck` and `lint` pass. SMOKE row 117; `tauri dev` unverified.
+- [x] **Scrolling a long note** (an embed 5891 px tall, switched to its second view, scrolled until unmounted, then back): it returns on that view with no jump, for both `![[Probe.base]]` and a ` ```base ` block. Before the fix it came back on the first view, and `scrollTop` leapt from 11966 to 39583. Adding a view in the block keeps the new view after the rewrite.
+- [x] 261 tests pass; `typecheck` and `lint` pass. Editor library: 63 tests and `vue-tsc` pass. SMOKE row 117; `tauri dev` unverified.
 
 ## V7: Wiring and docs
 

@@ -19,12 +19,14 @@ const cardSize = computed(() => (typeof view.value.cardSize === 'number' ? view.
                 :class="{'pb-3 mb-3 border-b border-default': view.groupBy}"
                 :style="{gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize}px, 1fr))`}"
             >
-                <!-- content-visibility lets the browser skip laying out cards far off screen. -->
+                <!-- content-visibility lets the browser skip laying out cards far off screen; not in a note, whose height
+                     would follow the placeholder size each time the editor redraws the embed. -->
                 <ViewerEditorBasesCard
                     v-for="row in group.rows"
                     :key="row.path"
                     :row="row"
-                    class="pb-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_240px]"
+                    class="pb-0.5"
+                    :class="{'[content-visibility:auto] [contain-intrinsic-size:auto_240px]': ctx.embed !== 'note'}"
                 />
             </div>
         </template>

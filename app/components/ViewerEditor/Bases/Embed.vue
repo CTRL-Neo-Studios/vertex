@@ -12,13 +12,17 @@ import {BASE_EMBED} from "~/composables/bases/useBaseContext";
  * - a ` ```base ` block (`codeContent`): the block's YAML, its edits written into the block;
  * - a canvas file card (`node`, its `subpath` `#View`): the file, filling the card.
  * `this` is the tab's file (the note or the canvas), from `BASE_EMBED`; without it (no workspace) nothing shows.
+ *
+ * The editor unmounts embeds scrolled out of view and remounts them on the way back (and a block after each edit it
+ * writes), so what must survive lives in `useState`: the shown view per embed, and each file's last text, which lets a
+ * remount draw at its full height at once instead of collapsing while the file is read.
  */
 defineOptions({inheritAttrs: false})
 const props = defineProps<{
     linkData?: InternalLink,
     subpath?: string,
     codeContent?: string,
-    node?: { file: string, subpath?: string },
+    node?: { id: string, file: string, subpath?: string },
 }>()
 
 const {t} = useI18n()
@@ -34,12 +38,13 @@ const file = computed(() => {
     return props.node ? $index.getFileByPath(`${embed.session.rootPath}/${props.node.file}`) : undefined
 })
 
-const text = ref<string | null>(inBlock ? props.codeContent! : null)
-const view = ref(props.subpath ?? props.node?.subpath?.replace(/^#/, '') ?? '')
+const texts = useState<Record<string, string>>('bases-embed-texts', () => ({}))
+const text = ref<string | null>(inBlock ? props.codeContent! : texts.value[file.value?.fullPath ?? ''] ?? null)
 
 // A file's text, read again when it changes on disk or in its tab.
 async function load() {
-    if (file.value) text.value = await readTextFile(file.value.fullPath)
+    const path = file.value?.fullPath
+    if (path) text.value = texts.value[path] = await readTextFile(path)
 }
 if (!inBlock) {
     watch(() => file.value?.fullPath, load, {immediate: true})
@@ -49,6 +54,18 @@ if (!inBlock) {
     onBeforeUnmount(() => unsubscribe?.())
 }
 
+// The shown view, by embed: a link by its target and subpath, a card by its id, a block by its text (moved to the new
+// text when the block is written).
+// ponytail: identical blocks (or links) in one note share their view; key by position if that ever matters.
+const views = useState<Record<string, string>>('bases-embed-views', () => ({}))
+const viewKey = computed(() => {
+    const here = embed?.thisPath() ?? ''
+    if (inBlock) return `${here}\n${text.value}`
+    return props.node ? `${here}#${props.node.id}` : `${here}#${props.linkData?.referenceId}#${props.subpath ?? ''}`
+})
+const view = ref(views.value[viewKey.value] ?? props.subpath ?? props.node?.subpath?.replace(/^#/, '') ?? '')
+watch(view, name => views.value[viewKey.value] = name)
+
 /** The block's editor and the position of its opening fence. */
 function blockPlace() {
     const widget = root.value?.closest<HTMLElement>('.vue-embed-widget')
@@ -56,19 +73,6 @@ function blockPlace() {
     const cm = editor ? EditorView.findFromDOM(editor) : null
     return cm && widget ? {cm, pos: cm.posAtDOM(widget)} : null
 }
-const blockKey = () => {
-    const place = blockPlace()
-    return place ? `${embed?.thisPath()}:${place.pos}` : null
-}
-// The widget mounts this before CodeMirror attaches it, which it does in the same update: look a moment later.
-onMounted(() => queueMicrotask(() => {
-    const key = inBlock ? blockKey() : null
-    if (key && blockViews.has(key)) view.value = blockViews.get(key)!
-}))
-watch(view, (name) => {
-    const key = inBlock ? blockKey() : null
-    if (key) blockViews.set(key, name)
-})
 
 /** Replaces the block's YAML, as Obsidian does: the base's text, then a blank line before the closing fence. */
 function writeBlock(next: string) {
@@ -88,12 +92,13 @@ function writeBlock(next: string) {
 }
 
 // Writing a block redraws it (a new embed), so it waits for the edit's handler to finish, which may still switch the
-// view; edits in the same tick go in one write.
+// view; edits in the same tick go in one write, and the view goes with the new text.
 let pending: string | null = null
 async function save(next: string) {
     text.value = next
     if (inBlock) {
         if (pending === null) void nextTick(() => {
+            views.value[viewKey.value] = view.value
             writeBlock(pending!)
             pending = null
         })
@@ -102,11 +107,6 @@ async function save(next: string) {
     }
     if (file.value && tools) await tools.editNotes([{uuid: file.value.uuid, text: next}], t('app.editor.ui.bases.editStep', {name: file.value.fileName}, 1))
 }
-</script>
-
-<script lang="ts">
-/** Code blocks' shown views, by note and block position: a block is drawn anew after each edit it writes. */
-const blockViews = new Map<string, string>()
 </script>
 
 <template>

@@ -43,7 +43,7 @@ function commit(next: Base) {
     text.value = out
 }
 
-const ctx = createBaseContext({base, commit, host, paths, thisPath: props.thisPath, session: props.session, viewName})
+const ctx = createBaseContext({base, commit, host, paths, thisPath: props.thisPath, session: props.session, viewName, embed: props.embed})
 provide(BASE_CONTEXT, ctx)
 if (!props.embed) registerBaseCommands(ctx)
 

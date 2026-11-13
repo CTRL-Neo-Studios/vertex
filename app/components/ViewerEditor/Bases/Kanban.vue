@@ -150,13 +150,15 @@ function menu(group: QueryGroup, index: number): ContextMenuItem[][] {
                 </div>
             </UContextMenu>
             <div class="flex-1 min-h-0 overflow-y-auto px-2 flex flex-col gap-2">
-                <!-- content-visibility lets the browser skip laying out cards far down a long column. -->
+                <!-- content-visibility lets the browser skip laying out cards far down a long column; not in a note (see
+                     Cards.vue). -->
                 <ViewerEditorBasesCard
                     v-for="row in group.rows"
                     :key="row.path"
                     :row="row"
                     :default-ratio="0.5"
-                    class="shrink-0 pb-2 [content-visibility:auto] [contain-intrinsic-size:auto_42px]"
+                    class="shrink-0 pb-2"
+                    :class="{'[content-visibility:auto] [contain-intrinsic-size:auto_42px]': ctx.embed !== 'note'}"
                     :draggable="movable"
                     @dragstart="(event: DragEvent) => event.dataTransfer?.setData(CARD, row.path)"
                 />

@@ -41,6 +41,11 @@ export interface BaseContext {
     /** Workspace-relative path of `this`: the base, or the note or canvas embedding it. */
     thisPath: string
     session: ActiveSession
+    /**
+     * Where the base is shown: its tab (undefined), a note (`note`: its height is the note's, so layouts size what they
+     * show exactly; the editor redraws embeds scrolled back into view and re-anchors on any change) or a canvas card.
+     */
+    embed?: 'note' | 'card'
 }
 
 export const BASE_CONTEXT: InjectionKey<BaseContext> = Symbol('bases')
@@ -92,8 +97,9 @@ export function createBaseContext(options: {
     session: ActiveSession
     /** The shown view's name, when its owner keeps it (an embed redrawn after its own edit). */
     viewName?: Ref<string>
+    embed?: 'note' | 'card'
 }): BaseContext {
-    const {base, host, paths, thisPath, session} = options
+    const {base, host, paths, thisPath, session, embed} = options
     const {t} = useI18n()
     const viewName = options.viewName ?? ref('')
     const view = computed(() => base.value.views?.find(v => v.name === viewName.value) ?? base.value.views?.[0] ?? {type: 'table', name: ''})
@@ -153,5 +159,5 @@ export function createBaseContext(options: {
         ...[...noteKinds.value.keys()].sort((a, b) => a.localeCompare(b)).map(property),
     ])
 
-    return {base, viewName, view, commit: options.commit, search, open, propertyPage, newItemPreset, result, properties, property, host, paths, thisPath, session}
+    return {base, viewName, view, commit: options.commit, search, open, propertyPage, newItemPreset, result, properties, property, host, paths, thisPath, session, embed}
 }
