@@ -1,6 +1,8 @@
 import type {ComputedRef, InjectionKey, Ref, ShallowRef} from "vue";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {fromFrontmatter, propertyKind, runQuery, type Base, type BaseHost, type BaseView, type PropertyKind, type QueryResult, type Value} from "@type32/obsidian-bases-parser";
+import {baseKind} from "#shared/utils/index/propertyTypes";
+import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 
 /** A property a menu can offer: `file.name`, `formula.x`, or a note property by its bare name (`status`). */
 export interface BaseProperty {
@@ -111,7 +113,8 @@ export function createBaseContext(options: {
     const result = computed(() => runQuery(base.value, view.value.name, {host, paths: paths.value, now: Date.now(), thisPath, search: searchTerm.value}))
 
     // Note properties across the workspace with the kind of their first value, as Obsidian infers types without
-    // `types.json`. Formulas take theirs from the view's rows.
+    // `types.json`; a stored type (`usePropertyTypes`) comes first. Formulas take theirs from the view's rows.
+    const propertyTypes = usePropertyTypes(session)
     const noteKinds = computed(() => {
         const kinds = new Map<string, PropertyKind | null>()
         for (const path of paths.value) {
@@ -149,7 +152,7 @@ export function createBaseContext(options: {
         if (bare.startsWith('formula.')) {
             return {id: bare, source: 'formula', label: typeof displayName === 'string' ? displayName : bare.slice(8), kind: formulaKinds.value.get(bare) ?? 'text', icon: 'i-lucide-square-function'}
         }
-        const kind = noteKinds.value.get(bare) ?? 'text'
+        const kind = baseKind(propertyTypes?.types.value[bare]) ?? noteKinds.value.get(bare) ?? 'text'
         return {id: bare, source: 'note', label: typeof displayName === 'string' ? displayName : bare, kind, icon: bare === 'tags' ? 'i-lucide-tags' : KIND_ICONS[kind]}
     }
 

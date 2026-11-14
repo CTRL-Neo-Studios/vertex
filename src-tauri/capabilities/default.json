@@ -124,6 +124,12 @@
 				},
 				{
 					"path": "**/.trash/**"
+				},
+				{
+					"path": "**/.vertex/types.json"
+				},
+				{
+					"path": "**/.obsidian/types.json"
 				}
 			]
 		},

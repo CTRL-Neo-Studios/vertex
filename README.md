@@ -1,5 +1,5 @@
 # Vertex
-![screenshot](alpha-screenshot.png)
+![screenshot](beta-screenshot.png)
 
 An OFM-compliant Markdown Editor built with Nuxt v4 + Nuxt UI v4 + Tauri v2.
 

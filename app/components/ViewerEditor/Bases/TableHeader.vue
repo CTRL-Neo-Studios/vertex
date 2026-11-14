@@ -2,6 +2,7 @@
 import type {ContextMenuItem} from "@nuxt/ui";
 import {setGroupBy, setOrder, setSort, toggleSort, type Base, type PropertyOrder, type RowScope} from "@type32/obsidian-bases-parser";
 import {useBaseContext} from "~/composables/bases/useBaseContext";
+import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 import {afterOverlaysClose} from "~/utils/overlays";
 
 /**
@@ -31,6 +32,31 @@ const sortBy = (dir: PropertyOrder['direction']) =>
 const summarizing = ref(false)
 const header = useTemplateRef<HTMLElement>('header')
 
+// Property type (note properties): Obsidian's choices, alphabetical by English name; the stored type, else the kind
+// the values give, is checked. Picking one saves it for the workspace, as Obsidian's `types.json`.
+const propertyTypes = usePropertyTypes(ctx.session)
+const TYPE_CHOICES = [
+    {type: 'checkbox', label: 'checkbox', icon: 'i-lucide-square-check'},
+    {type: 'date', label: 'date', icon: 'i-lucide-calendar'},
+    {type: 'datetime', label: 'datetime', icon: 'i-lucide-clock'},
+    {type: 'multitext', label: 'list', icon: 'i-lucide-list'},
+    {type: 'number', label: 'number', icon: 'i-lucide-binary'},
+    {type: 'text', label: 'text', icon: 'i-lucide-text'},
+] as const
+const KIND_TYPES: Record<string, string> = {text: 'text', list: 'multitext', number: 'number', checkbox: 'checkbox', date: 'date'}
+const currentType = computed(() => propertyTypes?.types.value[property.value.id] ?? KIND_TYPES[property.value.kind])
+const typeMenu = computed<ContextMenuItem[]>(() => (property.value.source !== 'note' || !propertyTypes ? [] : [{
+    label: t('app.editor.labels.ui.properties.typeMenu'),
+    icon: 'i-lucide-shapes',
+    children: TYPE_CHOICES.map(choice => ({
+        label: t(`app.editor.labels.ui.properties.type.${choice.label}`),
+        icon: choice.icon,
+        type: 'checkbox' as const,
+        checked: currentType.value === choice.type,
+        onSelect: () => void propertyTypes.set(property.value.id, choice.type).catch(error => console.error('[TableHeader] save type', error)),
+    })),
+}]))
+
 const items = computed<ContextMenuItem[][]>(() => [
     [
         {label: t('app.editor.ui.bases.hideColumn'), icon: 'i-lucide-eye-off', onSelect: () => write((b, v) => setOrder(b, v, order.value.filter(o => !same(o))))},
@@ -58,6 +84,7 @@ const items = computed<ContextMenuItem[][]>(() => [
             ctx.open.value = 'properties'
         },
     }],
+    ...(typeMenu.value.length ? [typeMenu.value] : []),
 ])
 
 // Column drag: drop on the header's left half to land before it, right half after.

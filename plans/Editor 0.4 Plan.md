@@ -118,9 +118,29 @@ graph LR
   - property kinds come from the stored types first, then inference, as Obsidian's Bases read `types.json`;
   - the header menu's "Property type", out of scope in V1 for lack of a store, joins as Obsidian has it.
 
+### As built
+- **Observed** (Obsidian 1.15.1, probe `zz-e4`; the test vault had no `types.json`, and the probe's file was removed after):
+  - **Format:** `{"types": {key: type}}`, two-space JSON, no final newline. The first write also lists `aliases: aliases`, `cssclasses: multitext`, `tags: tags`. A changed key keeps its place; "Automatic" removes it.
+  - **Types:** `text`, `multitext` (List), `number`, `checkbox`, `date`, `datetime`, `tags`, `aliases` (plus widgets for `file`, `folder`, `property`). A note's type menu offers Automatic (with the inferred type), Checkbox, Date, Date & time, List, Number, Text.
+  - **Notes aren't rewritten:** picking Number for `score: "12"`, or Text for a list, left the note as it was.
+  - **Bases:** a stored type decides the cell's editor where the value fits (`when` typed text is plain text; typed date it's a date input, empty cells too); numbers stay value-driven. The column header menu ends with Property type (Checkbox, Date, Date & time, List, Number, Text, the current one checked, no Automatic).
+- **`shared/utils/index/propertyTypes.ts`** (tested against Obsidian's written files): `readTypes`/`writeTypes` for the format, `withType` (built-ins first, a changed key keeps its place, `null` removes it), `editorType`/`storedType` (`multitext` ↔ `list`; `file`, `folder` and other Obsidian-only widgets are left to inference) and `baseKind` (stored type → Bases kind; `datetime` is `date`).
+- **`usePropertyTypes(session)`:** one store per workspace window.
+  - **Load:** `.vertex/types.json`, else `.obsidian/types.json`, so a vault starts with Obsidian's types until Vertex saves its own. It reloads when either file changes on disk (the index broadcasts every watcher event as `changed`).
+  - **Write:** `set(key, type)` writes `.vertex/types.json` only. The webview owns it, because opening a workspace that's already open focuses its window, so there's one writer.
+  - **Capabilities:** the fs read scope gains exactly `**/.vertex/types.json` and `**/.obsidian/types.json`; `.vertex/**` was already writable.
+- **Editor:** `usePropertiesOptions` adds `types` (a getter, mapped to the editor's names) and `onTypeChange` (saves through the store), so every editor host shares the workspace's types.
+- **Bases:** a note property's `kind` is `baseKind(stored) ?? inferred ?? 'text'` (`useBaseContext`), which drives cell editors, menus and the header icon. `TableHeader` ends with Property type for note properties, with Obsidian's six choices and the current one checked; its labels reuse the panel's (`app.editor.labels.ui.properties.*`).
+- **Library difference, not changed:** the editor's `setType` converts the note's value to the new type (`convertValue`), where Obsidian leaves notes as they are. That's the library's choice; raise it there if Obsidian parity should win.
+
 ### Acceptance
-- [ ] A type picked in one note applies to that key in every note and survives a restart. A workspace with only `.obsidian/types.json` starts with Obsidian's types, and `.obsidian/` is never written.
-- [ ] A base's column for that key renders by the stored type; the header menu changes it.
+- [x] **In a browser** against the dev server with Tauri stubbed:
+  - a vault with only `.obsidian/types.json` (`when: text`) showed `when` as text, though its value is a date;
+  - picking Date in the panel wrote `.vertex/types.json` in Obsidian's format and left the note and `.obsidian/` untouched;
+  - reloading with both files (Vertex's `when: text`, Obsidian's `when: date`) showed text: Vertex's file wins and the type survives a restart.
+  - `.obsidian/` was never written.
+- [x] **Bases:** the `when` column's icon follows the stored type (calendar, then text). The header's Property type showed Date checked, and picking Text rewrote `.vertex/types.json`.
+- [x] `typecheck` clean; no lint findings in the changed files; 268 tests pass (3 new).
 
 ## P5: YAML switch
 
