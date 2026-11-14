@@ -288,12 +288,31 @@ Git runs in Rust (`src-tauri/src/git.rs`), which spawns the installed `git`, so 
 - **Text ↔ base:** `Bases/Base.vue` parses the text once; toolbar edits go through the library's edit functions and come back as the text Obsidian would write, written only when something changes. A file that doesn't parse shows why and is never written. An empty file is Obsidian's default: one table view, "View", over every file.
 - **Context:** `createBaseContext` (`useBaseContext.ts`) is what the toolbar, menus and layouts share (`provide`d): the base, the shown view (never in the file), `commit`, the query result (a `computed`), the properties menus offer, and `this` (the base, or the note or canvas embedding it).
 - **Rows:** `useBaseHost` gives the library the workspace's files from the index (frontmatter, tags, links, backlinks), so a query re-runs when a file is created, edited, renamed or deleted. Bases read every file, not only notes.
-- **Writes to notes:** cell edits, kanban drops and New write frontmatter through `useNoteProperties` (YAML 1.2 core via the library's `readYaml`/`writeYaml`, as Obsidian), one Files undo step per edit (`editNotes`), and open tabs reload.
+- **Writes to notes:** cell edits, kanban drops and New write frontmatter through `useNoteProperties` (`obsidianYaml`, see Note properties), one Files undo step per edit (`editNotes`), and open tabs reload.
+- **Kinds:** a note property's kind (cell editors, menus, header icon) is its stored type first (`usePropertyTypes`), else what its values give; the table header's Property type sets it.
 - **Layouts:** `Table` (virtualized rows, column widths, summaries, selection and keyboard editing), `Cards`, `List`, `Kanban` and `Map` (`maplibre-gl`, OpenFreeMap tiles by default; its worker is set by URL so it loads under `tauri://`).
-- **Embeds:** `Bases/Embed.vue` takes each host's props: `![[x.base#View]]` (`.base` files in `SessionTab`'s link list, by full name), ` ```base ` blocks (`useActiveEditorCodeblockMappings`; edits rewrite the block) and canvas `.base` cards (`fileRenderers`). `SessionTab` provides `BASE_EMBED` (session, and its file as `this`). The editor unmounts embeds scrolled out of view, so their shown view and each file's text live in `useState`.
+- **Embeds:** `Bases/Embed.vue` takes each host's props: `![[x.base#View]]` (`.base` files in `SessionTab`'s link list, by full name), ` ```base ` blocks (`useActiveEditorCodeblockMappings`; edits rewrite the block) and canvas `.base` cards (`fileRenderers`). `SessionTab` provides `BASE_EMBED` (session, and its file as `this`). The editor unmounts embeds scrolled out of view, so their shown view and each file's text live in `useState`. Inside a callout or table cell the editor draws embeds in a read-only copy of the note: a ` ```base ` block there is read-only (as in Obsidian), while `![[x.base]]` still writes its file.
 - **Commands:** while a base is open, the palette's Bases group has Add view, Switch view, Copy table and Add item (`registerBaseCommands`); in a note, Insert new base (an empty `Untitled.base` at the root, embedded at the cursor through the editor dispatcher's `editor.insertBlock`). New Base: File menu, Files' row and empty-space menus, the palette.
 - **Links:** the index doesn't read `.base` files, so links in their filters or formulas make no backlinks; Obsidian doesn't count them either.
 - **Strings:** `app.editor.ui.bases.*` in en and zh-CN.
+
+### Note properties
+
+A note's frontmatter shows as the editor's properties panel (`@type32/codemirror-rich-obsidian-editor` 0.4, Obsidian's Properties view), in note tabs (`RichText`) and canvas note cards (`CanvasCardEditor`). Plan and phases: `plans/Editor 0.4 Plan.md`.
+
+- **Options:** `usePropertiesOptions(session)` gives `<Editor :properties>` one object for the editor's life. Its fields are getters over the index and the types store, so an index change or a type change never reconfigures the editor (which would rebuild the panel mid-edit). A singlespace gets `{}`: inferred types, no suggestions.
+- **Suggestions:** `propertySuggestions` (`shared/utils/index/propertySuggestions.ts`), from the index's notes, as Obsidian offers them:
+  - names: the built-ins `aliases`, `cssclasses`, `tags`, then every property as first seen;
+  - values: each key's distinct text values, alphabetical;
+  - tags: every tag, frontmatter and body, without `#`.
+  The panel itself drops the note's own keys and a list's existing items, and narrows by what's typed.
+- **Types:** `usePropertyTypes(session)`, Obsidian's vault-wide `types.json` (`{"types": {key: type}}`, Obsidian's type names; helpers in `shared/utils/index/propertyTypes.ts`).
+  - **Load:** `.vertex/types.json`, else `.obsidian/types.json`, so a vault starts with Obsidian's types. Reloaded when either changes on disk.
+  - **Write:** picking a type (in the panel or a base's header) writes `.vertex/types.json`, never `.obsidian/`.
+  - **Owner:** the webview, since a workspace opens in one window only. The fs read scope allows exactly those two files.
+- **One frontmatter writer:** edits outside the editor (Bases' property writes, workflows) use `obsidianYaml(frontmatterRange)` (`shared/workflows/vault.ts`): the bases parser's `readYaml`/`writeYaml`, YAML 1.2 core and Obsidian's quoting, so dates stay text and a key like `n` isn't quoted. The editor's own panel writes through the editor, keeping the note's formatting. `.yaml` files (`YamlDataForm`) keep the editor's `parseYaml`/`stringifyYaml`.
+- **Index:** the editor's `parseFrontmatter` (YAML 1.2 since 0.4) keeps dates as text, which Bases reads as written.
+- **Strings:** the panel's labels are editor labels (`app.editor.labels.ui.properties.*`, en and zh-CN, through `LABEL_KEYS`).
 
 ---
 

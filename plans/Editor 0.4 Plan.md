@@ -220,7 +220,7 @@ graph LR
   - a header click in the callout's block leaves the callout rendered, sorts nothing and writes nothing;
   - header clicks in the callout's and the cell's `![[P.base]]` wrote `P.base` (ASC, then DESC), never `Host.md`.
 - [x] Library: 150 tests, `vue-tsc` and `prepack` pass. Vertex: `typecheck` clean, 268 tests pass, no lint findings in the changed files.
-- [ ] Released as 0.4.4 and Vertex bumped. On the registry's 0.4.3, embeds in callouts and table cells still render twice.
+- [x] Released as 0.4.4 (`24aea3d`), and Vertex is on `^0.4.4`.
 
 ## P8: Docs and SMOKE
 
@@ -229,5 +229,11 @@ graph LR
 - **SMOKE rows:** the panel (`---` start, rename, types, suggestions, delete frontmatter), types seeding from `.obsidian/`, code highlighting, list keys, tables and callouts.
 - **`Package Issues.md`:** anything found in the editor along the way.
 
+### As built
+- **`Concepts and Structures.md`:** a `### Note properties` section (the options object and why it never changes, suggestions, the types store and its files, the one frontmatter writer, the index's YAML 1.2, strings). The Bases section now covers writes through `obsidianYaml`, kinds from stored types, and read-only blocks inside callouts and cells.
+- **SMOKE rows 119–123:** the properties panel; suggestions and types (seeding, restart, a base's Property type); rendering and list keys in both themes; embeds in callouts and table cells; a workflow's frontmatter write. Each row says what the browser runs already covered.
+- **`Package Issues.md`:** the editor issues found here, four of them fixed (0.3.9 parse progress, 0.4.1 label clash, 0.4.2 Escape draft, 0.4.4 nested embeds), and two open: `setType` rewrites values where Obsidian doesn't, and the six block plugins rebuild the whole note per keystroke.
+
 ### Acceptance
-- [ ] `bun run test`, `typecheck` and `lint` clean; the new SMOKE rows pass in `tauri:dev`.
+- [x] On editor 0.4.4: `bun run test` (268), `typecheck` clean, and lint clean for every file this plan touched (three warnings in `RichText.vue`, on props it didn't change).
+- [ ] SMOKE rows 119–123 pass in `tauri:dev` (the user's run).
