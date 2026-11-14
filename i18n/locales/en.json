@@ -1839,6 +1839,27 @@
 					"linkPlaceholder": "Paste a link…",
 					"linkApply": "Apply link",
 					"linkRemove": "Remove link",
+					"properties": {
+						"add": "Add property",
+						"addField": "Add field",
+						"name": "Property name",
+						"deleteFrontmatter": "Delete frontmatter",
+						"empty": "Empty",
+						"remove": "Remove",
+						"typeMenu": "Property type",
+						"type": {
+							"text": "Text",
+							"list": "List",
+							"number": "Number",
+							"checkbox": "Checkbox",
+							"date": "Date",
+							"datetime": "Date & time",
+							"tags": "Tags",
+							"aliases": "Aliases",
+							"object": "Object",
+							"unknown": "Unknown"
+						}
+					},
 					"ai": {
 						"suggestedEdit": "Suggested edit",
 						"suggestedInsertion": "Suggested insertion",

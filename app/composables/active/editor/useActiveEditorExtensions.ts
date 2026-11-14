@@ -23,6 +23,11 @@ const LABEL_KEYS = [
     'ui.ai.suggestedEdit', 'ui.ai.suggestedInsertion', 'ui.ai.count', 'ui.ai.thinking', 'ui.ai.stale', 'ui.ai.staleTool',
     'ui.ai.instructionPlaceholder', 'ui.ai.refinePlaceholder', 'ui.ai.accept', 'ui.ai.discard', 'ui.ai.retry',
     'ui.ai.stop', 'ui.ai.edit', 'ui.ai.done', 'ui.ai.copy', 'ui.ai.insertBelow',
+    'ui.properties.add', 'ui.properties.addField', 'ui.properties.name', 'ui.properties.deleteFrontmatter',
+    'ui.properties.empty', 'ui.properties.remove', 'ui.properties.typeMenu',
+    'ui.properties.type.text', 'ui.properties.type.list', 'ui.properties.type.number', 'ui.properties.type.checkbox',
+    'ui.properties.type.date', 'ui.properties.type.datetime', 'ui.properties.type.tags', 'ui.properties.type.aliases',
+    'ui.properties.type.object', 'ui.properties.type.unknown',
 ] as const
 
 function outlineKeys(session: ActiveSession | undefined, tabId: string) {

@@ -40,8 +40,12 @@ graph LR
 ### Change
 - Rename the type menu's label `ui.properties.type` (e.g. to `ui.properties.typeMenu`), keeping `ui.properties.type.<type>` for the type names. Release `0.4.1`; Vertex bumps to `^0.4.1`.
 
+### As built
+- In the library source (uncommitted, for the user to release): `PropertyRow.vue` reads the type menu's title and the type button's aria-label from `ui.properties.typeMenu`; the README's label table lists it, adds the missing `.unknown`, and states that no key is both a label and a prefix. Library tests (147), `vue-tsc` and `prepack` pass.
+
 ### Acceptance
-- [ ] No label key is both a string and a prefix of others (`ui.properties.*`).
+- [x] No label key is both a string and a prefix of others (`ui.properties.*`).
+- [ ] Released as `0.4.1`, and Vertex on `^0.4.1`. Until then, 0.4.0 still reads `ui.properties.type` for the menu's title, which Vertex doesn't translate, so that one label shows in English.
 
 ## P1: Frontmatter cutover
 
@@ -69,8 +73,11 @@ graph LR
   - the renamed type-menu label from L0;
   - `ui.properties.type.{text, list, number, checkbox, date, datetime, tags, aliases, object, unknown}`.
 
+### As built
+- `LABEL_KEYS` gains the 17 `ui.properties.*` keys (`typeMenu` from L0, and the ten type names including `unknown`); en and zh-CN under `app.editor.labels.ui.properties`, using the app's words (属性, 前置元数据).
+
 ### Acceptance
-- [ ] In 简体中文 the panel, its type menu and its buttons are translated; `i18n.test.ts` parity passes.
+- [x] In 简体中文 the panel's Add property (添加属性), the name placeholder (属性名称), Delete frontmatter (删除前置元数据), the type button and menu title (属性类型), every type name and Remove are translated. Checked in a browser against the dev server with Tauri stubbed, on the library build with L0's rename. `i18n.test.ts` parity, the other 261 tests and `typecheck` pass.
 
 ## P3: Suggestions
 

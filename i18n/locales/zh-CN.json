@@ -83,7 +83,7 @@
 				"theme": "主题",
 				"view": "视图",
 				"workflows": "工作流",
-				"git": "Git",
+				"git": "版本控制",
 				"ai": "辅助 AI",
 				"aiProviders": "服务商",
 				"aiModels": "模型配置",
@@ -500,7 +500,7 @@
 				"editUser": "编辑用户设置"
 			},
 			"git": {
-				"title": "Git",
+				"title": "版本控制",
 				"tokens": "登录令牌",
 				"tokensDescription": "用于 HTTPS 远程的个人访问令牌，在远程拒绝登录时保存。它们保存在系统钥匙串中；git 仅在与对应主机通信时获得令牌，此时不会询问你自己的凭据助手。",
 				"noTokens": "没有已保存的令牌。远程拒绝登录时，Vertex 会请你输入。",
@@ -1839,6 +1839,27 @@
 					"linkPlaceholder": "粘贴链接…",
 					"linkApply": "应用链接",
 					"linkRemove": "移除链接",
+					"properties": {
+						"add": "添加属性",
+						"addField": "添加字段",
+						"name": "属性名称",
+						"deleteFrontmatter": "删除前置元数据",
+						"empty": "空",
+						"remove": "移除",
+						"typeMenu": "属性类型",
+						"type": {
+							"text": "文本",
+							"list": "列表",
+							"number": "数字",
+							"checkbox": "复选框",
+							"date": "日期",
+							"datetime": "日期和时间",
+							"tags": "标签",
+							"aliases": "别名",
+							"object": "对象",
+							"unknown": "未知"
+						}
+					},
 					"ai": {
 						"suggestedEdit": "建议的修改",
 						"suggestedInsertion": "建议的插入",
@@ -2141,7 +2162,7 @@
 			"viewMissing": "此视图不可用。"
 		},
 		"git": {
-			"label": "Git",
+			"label": "版本控制",
 			"sync": "同步",
 			"syncHint": "提交所有更改，拉取远程的新提交，然后推送你的提交。",
 			"syncMessage": "更新 {count} 个文件",
@@ -2393,7 +2414,7 @@
 			"autoSync": {
 				"failed": "自动同步失败",
 				"paused": "自动同步已暂停",
-				"open": "打开 Git"
+				"open": "打开版本控制"
 			},
 			"rebasing": {
 				"title": "正在变基",
