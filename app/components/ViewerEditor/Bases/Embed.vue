@@ -71,8 +71,12 @@ function blockPlace() {
     const widget = root.value?.closest<HTMLElement>('.vue-embed-widget')
     const editor = widget?.closest<HTMLElement>('.cm-editor')
     const cm = editor ? EditorView.findFromDOM(editor) : null
-    return cm && widget ? {cm, pos: cm.posAtDOM(widget)} : null
+    return cm && widget ? {cm, pos: cm.posAtDOM(widget), nested: !!editor?.parentElement?.closest('.cm-editor')} : null
 }
+// A block in a callout or table cell sits in a read-only copy of the note (a nested editor): Obsidian doesn't edit
+// those, and a write would only change the copy. Known once the widget is attached.
+const readonly = ref(false)
+onMounted(() => queueMicrotask(() => readonly.value = inBlock && !!blockPlace()?.nested))
 
 /** Replaces the block's YAML, as Obsidian does: the base's text, then a blank line before the closing fence. */
 function writeBlock(next: string) {
@@ -123,6 +127,7 @@ async function save(next: string) {
             :session="embed.session"
             :this-path="embed.thisPath()"
             :embed="node ? 'card' : 'note'"
+            :readonly="readonly"
             @update:model-value="save"
         />
     </div>

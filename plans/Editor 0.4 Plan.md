@@ -46,7 +46,7 @@ graph LR
 ### Acceptance
 - [x] No label key is both a string and a prefix of others (`ui.properties.*`).
 - [x] Released as `0.4.1`, and Vertex on `^0.4.1`.
-- [ ] **`0.4.2`** (found in P3, fixed in the library source, uncommitted): in a list's input, Escape twice added the typed text as a pill, because the second Escape moved focus to the row and the input's `focusout` added its draft. Obsidian adds nothing. Escape now drops the draft first; Enter and blur still add it.
+- [x] **`0.4.2`** (found in P3; released as `af95daa`, and Vertex is on `^0.4.3`): in a list's input, Escape twice added the typed text as a pill, because the second Escape moved focus to the row and the input's `focusout` added its draft. Obsidian adds nothing. Escape now drops the draft first; Enter and blur still add it.
 
 ## P1: Frontmatter cutover
 
@@ -171,8 +171,27 @@ graph LR
 - **Keys:** list editing (Enter, Shift-Enter, Tab, renumbering) against Vertex's own commands (`HeaderTools`, slash menu, selection toolbar), which insert lists and tasks.
 - **Dev reloads:** fenced code now loads its language from `@codemirror/language-data` on demand. If Vite discovers those packages at runtime and reloads (as `xss` did in Bases V3), add them to `optimizeDeps.include`.
 
+### As built
+- **No Vertex changes were needed.** The pass ran on editor 0.4.3, in a browser against the dev server with Tauri stubbed, on a note with every case. Vertex's only editor CSS (`.cm-heading-*` sizes) still applies.
+- **Rendering, light and dark:**
+  - code blocks are highlighted with the `--code-*` palette and labelled by language name (JavaScript, Python, CSS), with a copy icon when there's no language;
+  - tasks: every status but a space is checked, and only `x` is struck through;
+  - lists: wrapped text hangs at the item's text, with one guide per level under the parent's bullet, and ordered numbers kept;
+  - nested quotes have one bar per level;
+  - callouts: plain, folded (chevron), `[!tip|wide]`, and a nested callout inside;
+  - the table, with bold and math in cells, a right-aligned column, and hover handles and `+` bars;
+  - inline and block math.
+  The library's defaults fit Vertex's theme in both modes, so no `--code-*` or `--table-*` overrides.
+- **Dev reloads:** none. Languages load on demand: Rust, Go, YAML and SQL blocks added to an open note highlighted without a reload, and the dev log had no dependency optimization. Nothing added to `optimizeDeps`.
+- **Keys:** Vertex binds no editor keys of its own, and its list and task insertion goes through the library's actions (header tools' `builtinActions`, the slash menu). By real key presses:
+  - Enter continues `1.`, `2.`, `3.`;
+  - Tab nests the third item as `1.`, and Shift-Tab returns it to `3.`;
+  - Enter on an empty item ends the list;
+  - inserting after item 1 renumbers the rest;
+  - the slash menu's Task list starts `- [ ]`, and Enter continues it.
+
 ### Acceptance
-- [ ] Each case renders and edits as in `WHATS-NEW-0.4.md`, in both themes. Opening a note with code blocks causes no dev reload.
+- [x] Each case renders and edits as in `WHATS-NEW-0.4.md`, in both themes. Opening a note with code blocks, and adding blocks in new languages, causes no dev reload.
 
 ## P7: Embeds in nested editors
 
@@ -181,8 +200,27 @@ graph LR
 - **` ```base ` in a callout:** `Embed.vue` finds its block through `closest('.cm-editor')`, which inside a callout is the read-only copy. Route the write to the note's editor, or show such blocks read-only, whichever matches Obsidian.
 - **Other embeds:** check image and Mermaid embeds in callouts and cells. `![[x.base]]` writes its file and isn't affected.
 
+### As built
+- **Observed** (Obsidian 1.15.1, probe `zz-e7`: a callout holding a ` ```base ` block, a callout holding `![[P.base]]`, a table cell holding `![[P.base]]`):
+  - all three render with the full toolbar;
+  - a header click in the callout's block does nothing (no sort, no write; the cursor stays where it was);
+  - in the callout's or the cell's `![[P.base]]` it writes `P.base`;
+  - `![[pic.png]]` resolves, `![[pic]]` doesn't.
+- **Library** (`codemirror-rich-obsidian`, uncommitted, for 0.4.4):
+  - **Duplicate embeds:** `![[x]]` inside a rendered callout or table rendered twice, once in the nested editor and again below the widget, because the parent's link plugin also placed its block widget at the source line. `inRenderedCallout` (moved next to `renderedCallout`, shared with the math plugin) and a new `inRenderedTable` make the link plugin leave those embeds to the nested editors. `test/prose-plugin.test.ts` covers top level, a rendered callout, a revealed callout and a table, and fails without the fix.
+  - **Clicks:** a mousedown inside an embed in a callout selected the callout's whole source, replacing the rendered callout. Embeds now handle their own clicks, as links already did (`proseCalloutWidget.ts`).
+- **Vertex:**
+  - **Read-only blocks:** a ` ```base ` block in a nested editor (callout, table cell; its `.cm-editor` sits inside another) is read-only. `Embed.vue` passes `readonly` to `Base.vue`, whose `commit` then ignores edits, so nothing changes in memory or in the copy, as in Obsidian.
+  - **Image links:** images are listed by their full file name (`pic.png`), as Obsidian resolves them, instead of the name without extension, which never matched `![[pic.png]]`. A `![[pic]]` written earlier no longer embeds; it doesn't in Obsidian either.
+  - **Mermaid** in a callout renders through the nested editor's code-block mapping; nothing to change.
+
 ### Acceptance
-- [ ] Embeds inside callouts and table cells render, and either edit the note as Obsidian does or don't edit at all. Nothing writes into a copy.
+- [x] **On the probe's note in Vertex** (browser against the dev server with Tauri stubbed, on the library build):
+  - each embed renders once, in place: the callout's block, the callout's link, the Mermaid graph, the image, and the cell's link;
+  - a header click in the callout's block leaves the callout rendered, sorts nothing and writes nothing;
+  - header clicks in the callout's and the cell's `![[P.base]]` wrote `P.base` (ASC, then DESC), never `Host.md`.
+- [x] Library: 150 tests, `vue-tsc` and `prepack` pass. Vertex: `typecheck` clean, 268 tests pass, no lint findings in the changed files.
+- [ ] Released as 0.4.4 and Vertex bumped. On the registry's 0.4.3, embeds in callouts and table cells still render twice.
 
 ## P8: Docs and SMOKE
 

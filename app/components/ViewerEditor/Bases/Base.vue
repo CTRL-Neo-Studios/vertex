@@ -12,11 +12,12 @@ import {useBaseHost} from "~/composables/bases/useBaseHost";
  * - `embed: 'note'` (`![[x.base]]`, ` ```base `) sizes as Obsidian's: content height, kanban at least 500 px, a map
  * `mapHeight` (400) high;
  * - `embed: 'card'` (canvas) fills the card.
- * Embeds don't take the palette's Bases commands.
+ * Embeds don't take the palette's Bases commands. `readonly` (a block in a callout or table cell, which Obsidian
+ * doesn't edit) ignores every edit.
  */
 const text = defineModel<string>({required: true})
 const viewName = defineModel<string>('view', {default: ''})
-const props = defineProps<{ session: ActiveSession, thisPath: string, embed?: 'note' | 'card' }>()
+const props = defineProps<{ session: ActiveSession, thisPath: string, embed?: 'note' | 'card', readonly?: boolean }>()
 
 const {t} = useI18n()
 const {host, paths} = useBaseHost(props.session)
@@ -35,7 +36,7 @@ watch(text, (next) => {
 })
 
 function commit(next: Base) {
-    if (problem.value !== null) return
+    if (problem.value !== null || props.readonly) return
     base.value = next
     const out = stringifyBase(next)
     if (out === text.value) return

@@ -69,12 +69,13 @@ const internalLinkList = computed<InternalLink[]>(() => {
         const ext = getFileExtensionFromPath(f.fileName)
         const name = fileNameFromPath(f.fullPath, true)
         if (isPlainTextFile(ext)) return [{name, filePath: f.relativePath, referenceId: f.uuid} satisfies InternalLink]
+        // Files other than notes are linked by their full name, as Obsidian links them: `![[pic.png]]` resolves there,
+        // `![[pic]]` doesn't.
         if (isImage(ext)) return [{
-            name, filePath: f.relativePath, referenceId: f.uuid,
+            name: f.fileName, filePath: f.relativePath, referenceId: f.uuid,
             embedComponent: EditorProseEmbedImageDisplay,
             componentProps: {srcPath: convertFileSrc(f.fullPath), display: name},
         } satisfies InternalLink]
-        // Linked by their full name, as Obsidian links files other than notes (`![[x.base#View]]`).
         if (isBasesFile(ext)) return [{name: f.fileName, filePath: f.relativePath, referenceId: f.uuid, embedComponent: ViewerEditorBasesEmbed} satisfies InternalLink]
         return []
     })
