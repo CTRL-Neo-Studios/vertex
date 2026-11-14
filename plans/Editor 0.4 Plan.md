@@ -50,9 +50,16 @@ graph LR
 - **The panel:** on in `RichText` (the default). In canvas note cards (`CanvasCardEditor`), observe first whether Obsidian shows properties there.
 - **`:context-menu-size`:** the size the app's other context menus use.
 
+### As built
+- **Observed:** Obsidian shows a note card's properties on a canvas ("Properties in document" at its default, `visible`), so `CanvasCardEditor` keeps the panel too.
+- **Removed:** `FrontmatterEditor.vue` (the Frontmatter button and its modal) and `RichText.vue`'s `frontmatterOpen` state. The editor and header tools are read-only only while disabled or renaming. The modal's three strings went with it (`app.generic.frontmatter`, `app.editor.ui.frontmatterError`, `…Description`).
+- **Menus:** `RichText` and `CanvasCardEditor` pass `context-menu-size="sm"`, the size of every other context and dropdown menu in the app.
+
 ### Acceptance
-- [ ] A note with frontmatter shows the panel and no Frontmatter button. Typing `---` as the first line starts properties. An edit saves through the tab's autosave, and the index sees it (backlinks, a base's row).
-- [ ] `typecheck`, `lint` and tests pass.
+- [x] A note with frontmatter shows the panel (`status` text, `due` as a date, `tags` as a pill, Add property) and no Frontmatter button. Checked in a browser against the dev server with Tauri stubbed.
+- [x] **Edits reach the index:** an edit in the panel saved `A.md` with only that value changed (`due: 2026-02-03` intact), and the base's row showed the new value.
+- [x] **`---` on an empty first line** made `---\n\n---` and opened the panel on "Property name".
+- [x] `typecheck` clean; 262 tests pass; no lint errors in the changed files (three warnings in `RichText.vue`, on props this phase didn't touch).
 
 ## P2: Labels
 
@@ -100,8 +107,13 @@ graph LR
 - **Workflows:** move their frontmatter writes (`useWorkflowRunner`'s `YamlTools`) to Obsidian's writer, the bases parser's `readYaml`/`writeYaml`, as `useNoteProperties` does. That gives one writer for every frontmatter edit outside the editor. Update §10's expectation to that writer's output. Add a test that `due: 2026-02-03` survives a workflow's property write, the date bug flagged in Bases V2.
 - **`.yaml` files** (`YamlDataForm`) keep the editor's `parseYaml`/`stringifyYaml`; its new quoting is accepted.
 
+### As built
+- **`obsidianYaml(frontmatterRange)`** (`shared/workflows/vault.ts`) is the one set of `YamlTools` for frontmatter edits outside the editor: the bases parser's `readYaml`/`writeYaml` (YAML 1.2 core, Obsidian's writer), with `frontmatterRange` injected. `useNoteProperties`, `useWorkflowRunner` and `workflows.test.ts` all use it; the editor's `parseYaml`/`stringifyYaml` remain only for `.yaml` files (`YamlDataForm`).
+- **`baseFile.ts`:** the Date round-trip (`asWritten`) and its `ponytail:` are gone. The index's reader (the editor's `parseFrontmatter`, now `yaml`) keeps dates as text, and `baseFile.test.ts`'s date cases pass unchanged.
+- **§10:** the renamed note keeps `tags: "#Draft/idea"` as written; `js-yaml` used to rewrite it with single quotes.
+
 ### Acceptance
-- [ ] All tests pass, with §10 on the new writer and the date test added.
+- [x] All 262 tests pass, with §10 on the new writer. The new test (`setFrontmatterProperty leaves the other properties as Obsidian wrote them`: `due: 2026-02-03` and `n: 1` survive a write) passes, and fails when run with the old `js-yaml` reader and writer.
 
 ## P6: Rendering pass
 

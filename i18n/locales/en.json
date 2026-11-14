@@ -543,8 +543,6 @@
 				"analyzeText": "Analyze Text",
 				"previewMermaid": "Preview Mermaid Graph",
 				"copiedMermaid": "Copied Mermaid diagram code.",
-				"frontmatterError": "Cannot parse frontmatter",
-				"frontmatterErrorDescription": "Something is wrong with this frontmatter. The form editor is hidden to avoid corrupting your content.",
 				"palette": {
 					"quickActions": "Quick Actions",
 					"newFileDescription": "Creates a new Markdown file in the workspace root.",
@@ -1882,7 +1880,6 @@
 			"fileName": "File Name",
 			"black": "Black",
 			"properties": "Properties",
-			"frontmatter": "Frontmatter",
 			"words": "Words",
 			"lines": "Lines",
 			"paragraphs": "Paragraphs"

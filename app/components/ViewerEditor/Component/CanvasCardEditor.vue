@@ -27,6 +27,7 @@ watch(() => editor.value?.view, (view) => {
             class="w-full"
             :model-value="props.text"
             :internal-link-map="props.internalLinkList"
+            context-menu-size="sm"
             @update:model-value="(text?: string) => emit('update', text ?? '')"
             @internal-link-click="(detail: InternalLinkClickDetail) => emit('openLink', detail)"
         />

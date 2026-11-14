@@ -543,8 +543,6 @@
 				"analyzeText": "分析文本",
 				"previewMermaid": "预览 Mermaid 图表",
 				"copiedMermaid": "已复制 Mermaid 图表代码。",
-				"frontmatterError": "无法解析前置元数据",
-				"frontmatterErrorDescription": "前置元数据有误。为避免损坏内容，已隐藏表单编辑器。",
 				"palette": {
 					"quickActions": "快捷操作",
 					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
@@ -1882,7 +1880,6 @@
 			"fileName": "文件名",
 			"black": "黑色",
 			"properties": "属性",
-			"frontmatter": "前置元数据",
 			"words": "词",
 			"lines": "行",
 			"paragraphs": "段"

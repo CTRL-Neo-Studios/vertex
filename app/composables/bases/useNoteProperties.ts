@@ -1,7 +1,6 @@
 import {readTextFile} from "@tauri-apps/plugin-fs";
-import {readYaml, writeYaml} from "@type32/obsidian-bases-parser";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import {setFrontmatterProperty, type YamlTools} from "#shared/workflows/vault";
+import {obsidianYaml, setFrontmatterProperty} from "#shared/workflows/vault";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 
@@ -14,24 +13,13 @@ export interface PropertyEdit {
 
 /**
  * Writes note properties from a base (cell edits, paste, clear), as one undo step per call in the workspace's history
- * (⌘Z in the table, or Files' Undo). Notes keep everything but the changed keys. The frontmatter is read and written as
- * Obsidian does (YAML 1.2 core schema): the editor's YAML 1.1 reader would turn `due: 2026-02-03` into a Date written
- * back as `2026-02-03T00:00:00.000Z`, and quote a key like `n`.
+ * (⌘Z in the table, or Files' Undo). Notes keep everything but the changed keys, read and written as Obsidian does
+ * (`obsidianYaml`).
  */
 export function useNoteProperties(session: ActiveSession) {
     const $index = useActiveWorkspaceIndex(session)
     const tools = useActiveWorkspaceTools(session)
-    const yaml: YamlTools = {
-        frontmatterRange,
-        parseYaml(text) {
-            try {
-                return {data: readYaml(text) ?? {}}
-            } catch (error) {
-                return {error}
-            }
-        },
-        stringifyYaml: data => ({yaml: writeYaml(data).trimEnd()}),
-    }
+    const yaml = obsidianYaml(frontmatterRange)
     const {t} = useI18n()
 
     async function setProperties(edits: PropertyEdit[]) {
