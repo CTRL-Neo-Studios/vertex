@@ -45,7 +45,8 @@ graph LR
 
 ### Acceptance
 - [x] No label key is both a string and a prefix of others (`ui.properties.*`).
-- [ ] Released as `0.4.1`, and Vertex on `^0.4.1`. Until then, 0.4.0 still reads `ui.properties.type` for the menu's title, which Vertex doesn't translate, so that one label shows in English.
+- [x] Released as `0.4.1`, and Vertex on `^0.4.1`.
+- [ ] **`0.4.2`** (found in P3, fixed in the library source, uncommitted): in a list's input, Escape twice added the typed text as a pill, because the second Escape moved focus to the row and the input's `focusout` added its draft. Obsidian adds nothing. Escape now drops the draft first; Enter and blur still add it.
 
 ## P1: Frontmatter cutover
 
@@ -86,8 +87,22 @@ graph LR
 - **Source:** one composable over the index: property names across the workspace's notes, and each key's distinct values (tags from the tag index). Recomputed per index change, not per keystroke. Bases' property list (`noteKinds` in `useBaseContext`) reads the same data; reuse it there if the shapes fit.
 - **Wiring:** `<Editor :properties="{keySuggestions, valueSuggestions}">`.
 
+### As built
+- **Observed** (Obsidian 1.15.1, probe `zz-e3`: four notes sharing `status`, `author`, `topics`, `tags` and body `#inline`):
+  - **Naming a property** offers Obsidian's property registry: the built-ins `aliases`, `cssclasses`, `tags`, then the vault's properties, minus the note's own keys, uncapped. Typing narrows it (fuzzy).
+  - **A text value** (`status`) offers that key's other values in the vault (`doing`, `todo`, `X`), alphabetical, case-insensitive.
+  - **A list** (`topics`) offers its key's values minus the list's items (`beta`, `gamma`, not `alpha`).
+  - **Tags** offer every tag in the vault, frontmatter and body, without `#`, alphabetical.
+- **`propertySuggestions`** (`shared/utils/index/propertySuggestions.ts`, tested against those lists): the built-ins, then every property as first seen; each key's distinct text values, list items included; all tags without `#` (frontmatter lists or `"a, b"` text, and body tags).
+- **`usePropertiesOptions(session)`** feeds it the index's notes in a lazy `computed` (recomputed after an index change, only when a menu reads it). It returns one object for the editor's life whose fields read that `computed`, so an index change never reconfigures the panel. `RichText` and `CanvasCardEditor` pass it as `:properties`; a singlespace gets `{}`.
+- **Left to the library:** dropping the note's own keys and a list's items, and narrowing by what's typed (substring, where Obsidian matches fuzzily).
+- **Not reused:** Bases' `noteKinds` infers kinds, not names or values; the shapes didn't fit.
+- **`ponytail:`-level difference:** Obsidian lists properties with a stored type (`types.json`) before the ones only seen in notes; P4's types will join the list after the seen ones, the library's order.
+
 ### Acceptance
-- [ ] Adding a property offers the workspace's names; a list or text value offers that key's existing values, matching what Obsidian offers on the same vault.
+- [x] On the probe's notes in Vertex (browser against the dev server with Tauri stubbed): naming a property offered `aliases`, `cssclasses`, `author`, `zeta` (`tags`, `status`, `topics` being the note's own); `status` offered `doing`, `todo`; `topics` offered `beta`, `gamma`; `tags` offered `draft`, `idea`, `inline`, `work/x`. Typing narrowed each. Picking `gamma` by click or ↓ Enter wrote only `gamma`.
+- [x] With the library fix, typing then Escape twice writes nothing, and Enter adds the typed text.
+- [x] `typecheck` clean; 265 tests pass (3 new).
 
 ## P4: Property types
 

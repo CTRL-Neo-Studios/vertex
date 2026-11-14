@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type {EditorView} from "@codemirror/view"
 import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions"
+import {useActiveSessions} from "~/composables/active/useActiveSessions"
 
 /**
  * The markdown editor inside a canvas card being edited (a text card, or a note card): the note editor's own
@@ -10,6 +12,8 @@ import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsid
 const props = defineProps<{ text: string, internalLinkList: InternalLink[] }>()
 const emit = defineEmits<{ update: [text: string], done: [], openLink: [detail: InternalLinkClickDetail] }>()
 const editor = useTemplateRef<{ view: EditorView | undefined }>('editor')
+const $route = useRoute()
+const properties = usePropertiesOptions(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
 
 // Focused at the end, as a double-clicked card starts editing there; without scrolling, which would move the canvas
 // out of its tab.
@@ -27,6 +31,7 @@ watch(() => editor.value?.view, (view) => {
             class="w-full"
             :model-value="props.text"
             :internal-link-map="props.internalLinkList"
+            :properties="properties"
             context-menu-size="sm"
             @update:model-value="(text?: string) => emit('update', text ?? '')"
             @internal-link-click="(detail: InternalLinkClickDetail) => emit('openLink', detail)"
