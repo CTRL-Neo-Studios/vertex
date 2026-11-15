@@ -4,6 +4,9 @@ import {computed} from "vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 const $navi = useAppNavigator()
 const $route = useRoute()

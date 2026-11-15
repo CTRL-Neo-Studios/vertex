@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import {StateKey} from "#shared/constants/app";
 import type {TreeItem, TreeProps, ContextMenuItem} from '@nuxt/ui';
-import type {UITreeNode} from '#shared/types/active/workspace';
+import type {ActiveWorkspaceFileIndex, UITreeNode} from '#shared/types/active/workspace';
 import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/utils/index/parse";
-import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isCanvasFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath} from "#shared/utils/fs/filenames";
+import {fileMenuItems, fileTypes} from "~/utils/contributions";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
 import {invoke, isTauri} from "@tauri-apps/api/core"
 import {platform} from "@tauri-apps/plugin-os"
@@ -17,7 +18,6 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {FILES_DRAG, dragOut, outsideItems, outsideItemsAt, type OutsideItem} from "~/utils/outsideItems";
@@ -33,7 +33,7 @@ const $navi = useAppNavigator()
 const $opener = useAppOpener()
 const session = useActiveSessions().getSession(props.sessionId)
 const {openTab, openTabs, activeTabUuid} = useActiveTabs(session)
-const {getFileByUuid, getFileByPath, getPropertiesFile, getFilteredFiles} = useActiveWorkspaceIndex(session)
+const {getFileByUuid, getFileByPath, getPropertiesFile} = useActiveWorkspaceIndex(session)
 const {createFile, moveFiles, importItems, deleteFiles, deletedFiles, undo, redo, undoLabel, redoLabel} = useActiveWorkspaceTools(session)
 /** Delete: straight into a trash (the toast offers Undo), or after the dialog when it's for good (`fileConfig.deletedFiles`). */
 function requestDelete(ids: string[]) {
@@ -43,23 +43,18 @@ function requestDelete(ids: string[]) {
 const $qt = useQuickToasts()
 // The workspace's own view settings, when it overrides them.
 const config = useSettingsScope().effective
-// Workflows run on a workspace folder; a session without one gets no run items.
-const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
+// Each file type's icon, by extension.
+const typeIcons = computed(() => new Map([...fileTypes.items.values()].flatMap(type => type.extensions.map(ext => [ext, type.icon]))))
 
 const newFileModal = $ovl.create(NewFileModal)
 const deleteFilesModal = $ovl.create(DeleteFilesModal)
 const renameFileModal = $ovl.create(RenameFileModal)
 const expandedFolders = useState<string[]>(StateKey.expandedFolders(props.sessionId), () => [])
-// Once per index change, not per note row each time the tree renders.
-const workflows = computed(() => getFilteredFiles(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName))))
 
 const formattedTreeData = computed<TreeItem[]>(() => {
     const build = (nodes: UITreeNode[]): TreeItem[] => nodes.map(node => {
         const icon = isPropertiesFile(node.fileName) ? 'i-lucide-file-cog'
-            : isWorkflowFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-workflow'
-            : isCanvasFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-layout-dashboard'
-            : isBasesFile(getFileExtensionFromPath(node.fileName)) ? 'i-lucide-table'
-            : node.icon
+            : typeIcons.value.get(getFileExtensionFromPath(node.fileName).toLowerCase()) ?? node.icon
         const item: TreeItem = {
             id: node.uuid,
             label: node.fileName,
@@ -622,6 +617,12 @@ async function openInTab(uuid: string) {
     await $navi.toWorkspaceTab(props.sessionId, openTab(uuid))
 }
 
+/** Plugins' items (`fileMenuItems`) for the rows `files`, a group per registration. */
+function pluginItems(files: ActiveWorkspaceFileIndex[]): ContextMenuItem[][] {
+    if (!session || !files.length) return []
+    return [...fileMenuItems.items.values()].map(def => def.items({session, files}))
+}
+
 function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean): ContextMenuItem[][] {
     const file = () => getFileByUuid(item.id)
     /** Above / this / under level submenu for creating a file (with `ext`) or folder relative to `item`. */
@@ -637,36 +638,14 @@ function getItemContextMenu(item: TreeItem, itemLevel: number, isFolder: boolean
     }))
 
     const node = item.originalNodeData as UITreeNode
-    const ext = getFileExtensionFromPath(node.fileName)
-    /** `.workflow`: Run / Dry run. A note: run one of the vault's workflows on it. */
-    const runItems = (): ContextMenuItem[] => {
-        if (!runner || isFolder) return []
-        if (isWorkflowFile(ext)) return [
-            {label: t('app.editor.ui.workflow.run'), icon: 'i-lucide-play', onSelect: () => runner.runFile(node.relativePath, false)},
-            {label: t('app.editor.ui.workflow.dryRun'), icon: 'i-lucide-flask-conical', onSelect: () => runner.runFile(node.relativePath, true)},
-        ]
-        if (ext.toLowerCase() !== 'md') return []
-        return [{
-            label: t('app.editor.ui.workflow.runOnNote'),
-            icon: 'i-lucide-workflow',
-            disabled: !workflows.value.length,
-            children: workflows.value.map(w => ({
-                label: fileNameFromPath(w.fileName, true),
-                description: w.relativePath,
-                icon: 'i-lucide-workflow',
-                onSelect: () => runner.runFile(w.relativePath, false, {note: node.relativePath}),
-            })),
-        }]
-    }
-
     const groups: ContextMenuItem[][] = [
-        runItems(),
+        ...pluginItems([file()].filter(f => !!f)),
         [
             {label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', children: newAt(false, t('app.editor.ui.filetree.newMarkdownFile'))},
             {label: t('app.editor.ui.filetree.newFolder'), icon: 'i-lucide-file-plus', children: newAt(true, t('app.editor.ui.filetree.newFolder'))},
-            {label: t('app.editor.ui.filetree.newCanvas'), icon: 'i-lucide-layout-dashboard', children: newAt(false, t('app.editor.ui.filetree.newCanvas'), 'canvas')},
-            {label: t('app.editor.ui.filetree.newBase'), icon: 'i-lucide-table', children: newAt(false, t('app.editor.ui.filetree.newBase'), 'base')},
-            {label: t('app.editor.ui.filetree.newWorkflow'), icon: 'i-lucide-workflow', children: newAt(false, t('app.editor.ui.filetree.newWorkflow'), 'workflow')},
+            ...[...fileTypes.items.values()].filter(type => type.new).map(type => ({
+                label: t(type.new!.label), icon: type.icon, children: newAt(false, t(type.new!.label), type.extensions[0]),
+            })),
             {
                 label: t('app.editor.ui.filetree.newOpenFolderProperties'),
                 icon: 'i-lucide-file-plus',
@@ -703,6 +682,7 @@ function getSelectionMenu(ids: string[]): ContextMenuItem[][] {
     const notes = files.filter(f => !f.isFolder).map(f => f.uuid)
     const copy = (key: 'fullPath' | 'relativePath') => writeText(files.map(f => f[key]).join('\n'))
     return [
+        ...pluginItems(files).filter(group => group.length),
         [{
             label: t('app.editor.ui.filetree.openInNewTabs'), icon: 'i-lucide-square-plus', disabled: !notes.length,
             async onSelect() {

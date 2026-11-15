@@ -1,36 +1,35 @@
 <script setup lang="ts">
+import type {TabProps} from "#shared/plugin/api";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import ChatView from "~/components/Chat/ChatView.vue";
-import GitDiffView from "~/components/Git/GitDiffView.vue";
-import ChatChangeView from "~/components/Chat/ChatChangeView.vue";
-import {chatChangeOf} from "~/utils/chatChanges";
-import PanelViewTab from "~/components/LayoutComponents/PanelViewTab.vue";
+import {tabKinds} from "~/utils/contributions";
+import {pluginSession} from "~/utils/plugins/runtime";
 
 // Keyed by tab so switching tabs remounts the editor with fresh state.
 definePageMeta({
     layout: 'session'
 })
 
+const {t} = useI18n()
 const $route = useRoute()
 const tabId = computed(() => $route.params.tabId as string)
 const {getActiveTab} = useActiveTabs(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
-// A chat, a diff or a view sits absolutely, so it fills the panel body without adding to its height (it'd grow past
-// the window).
 const kind = computed(() => getActiveTab(tabId.value)?.kind)
+const def = computed(() => tabKinds.get(kind.value))
+// Drawn once the session is handed to plugins (`pluginSession`), so the tab always gets it. It sits absolutely, so it
+// fills the panel body without adding to its height (it'd grow past the window).
+const tabProps = computed<TabProps | undefined>(() => {
+    const session = pluginSession()
+    return session && {session, id: tabId.value}
+})
 </script>
 
 <template>
-    <div v-if="kind === 'chat'" class="absolute inset-0 flex flex-col">
-        <ChatView :key="tabId" :chat-id="tabId"/>
+    <SessionTab v-if="!kind" :key="tabId"/>
+    <div v-else class="absolute inset-0 flex flex-col">
+        <template v-if="def">
+            <PluginMount v-if="tabProps" :key="tabId" :ui="def" :props="tabProps"/>
+        </template>
+        <UEmpty v-else variant="naked" size="sm" icon="i-lucide-square-dashed" class="h-full" :title="t('app.panels.viewMissing')"/>
     </div>
-    <div v-else-if="kind === 'diff'" class="absolute inset-0 flex flex-col">
-        <!-- A diff tab is a chat's staged change or git's; its id says which. -->
-        <ChatChangeView v-if="chatChangeOf(tabId)" :key="tabId" :tab-id="tabId"/>
-        <GitDiffView v-else :key="tabId" :tab-id="tabId"/>
-    </div>
-    <div v-else-if="kind === 'view'" class="absolute inset-0 flex flex-col">
-        <PanelViewTab :key="tabId" :view-id="tabId"/>
-    </div>
-    <SessionTab v-else :key="tabId"/>
 </template>

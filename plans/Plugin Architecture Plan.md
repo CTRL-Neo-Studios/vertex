@@ -313,10 +313,34 @@ Blocked by K2. Each registry replaces a closed list; what's built in today regis
 - **Session hooks:** `session.vue`'s chat sync, git presence and auto-sync become `onSession` callbacks.
 
 ### Acceptance
-- [ ] No behaviour change: the SMOKE rows for tabs, recovery, panels, menus, the palette and Files pass.
-- [ ] Tests: old session contexts load as `openedTabs`; the menu resolves kernel and registered commands in order.
-- [ ] The kernel files named in the Baseline no longer import a feature for these points (the boundary test's rule 1 passes for them).
-- [ ] Concepts doc.
+- [x] No behaviour change: the SMOKE rows for tabs, recovery, panels, menus, the palette and Files pass (checked in `tauri dev`, below; two small differences listed there).
+- [x] Tests: old session contexts load as `openedTabs`; the menu resolves kernel and registered commands in order.
+- [x] The kernel files named in the Baseline no longer import a feature for these points (the boundary test's rule 1 passes for them).
+- [x] Concepts doc.
+
+### As built
+
+- **Contract** (`shared/plugin/contributions.ts`, re-exported by `api.ts`): one type per point; every UI slot is a `UiSlot` (`component` loader, or `mount(el, props)` returning its disposer). `ctx` gains `commands.paletteGroup`, `views.{panel, tabKind, fileViewer, statusItem}`, `files.{type, menuItem}`, `settings.page`, `home.action`; `SessionContext` is `{session, views: {show, openInTab}}`. Ids are global and unprefixed (panel and tab ids are saved), except commands'.
+- **Registries** (`app/utils/registry.ts`, `app/utils/contributions.ts`): by id, reactive, a duplicate id throws. The host takes one `contribute(point, owner, def)`; `runtime.ts` maps each point to its registry and remembers the owner for `PluginMount`'s message. The kernel registers its own (`markdown` and `code` viewers, the `view` tab kind) straight into the registries.
+- **Built-in plugins** (`app/builtins/`, source `builtin`): K3 didn't move files, so the features register through a real `ctx` from where their code is: one `definePlugin` per future layer, always on, hidden from Settings. Each X phase moves one into `layers/<id>/` and deletes it from `builtinPlugins`; the `builtin` source goes when the list is empty. Their `onSession` code runs outside a component, so what it reaches had to stop calling `useI18n` (`usePanels`, `useChatActions`, `useActiveWorkspaceTools`, `useFilesHistory`, `useBaseCommands`, `useAppSessionActions`, `useGitAutoSync`: `useNuxtApp().$i18n`) and `onBeforeUnmount` (`onScopeDispose`).
+- **`PluginMount.vue`**: as planned; the error reads "{name} couldn't draw this" (the kernel's own say Vertex). `pluginSession()` is reactive, and tabs and views draw once the session is handed to plugins, so they always get a `session`.
+- **Commands:** the kernel's `MENU_LAYOUT` stays the kernel's; what K3 removed from it are the feature items (`file.newCanvas`, `newBase`, `newWorkflow`, `newChat`). Registered commands sort into the kernel's groups (`menu.group`, default 100) after the kernel's items, replacing K1's +100 offset, so New Canvas/Base/Workflow (`file.new.<type>`, from the file types) and `chat:new` sit in File's group 0 in the old order. Shortcuts beyond menu accelerators: not added; menu accelerators cover every command today (add with the first plugin that needs one).
+- **Tab kinds:** `{kind, describe(id) → {label, icon}, persist?, exists?(id), component | mount}`, props `{session, id}`. The old `diff` kind split into `git-diff` (git) and `chat-change` (chat). Recovery now also marks the focused tab active itself: after a reload the window is on that tab's route already, so navigating didn't, and the last restored tab stayed active (a bug from before K3, seen with a chat tab after a focused view).
+- **File viewers:** as planned; `ViewerProps` gains `fileId`, the `onUpdate:*` handlers and `onRename` (every viewer emits `rename`). What only notes need moved into `RichText`; the link list into `useInternalLinkList`. `BasesViewer`'s unused `internalLinkList` prop went.
+- **File types:** `new` is `{label, command?, description?}` (`command`: File → New's label with its ellipsis; `description`: the palette's). `template` left out (no file type needs one yet).
+- **Panel views:** `definePanelView` went (nothing needed a kernel-side helper once the definitions moved). The note views' `when` is `activeViewer !== 'bases'`. Builtins owning views also run in Settings (View → Panels lists them).
+- **Status items:** `{id, viewers?, component | mount}`, props `{text, filePath}`; writers-tools registers the word counter twice (words, lines and paragraphs for markdown and YAML; lines for code and LaTeX), as before.
+- **Settings pages:** `pages/settings/[...path].vue` draws a registered page; kernel ids are refused. The moved pages are components under `app/components/Settings/` (Git, Workflows, Ai); `/settings/ai` sends on to its providers as before.
+- **Home actions:** drawn after New Workspace (Clone stays where it was), each with `data-home-action="<id>"`.
+- **Files for any file browser** moved to X4, so `FileTreeComponent` is reworked once.
+- **Checked in `tauri dev`** (separate app identifier; a temporary harness logging from the main, session and Settings windows, with screenshots; deleted after), on a vault with a note, canvas, base, workflow, image, YAML, LaTeX and JS file in a git repository:
+  - every registry populated as expected; File → New in the old order; Files' icons and Run workflow item from the registries;
+  - each file opened in its old viewer with no draw error, the image through its asset URL, word and line counts in the status bar;
+  - New Chat opened a chat tab; History opened in a tab; a git diff tab drew the change;
+  - after a reload: files, chat and History tabs back (the diff tab, not persisted, not), the focused one active;
+  - Settings: `/settings/git`, `/workflows`, `/ai` (→ providers), a provider's page, `/ai/models`, `/ai/features`, then the kernel's pages; the nav as before; the start page's buttons in the old order with Clone.
+  - Differences: in a single-file window a `.base` file (opened as YAML there) now shows the note views, since the viewer decides; in dev, hot-reloading `viewers.ts` itself throws on the second registration of the kernel's viewers (a full reload fixes it).
+- **Numbers:** 314 tests (42 files); typecheck unchanged (the 7 errors in `@type32/latex2vue`); startup closure 1,214,592 bytes (405,907 gzipped), 49 KB smaller than K2, as feature components left static kernel imports.
 
 ## K4: Editor and index contribution points; shared services
 
@@ -409,7 +433,10 @@ Blocked by X2.
 
 Blocked by X3.
 
-- `files`: `FileTreeComponent`, `PanelFilesView`, selection, drag select and its modals; `viewConfig.fileTree` → `plugins.config.files`. File operations, their history, the file menu, the drag image and `outsideItems` are the kernel's since K3 (the editor and chat import files too, and another file browser needs them).
+- `files`: `FileTreeComponent`, `PanelFilesView`, selection, drag select and its modals; `viewConfig.fileTree` → `plugins.config.files`. File operations, their history, the file menu, the drag image and `outsideItems` become the kernel's here, moved from K3 so `FileTreeComponent` is refactored once (the editor and chat import files too, and another file browser needs them):
+  - `SessionContext.files` is `useActiveWorkspaceTools` (clash and link dialogs, `fileConfig`, one undo step per action), plus `readMany` (Rust's batch read) and `assetUrl` (for thumbnails);
+  - `files.menuFor(target)`: the standard items for a file, a folder, several, or empty space (open, New from the file types, rename, duplicate, copy paths, reveal, delete, undo and redo), then what plugins registered with `menuItem`;
+  - `files.drag.start`: the `FILES_DRAG` data, the drag image and the native drag-out; `files.drag.rows`: what a drop carries. The editor and chat keep taking those drops.
 - `palette`: `WorkspaceCommandPalette` over the command and file-type registries (quick switcher, commands, New items), and the Search panel action.
 
 ### Acceptance

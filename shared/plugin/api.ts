@@ -3,12 +3,16 @@
  * implements; each phase of the Plugin Architecture Plan adds its contribution points here.
  */
 import type {ActiveSession} from '#shared/types/active/sessions'
+import type {PanelViewId} from '#shared/types/app/settings'
+import type {FileMenuItemDef, FileTypeDef, HomeActionDef, PaletteGroupDef, PanelViewDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef} from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
 
 export type {ActiveSession}
 export type {PluginManifest, WindowKind}
+export type * from './contributions'
 
-export type PluginSource = 'core' | 'global' | 'workspace'
+/** `builtin`: a feature not extracted into its layer yet (Plugin Architecture Plan, X phases): always on, not in Settings. */
+export type PluginSource = 'core' | 'global' | 'workspace' | 'builtin'
 
 export type MenuSection = 'app' | 'file' | 'edit' | 'view' | 'help'
 
@@ -23,7 +27,7 @@ export interface PluginCommand {
     enabled?: () => boolean
     /** Native menu accelerator (`CmdOrCtrl+Shift+G`); it works as a shortcut while the item is in the menu. */
     accelerator?: string
-    /** Shows it in the native menu: in `section`, after the kernel's items, groups separated. */
+    /** Shows it in the native menu: in `section`, after the kernel's items of the same group (default 100, at the end), groups separated. */
     menu?: { section: MenuSection, group?: number }
     /** Shows it in the command palette's Commands group. */
     palette?: boolean
@@ -32,6 +36,12 @@ export interface PluginCommand {
 /** What `onSession` callbacks get: the window's session once its index is built. */
 export interface SessionContext {
     session: ActiveSession
+    views: {
+        /** Shows a panel view in its pane (out of Hidden, the area expanded), or in a tab when no pane can show it. */
+        show(id: PanelViewId): unknown
+        /** Opens a `tab: true` view in a tab. */
+        openInTab(id: PanelViewId): unknown
+    }
 }
 
 /**
@@ -67,6 +77,25 @@ export interface PluginContext<Config = Record<string, unknown>> {
     commands: {
         /** Removed when the plugin stops, or with the session when called from an `onSession` callback. */
         register(command: PluginCommand): () => void
+        /** A group in the command palette. */
+        paletteGroup(def: PaletteGroupDef): () => void
+    }
+    views: {
+        panel(def: PanelViewDef): () => void
+        tabKind(def: TabKindDef): () => void
+        fileViewer(def: ViewerDef): () => void
+        statusItem(def: StatusItemDef): () => void
+    }
+    files: {
+        type(def: FileTypeDef): () => void
+        /** Items in Files' row menu. */
+        menuItem(def: FileMenuItemDef): () => void
+    }
+    settings: {
+        page(def: SettingsPageDef): () => void
+    }
+    home: {
+        action(def: HomeActionDef): () => void
     }
     /** Runs for the window's session once its index is built (now, if it already is); what it starts stops with the session. */
     onSession(fn: (session: SessionContext) => unknown): void

@@ -8,8 +8,12 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {usePanelActions} from "~/utils/panelViews";
+import {fileTypes} from "~/utils/contributions";
+import type {PanelViewProps} from "#shared/plugin/api";
 
-/** The Files view: the workspace's file tree, with New note/folder/workflow on right-click. */
+defineProps<PanelViewProps>()
+
+/** The Files view: the workspace's file tree, with New note/folder/each file type on right-click. */
 const {t} = useI18n()
 const $route = useRoute()
 const $navi = useAppNavigator()
@@ -29,13 +33,11 @@ type NewOptions = { asFolder: boolean, fileExt?: string }
 const openNew = (label: string, options: NewOptions) =>
     void overlay.create(NewFileModal, {destroyOnClose: true}).open({modalTitle: t(label), asLevel: 'same', ...options})
 const newItem = (label: string, icon: string, options: NewOptions): ContextMenuItem => ({label: t(label), icon, onSelect: () => openNew(label, options)})
-const contextMenuItems: ContextMenuItem[][] = [[
+const contextMenuItems = computed<ContextMenuItem[][]>(() => [[
     newItem('app.editor.ui.filetree.newMarkdownFile', 'i-lucide-file-plus', {asFolder: false, fileExt: 'md'}),
     newItem('app.editor.ui.filetree.newFolder', 'i-lucide-folder-dot', {asFolder: true}),
-    newItem('app.editor.ui.filetree.newCanvas', 'i-lucide-layout-dashboard', {asFolder: false, fileExt: 'canvas'}),
-    newItem('app.editor.ui.filetree.newBase', 'i-lucide-table', {asFolder: false, fileExt: 'base'}),
-    newItem('app.editor.ui.filetree.newWorkflow', 'i-lucide-workflow', {asFolder: false, fileExt: 'workflow'}),
-]]
+    ...[...fileTypes.items.values()].filter(type => type.new).map(type => newItem(type.new!.label, type.icon, {asFolder: false, fileExt: type.extensions[0]})),
+]])
 // Like Chats' New chat and New folder.
 usePanelActions(() => [
     {id: 'newNote', label: t('app.editor.ui.filetree.newMarkdownFile'), icon: 'i-lucide-file-plus', onSelect: () => openNew('app.editor.ui.filetree.newMarkdownFile', {asFolder: false, fileExt: 'md'})},

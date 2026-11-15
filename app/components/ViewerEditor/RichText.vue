@@ -1,31 +1,40 @@
 <script setup lang="ts">
-import type {
-    InternalLink,
-    InternalLinkClickDetail,
-    SpecialCodeBlockMapping
-} from "#codemirror-rich-obsidian-editor/editor-types";
-import type {EditorState, Extension} from "@codemirror/state";
+import type {InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {EditorState} from "@codemirror/state";
 import {EditorView} from "@codemirror/view";
 import {selectAll} from "@codemirror/commands";
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {ContextMenuItem} from "@nuxt/ui";
+import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
+import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import {useActiveTabs} from "~/composables/active/useActiveTabs";
+import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
+import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
+import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEditorExtensions";
+import {useInternalLinkList} from "~/composables/active/editor/useInternalLinkList";
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions";
+import {BASE_EMBED} from "~/composables/bases/useBaseContext";
 import {useChats} from "~/composables/ai/useChats";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 
-const editorInstance = defineModel('editorInstance')
+/**
+ * The kernel's markdown viewer (`.md`, `.txt`): the rich editor, with the outline's line beside it. Two roots (the
+ * layout and the outline), so the `ViewerProps` it doesn't declare are dropped rather than given to one of them.
+ */
+defineOptions({inheritAttrs: false})
+
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({ default: '' })
 const contentSaved = defineModel<boolean>('contentSaved', {default: false})
 
 const props = withDefaults(defineProps<{
-    internalLinkList: InternalLink[],
-    specialCodeBlockMapping: SpecialCodeBlockMapping[],
-    extensions?: Extension[],
+    sessionId: string,
+    fileId: string,
     renaming: boolean,
     filePath?: string,
     disabled?: boolean
@@ -36,28 +45,63 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
-    (e: 'on-clicked-internal-link', detail: InternalLinkClickDetail): void
+    (e: 'rename', oldValue: string, newValue: string): void
 }>()
+
+const session = useActiveSessions().getSession(props.sessionId)
+const internalLinkList = useInternalLinkList(session)
+const codeblockMappings = useActiveEditorCodeblockMappings()
+const extensions = useActiveEditorExtensions(session, () => props.fileId)
+// Bases embedded in this note (`![[x.base]]`, ` ```base `) query this workspace, with this note as `this`.
+if (session?.workspaceSession) provide(BASE_EMBED, {session, thisPath: () => props.filePath})
 
 // Header tools: the editor's latest state drives their enabled/active looks; each group sits where settings say.
 const {effective} = useSettingsScope()
+const editorInstance = useTemplateRef<{ view?: MaybeRef<EditorView | undefined> }>('editorInstance')
 const editorState = shallowRef<EditorState>()
 const stateTracker = EditorView.updateListener.of(update => { editorState.value = update.state })
-const editorExtensions = computed(() => [...(props.extensions ?? []), stateTracker])
-const editorView = computed(() => unref((editorInstance.value as {view?: MaybeRef<EditorView | undefined>} | undefined)?.view))
+const editorExtensions = computed(() => [...extensions.value, stateTracker])
+const editorView = computed(() => unref(editorInstance.value?.view))
 watch(editorView, view => { if (view) editorState.value = view.state }, {immediate: true})
 function toolsAt(side: HeaderToolsPosition) {
     const panel = effective.value?.viewConfig.editorPanel
     return (['history', 'format'] as const).filter(tools => (tools === 'history' ? panel?.headerHistory : panel?.headerFormatting) === side)
 }
 
+// A link in the note opens its file's tab.
+const $navi = useAppNavigator()
+const {openTab} = useActiveTabs(session)
+async function openLink({referenceId}: InternalLinkClickDetail) {
+    if (session?.workspaceSession && referenceId) await $navi.toWorkspaceTab(props.sessionId, openTab(referenceId))
+}
+
+// The outline's jumps and Insert new base arrive through the session's editor dispatcher.
+const {dispatcher} = useActiveEditorDispatcher(session)
+function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryProps) {
+    const view = editorView.value
+    if (!view) return
+    view.dispatch({selection: {anchor: from}, effects: EditorView.scrollIntoView(from, {y: verticalScrollStrategy ?? 'start', yMargin: verticalMargin ?? 70})})
+    view.focus()
+}
+dispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
+
+/** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
+function insertBlock({text}: { text: string }) {
+    const view = editorView.value
+    if (!view) return
+    const {from, to} = view.state.selection.main
+    const line = view.state.doc.lineAt(from)
+    const insert = `${from > line.from ? '\n' : ''}${text}\n`
+    view.dispatch({changes: {from, to, insert}, selection: {anchor: from + insert.length - 1}, scrollIntoView: true})
+    view.focus()
+}
+dispatcher.on('editor.insertBlock', insertBlock)
+onBeforeUnmount(dispatcher.unmount)
+
 // The editor's right-click menu (replaces the webview's, so spelling suggestions and Look Up are gone). Tables keep
 // their own: their menu takes the event first. Ask in chat needs a workspace (chats belong to one) and Chat on.
 const {t} = useI18n()
-const $route = useRoute()
 const $qt = useQuickToasts()
-const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {root: chatsRoot, askInChat} = useChats(session)
 // The properties panel's suggestions: the workspace's property names and values.
 const properties = usePropertiesOptions(session)
@@ -126,7 +170,7 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
     <ViewerEditorLayoutWrapper
         scrollMode="vertical"
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
     >
@@ -139,12 +183,12 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
                     ref="editorInstance"
                     v-model="content"
                     class="max-w-2xl w-full"
-                    :special-code-block-map="props.specialCodeBlockMapping"
-                    :internal-link-map="props.internalLinkList"
+                    :special-code-block-map="codeblockMappings"
+                    :internal-link-map="internalLinkList"
                     :properties="properties"
                     context-menu-size="sm"
                     @update:model-value="() => contentSaved = false"
-                    @internal-link-click="(detail) => emit('on-clicked-internal-link', detail)"
+                    @internal-link-click="openLink"
                 />
             </UContextMenu>
         </template>
@@ -154,10 +198,11 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
         <template #header-right>
             <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('right')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="readOnly"/>
         </template>
-        <template #status-bar>
-            <ViewerEditorComponentWordCounter v-model="content"/>
-        </template>
     </ViewerEditorLayoutWrapper>
+    <MinimalLineToc
+        class="absolute right-8 top-1/2 -translate-y-1/2 z-10"
+        @to-toc="(heading: Heading) => toTocEntry({from: heading.from})"
+    />
 </template>
 
 <style scoped>

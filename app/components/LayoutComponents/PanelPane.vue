@@ -6,7 +6,9 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels, type PanelPaneState} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
-import {PANEL_ACTIONS, panelViewComponent, panelViews, type PanelViewAction} from "~/utils/panelViews";
+import type {PanelViewAction, PanelViewProps} from "#shared/plugin/api";
+import {PANEL_ACTIONS, panelViews} from "~/utils/panelViews";
+import {pluginSession} from "~/utils/plugins/runtime";
 
 /**
  * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
@@ -28,12 +30,29 @@ const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const panels = usePanels(session)
 const drag = inject(PANEL_DRAG, () => usePanelDrag(panels.move), true)
-provide(PANEL_ACTIONS, props.actions)
+/** This pane's actions slot: written by its view (and cleared below), read by this pane's and the panel's header. */
+const slot = props.actions
+provide(PANEL_ACTIONS, slot)
 
 const strip = computed(() => panels.style.value === 'strip')
 const kbds = computed(() => panels.kbdsOf(props.area))
 const view = computed(() => panelViews.get(props.pane.active))
-const viewComponent = computed(() => panelViewComponent(props.pane.active))
+// Views draw once the session is ready (`pluginSession`), so they always get it; `actions` fills this pane's slot, as
+// `usePanelActions` does.
+const viewProps = computed<PanelViewProps | undefined>(() => {
+    const session = pluginSession()
+    return session && {
+        session,
+        placement: 'panel',
+        actions: list => {
+            slot.value = list
+        },
+    }
+})
+// A view's actions leave with it (a component's `usePanelActions` clears its own; a `mount` view's are cleared here).
+watch(() => props.pane.active, () => {
+    slot.value = undefined
+})
 const actions = computed(() => toValue(props.actions.value) ?? [])
 // Every pane has this row, whatever its view declares, so switching views doesn't move the view up or down: the
 // name (strips hold no names; in buttons style only on the right, the left list already names the view), the
@@ -125,10 +144,10 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
                 data-tauri-drag-region
             >
                 <div class="w-full">
-                    <component :is="viewComponent" class="w-full h-full mt-2"/>
+                    <PluginMount v-if="viewProps" :key="view.id" :ui="view" :props="viewProps" class="w-full h-full mt-2"/>
                 </div>
             </UScrollArea>
-            <component :is="viewComponent" v-else-if="viewComponent"/>
+            <PluginMount v-else-if="viewProps && view && (view.component || view.mount)" :key="view.id" :ui="view" :props="viewProps"/>
         </div>
     </div>
 </template>

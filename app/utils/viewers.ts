@@ -1,38 +1,31 @@
-import {isBasesFile, isCanvasFile, isImage, isLatexFile, isPlainTextFile, isUnreadableAsText, isWorkflowFile, isYamlFile} from "#shared/utils/fs/filenames";
+import type {InjectionKey, Ref} from "vue";
+import type {SessionMode} from "#shared/constants/app";
+import type {ViewerDef} from "#shared/plugin/api";
+import {isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
+import {fileViewers} from "~/utils/contributions";
 
 /**
- * Which viewer opens which file. The tab page renders the first match; add new file types here and map
- * the id to its component in `app/components/viewerComponents.ts`.
- *
- * - `loadsText`: the tab page reads/autosaves the file as UTF-8 and binds it with `v-model`.
- * - `extras`: inputs beyond the common ones (`fileName`, `filePath`, `renaming`, `disabled`,
- *   `contentSaved`, `onRename`) that the tab page should pass to this viewer.
+ * Which viewer opens a file: of the registered ones (`fileViewers`) that work in the session's mode and match the
+ * extension, the one with the highest `priority`; on a tie, the one registered first.
  */
-export type ViewerId = 'markdown' | 'image' | 'bases' | 'workflow' | 'canvas' | 'yaml' | 'latex' | 'code'
-export type ViewerExtra = 'editorInstance' | 'internalLinks' | 'codeBlocks' | 'sessionId' | 'imageSrc' | 'extensions'
-
-export interface ViewerDefinition {
-    id: ViewerId
-    loadsText: boolean
-    extras: ViewerExtra[]
-    /** Session modes the viewer supports (bases and workflows need the workspace index). */
-    modes?: ('workspace' | 'singlespace')[]
-    match: (ext: string) => boolean
+export function viewerFor(ext: string, mode: SessionMode): ViewerDef | undefined {
+    let best: ViewerDef | undefined
+    for (const viewer of fileViewers.items.values()) {
+        if (viewer.modes && !viewer.modes.includes(mode)) continue
+        if (viewer.match(ext) && (!best || (viewer.priority ?? 0) > (best.priority ?? 0))) best = viewer
+    }
+    return best
 }
 
-export const viewers: ViewerDefinition[] = [
-    {id: 'markdown', loadsText: true, extras: ['editorInstance', 'internalLinks', 'codeBlocks', 'extensions'], match: isPlainTextFile},
-    {id: 'image', loadsText: false, extras: ['imageSrc'], match: isImage},
-    {id: 'bases', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isBasesFile},
-    {id: 'workflow', loadsText: true, extras: ['sessionId'], modes: ['workspace'], match: isWorkflowFile},
-    // Cards show workspace files, so a canvas needs the index; in a singlespace it opens as JSON.
-    {id: 'canvas', loadsText: true, extras: ['internalLinks', 'sessionId'], modes: ['workspace'], match: isCanvasFile},
-    {id: 'yaml', loadsText: true, extras: [], match: isYamlFile},
-    // Only the markdown editor exposes its CodeMirror view (`editorInstance`, for the outline's jumps).
-    {id: 'latex', loadsText: true, extras: [], match: isLatexFile},
-    {id: 'code', loadsText: true, extras: [], match: ext => !isUnreadableAsText(ext)},
-]
+/**
+ * The viewer a file tab shows and what its status items are drawn with. `SessionTab` provides it; the viewer's
+ * `LayoutWrapper` draws the status bar's items for it.
+ */
+export const SHOWN_VIEWER: InjectionKey<{
+    viewer: Readonly<Ref<ViewerDef | undefined>>
+    status: Readonly<Ref<{ text: string, filePath: string }>>
+}> = Symbol('shown-viewer')
 
-export function viewerFor(ext: string, mode: 'workspace' | 'singlespace'): ViewerDefinition | undefined {
-    return viewers.find(v => (!v.modes || v.modes.includes(mode)) && v.match(ext))
-}
+// The kernel's own: notes, and the code editor for any other file readable as text (when nothing else matches).
+fileViewers.register({id: 'markdown', loadsText: true, match: isPlainTextFile, component: () => import('~/components/ViewerEditor/RichText.vue')})
+fileViewers.register({id: 'code', loadsText: true, priority: -100, match: ext => !isUnreadableAsText(ext), component: () => import('~/components/ViewerEditor/CodeText.vue')})

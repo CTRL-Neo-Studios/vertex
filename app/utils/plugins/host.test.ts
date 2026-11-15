@@ -4,7 +4,7 @@ import type {PluginContext, PluginDefinition, PluginEntry} from '#shared/plugin/
 import type {PluginManifest} from '#shared/plugin/manifest'
 import {createPluginHost} from './host'
 
-const SESSION = {session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'}}
+const SESSION = {session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'}, views: {show: () => {}, openInTab: () => {}}}
 
 function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, setup?: (ctx: PluginContext) => void, loadError?: Error }>) {
     const log: string[] = []
@@ -24,9 +24,11 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
     const host = createPluginHost(entries, {
         window: {kind: 'session', label: 'session-s1'},
         config: () => ({value: {}, set: async () => {}, overridden: () => false}),
-        registerCommand(command) {
-            commands.set(command.id, command.plugin)
-            return () => commands.delete(command.id)
+        contribute(point, owner, def) {
+            // Commands by their id; other points by `point:owner`, enough to see them come and go.
+            const key = point === 'command' ? (def as {id: string}).id : `${point}:${owner}`
+            commands.set(key, owner)
+            return () => commands.delete(key)
         },
         onFailed,
         reload,
@@ -83,6 +85,8 @@ describe('createPluginHost', () => {
         const {host, commands} = setup({
             a: {setup: ctx => {
                 ctx.commands.register({id: 'cmd', label: 'cmd', run() {}})
+                ctx.views.tabKind({kind: 'a-tab', describe: () => undefined})
+                ctx.home.action({id: 'a-home', label: 'l', icon: 'i', run() {}})
                 watch(counter, n => seen.push(n))
             }},
         })

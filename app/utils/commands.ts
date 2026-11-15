@@ -6,7 +6,7 @@ import type {MenuSection, PluginCommand} from '#shared/plugin/api'
  *
  * The kernel's menu items are `MENU_LAYOUT`; components register the handlers they can actually perform while mounted
  * (`useCommands`), so an item is only enabled when something handles it. Plugins register whole commands
- * (`registerCommand`, through `ctx.commands`), placed after the kernel's items.
+ * (`registerCommand`, through `ctx.commands`), placed in the kernel's groups after the kernel's items.
  */
 export type {MenuSection}
 
@@ -32,10 +32,6 @@ export const MENU_LAYOUT: {id: string, section: MenuSection, group: number, labe
 
     {id: 'file.newFile', section: 'file', group: 0, label: 'app.commands.newFile', accelerator: 'CmdOrCtrl+N'},
     {id: 'file.newFolder', section: 'file', group: 0, label: 'app.commands.newFolder', accelerator: 'CmdOrCtrl+Shift+N'},
-    {id: 'file.newCanvas', section: 'file', group: 0, label: 'app.commands.newCanvas'},
-    {id: 'file.newBase', section: 'file', group: 0, label: 'app.commands.newBase'},
-    {id: 'file.newWorkflow', section: 'file', group: 0, label: 'app.commands.newWorkflow'},
-    {id: 'file.newChat', section: 'file', group: 0, label: 'app.commands.newChat', accelerator: 'CmdOrCtrl+Shift+L'},
     {id: 'file.newWorkspace', section: 'file', group: 1, label: 'app.commands.newWorkspace'},
     {id: 'file.openFile', section: 'file', group: 1, label: 'app.commands.openFile', accelerator: 'CmdOrCtrl+O'},
     {id: 'file.openFolder', section: 'file', group: 1, label: 'app.commands.openFolder', accelerator: 'CmdOrCtrl+Shift+O'},
@@ -80,12 +76,10 @@ export function registerCommand(command: RegisteredCommand): () => void {
     }
 }
 
-/** Plugins' menu groups come after the kernel's (0–2). */
-const PLUGIN_GROUP = 100
-
 /**
- * Resolves the menu: one entry per layout item, enabled only when a handler is registered and allows it; then the
- * registered commands that ask for the menu, by group, in registration order.
+ * Resolves the menu: one entry per layout item, enabled only when a handler is registered and allows it; and the
+ * registered commands that ask for the menu (default group 100, at the end). Within a group, the kernel's items come
+ * first, then registered ones in registration order.
  */
 export function resolveMenu(handlers: CommandHandlers, registered: Iterable<RegisteredCommand> = []): MenuEntry[] {
     const kernel = MENU_LAYOUT.map(item => {
@@ -94,10 +88,9 @@ export function resolveMenu(handlers: CommandHandlers, registered: Iterable<Regi
     })
     const plugin = [...registered]
         .filter(c => c.menu)
-        .map((c, i) => ({c, i, group: PLUGIN_GROUP + (c.menu!.group ?? 0)}))
-        .sort((a, b) => a.group - b.group || a.i - b.i)
-        .map(({c, group}) => ({id: c.id, section: c.menu!.section, group, label: c.label, accelerator: c.accelerator, run: c.run, enabled: c.enabled?.() ?? true}))
-    return [...kernel, ...plugin]
+        .map(c => ({id: c.id, section: c.menu!.section, group: c.menu!.group ?? 100, label: c.label, accelerator: c.accelerator, run: c.run, enabled: c.enabled?.() ?? true}))
+    // A stable sort by group: `menuSections` splits sections, keeping this order within each.
+    return [...kernel, ...plugin].sort((a, b) => a.group - b.group)
 }
 
 /** Groups resolved entries into sections; `null` marks a separator between groups. */

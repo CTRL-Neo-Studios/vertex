@@ -8,6 +8,7 @@ import {SETTINGS_ROUTE_EVENT, SETTINGS_SCOPE_EVENT} from "~/composables/app/useA
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {pluginEnabled} from "#shared/plugin/resolve";
 import {pluginManifests} from "~/utils/plugins/catalog";
+import {settingsPages} from "~/utils/contributions";
 
 const {t} = useI18n()
 const $route = useRoute()
@@ -19,19 +20,18 @@ const links = computed(() => [
     {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
-    {label: t('app.settings.nav.workflows'), icon: 'i-lucide-workflow', to: `${Routes.settings}/workflows`},
-    {label: t('app.settings.nav.git'), icon: 'i-lucide-git-branch', to: `${Routes.settings}/git`},
-    {
-        label: t('app.settings.nav.ai'),
-        icon: 'i-lucide-sparkles',
-        defaultOpen: $route.path.startsWith(`${Routes.settings}/ai`),
-        children: [
-            // `active` by prefix: a profile's or provider's own page keeps its list highlighted.
-            {label: t('app.settings.nav.aiProviders'), icon: 'i-lucide-server', to: `${Routes.settings}/ai/providers`, active: $route.path.startsWith(`${Routes.settings}/ai/providers`)},
-            {label: t('app.settings.nav.aiModels'), icon: 'i-lucide-box', to: `${Routes.settings}/ai/models`, active: $route.path.startsWith(`${Routes.settings}/ai/models`)},
-            {label: t('app.settings.nav.aiFeatures'), icon: 'i-lucide-toggle-right', to: `${Routes.settings}/ai/features`},
-        ],
-    },
+    // Registered pages, in registration order; one with children is a group, open on its routes.
+    ...[...settingsPages.items.values()].map(page => {
+        const to = `${Routes.settings}/${page.id}`
+        if (!page.children) return {label: t(page.label), icon: page.icon, to}
+        return {
+            label: t(page.label),
+            icon: page.icon,
+            defaultOpen: $route.path.startsWith(to),
+            // `active` by prefix: an item's own page (a provider's, a profile's) keeps its list highlighted.
+            children: page.children.map(child => ({label: t(child.label), icon: child.icon, to: `${to}/${child.path}`, active: $route.path.startsWith(`${to}/${child.path}`)})),
+        }
+    }),
     {label: t('app.settings.nav.plugins'), icon: 'i-lucide-puzzle', to: `${Routes.settings}/plugins`, active: $route.path === `${Routes.settings}/plugins`},
     // The settings of the plugins that are on in the scope being edited.
     ...pluginManifests()

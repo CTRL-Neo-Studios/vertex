@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {statusItems} from "~/utils/contributions";
+import {SHOWN_VIEWER} from "~/utils/viewers";
 
 /**
  * Flexible layout wrapper for different viewer/editor types.
@@ -13,15 +15,22 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
  * - Different alignment strategies
  */
 
-// Viewers wrap themselves in this, and `SessionTab` hands every viewer the same props and listeners (`content-saved`,
-// the internal-link listener); what a viewer doesn't declare falls through to here. This renders a fragment, so such
-// attrs could never land anywhere: dropped, instead of a Vue warning per viewer.
+// Viewers wrap themselves in this, and `SessionTab` hands every viewer the same `ViewerProps`; what a viewer doesn't
+// declare falls through to here. This renders a fragment, so such attrs could never land anywhere: dropped, instead
+// of a Vue warning per viewer.
 defineOptions({inheritAttrs: false})
 
 const fileName = defineModel<string>('fileName')
 // The workspace's own view settings, when it overrides them.
 const {effective} = useSettingsScope()
 const statusBarDisplayMode = computed(() => effective.value?.viewConfig.editorPanel.showStatusBar)
+// The status bar's registered items for the tab's viewer (default: viewers that load text), after the viewer's own.
+const shown = inject(SHOWN_VIEWER, null)
+const items = computed(() => {
+    const viewer = shown?.viewer.value
+    if (!viewer) return []
+    return [...statusItems.items.values()].filter(item => item.viewers?.includes(viewer.id) ?? viewer.loadsText)
+})
 
 // One header row for both root variants: left slot, breadcrumbs always centered, right slot.
 const [DefineHeaderRow, HeaderRow] = createReusableTemplate()
@@ -178,6 +187,7 @@ const viewportClasses = computed(() => {
         <div v-if="showStatusBar" class="bg-default absolute z-10 left-0 right-0 bottom-0 h-fit">
             <div class="bg-submuted inline-flex justify-center items-center w-full border-t border-default p-1 px-3 pb-1.5">
                 <slot name="status-bar"/>
+                <PluginMount v-for="item in items" :key="item.id" :ui="item" :props="shown!.status.value"/>
             </div>
         </div>
     </div>
@@ -223,6 +233,7 @@ const viewportClasses = computed(() => {
 				]"
 			>
 				<slot name="status-bar" />
+				<PluginMount v-for="item in items" :key="item.id" :ui="item" :props="shown!.status.value"/>
 			</div>
 		</div>
 

@@ -18,8 +18,8 @@ export interface GitDiffSpec {
 const PREFIX = 'diff-'
 
 /**
- * A diff tab's id, which is also its route segment: the whole spec, URL-safe, so the page can show it from the route
- * alone and the same diff opens the same tab (and never a file's own tab).
+ * A `git-diff` tab's id, which is also its route segment: the whole spec, URL-safe, so the page can show it from the
+ * route alone and the same diff opens the same tab (and never a file's own tab).
  */
 export const diffTabId = (spec: GitDiffSpec) => PREFIX + toBase64Url(JSON.stringify([spec.top, spec.path, spec.side, spec.origPath ?? null]))
 

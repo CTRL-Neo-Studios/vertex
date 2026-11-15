@@ -51,17 +51,14 @@ export const StateKey = {
     bottomPanel: (s: string) => `active.layouts.bottom-panel.${s}`,
     shownPanelViews: (s: string) => `active.layouts.shown-panel-views.${s}`,
     fileSearchOpen: (s: string) => `active.layouts.file-search-open.${s}`,
-    chatSearchOpen: (s: string) => `active.chats.search-open.${s}`,
-    chatsExpanded: (s: string) => `active.chats.expanded.${s}`,
-    chatVault: (s: string) => `active.chats.vault.${s}`,
-    chatIndex: (s: string) => `active.chats.index.${s}`,
-    chatError: (s: string) => `active.chats.error.${s}`,
-    chatSidePanel: (s: string) => `active.chats.side-panel.${s}`,
-    chatPrompt: (s: string) => `active.chats.prompt.${s}`,
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,
 } as const
+
+/** A plugin's `useState` key: `plugin.<id>.<name>`, per session when given. Keeps plugins' state apart from the kernel's and each other's. */
+export const pluginStateKey = (plugin: string, name: string, session?: string) =>
+    `plugin.${plugin}.${name}${session === undefined ? '' : `.${session}`}`
 
 /**
  * Resolves the uuid used to scope per-session state. A missing session is a bug in the caller

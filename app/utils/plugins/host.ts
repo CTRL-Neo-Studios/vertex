@@ -1,5 +1,5 @@
 import {effectScope, getCurrentScope, onScopeDispose, shallowReactive, type EffectScope} from 'vue'
-import type {PluginApis, PluginCommand, PluginConfigAccess, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
+import type {ContributionPoints, PluginApis, PluginConfigAccess, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
 import {parseRequirement, pluginWindows, type PluginManifest, type WindowKind} from '#shared/plugin/manifest'
 import {resolvePlugins, type OffReason} from '#shared/plugin/resolve'
 
@@ -11,8 +11,8 @@ export type PluginState =
 
 export interface PluginHostOptions {
     window: { kind: WindowKind, label: string }
-    /** Adds a command, its id already `<plugin>:<id>`; returns its removal. */
-    registerCommand(command: PluginCommand & { plugin: string }): () => void
+    /** Adds a contribution (a command's id already `<plugin>:<id>`) on behalf of plugin `owner`; returns its removal. */
+    contribute<P extends keyof ContributionPoints>(point: P, owner: string, def: ContributionPoints[P]): () => void
     /** A plugin's `ctx.config`: its settings in this window. */
     config(manifest: PluginManifest): PluginConfigAccess<Record<string, unknown>>
     /** A plugin failed to load or start, or one of its callbacks threw. */
@@ -92,6 +92,18 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
             if (getCurrentScope()) onScopeDispose(dispose)
             else if (r.scope.active) r.scope.run(() => onScopeDispose(dispose))
         }
+        /** Registers `def` at `point` for this plugin; the removal belongs to the current scope (see `own`) and runs once. */
+        const add = <P extends keyof ContributionPoints>(point: P, def: ContributionPoints[P]) => {
+            const remove = options.contribute(point, id, def)
+            let removed = false
+            const once = () => {
+                if (removed) return
+                removed = true
+                remove()
+            }
+            own(once)
+            return once
+        }
         const use = <K extends keyof PluginApis>(target: K) =>
             (states.get(target as string)?.status === 'active' ? running.get(target as string)?.api : undefined) as PluginApis[K] | undefined
 
@@ -100,18 +112,21 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
             config: options.config(manifest),
             window: {...options.window},
             commands: {
-                register(command) {
-                    const remove = options.registerCommand({...command, id: `${id}:${command.id}`, plugin: id})
-                    let removed = false
-                    const once = () => {
-                        if (removed) return
-                        removed = true
-                        remove()
-                    }
-                    own(once)
-                    return once
-                },
+                register: command => add('command', {...command, id: `${id}:${command.id}`, plugin: id}),
+                paletteGroup: def => add('paletteGroup', def),
             },
+            views: {
+                panel: def => add('panel', def),
+                tabKind: def => add('tabKind', def),
+                fileViewer: def => add('viewer', def),
+                statusItem: def => add('statusItem', def),
+            },
+            files: {
+                type: def => add('fileType', def),
+                menuItem: def => add('fileMenuItem', def),
+            },
+            settings: {page: def => add('settingsPage', def)},
+            home: {action: def => add('homeAction', def)},
             onSession(fn) {
                 r.hooks.push(fn)
                 // During `setup` the host runs it once `setup` is done; later, now.

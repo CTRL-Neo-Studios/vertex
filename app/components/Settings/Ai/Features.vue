@@ -6,10 +6,6 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 const {t} = useI18n()
 const {load, config} = useAppSettings()
 const scope = useSettingsScope()

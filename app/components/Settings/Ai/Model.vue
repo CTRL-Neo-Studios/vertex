@@ -8,11 +8,8 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {createAiFetch} from "~/utils/aiFetch";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 /** One model profile: a provider's model, how features use it (system prompt, tools) and its request parameters. */
+const props = defineProps<{ id: string }>()
 const {t} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
@@ -21,7 +18,7 @@ const {ai, updateModelProfile, removeModelProfiles, setDefaultModelProfile} = us
 onMounted(load)
 
 const back = computed(() => ({path: `${Routes.settings}/ai/models`, query: {q: $route.query.q || undefined}}))
-const profile = computed(() => ai.value?.modelProfiles.find(p => p.id === $route.params.id))
+const profile = computed(() => ai.value?.modelProfiles.find(p => p.id === props.id))
 const save = (patch: Partial<AiModelProfile>) => profile.value && updateModelProfile(profile.value.id, patch)
 
 const name = ref('')

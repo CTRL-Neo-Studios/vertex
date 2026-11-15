@@ -7,7 +7,7 @@ import {readFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
-import {sessionScope, StateKey} from "#shared/constants/app";
+import {pluginStateKey, sessionScope} from "#shared/constants/app";
 import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
@@ -67,6 +67,10 @@ const inFolder = (folder: string, path: string) => folder === path || folder.sta
 /** A workflow run's change, in a few words for the model. */
 const opText = (op: Op) => op.kind === 'move' ? `${op.why}: "${op.from}" → "${op.to}"` : `${op.kind === 'create' ? `new ${op.why}` : op.why}: "${op.path}"`
 
+/** A chat's entry in the session's index, without the rest of `useChats` (which needs a component): its tab's name. */
+export const chatSummaryOf = (session: ActiveSession, id: string): ChatSummary | undefined =>
+    useState<ChatIndex | null>(pluginStateKey('chat', 'index', session.uuid), () => null).value?.chats.find(c => c.id === id)
+
 /**
  * A workspace's chats (Rust stores them; see chatClient). Unavailable (`root` null) in singlespace sessions.
  * Mutations throw Rust's error strings (`ChatError`); `refresh` puts its error in `error` instead.
@@ -82,12 +86,12 @@ export function useChats(session?: ActiveSession) {
 
     const root = computed(() => session?.workspaceSession && session.rootPath ? session.rootPath : null)
     const storage = computed<ChatStorage>(() => effective.value?.aiConfig.chatStorage ?? 'app')
-    const vault = useState<ChatVaultState | null>(StateKey.chatVault(scope), () => null)
-    const index = useState<ChatIndex | null>(StateKey.chatIndex(scope), () => null)
-    const error = useState<string | null>(StateKey.chatError(scope), () => null)
-    const sidePanelChatId = useState<string | null>(StateKey.chatSidePanel(scope), () => null)
+    const vault = useState<ChatVaultState | null>(pluginStateKey('chat', 'vault', scope), () => null)
+    const index = useState<ChatIndex | null>(pluginStateKey('chat', 'index', scope), () => null)
+    const error = useState<string | null>(pluginStateKey('chat', 'error', scope), () => null)
+    const sidePanelChatId = useState<string | null>(pluginStateKey('chat', 'side-panel', scope), () => null)
     /** Text and notes for a chat's prompt, put there by `askInChat` and taken by that chat's ChatView. */
-    const pendingPrompt = useState<{ chatId: string, text: string, notes: string[] } | null>(StateKey.chatPrompt(scope), () => null)
+    const pendingPrompt = useState<{ chatId: string, text: string, notes: string[] } | null>(pluginStateKey('chat', 'prompt', scope), () => null)
 
     const keyOf = (id: string) => `${scope}:${id}`
     const ownLive = () => [...live].filter(([key]) => key.startsWith(`${scope}:`))
@@ -291,9 +295,9 @@ export function useChats(session?: ActiveSession) {
         return until(() => editorViewOf(session, noteId)).toBeTruthy({timeout: 10_000, throwOnTimeout: false})
     }
 
-    /** A Write-mode change's diff tab (`ChatChangeView`), with the chat beside it. */
+    /** A Write-mode change's diff tab (`ChatChangeView`, tab kind `chat-change`), with the chat beside it. */
     const openChange = (chatId: string, messageId: string, path: string) =>
-        showBeside(chatId, $tabs.openTab(chatChangeTabId({chatId, messageId, path}), 'diff'))
+        showBeside(chatId, $tabs.openTab(chatChangeTabId({chatId, messageId, path}), 'chat-change'))
 
     /** A note by workspace-relative path or, as models often pass, by name (like a wikilink: any case, `.md` optional). */
     function findNote(path: string) {

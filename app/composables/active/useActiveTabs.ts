@@ -11,7 +11,7 @@ export function useActiveTabs(session?: ActiveSession) {
     const activeTabUuid = useState<string | null>(StateKey.activeTab(scope), () => null);
 
     /**
-     * Opens a new tab for a given file UUID (or chat id, with `kind` `'chat'`).
+     * Opens a new tab for a given file UUID (or another kind's id, with its registered `kind`: `tabKinds`).
      * If the tab is already open, it just makes it active.
      */
     function openTab(fileUuidRef: PossiblyRef<string>, kind?: ActiveTab['kind']) {

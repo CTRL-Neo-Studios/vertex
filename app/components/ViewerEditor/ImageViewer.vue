@@ -7,7 +7,7 @@
 const fileName = defineModel<string>('fileName', { required: true })
 
 withDefaults(defineProps<{
-    imageSrc: string,
+    assetUrl: string,
     renaming: boolean,
     filePath?: string,
     disabled?: boolean, // I don't know what to do with this for now, so I'll leave it here
@@ -18,7 +18,7 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
+    (e: 'rename', oldValue: string, newValue: string): void
 }>()
 
 const imageRef = ref<HTMLImageElement>()
@@ -54,7 +54,7 @@ const fileSizeKB = computed(() => {
 <template>
     <ViewerEditorLayoutWrapper
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
 
@@ -95,7 +95,7 @@ const fileSizeKB = computed(() => {
             <div class="w-full h-full pb-6 flex items-center justify-center overflow-hidden bg-muted/30">
                 <img
                     ref="imageRef"
-                    :src="imageSrc" 
+                    :src="assetUrl"
                     :alt="fileName"
                     class="max-w-full max-h-full object-contain transition-transform"
                     :style="{ transform: `scale(${zoom / 100})` }"

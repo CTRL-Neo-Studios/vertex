@@ -20,7 +20,8 @@ import {useFilesHistory, type FilesStep} from "~/composables/active/useFilesHist
 export function useActiveWorkspaceTools(session?: ActiveSession) {
     const $tabs = useActiveTabs(session)
     const $qt = useQuickToasts()
-    const {t} = useI18n()
+    // Not `useI18n`: the Bases palette group uses it outside a component's setup.
+    const {t} = useNuxtApp().$i18n
     const scope = useSettingsScope()
     const updateLinksModal = useOverlay().create(UpdateLinksModal)
     const conflictModal = useOverlay().create(FileConflictModal)

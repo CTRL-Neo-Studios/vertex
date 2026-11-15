@@ -585,6 +585,11 @@
 					"runWorkflow": "运行 {name}",
 					"runWorkflowOn": "在 {note} 上"
 				},
+				"fileTypes": {
+					"canvas": "画布",
+					"base": "数据库",
+					"workflow": "工作流"
+				},
 				"bases": {
 					"invalid": "无法解析数据库文件",
 					"unknownViewType": "未知的视图类型：{type}",
@@ -2161,7 +2166,8 @@
 			"recent": "最近的工作区"
 		},
 		"plugins": {
-			"failed": "{name} 无法启动"
+			"failed": "{name} 无法启动",
+			"drawFailed": "{name} 无法绘制此内容"
 		},
 		"panels": {
 			"moveUp": "上移",

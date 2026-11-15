@@ -16,7 +16,7 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
+    (e: 'rename', oldValue: string, newValue: string): void
 }>()
 
 const payload = computed(() => parseYaml<YamlFormData>(unref(content)))
@@ -38,7 +38,7 @@ const payloadData = computed({
     <ViewerEditorLayoutWrapper
         scrollMode="vertical"
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
     >
@@ -49,9 +49,6 @@ const payloadData = computed({
                 class="h-full max-w-2xl w-full"
                 :disabled="payloadError != undefined || renaming"
             />
-        </template>
-        <template #status-bar>
-            <ViewerEditorComponentWordCounter v-model="content"/>
         </template>
     </ViewerEditorLayoutWrapper>
 </template>

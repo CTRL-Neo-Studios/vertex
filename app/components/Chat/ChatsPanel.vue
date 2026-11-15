@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {CommandPaletteGroup, NavigationMenuChildItem, NavigationMenuItem} from "@nuxt/ui";
 import type {ChatHit, ChatSummary} from "#shared/types/app/chats";
-import {StateKey} from "#shared/constants/app";
+import {pluginStateKey} from "#shared/constants/app";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useChats} from "~/composables/ai/useChats";
@@ -9,6 +9,9 @@ import {useChatActions} from "~/composables/ai/useChatActions";
 import ChatVaultForm from "~/components/Chat/ChatVaultForm.vue";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {usePanelActions} from "~/utils/panelViews";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 /**
  * The left sidebar's Chats view, after the Nuxt UI chat template: New chat and New folder in the panel's header, the
@@ -24,7 +27,7 @@ const {run, chatTitle, newChat, newFolder, moveFolderTo, panelMenu, chatActions,
 
 watch(storage, () => refresh(), {immediate: true})
 
-const expanded = useState<string[]>(StateKey.chatsExpanded(sessionId.value), () => [])
+const expanded = useState<string[]>(pluginStateKey('chat', 'expanded', sessionId.value), () => [])
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const fade = useScrollFade(() => scrollAreaRef.value?.$el)
@@ -216,7 +219,7 @@ function onDrop(event: DragEvent) {
 }
 
 // Shared: the panels' Search opens it while this view is showing.
-const searchOpen = useState<boolean>(StateKey.chatSearchOpen(sessionId.value), () => false)
+const searchOpen = useState<boolean>(pluginStateKey('chat', 'search-open', sessionId.value), () => false)
 const searchTerm = ref('')
 const hits = shallowRef<ChatHit[]>([])
 let searchRun = 0

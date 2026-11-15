@@ -28,7 +28,8 @@ export const autoSyncPaused = reactive(new Set<string>())
 
 /**
  * Keeps `isGitRepo` current for a workspace window: checked when it opens, and again when its `.git` folder comes or
- * goes (a known repository's everyday writes there don't count). The Git view's own status keeps it current too.
+ * goes (a known repository's everyday writes there don't count). The Git view's own status keeps it current too. Runs
+ * in the git plugin's `onSession` callback; it stops with the session.
  */
 export function watchGitPresence(session: ActiveSession | undefined) {
     const root = session?.rootPath
@@ -37,7 +38,7 @@ export function watchGitPresence(session: ActiveSession | undefined) {
     void check()
     const recheck = useDebounceFn(check, 500)
     const gitDir = `${root}/.git`
-    onBeforeUnmount(useActiveWorkspaceIndex(session).on(event => {
+    onScopeDispose(useActiveWorkspaceIndex(session).on(event => {
         if (event.type !== 'changed') return
         if (event.paths.some(p => p === gitDir || (!repoRoots.has(root) && p.startsWith(`${gitDir}/`)))) void recheck()
     }))

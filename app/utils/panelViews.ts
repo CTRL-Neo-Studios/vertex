@@ -1,89 +1,20 @@
-import type {Component, InjectionKey, MaybeRefOrGetter, ShallowRef} from "vue";
+import type {InjectionKey, MaybeRefOrGetter, ShallowRef} from "vue";
 import type {ContextMenuItem} from "@nuxt/ui";
-import type {ActiveSession} from "#shared/types/active/sessions";
-import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
-import type {AppSettings, PanelArea, PanelLayout, PanelViewId} from "#shared/types/app/settings";
-import {sessionScope, StateKey} from "#shared/constants/app";
-import {isBasesFile} from "#shared/utils/fs/filenames";
+import type {PanelArea, PanelLayout, PanelViewId} from "#shared/types/app/settings";
+import type {PanelViewAction, PanelViewDef} from "#shared/plugin/api";
 import {PANEL_AREAS, addPanelSeparator, addPanelSplit, movePanelSlot, placeMissingViews, type PanelList} from "#shared/utils/panelLayout";
-import {aiFeatureOn} from "~/composables/ai/useAiConfig";
-import {isGitRepo} from "~/composables/git/useGitRepo";
+import {createRegistry} from "~/utils/registry";
 
-/** What a view's `when` sees: the session window it would show in. */
-export interface PanelViewContext {
-    session: ActiveSession | undefined
-    isWorkspace: boolean
-    /** The focused tab's file; `undefined` for a chat tab or no tab. */
-    activeFile: ActiveWorkspaceFileIndex | undefined
-    /** The effective settings (the workspace's overrides applied). */
-    settings: AppSettings | undefined
-}
-
-/** What an action and its shortcut hint see: the context, plus the area its button is in and the view shown there. */
-export interface PanelActionContext extends PanelViewContext {
-    area: PanelArea
-    /** The view shown in the pane holding the button, `undefined` when the area is collapsed. */
-    shown: PanelViewId | undefined
-}
-
-/** A panel view: either a `component` shown in a pane (on a side or at the bottom), or an `action` its button runs (Search). */
-export interface PanelViewDef {
-    id: PanelViewId
-    /** i18n key. */
-    label: string
-    icon: string
-    /** Where the view first goes when a layout doesn't hold it; built-ins are placed by `DEFAULT_PANEL_LAYOUT`. */
-    defaultArea: PanelList
-    component?: () => Promise<Component | { default: Component }>
-    /** Runs inside the Nuxt app's context, so it may use `useState`. */
-    action?: (ctx: PanelActionContext) => void
-    /** Whether the view can show in this window; absent = always. */
-    when?: (ctx: PanelViewContext) => boolean
-    /** Wrap it in the panel's fading scroll area (views that don't scroll on their own). */
-    scroll?: boolean
-    /**
-     * It may open in a tab of its own (`ActiveTab.kind: 'view'`, id = view id) as well as in its pane, so it must work
-     * mounted twice at once.
-     */
-    tab?: boolean
-    /** Keyboard hint on its button. */
-    kbds?: (ctx: PanelActionContext) => string[] | undefined
-}
-
-const views = shallowReactive(new Map<PanelViewId, PanelViewDef>())
-const components = new Map<PanelViewId, Component>()
+const registry = createRegistry<PanelViewDef>('panel view', d => d.id)
 
 /** Every registered view, in registration order. */
-export const panelViews: ReadonlyMap<PanelViewId, PanelViewDef> = views
+export const panelViews: ReadonlyMap<PanelViewId, PanelViewDef> = registry.items
 
-/** Registers a view (replacing one with the same id). */
-export function definePanelView(def: PanelViewDef): PanelViewDef {
-    views.set(def.id, def)
-    const load = def.component
-    // Vue unwraps `default` only from real ES modules; a loader may resolve to a plain `{default}` too.
-    if (load) components.set(def.id, defineAsyncComponent(async () => {
-        const loaded = await load()
-        return 'default' in loaded ? loaded.default : loaded
-    }))
-    else components.delete(def.id)
-    return def
-}
-
-/** The component a view shows, loaded on first use; `undefined` for actions and unregistered ids. */
-export const panelViewComponent = (id: PanelViewId | undefined) => (id ? components.get(id) : undefined)
+/** Registers a view; returns its removal. A second view with the same id is an error. */
+export const registerPanelView = (def: PanelViewDef) => registry.register(def)
 
 /** `layout` with every registered view it doesn't hold yet, at its `defaultArea`. */
-export const withRegisteredViews = (layout: PanelLayout) => placeMissingViews(layout, views.values())
-
-/** A button a view puts in its panel's header (refresh, new, collapse all…). */
-export interface PanelViewAction {
-    id: string
-    /** Shown text (already translated): the tooltip and the accessible name. */
-    label: string
-    icon: string
-    onSelect: () => unknown
-    disabled?: boolean
-}
+export const withRegisteredViews = (layout: PanelLayout) => placeMissingViews(layout, registry.items.values())
 
 /** A pane's slot for its shown view's actions; each pane (`PanelPane`) provides one. */
 export const PANEL_ACTIONS: InjectionKey<ShallowRef<MaybeRefOrGetter<PanelViewAction[]> | undefined>> = Symbol('panel-actions')
@@ -101,67 +32,6 @@ export function usePanelActions(actions: MaybeRefOrGetter<PanelViewAction[]>) {
         if (slot.value === actions) slot.value = undefined
     })
 }
-
-const chatOn = (ctx: PanelViewContext) => ctx.isWorkspace && aiFeatureOn(ctx.settings?.aiConfig, 'chat')
-/** Views about the open note, which a Bases file doesn't have. */
-const noteView = (ctx: PanelViewContext) => !isBasesFile(ctx.activeFile?.fileExt ?? '')
-
-definePanelView({
-    id: 'files', label: 'app.chat.files', icon: 'i-lucide-files', defaultArea: 'left',
-    when: ctx => ctx.isWorkspace,
-    component: () => import('~/components/LayoutComponents/PanelFilesView.vue'),
-})
-definePanelView({
-    id: 'chats', label: 'app.chat.chats', icon: 'i-lucide-messages-square', defaultArea: 'left',
-    when: chatOn,
-    component: () => import('~/components/Chat/ChatsPanel.vue'),
-})
-definePanelView({
-    id: 'search', label: 'app.chat.search', icon: 'i-lucide-search', defaultArea: 'left',
-    when: ctx => ctx.isWorkspace,
-    // The chats' search while Chats shows beside it, else the files'.
-    action: ({session, shown}) => {
-        const scope = sessionScope(session, 'search')
-        useState<boolean>(shown === 'chats' ? StateKey.chatSearchOpen(scope) : StateKey.fileSearchOpen(scope), () => false).value = true
-    },
-    kbds: ({shown}) => (shown === 'chats' ? undefined : ['meta', 'p']),
-})
-definePanelView({
-    id: 'git', label: 'app.git.label', icon: 'i-lucide-git-branch', defaultArea: 'left',
-    when: ctx => ctx.isWorkspace,
-    component: () => import('~/components/Git/GitChangesView.vue'),
-})
-definePanelView({
-    id: 'gitHistory', label: 'app.git.history.label', icon: 'i-lucide-git-graph', defaultArea: 'bottom', tab: true,
-    // Only where there's a history, so a workspace without git doesn't get a bottom area for it.
-    when: ctx => ctx.isWorkspace && isGitRepo(ctx.session?.rootPath),
-    component: () => import('~/components/Git/GitHistoryView.vue'),
-})
-definePanelView({
-    id: 'forelinks', label: 'app.editor.ui.forelinks', icon: 'i-lucide-square-arrow-out-up-right', defaultArea: 'right',
-    when: noteView, scroll: true,
-    component: () => import('~/components/ReferenceForelinksListComponent.vue'),
-})
-definePanelView({
-    id: 'backlinks', label: 'app.editor.ui.backlinks', icon: 'i-lucide-square-arrow-out-down-left', defaultArea: 'right',
-    when: noteView, scroll: true,
-    component: () => import('~/components/ReferenceBacklinksListComponent.vue'),
-})
-definePanelView({
-    id: 'writersTools', label: 'app.editor.ui.functions.writersTools', icon: 'i-lucide-pencil', defaultArea: 'right',
-    when: noteView, scroll: true,
-    component: () => import('~/components/WritersInfoPanelComponent.vue'),
-})
-definePanelView({
-    id: 'toc', label: 'app.editor.ui.functions.tableOfContents', icon: 'i-lucide-table-of-contents', defaultArea: 'right',
-    when: noteView, scroll: true,
-    component: () => import('~/components/TableOfContentsPanelComponent.vue'),
-})
-definePanelView({
-    id: 'chat', label: 'app.chat.chat', icon: 'i-lucide-message-square', defaultArea: 'right',
-    when: chatOn,
-    component: () => import('~/components/Chat/ChatSidePanelView.vue'),
-})
 
 /**
  * The right-click menu of a slot (`index` in `list`), or of a list's empty space: move it (up, down, to the other side),
@@ -211,7 +81,7 @@ export function panelSlotMenu(o: {
     const items2: ContextMenuItem[] = [{label: t('app.panels.reset'), icon: 'i-lucide-rotate-ccw', onSelect: () => void o.reset()}]
     // Hidden views that aren't registered (a plugin that's off, later) keep their place but aren't offered.
     const hidden = l.hidden.flatMap((id, i) => {
-        const view = views.get(id)
+        const view = registry.get(id)
         return view ? [{view, i}] : []
     })
     if (list !== 'hidden') {

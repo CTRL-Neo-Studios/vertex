@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
+    (e: 'rename', oldValue: string, newValue: string): void
 }>()
 </script>
 
@@ -26,7 +26,7 @@ const emit = defineEmits<{
     <ViewerEditorLayoutWrapper
         scrollMode="none"
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="props.filePath"
         :renaming="renaming"
         :bottomSpacing="false"
@@ -53,9 +53,6 @@ const emit = defineEmits<{
                     </div>
                 </div>
             </div>
-        </template>
-        <template #status-bar>
-            <ViewerEditorComponentWordCounter v-model="content" :paragraphs="false" :words="false"/>
         </template>
     </ViewerEditorLayoutWrapper>
 </template>

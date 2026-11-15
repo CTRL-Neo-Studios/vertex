@@ -1,7 +1,8 @@
 <script setup lang="ts">
-const content = defineModel({ default: '' })
-
-withDefaults(defineProps<{
+/** A status item (writers-tools): the shown file's counts. */
+const props = withDefaults(defineProps<{
+    text: string,
+    filePath: string,
     words?: boolean,
     lines?: boolean,
     paragraphs?: boolean
@@ -13,7 +14,7 @@ withDefaults(defineProps<{
 
 const $du = useDocumentUtils()
 // Three passes over the whole text: once typing pauses, not per keystroke.
-const text = refDebounced(content, 250)
+const text = refDebounced(toRef(props, 'text'), 250)
 const wordCount = computed(() => $du.getWordCount(text.value || ''))
 const lineCount = computed(() => $du.getLineCount(text.value || ''))
 const paragraphCount = computed(() => $du.getParagraphs(text.value || ''))

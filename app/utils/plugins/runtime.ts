@@ -1,14 +1,16 @@
-import {computed, watch} from 'vue'
+import {computed, shallowRef, watch} from 'vue'
 import {getCurrentWebviewWindow} from '@tauri-apps/api/webviewWindow'
 import {pluginConfig} from '#shared/plugin/config'
 import {sessionUuidFromLabel, WindowLabel} from '#shared/constants/app'
-import type {SessionContext} from '#shared/plugin/api'
+import type {ContributionPoints, SessionContext} from '#shared/plugin/api'
 import type {WindowKind} from '#shared/plugin/manifest'
 import {pluginEnabled} from '#shared/plugin/resolve'
 import {getAt, withAt, withoutAt} from '#shared/utils/settings/paths'
 import type {AppSettingPath} from '#shared/utils/settings/scopes'
 import {registerCommand} from '~/utils/commands'
-import {pluginEntries} from '~/utils/plugins/catalog'
+import {fileMenuItems, fileTypes, fileViewers, homeActions, paletteGroups, settingsPages, statusItems, tabKinds} from '~/utils/contributions'
+import {registerPanelView} from '~/utils/panelViews'
+import {isBuiltin, pluginEntries} from '~/utils/plugins/catalog'
 import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import useQuickToasts from '~/composables/utility/useQuickToasts'
@@ -17,6 +19,30 @@ import {createPluginHost, type PluginHost} from '~/utils/plugins/host'
 /** One host per window: each window is its own JavaScript realm. */
 let host: PluginHost | undefined
 const beforeReload = new Set<() => unknown>()
+/** Reactive: tabs and views restored before the session starts draw once it does. */
+const session = shallowRef<SessionContext>()
+/** Which plugin registered a definition, for `PluginMount`'s error message. */
+const owners = new WeakMap<object, string>()
+
+/** The name of the plugin that registered `def`; `undefined` for the kernel's own. */
+export function contributionOwner(def: object): string | undefined {
+    const id = owners.get(def)
+    return id && (pluginEntries().find(e => e.manifest.id === id)?.manifest.name ?? id)
+}
+
+/** Where each contribution point's definitions go. */
+const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]) => () => void } = {
+    command: registerCommand,
+    paletteGroup: paletteGroups.register,
+    panel: registerPanelView,
+    tabKind: tabKinds.register,
+    viewer: fileViewers.register,
+    statusItem: statusItems.register,
+    fileType: fileTypes.register,
+    fileMenuItem: fileMenuItems.register,
+    settingsPage: settingsPages.register,
+    homeAction: homeActions.register,
+}
 /** Set across the reload a plugin's switch-off causes, so the reloaded window doesn't take focus. */
 const QUIET_RELOAD = 'vertex-plugin-reload'
 
@@ -53,7 +79,10 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
 
     host = createPluginHost(pluginEntries(), {
         window: {kind, label},
-        registerCommand,
+        contribute(point, owner, def) {
+            owners.set(def, owner)
+            return REGISTRIES[point](def)
+        },
         config(manifest) {
             const id = manifest.id
             const at = (path: string) => `plugins.config.${id}.${path}` as AppSettingPath
@@ -87,16 +116,35 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
             window.location.reload()
         },
     })
-    const apply = () => host!.apply(manifest => pluginEnabled(manifest, enabled()))
+    // Every way into the host runs in the Nuxt app's context, so a plugin's `setup` and `onSession` callbacks may use
+    // Nuxt's composables, also when a settings change turns one on later.
+    const nuxtApp = useNuxtApp()
+    inApp = fn => nuxtApp.runWithContext(fn)
+    const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => isBuiltin(manifest.id) || pluginEnabled(manifest, enabled())))
     await apply()
     watch(() => JSON.stringify(enabled()), () => void apply())
 }
 
+/** Runs host calls from outside the Nuxt context (the session layout's `onMounted` after an `await`) inside it. */
+let inApp: (fn: () => unknown) => unknown = fn => fn()
+
 /** The session layout's side of the host: its session is ready, or ending. */
 export const pluginSessions = {
-    start: (context: SessionContext) => host?.startSession(context),
-    end: () => host?.endSession(),
+    start(context: SessionContext) {
+        session.value = context
+        inApp(() => host?.startSession(context))
+    },
+    end() {
+        session.value = undefined
+        inApp(() => host?.endSession())
+    },
 }
+
+/**
+ * This window's session as plugins get it (`SessionContext`), for what draws their UI (tabs, views); `undefined` outside
+ * one and until it starts. Reactive.
+ */
+export const pluginSession = (): SessionContext | undefined => session.value
 
 /** Runs before a plugin's switch-off reloads the window (a session window saves its state first). */
 export function onBeforePluginReload(flush: () => unknown) {

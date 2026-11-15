@@ -9,9 +9,6 @@ import {useAppSessionPersistence} from "~/composables/app/useAppSessionPersisten
 import {useSessionCommands} from "~/composables/app/useSessionCommands";
 import {usePanels} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
-import {useChats} from "~/composables/ai/useChats";
-import {watchGitPresence} from "~/composables/git/useGitRepo";
-import {useGitAutoSync} from "~/composables/git/useGitAutoSync";
 import DashboardSidePanel from "~/components/LayoutComponents/DashboardSidePanel.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
@@ -21,8 +18,8 @@ import {Routes} from "#shared/constants/app";
 import {onBeforePluginReload, pluginSessions} from "~/utils/plugins/runtime";
 
 /**
- * Frame for a session window (workspace or singlespace): builds the index, restores tabs,
- * starts persistence, registers session commands, and tears everything down on unmount.
+ * Frame for a session window (workspace or singlespace): builds the index, restores tabs, starts persistence,
+ * registers session commands, hands the session to plugins (`onSession`), and tears everything down on unmount.
  */
 const $route = useRoute()
 const $sessionId = computed(() => $route.params.sessionId as string)
@@ -44,27 +41,6 @@ const panels = usePanels(activeSesh)
 // One drag state for the window's panel buttons, so a view can go from one side's list to the other's.
 provide(PANEL_DRAG, usePanelDrag(panels.move))
 
-// Whether the workspace is a git repository, for the views that need one (History), and auto-sync when it's on.
-if (isWorkspace) {
-    watchGitPresence(activeSesh)
-    useGitAutoSync(activeSesh)
-}
-
-// Chats synced in from elsewhere: one refresh per burst of watcher events.
-if (isWorkspace) {
-    const {syncExternal} = useChats(activeSesh)
-    const changedChats = new Set<string>()
-    const flushChats = useDebounceFn(() => {
-        const paths = [...changedChats]
-        changedChats.clear()
-        return syncExternal(paths)
-    }, 500)
-    onBeforeUnmount(index.on(event => {
-        if (event.type !== 'chats') return
-        changedChats.add(event.path)
-        void flushChats()
-    }))
-}
 
 let unregisterClose: (() => void) | undefined
 
@@ -82,7 +58,7 @@ onMounted(async () => {
     // Track changes only after restore, so the restored state is never overwritten by an empty one.
     $persistence?.start()
     // Plugins' `onSession` callbacks: the index is built and the tabs are back.
-    pluginSessions.start({session: activeSesh})
+    pluginSessions.start({session: activeSesh, views: {show: panels.showView, openInTab: panels.openInTab}})
 })
 
 onBeforeUnmount(async () => {

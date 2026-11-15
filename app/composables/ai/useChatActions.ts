@@ -15,7 +15,8 @@ const join = (parent: string, name: string) => parent ? `${parent}/${name}` : na
 
 /** The chat and folder menus (with their rename/delete modals), shared by the Chats view and a chat's header. */
 export function useChatActions(session?: ActiveSession) {
-    const {t} = useI18n()
+    // Not `useI18n`: the chat builtin's New Chat command uses it outside a component's setup.
+    const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()
     const $ovl = useOverlay()
     const {root, index, vault, lock, createChat, renameChat, moveChat, deleteChat, createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab, liveChat} = useChats(session)

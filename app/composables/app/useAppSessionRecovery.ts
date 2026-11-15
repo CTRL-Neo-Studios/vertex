@@ -7,7 +7,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
-import {panelViews} from "~/utils/panelViews";
+import {tabKinds} from "~/utils/contributions";
 import {isPluginReload} from "~/utils/plugins/runtime";
 
 /**
@@ -31,10 +31,10 @@ export function useAppSessionRecovery() {
         return result
     }
 
-    /** Restore tabs (files, then chats, then views), focused tab, expanded folders and the panels' state after the workspace index is built. */
+    /** Restore tabs (files, then the other saved tabs), focused tab, expanded folders and the panels' state after the workspace index is built. */
     async function recoverWorkspaceTabs(activeSession: ActiveSession, appSession: AppSession) {
         const {getFilteredFiles} = useActiveWorkspaceIndex(activeSession)
-        const {openTab, openTabs, getActiveTab} = useActiveTabs(activeSession)
+        const {openTab, openTabs, getActiveTab, setActiveTab} = useActiveTabs(activeSession)
         const expandedFolders = useState<string[]>(StateKey.expandedFolders(activeSession.uuid), () => [])
         const context = appSession.context
         const byPath = new Map(getFilteredFiles(() => true).map(f => [f.relativePath, f.uuid]))
@@ -48,16 +48,20 @@ export function useAppSessionRecovery() {
         layouts.bottomPanelCollapsed.value = context.bottomPanelCollapsed ?? false
 
         const fileUuids = uuids(context.openedFilePaths)
-        const chatIds = context.openedChatIds ?? []
-        // A view that isn't registered any more (a plugin's, later) has nothing to show.
-        const viewIds = (context.openedViewIds ?? []).filter(id => panelViews.get(id)?.tab)
-        if (fileUuids.length === 0 && chatIds.length === 0 && viewIds.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
+        // A kind that isn't registered (a plugin that's off), or a tab whose content is gone, has nothing to show.
+        const saved = context.openedTabs.filter(({kind, id}) => {
+            const def = tabKinds.get(kind)
+            return !!def && (def.exists?.(id) ?? true)
+        })
+        if (fileUuids.length === 0 && saved.length === 0) return $navi.toWorkspaceEmptyTab(activeSession.uuid)
 
         let lastOpened = openTabs(fileUuids)
-        for (const id of chatIds) lastOpened = openTab(id, 'chat')
-        for (const id of viewIds) lastOpened = openTab(id, 'view')
-        const focused = getActiveTab(context.lastFocusedChatId ?? context.lastFocusedViewId ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0])
-        await $navi.toWorkspaceTab(activeSession.uuid, focused ?? lastOpened)
+        for (const {kind, id} of saved) lastOpened = openTab(id, kind)
+        const focused = getActiveTab(context.lastFocusedTab?.id ?? uuids(context.lastFocusedFilePath ? [context.lastFocusedFilePath] : [])[0]) ?? lastOpened
+        // Opening made the last tab active; a reload (a plugin's switch-off) is on the focused tab's route already, so
+        // navigating there changes nothing: mark it active here.
+        if (focused) setActiveTab(focused.fileUuid)
+        await $navi.toWorkspaceTab(activeSession.uuid, focused)
     }
 
     return {

@@ -21,7 +21,7 @@ const props = withDefaults(defineProps<{
     sessionId: string,
     disabled?: boolean,
 }>(), {filePath: '', disabled: false})
-const emit = defineEmits<{ 'on-rename': [oldValue: string, newValue: string] }>()
+const emit = defineEmits<{ rename: [oldValue: string, newValue: string] }>()
 
 const {t} = useI18n()
 const $qt = useQuickToasts()
@@ -140,7 +140,7 @@ const status = computed(() => {
     <ViewerEditorLayoutWrapper
         scrollMode="none"
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
         :showStatusBar="false"

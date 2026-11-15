@@ -1,5 +1,4 @@
-import type {ActiveSession} from "#shared/types/active/sessions";
-import {usePanels} from "~/composables/active/usePanels";
+import type {SessionContext} from "#shared/plugin/api";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useCommitMessage} from "~/composables/git/useCommitMessage";
 import {autoSyncPaused, errorKey, isGitRepo} from "~/composables/git/useGitRepo";
@@ -15,14 +14,14 @@ const FOCUS_PULL_GAP = 60_000
  * focus. The commit's message is the model's with `aiConfig.commitMessages.autoSync` (falling back quietly), else
  * "Update N file(s)". It runs only in a repository, never during a merge or rebase, and stops after the remote
  * refuses to sign in (`autoSyncPaused`) until an operation from the Git view works. Each kind of failure shows once,
- * until a run succeeds. It runs beside the Git view, which picks its changes up from the watcher.
+ * until a run succeeds. It runs beside the Git view, which picks its changes up from the watcher. Runs in the git
+ * plugin's `onSession` callback (an effect scope, no component), so nothing here needs a component.
  */
-export function useGitAutoSync(session: ActiveSession | undefined) {
-    const root = session?.rootPath
+export function useGitAutoSync({session, views}: SessionContext) {
+    const root = session.rootPath
     if (!root) return
-    const {t} = useI18n()
+    const {t} = useNuxtApp().$i18n
     const toast = useToast()
-    const panels = usePanels(session)
     const {effective} = useSettingsScope()
     const auto = computed(() => effective.value?.gitConfig.autoSync)
     const commitMessage = useCommitMessage(root)
@@ -42,7 +41,7 @@ export function useGitAutoSync(session: ActiveSession | undefined) {
             description: key ? t(`app.git.errors.${key}.description`) : error,
             color: 'warning',
             icon: 'i-lucide-refresh-cw-off',
-            actions: [{label: t('app.git.autoSync.open'), color: 'neutral', variant: 'outline', onClick: () => void panels.showView('git')}],
+            actions: [{label: t('app.git.autoSync.open'), color: 'neutral', variant: 'outline', onClick: () => void views.show('git')}],
         })
     }
 
@@ -76,7 +75,7 @@ export function useGitAutoSync(session: ActiveSession | undefined) {
         clearInterval(timer)
         timer = minutes > 0 ? setInterval(() => void run(false), minutes * 60_000) : undefined
     }, {immediate: true})
-    onBeforeUnmount(() => clearInterval(timer))
+    onScopeDispose(() => clearInterval(timer))
 
     // Once, as soon as the window knows it's a repository (and the settings are in).
     let opened = false

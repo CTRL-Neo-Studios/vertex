@@ -5,10 +5,6 @@ import {useAiConfig} from "~/composables/ai/useAiConfig";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {aiClient} from "~/utils/aiClient";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 const {t} = useI18n()
 const $route = useRoute()
 const $router = useRouter()

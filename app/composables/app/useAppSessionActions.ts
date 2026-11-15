@@ -7,12 +7,12 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionNavigator} from "~/composables/app/useAppSessionNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import GitCloneModal from "~/components/Git/GitCloneModal.vue";
 
 /**
  * User-facing "open something" actions, callable from menus, buttons and the OS open queue.
  * Each opened path gets one persisted AppSession and one `session-{uuid}` window; reopening a path
  * focuses its existing window. The new window initializes itself from /loading.
+ * Needs only the Nuxt app's context (not a component's), so plugins' actions can call it too.
  */
 export function useAppSessionActions() {
     const $sessions = useAppSessions()
@@ -20,8 +20,7 @@ export function useAppSessionActions() {
     const $win = useAppWebviewWindows()
     const $qt = useQuickToasts()
     const $toast = useToast()
-    const {t} = useI18n()
-    const overlay = useOverlay()
+    const {t} = useNuxtApp().$i18n
 
     /**
      * Opens a folder picker and creates a new workspace session window.
@@ -96,12 +95,6 @@ export function useAppSessionActions() {
         return openWorkspaceFromPath(path)
     }
 
-    /** Clones a repository into a new folder (`GitCloneModal`) and opens it as a workspace. */
-    async function cloneWorkspaceAction() {
-        const path = await overlay.create(GitCloneModal, {destroyOnClose: true}).open().result
-        if (path) await openWorkspaceFromPath(path)
-    }
-
     /** The path is gone: says so, offering to drop its recent entry. */
     function notFound(path: string, session: AppSession | undefined) {
         $toast.add({
@@ -141,7 +134,6 @@ export function useAppSessionActions() {
         openWorkspaceAction,
         openSinglespaceAction,
         newWorkspaceAction,
-        cloneWorkspaceAction,
 
         // Actions with known paths (for "Open Recent", drag & drop, etc.)
         openWorkspaceFromPath,

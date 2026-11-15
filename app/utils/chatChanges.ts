@@ -12,8 +12,8 @@ export interface ChatChangeRef {
 const TAB_PREFIX = 'chat-change-'
 
 /**
- * A chat change's diff tab id (a `diff` tab, like git's `diffTabId`, with its own prefix): the whole reference,
- * URL-safe, so the page shows it from the route alone and the same change opens the same tab.
+ * A `chat-change` tab's id (prefixed, as tab ids are unique among all tabs, like git's `diffTabId`): the whole
+ * reference, URL-safe, so the page shows it from the route alone and the same change opens the same tab.
  */
 export const chatChangeTabId = (ref: ChatChangeRef) => TAB_PREFIX + toBase64Url(JSON.stringify([ref.chatId, ref.messageId, ref.path]))
 

@@ -3,14 +3,12 @@ import type {CommandPaletteGroup, CommandPaletteItem} from "@nuxt/ui";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import type {UITreeNode} from "#shared/types/active/workspace";
-import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {StateKey} from "#shared/constants/app";
-import {useBaseCommandItems} from "~/composables/bases/useBaseCommands";
 import {registeredCommands} from "~/utils/commands";
+import {fileTypes, paletteGroups} from "~/utils/contributions";
 
 const { t } = useI18n()
 
@@ -21,19 +19,13 @@ const $sesh = useActiveSessions()
 const $navi = useAppNavigator()
 const {
     fileIndex,
-    getFileByUuid,
 } = useActiveWorkspaceIndex($sesh.getSession(sessionId))
 const {
     openTab,
-    activeTabUuid,
 } = useActiveTabs($sesh.getSession(sessionId))
 const newFileModal = $ovl.create(NewFileModal)
-const session = $sesh.getSession(sessionId)
-const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 // Shared so the left sidebar's Search item can open it.
 const open = useState<boolean>(StateKey.fileSearchOpen(sessionId.value), () => false)
-// The Bases commands: the open base's, and Insert new base in a note.
-const baseCommands = useBaseCommandItems(session!)
 
 async function onClickFile(item: Partial<UITreeNode>) {
     if (!item || !item.uuid) return;
@@ -60,119 +52,75 @@ const paletteItemFiles = computed(() => {
     return items
 })
 
-// Each workflow, run on the open note when there is one (for Current note).
-const paletteItemWorkflows = computed<CommandPaletteItem[]>(() => {
-    if (!runner) return []
-    const active = getFileByUuid(activeTabUuid.value ?? undefined)
-    const note = active && getFileExtensionFromPath(active.fileName) === 'md' ? active.relativePath : undefined
-    return Object.values(unref(fileIndex))
-        .filter(f => !f.isFolder && isWorkflowFile(getFileExtensionFromPath(f.fileName)))
-        .map(f => ({
-            id: `run:${f.uuid}`,
-            label: t('app.editor.ui.palette.runWorkflow', {name: fileNameFromPath(f.fileName, true)}),
-            description: note ? t('app.editor.ui.palette.runWorkflowOn', {note}) : f.relativePath,
-            icon: 'i-lucide-play',
-            onSelect: () => runner.runFile(f.relativePath, false, {note}),
-        }))
-})
-
 // Plugins' commands that ask for the palette.
 const paletteItemCommands = computed<CommandPaletteItem[]>(() => [...registeredCommands.values()]
     .filter(c => c.palette)
     .map(c => ({id: c.id, label: t(c.label), icon: c.icon, disabled: c.enabled ? !c.enabled() : false, onSelect: () => void c.run()})))
 
+/** New Markdown File, New Folder, then New for each file type that offers it. */
+const paletteItemQuickActions = computed<CommandPaletteItem[]>(() => [
+    {
+        label: t('app.editor.ui.filetree.newMarkdownFile'),
+        description: t('app.editor.ui.palette.newFileDescription'),
+        icon: 'i-lucide-file-plus',
+        onSelect() {
+            newFileModal.open({
+                modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
+                asFolder: false,
+                asLevel: 'same',
+                fileExt: 'md'
+            })
+        }
+    },
+    {
+        label: t('app.editor.ui.filetree.newFolder'),
+        description: t('app.editor.ui.palette.newFolderDescription'),
+        icon: 'i-lucide-folder-dot',
+        onSelect() {
+            newFileModal.open({
+                modalTitle: t('app.editor.ui.filetree.newFolder'),
+                asFolder: true,
+                asLevel: 'same'
+            })
+        }
+    },
+    ...[...fileTypes.items.values()].filter(type => type.new).map(type => ({
+        label: t(type.new!.label),
+        description: type.new!.description && t(type.new!.description),
+        icon: type.icon,
+        onSelect() {
+            newFileModal.open({
+                modalTitle: t(type.new!.label),
+                asFolder: false,
+                asLevel: 'same',
+                fileExt: type.extensions[0]
+            })
+        }
+    })),
+])
+
+/** The kernel's groups and the registered ones, by `order` (registered ones default to 50). */
 const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     {
         id: 'quick-actions',
+        order: 0,
         label: t('app.editor.ui.palette.quickActions'),
-        items: [
-            {
-                label: t('app.editor.ui.filetree.newMarkdownFile'),
-                description: t('app.editor.ui.palette.newFileDescription'),
-                icon: 'i-lucide-file-plus',
-                onSelect() {
-                    newFileModal.open({
-                        modalTitle: t('app.editor.ui.filetree.newMarkdownFile'),
-                        asFolder: false,
-                        asLevel: 'same',
-                        fileExt: 'md'
-                    })
-                }
-            },
-            {
-                label: t('app.editor.ui.filetree.newFolder'),
-                description: t('app.editor.ui.palette.newFolderDescription'),
-                icon: 'i-lucide-folder-dot',
-                onSelect() {
-                    newFileModal.open({
-                        modalTitle: t('app.editor.ui.filetree.newFolder'),
-                        asFolder: true,
-                        asLevel: 'same'
-                    })
-                }
-            },
-            {
-                label: t('app.editor.ui.filetree.newCanvas'),
-                description: t('app.editor.ui.palette.newCanvasDescription'),
-                icon: 'i-lucide-layout-dashboard',
-                onSelect() {
-                    newFileModal.open({
-                        modalTitle: t('app.editor.ui.filetree.newCanvas'),
-                        asFolder: false,
-                        asLevel: 'same',
-                        fileExt: 'canvas'
-                    })
-                }
-            },
-            {
-                label: t('app.editor.ui.filetree.newBase'),
-                description: t('app.editor.ui.palette.newBaseDescription'),
-                icon: 'i-lucide-table',
-                onSelect() {
-                    newFileModal.open({
-                        modalTitle: t('app.editor.ui.filetree.newBase'),
-                        asFolder: false,
-                        asLevel: 'same',
-                        fileExt: 'base'
-                    })
-                }
-            },
-            {
-                label: t('app.editor.ui.filetree.newWorkflow'),
-                description: t('app.editor.ui.palette.newWorkflowDescription'),
-                icon: 'i-lucide-workflow',
-                onSelect() {
-                    newFileModal.open({
-                        modalTitle: t('app.editor.ui.filetree.newWorkflow'),
-                        asFolder: false,
-                        asLevel: 'same',
-                        fileExt: 'workflow'
-                    })
-                }
-            }
-        ]
+        items: paletteItemQuickActions.value,
     },
     {
         id: 'commands',
+        order: 10,
         label: t('app.editor.ui.palette.commands'),
         items: paletteItemCommands.value,
     },
-    {
-        id: 'bases',
-        label: t('app.editor.ui.bases.commands.group'),
-        items: baseCommands.value,
-    },
-    {
-        id: 'workflows',
-        label: t('app.editor.ui.palette.workflows'),
-        items: unref(paletteItemWorkflows),
-    },
+    ...[...paletteGroups.items.values()].map(group => ({id: group.id, order: group.order ?? 50, label: group.label(), items: group.items()})),
     {
         id: 'files',
+        order: 100,
         label: t('app.editor.ui.palette.files', {count: unref(paletteItemFiles).length}),
         items: unref(paletteItemFiles),
     }
-])
+].sort((a, b) => a.order - b.order).map(({order: _, ...group}) => group))
 </script>
 
 <template>

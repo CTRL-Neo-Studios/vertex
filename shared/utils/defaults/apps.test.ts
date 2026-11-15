@@ -63,10 +63,24 @@ describe('defaultAppSession', () => {
         expect(defaultAppSessionContext({}).shownPanelViews).toEqual([])
     })
 
-    it('keeps only well-formed view ids for view tabs', () => {
-        const context = defaultAppSessionContext({openedViewIds: ['gitHistory', 'split', '../x', 'plugin:view'], lastFocusedViewId: 'separator'})
-        expect([context.openedViewIds, context.lastFocusedViewId]).toEqual([['gitHistory', 'plugin:view'], undefined])
-        expect(defaultAppSessionContext({}).openedViewIds).toEqual([])
+    it('reads the old chat and view tabs as saved tabs, keeping only well-formed view ids', () => {
+        const context = defaultAppSessionContext({openedChatIds: ['c1'], openedViewIds: ['gitHistory', 'split', '../x', 'plugin:view'], lastFocusedViewId: 'gitHistory'})
+        expect(context.openedTabs).toEqual([{kind: 'chat', id: 'c1'}, {kind: 'view', id: 'gitHistory'}, {kind: 'view', id: 'plugin:view'}])
+        expect(context.lastFocusedTab).toEqual({kind: 'view', id: 'gitHistory'})
+        expect(defaultAppSessionContext({lastFocusedChatId: 'c1', lastFocusedViewId: 'gitHistory'}).lastFocusedTab).toEqual({kind: 'chat', id: 'c1'})
+        expect(defaultAppSessionContext({lastFocusedViewId: 'separator'}).lastFocusedTab).toBeUndefined()
+        expect([defaultAppSessionContext({}).openedTabs, defaultAppSessionContext({}).lastFocusedTab]).toEqual([[], undefined])
+    })
+
+    it('drops malformed saved tabs and ignores the old fields once there are saved tabs', () => {
+        const context = defaultAppSessionContext({
+            openedTabs: [{kind: 'git-diff', id: 'diff-x'}, {kind: '', id: 'a'}, {kind: 'chat'}, 'chat', null, {kind: 'chat', id: 'c2', extra: 1}] as never,
+            lastFocusedTab: {kind: 'chat', id: 5} as never,
+            openedChatIds: ['c1'],
+            lastFocusedChatId: 'c1',
+        })
+        expect(context.openedTabs).toEqual([{kind: 'git-diff', id: 'diff-x'}, {kind: 'chat', id: 'c2'}])
+        expect(context.lastFocusedTab).toBeUndefined()
     })
 })
 

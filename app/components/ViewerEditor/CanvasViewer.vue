@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import {parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
 import {MESSAGES, type CanvasError, type CanvasMessages, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
-import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
 import {defaultAppCanvasConfig} from "#shared/utils/defaults/apps"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
+import {useInternalLinkList} from "~/composables/active/editor/useInternalLinkList"
 import {useAppNavigator} from "~/composables/app/useAppNavigator"
 import {useSettingsScope} from "~/composables/app/useSettingsScope"
+import {BASE_EMBED} from "~/composables/bases/useBaseContext"
 import {useCanvasHost} from "~/composables/canvas/useCanvasHost"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
 import {ViewerEditorBasesEmbed} from "#components"
@@ -24,10 +26,9 @@ const props = withDefaults(defineProps<{
     renaming: boolean,
     filePath?: string,
     sessionId: string,
-    internalLinkList?: InternalLink[],
     disabled?: boolean,
-}>(), {filePath: '', internalLinkList: () => [], disabled: false})
-const emit = defineEmits<{ 'on-rename': [oldValue: string, newValue: string] }>()
+}>(), {filePath: '', disabled: false})
+const emit = defineEmits<{ rename: [oldValue: string, newValue: string] }>()
 
 const {t} = useI18n()
 const $qt = useQuickToasts()
@@ -37,6 +38,9 @@ const {openTab} = useActiveTabs(session)
 const $navi = useAppNavigator()
 const scope = useSettingsScope()
 const host = useCanvasHost(session, () => props.filePath && `${session.rootPath}/${props.filePath}`)
+// Text cards link and embed like notes; embedded bases (cards included) have the canvas as `this`.
+const internalLinkList = useInternalLinkList(session)
+provide(BASE_EMBED, {session, thisPath: () => props.filePath})
 // `.base` cards show the base (its `#View`), with the canvas as `this`.
 // It takes `node` and leaves `file` and `host` as attributes.
 const fileRenderers: FileRenderers = {base: ViewerEditorBasesEmbed as FileRenderers[string]}
@@ -111,7 +115,7 @@ onBeforeUnmount(unsubscribe)
     <ViewerEditorLayoutWrapper
         scrollMode="none"
         v-model:fileName="fileName"
-        @onRename="(oldValue: string, newValue: string) => emit('on-rename', oldValue, newValue)"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
         :filePath="filePath"
         :renaming="renaming"
         :showStatusBar="false"

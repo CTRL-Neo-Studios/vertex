@@ -16,7 +16,8 @@ const histories = new Map<string, History>()
  * one toast.
  */
 export function useFilesHistory(sessionId: string | undefined) {
-    const {t} = useI18n()
+    // Not `useI18n`: the Bases palette group uses it (through `useActiveWorkspaceTools`) outside a component's setup.
+    const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()
     const key = sessionId ?? ''
     if (!histories.has(key)) histories.set(key, shallowReactive({done: [], undone: [], busy: false}))

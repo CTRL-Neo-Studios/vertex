@@ -10,7 +10,8 @@ import PanelPane from "~/components/LayoutComponents/PanelPane.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels} from "~/composables/active/usePanels";
 import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
-import {panelViews, type PanelViewAction} from "~/utils/panelViews";
+import type {PanelViewAction} from "#shared/plugin/api";
+import {panelViews} from "~/utils/panelViews";
 
 /**
  * One side panel (left or right): its panes stacked (split by the layout's `split` slots, resized by dragging between

@@ -3,6 +3,9 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useTabOutline} from "~/composables/active/editor/useActiveEditorExtensions";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 const {t} = useI18n()
 const $route = useRoute()

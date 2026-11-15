@@ -1,31 +1,22 @@
 <script setup lang="ts">
 import {convertFileSrc} from "@tauri-apps/api/core"
 import {readTextFile} from "@tauri-apps/plugin-fs"
-import {EditorView} from "@codemirror/view"
-import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
-import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit"
-import type {ToTocEntryProps} from "#shared/types/active/events";
+import type {ViewerMountProps, ViewerProps} from "#shared/plugin/api";
 import type {SessionMode} from "#shared/constants/app";
-import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
-import {EditorProseEmbedImageDisplay, ViewerEditorBasesEmbed} from "#components";
+import {fileNameFromPath, getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
-import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
-import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEditorExtensions";
-import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import {BASE_EMBED} from "~/composables/bases/useBaseContext";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {viewerFor} from "~/utils/viewers";
-import {viewerComponents} from "~/utils/viewerComponents";
+import {SHOWN_VIEWER, viewerFor} from "~/utils/viewers";
 
 /**
- * The editor for one open file, in either session mode. The viewer is chosen by extension from
- * `app/utils/viewers.ts`; loading, autosave, rename and external-change handling live here once.
+ * The editor for one open file, in either session mode. The viewer is the registered one for its extension
+ * (`viewerFor`), drawn with `ViewerProps`; loading, autosave, rename and external-change handling live here once.
  */
 const $route = useRoute()
 const sessionId = computed(() => $route.params.sessionId as string)
@@ -39,78 +30,46 @@ const $qt = useQuickToasts()
 const {t} = useI18n()
 const $index = useActiveWorkspaceIndex(session)
 const $tools = useActiveWorkspaceTools(session)
-const {closeTab, activeTabUuid, getActiveTab, isTabOpened, setTabSavedState, openTab, tabs} = useActiveTabs(session)
+const {closeTab, activeTabUuid, getActiveTab, isTabOpened, setTabSavedState, tabs} = useActiveTabs(session)
 const {content} = useActiveEditorContent(session, getActiveTab(tabId))
-const {dispatcher: editorDispatcher} = useActiveEditorDispatcher(session)
-const codeblockMappings = useActiveEditorCodeblockMappings()
 
-const editorExtensions = useActiveEditorExtensions(session, tabId)
 const file = computed(() => $index.getFileByUuid(tabId.value))
 const fullFilePath = computed(() => file.value?.fullPath)
-const displayPath = computed(() => mode === 'workspace' ? file.value?.relativePath : file.value?.fullPath)
+const displayPath = computed(() => (mode === 'workspace' ? file.value?.relativePath : file.value?.fullPath) ?? '')
 const fileExt = computed(() => getFileExtensionFromPath(fullFilePath.value ?? ''))
 const viewer = computed(() => viewerFor(fileExt.value, mode))
-const viewerComponent = computed(() => viewer.value ? viewerComponents[viewer.value.id] : undefined)
 
 const isContentSaved = ref(true)
 const isContentLoaded = ref(false)
 const renaming = ref(false)
 const fileName = ref(fileNameFromPath(fullFilePath.value ?? '', true))
-const editorRef = ref()
 const INVALID_CHARS = /[\\/:*?"<>|]/
 
 watch(isContentSaved, v => setTabSavedState(tabId, v))
-// Bases embedded in this file (`![[x.base]]`, ` ```base `, canvas cards) query this workspace, with this file as `this`.
-if (mode === 'workspace') provide(BASE_EMBED, {session: session!, thisPath: () => file.value?.relativePath ?? ''})
+provide(SHOWN_VIEWER, {viewer, status: computed(() => ({text: content.value, filePath: displayPath.value}))})
 
-const internalLinkList = computed<InternalLink[]>(() => {
-    if (mode !== 'workspace') return []
-    return $index.getFilteredFiles(f => !f.isFolder).flatMap(f => {
-        const ext = getFileExtensionFromPath(f.fileName)
-        const name = fileNameFromPath(f.fullPath, true)
-        if (isPlainTextFile(ext)) return [{name, filePath: f.relativePath, referenceId: f.uuid} satisfies InternalLink]
-        // Files other than notes are linked by their full name, as Obsidian links them: `![[pic.png]]` resolves there,
-        // `![[pic]]` doesn't.
-        if (isImage(ext)) return [{
-            name: f.fileName, filePath: f.relativePath, referenceId: f.uuid,
-            embedComponent: EditorProseEmbedImageDisplay,
-            componentProps: {srcPath: convertFileSrc(f.fullPath), display: name},
-        } satisfies InternalLink]
-        if (isBasesFile(ext)) return [{name: f.fileName, filePath: f.relativePath, referenceId: f.uuid, embedComponent: ViewerEditorBasesEmbed} satisfies InternalLink]
-        return []
-    })
-})
-
-/** Inputs specific to the active viewer, from its `extras` in the registry, plus the text model when it loads text. */
-const viewerProps = computed(() => {
-    const v = viewer.value
-    if (!v) return {}
-    const props: Record<string, unknown> = {}
-    if (v.loadsText) {
-        props.modelValue = content.value
-        props['onUpdate:modelValue'] = (value: string) => { content.value = value }
+const setText = (value: string) => { content.value = value }
+const viewerProps = computed((): ViewerProps | ViewerMountProps => {
+    const props: ViewerProps = {
+        sessionId: sessionId.value,
+        fileId: tabId.value,
+        filePath: displayPath.value,
+        fileName: fileName.value,
+        'onUpdate:fileName': value => { fileName.value = value },
+        contentSaved: isContentSaved.value,
+        'onUpdate:contentSaved': value => { isContentSaved.value = value },
+        renaming: renaming.value,
+        disabled: !isContentLoaded.value,
+        assetUrl: convertFileSrc(fullFilePath.value ?? ''),
+        onRename,
     }
-    for (const extra of v.extras) {
-        if (extra === 'editorInstance') {
-            props.editorInstance = editorRef.value
-            props['onUpdate:editorInstance'] = (value: unknown) => { editorRef.value = value }
-        }
-        else if (extra === 'internalLinks') props.internalLinkList = internalLinkList.value
-        else if (extra === 'codeBlocks') props.specialCodeBlockMapping = codeblockMappings
-        else if (extra === 'extensions') props.extensions = editorExtensions.value
-        else if (extra === 'sessionId') props.sessionId = sessionId.value
-        else if (extra === 'imageSrc') props.imageSrc = convertFileSrc(fullFilePath.value ?? '')
-    }
-    return props
+    if (!viewer.value?.loadsText) return props
+    return viewer.value.mount ? {...props, modelValue: content.value, setText} : {...props, modelValue: content.value, 'onUpdate:modelValue': setText}
 })
 
 async function goToTab(uuid?: string | null) {
     const tab = uuid ? getActiveTab(uuid) : undefined
     await (mode === 'workspace' ? $navi.toWorkspaceTab(sessionId, tab) : tab ? $navi.toSinglespaceTab(sessionId, tab) : $navi.toSinglespaceEmptyTab(sessionId))
-}
-
-async function onInternalLinkClick({referenceId}: InternalLinkClickDetail) {
-    if (mode === 'workspace' && referenceId) await goToTab(openTab(referenceId).fileUuid)
 }
 
 // The file's text as this tab last read or wrote it. Loading and reloading set `content` too; only a change is written,
@@ -161,10 +120,7 @@ const unsubscribe = $index.on(async (event) => {
     }
 })
 
-onBeforeUnmount(() => {
-    editorDispatcher.unmount()
-    unsubscribe()
-})
+onBeforeUnmount(unsubscribe)
 
 async function onRename(oldValue: string) {
     if (!fileName.value || INVALID_CHARS.test(fileName.value) || fileName.value === oldValue) {
@@ -182,27 +138,6 @@ async function onRename(oldValue: string) {
         renaming.value = false
     }
 }
-
-function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryProps) {
-    const view = unref(editorRef.value?.view) as EditorView | undefined
-    if (!view) return
-    view.dispatch({selection: {anchor: from}, effects: EditorView.scrollIntoView(from, {y: verticalScrollStrategy ?? 'start', yMargin: verticalMargin ?? 70})})
-    view.focus()
-}
-
-editorDispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
-
-/** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
-function insertBlock({text}: { text: string }) {
-    const view = unref(editorRef.value?.view) as EditorView | undefined
-    if (!view) return
-    const {from, to} = view.state.selection.main
-    const line = view.state.doc.lineAt(from)
-    const insert = `${from > line.from ? '\n' : ''}${text}\n`
-    view.dispatch({changes: {from, to, insert}, selection: {anchor: from + insert.length - 1}, scrollIntoView: true})
-    view.focus()
-}
-editorDispatcher.on('editor.insertBlock', insertBlock)
 </script>
 
 <template>
@@ -210,24 +145,7 @@ editorDispatcher.on('editor.insertBlock', insertBlock)
         <div v-if="!isContentLoaded" class="h-full max-h-svh w-full flex items-center justify-center">
             <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin size-6"/>
         </div>
-        <template v-else-if="viewerComponent">
-            <component
-                :is="viewerComponent"
-                v-bind="viewerProps"
-                v-model:content-saved="isContentSaved"
-                v-model:fileName="fileName"
-                :disabled="!isContentLoaded"
-                :filePath="displayPath"
-                :renaming="renaming"
-                @onClickedInternalLink="onInternalLinkClick"
-                @onRename="onRename"
-            />
-            <MinimalLineToc
-                v-if="viewer?.id === 'markdown'"
-                class="absolute right-8 top-1/2 -translate-y-1/2 z-10"
-                @to-toc="(heading: Heading) => toTocEntry({from: heading.from})"
-            />
-        </template>
+        <PluginMount v-else-if="viewer" :ui="viewer" :props="viewerProps"/>
         <div v-else class="h-full w-full flex items-center justify-center text-muted text-sm">
             {{ t('app.editor.ui.noViewer', {ext: fileExt}) }}
         </div>

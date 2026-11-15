@@ -1,5 +1,16 @@
 import {describe, expect, it} from 'vitest'
+import {isBasesFile, isCanvasFile, isImage, isLatexFile, isPlainTextFile, isWorkflowFile, isYamlFile} from '#shared/utils/fs/filenames'
+import {fileViewers} from './contributions'
 import {viewerFor} from './viewers'
+
+// The builtins' viewers as they register them (`app/builtins/`); the kernel's (markdown, code) come with `viewers.ts`.
+const component = async () => ({})
+fileViewers.register({id: 'image', loadsText: false, match: isImage, component})
+fileViewers.register({id: 'yaml', loadsText: true, match: isYamlFile, component})
+fileViewers.register({id: 'latex', loadsText: true, match: isLatexFile, component})
+fileViewers.register({id: 'canvas', loadsText: true, modes: ['workspace'], match: isCanvasFile, component})
+fileViewers.register({id: 'bases', loadsText: true, modes: ['workspace'], match: isBasesFile, component})
+fileViewers.register({id: 'workflow', loadsText: true, modes: ['workspace'], match: isWorkflowFile, component})
 
 describe('viewerFor', () => {
     it.each([
@@ -24,5 +35,15 @@ describe('viewerFor', () => {
     it('binary formats without a viewer get none', () => {
         expect(viewerFor('pdf', 'workspace')).toBeUndefined()
         expect(viewerFor('mp4', 'workspace')).toBeUndefined()
+    })
+
+    it('the highest priority wins; on a tie, the first registered', () => {
+        const removeTie = fileViewers.register({id: 'tie', loadsText: true, match: isPlainTextFile, component})
+        expect(viewerFor('md', 'workspace')?.id).toBe('markdown')
+        const removeHigh = fileViewers.register({id: 'high', loadsText: true, priority: 1, match: isPlainTextFile, component})
+        expect(viewerFor('md', 'workspace')?.id).toBe('high')
+        removeHigh()
+        removeTie()
+        expect(viewerFor('md', 'workspace')?.id).toBe('markdown')
     })
 })

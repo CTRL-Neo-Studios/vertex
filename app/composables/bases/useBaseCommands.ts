@@ -1,4 +1,4 @@
-import type {CommandPaletteItem} from "@nuxt/ui";
+import type {PaletteItem} from "#shared/plugin/api";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames";
@@ -24,7 +24,8 @@ export function registerBaseCommands(ctx: BaseContext) {
 
 /** Copies a view's table as Obsidian's "Copy to clipboard" does (TSV), with a toast. */
 export function useCopyTable() {
-    const {t} = useI18n()
+    // Not `useI18n`: the Bases palette group uses it outside a component's setup.
+    const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()
     return async (ctx: BaseContext) => {
         try {
@@ -42,7 +43,7 @@ export function useCopyTable() {
  * at the note's cursor.
  */
 export function useBaseCommandItems(session: ActiveSession) {
-    const {t} = useI18n()
+    const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()
     const copyTable = useCopyTable()
     const $index = useActiveWorkspaceIndex(session)
@@ -65,7 +66,7 @@ export function useBaseCommandItems(session: ActiveSession) {
         }
     }
 
-    return computed<CommandPaletteItem[]>(() => {
+    return computed<PaletteItem[]>(() => {
         const ctx = active.value
         const note = $index.getFileByUuid(activeTabUuid.value ?? undefined)
         return [

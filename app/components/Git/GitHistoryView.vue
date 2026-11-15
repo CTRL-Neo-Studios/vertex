@@ -8,6 +8,9 @@ import {useGitRepo} from "~/composables/git/useGitRepo";
 import {gitClient} from "~/utils/gitClient";
 import {diffTabId} from "~/utils/gitDiff";
 import {usePanelActions} from "~/utils/panelViews";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 /**
  * History, the Git map: every branch's, remote branch's and tag's commits as a graph, newest first, paged in while
@@ -113,7 +116,7 @@ async function openDiff(change: GitChange) {
     const current = status.value
     if (!current || !selected.value || !session) return
     const spec = {top: current.top, path: change.path, side: selected.value.id, ...(change.origPath ? {origPath: change.origPath} : {})}
-    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'diff'))
+    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'git-diff'))
 }
 
 const box = useTemplateRef<HTMLElement>('box')

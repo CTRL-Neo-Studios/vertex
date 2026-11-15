@@ -1,7 +1,7 @@
 import type {AppCanvasConfig, AppFileConfig, AppGitConfig, AppPluginsConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
-import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
+import type {AppSession, AppSessionContext, SavedTab} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import {isPanelViewId, normalizePanelLayout} from "#shared/utils/panelLayout";
 import {sanitizeModelParams} from "#shared/utils/aiParams";
@@ -186,6 +186,11 @@ type LegacyContext = Partial<AppSessionContext> & {
     /** Before split panes: one view per side, now `shownPanelViews`. */
     leftPanelView?: string,
     rightPanelView?: string,
+    /** Before tab kinds: chat and view tabs, now `openedTabs` (kinds `chat` and `view`) and `lastFocusedTab`. */
+    openedChatIds?: string[],
+    lastFocusedChatId?: string,
+    openedViewIds?: string[],
+    lastFocusedViewId?: string,
 }
 
 export function defaultAppSession(data?: LegacySession): AppSession {
@@ -204,6 +209,12 @@ export function defaultAppSession(data?: LegacySession): AppSession {
 
 const panelViews = (current: unknown, legacy: unknown[]) => (Array.isArray(current) ? current : legacy).filter(isPanelViewId)
 
+/** A saved tab as `{kind, id}`, when both are non-empty strings. */
+function savedTab(value: unknown): SavedTab | undefined {
+    const {kind, id} = (value ?? {}) as Partial<Record<keyof SavedTab, unknown>>
+    return typeof kind === 'string' && kind && typeof id === 'string' && id ? {kind, id} : undefined
+}
+
 /** `root`: the workspace root, to turn old absolute paths into relative ones (the index's `relativePath`); others are dropped. */
 export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSessionContext {
     const relative = (path: string) => root && path.length > root.length && path.startsWith(root) && /[\\/]/.test(path[root.length]!)
@@ -211,14 +222,21 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
         : undefined
     const paths = (current: string[] | undefined, legacy: string[] | undefined) =>
         current ?? (legacy ?? []).map(relative).filter((p): p is string => !!p)
+    // Before tab kinds, chat and view tabs had their own fields: chats first, then views (well-formed view ids only).
+    const tabs: unknown[] = Array.isArray(data?.openedTabs) ? data.openedTabs : [
+        ...(Array.isArray(data?.openedChatIds) ? data.openedChatIds : []).map(id => ({kind: 'chat', id})),
+        ...panelViews(data?.openedViewIds, []).map(id => ({kind: 'view', id})),
+    ]
+    const focused = Array.isArray(data?.openedTabs) ? data.lastFocusedTab
+        : data?.lastFocusedChatId ? {kind: 'chat', id: data.lastFocusedChatId}
+            : isPanelViewId(data?.lastFocusedViewId) ? {kind: 'view', id: data.lastFocusedViewId}
+                : undefined
     return {
         openedFilePaths: paths(data?.openedFilePaths, data?.openedAbsoluteFilePaths),
         openedFolderPaths: paths(data?.openedFolderPaths, data?.openedAbsoluteFolderPaths),
         lastFocusedFilePath: data?.lastFocusedFilePath ?? (data?.lastFocusedAbsoluteFilePath && relative(data.lastFocusedAbsoluteFilePath)),
-        openedChatIds: data?.openedChatIds || [],
-        lastFocusedChatId: data?.lastFocusedChatId,
-        openedViewIds: panelViews(data?.openedViewIds, []),
-        lastFocusedViewId: isPanelViewId(data?.lastFocusedViewId) ? data.lastFocusedViewId : undefined,
+        openedTabs: tabs.flatMap(tab => savedTab(tab) ?? []),
+        lastFocusedTab: savedTab(focused),
         shownPanelViews: panelViews(data?.shownPanelViews, [data?.leftPanelView, data?.rightPanelView]),
         leftPanelCollapsed: data?.leftPanelCollapsed === true,
         rightPanelCollapsed: data?.rightPanelCollapsed !== false,

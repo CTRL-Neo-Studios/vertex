@@ -4,7 +4,7 @@ import {SplitterGroup, SplitterPanel, SplitterResizeHandle} from "reka-ui";
 import PanelPane from "~/components/LayoutComponents/PanelPane.vue";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {usePanels} from "~/composables/active/usePanels";
-import type {PanelViewAction} from "~/utils/panelViews";
+import type {PanelViewAction} from "#shared/plugin/api";
 
 /**
  * The bottom area under the editor, while it's open: its panes side by side (split by the layout's `split` slots,

@@ -7,11 +7,8 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {aiClient} from "~/utils/aiClient";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 /** One provider: name, base URL, its keychain key (write-only) and the models enabled on it. */
+const props = defineProps<{ id: string }>()
 const {t} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
@@ -21,7 +18,7 @@ const {list} = useAiModels()
 onMounted(load)
 
 const back = computed(() => ({path: `${Routes.settings}/ai/providers`, query: {q: $route.query.q || undefined}}))
-const provider = computed(() => ai.value?.providers.find(p => p.id === $route.params.id))
+const provider = computed(() => ai.value?.providers.find(p => p.id === props.id))
 
 const name = ref('')
 const baseURL = ref('')

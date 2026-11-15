@@ -7,10 +7,6 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
 import {gitClient} from "~/utils/gitClient";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 /**
  * Git: auto-sync (global, or a trusted workspace's own), and the personal access tokens saved in the keychain for
  * signing in to remotes (this computer's, whatever scope is edited).

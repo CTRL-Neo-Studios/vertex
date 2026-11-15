@@ -585,6 +585,11 @@
 					"runWorkflow": "Run {name}",
 					"runWorkflowOn": "On {note}"
 				},
+				"fileTypes": {
+					"canvas": "Canvas",
+					"base": "Base",
+					"workflow": "Workflow"
+				},
 				"bases": {
 					"invalid": "Unable to parse your base file",
 					"unknownViewType": "Unknown view type: {type}",
@@ -2161,7 +2166,8 @@
 			"recent": "Recent Workspaces"
 		},
 		"plugins": {
-			"failed": "{name} couldn't start"
+			"failed": "{name} couldn't start",
+			"drawFailed": "{name} couldn't draw this"
 		},
 		"panels": {
 			"moveUp": "Move up",

@@ -5,20 +5,22 @@ export interface AppSessionContext {
     openedFilePaths: string[],
     openedFolderPaths: string[],
     lastFocusedFilePath?: string,
-    /** Chat tabs, reopened after the file tabs (workspace sessions). */
-    openedChatIds?: string[],
-    /** Set instead of `lastFocusedFilePath` when the focused tab was a chat. */
-    lastFocusedChatId?: string,
-    /** Panel views open in tabs (`ActiveTab.kind: 'view'`), reopened after the chats. */
-    openedViewIds?: PanelViewId[],
-    /** Set instead of `lastFocusedFilePath` when the focused tab was a view. */
-    lastFocusedViewId?: PanelViewId,
+    /** Tabs of other kinds (`ActiveTab.kind`) whose kind persists them, reopened after the file tabs when their kind is registered. */
+    openedTabs: SavedTab[],
+    /** Set instead of `lastFocusedFilePath` when the focused tab was one of `openedTabs`. */
+    lastFocusedTab?: SavedTab,
     /** The view each panel pane shows: a pane shows the first of its views listed here, else its first view. */
     shownPanelViews?: PanelViewId[],
     /** Whether each side panel is collapsed (the right one is, unless saved open), and the bottom area (to its header). */
     leftPanelCollapsed?: boolean,
     rightPanelCollapsed?: boolean,
     bottomPanelCollapsed?: boolean,
+}
+
+/** A tab of a registered kind (`TabKindDef`) as it's saved: its kind and its id within it. */
+export interface SavedTab {
+    kind: string,
+    id: string,
 }
 
 /** A workspace or single file Vertex has opened: the recents list, and what each window restores. */

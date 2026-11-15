@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import {computed} from "vue";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 const $route = useRoute()
 const $sessionId = computed<string>(() => $route.params.sessionId as string), $tabId = computed<string>(() => $route.params.tabId as string)

@@ -11,10 +11,6 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {parseWorkflow} from "~/composables/workflows/useWorkflowRunner";
 import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
 
-definePageMeta({
-    layout: 'settings'
-})
-
 const {t} = useI18n()
 const $qt = useQuickToasts()
 const {config, load, save} = useAppSettings()

@@ -21,6 +21,9 @@ import {diffTabId} from "~/utils/gitDiff";
 import {GIT_STATES} from "~/utils/gitStates";
 import {usePanelActions} from "~/utils/panelViews";
 import {usePanels} from "~/composables/active/usePanels";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 /** The Git view: the branch, Sync, what changed (staged and not), and the commit box. */
 const {t} = useI18n()
@@ -210,7 +213,7 @@ async function openChanges(section: Section, file: GitFile) {
     if (!current || !session) return
     const side = section.id === 'staged' ? 'staged' : 'worktree'
     const spec = {top: current.top, path: file.path, side, ...(file.origPath ? {origPath: file.origPath} : {})}
-    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'diff'))
+    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'git-diff'))
 }
 
 /** Gone from the disk: nothing to open or reveal. */

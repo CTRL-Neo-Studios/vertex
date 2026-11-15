@@ -6,14 +6,13 @@ import {useCommands} from "~/composables/app/useAppWindowMenu";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {useChatActions} from "~/composables/ai/useChatActions";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {aiFeatureOn} from "~/composables/ai/useAiConfig";
+import {registerCommand} from "~/utils/commands";
+import {fileTypes} from "~/utils/contributions";
 import {usePanels} from "~/composables/active/usePanels";
 
 /**
- * Commands that act on the open session (tabs, save, new folder). Registered by the session layout,
- * so they are enabled exactly while a session window shows a session.
+ * Commands that act on the open session (tabs, save, new folder, New for each file type that offers it). Registered
+ * by the session layout, so they are enabled exactly while a session window shows a session.
  */
 export function useSessionCommands(session?: ActiveSession) {
     const route = useRoute()
@@ -23,11 +22,9 @@ export function useSessionCommands(session?: ActiveSession) {
     const $qt = useQuickToasts()
     const {tabs, activeTabUuid, closeTab, clearTabs, getActiveTab, setTabSavedState} = useActiveTabs(session)
     const newFileModal = useOverlay().create(NewFileModal)
-    const {newChat} = useChatActions(session)
     const isWorkspace = !!session?.workspaceSession
     const tabId = () => route.params.tabId as string | undefined
     const hasTab = () => !!tabId() && !!getActiveTab(tabId())
-    const {effective} = useSettingsScope()
     const panels = usePanels(session)
 
     async function showTab(uuid?: string | null) {
@@ -54,11 +51,6 @@ export function useSessionCommands(session?: ActiveSession) {
         'view.toggleBottomPanel': {run: () => panels.toggle('bottom'), enabled: () => panels.areas.value.bottom.panes.length > 0},
         ...(isWorkspace ? {
             'file.newFolder': {run: () => newFileModal.open({asFolder: true, asLevel: 'same', modalTitle: t('app.editor.ui.filetree.newFolder')})},
-            'file.newCanvas': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'canvas', modalTitle: t('app.editor.ui.filetree.newCanvas')})},
-            'file.newBase': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'base', modalTitle: t('app.editor.ui.filetree.newBase')})},
-            'file.newWorkflow': {run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt: 'workflow', modalTitle: t('app.editor.ui.filetree.newWorkflow')})},
-            // Opens it in a tab; a locked vault or a failure shows as a toast (useChatActions.run).
-            'file.newChat': {run: () => newChat(), enabled: () => aiFeatureOn(effective.value?.aiConfig, 'chat')},
             'view.closeTab': {
                 run: async () => {
                     const id = tabId()
@@ -76,5 +68,21 @@ export function useSessionCommands(session?: ActiveSession) {
                 enabled: () => tabs.value.length > 0,
             },
         } : {}),
+    })
+
+    // File → New for each file type that offers it, after New Folder (group 0).
+    if (isWorkspace) watchEffect(onCleanup => {
+        for (const type of fileTypes.items.values()) {
+            if (!type.new) continue
+            const {label, command = label} = type.new
+            const fileExt = type.extensions[0]
+            onCleanup(registerCommand({
+                id: `file.new.${type.id}`,
+                plugin: 'kernel',
+                label: command,
+                menu: {section: 'file', group: 0},
+                run: () => newFileModal.open({asFolder: false, asLevel: 'same', fileExt, modalTitle: t(label)}),
+            }))
+        }
     })
 }

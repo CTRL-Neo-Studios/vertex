@@ -4,6 +4,9 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {usePanelActions} from "~/utils/panelViews";
+import type {PanelViewProps} from "#shared/plugin/api";
+
+defineProps<PanelViewProps>()
 
 /** The Chat panel view: the side panel's chat, or a way to start one. */
 const {t} = useI18n()

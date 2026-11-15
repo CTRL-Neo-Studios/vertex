@@ -6,6 +6,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
+import {tabKinds} from "~/utils/contributions";
 import {stateClient} from "~/utils/stateClient";
 
 /**
@@ -25,17 +26,15 @@ export function useAppSessionPersistence(session: ActiveSession) {
     function snapshot(): AppSessionContext {
         const paths = (uuids: (string | null | undefined)[]) =>
             uuids.map(u => pathOf(u ?? undefined)?.relativePath).filter((p): p is string => !!p)
-        const chatIds = unref(tabs).filter(t => t.kind === 'chat').map(t => t.fileUuid)
-        const viewIds = unref(tabs).filter(t => t.kind === 'view').map(t => t.fileUuid)
+        // Other tabs only when their kind says so (`TabKindDef.persist`).
+        const saved = unref(tabs).flatMap(t => (t.kind && tabKinds.get(t.kind)?.persist ? [{kind: t.kind, id: t.fileUuid}] : []))
         const focused = unref(activeTabUuid)
         return {
             openedFilePaths: paths(unref(tabs).filter(t => !t.kind).map(t => t.fileUuid)),
             openedFolderPaths: session.workspaceSession ? paths(unref(expandedFolders)) : [],
             lastFocusedFilePath: paths([focused])[0],
-            openedChatIds: chatIds,
-            lastFocusedChatId: focused && chatIds.includes(focused) ? focused : undefined,
-            openedViewIds: viewIds,
-            lastFocusedViewId: focused && viewIds.includes(focused) ? focused : undefined,
+            openedTabs: saved,
+            lastFocusedTab: saved.find(t => t.id === focused),
             shownPanelViews: [...unref(shownPanelViews)],
             leftPanelCollapsed: unref(leftPanelCollapsed),
             rightPanelCollapsed: unref(rightPanelCollapsed),

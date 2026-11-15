@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {Chat} from "@ai-sdk/vue";
+import type {TabProps} from "#shared/plugin/api";
 import type {ChatChange, VertexChatMessage} from "#shared/types/app/chats";
-import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -11,21 +11,20 @@ import {chatChangeOf} from "~/utils/chatChanges";
 import TextDiff from "~/components/Diff/TextDiff.vue";
 
 /**
- * A chat change's diff tab: what a Write-mode reply staged for one note, from the chat's own record (`ChatChange`:
- * the note's text before and the reply's after; never git). It follows the change as it's applied, discarded, undone or
- * found in conflict, and offers Apply / Discard while it's pending.
+ * A chat change's diff tab (tab kind `chat-change`): what a Write-mode reply staged for one note, from the chat's own
+ * record (`ChatChange`: the note's text before and the reply's after; never git). It follows the change as it's
+ * applied, discarded, undone or found in conflict, and offers Apply / Discard while it's pending.
  */
-const props = defineProps<{ tabId: string }>()
+const props = defineProps<TabProps>()
 
 const {t} = useI18n()
-const $route = useRoute()
 const $navi = useAppNavigator()
 const $qt = useQuickToasts()
-const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
+const session = props.session.session
 const index = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
 const {liveChat, summary, applyChanges, discardChanges, showInSidePanel} = useChats(session)
-const target = chatChangeOf(props.tabId)
+const target = chatChangeOf(props.id)
 
 const chat = shallowRef<Chat<VertexChatMessage>>()
 const chatFailed = ref(false)
@@ -49,7 +48,7 @@ const missing = computed(() => chatFailed.value ? t('app.chat.changes.chatFailed
 const path = target?.path ?? ''
 const name = path.slice(path.lastIndexOf('/') + 1)
 const dir = path.slice(0, Math.max(path.lastIndexOf('/'), 0))
-const node = computed(() => (session?.rootPath ? index.getFileByPath(`${session.rootPath}/${path}`) : undefined))
+const node = computed(() => (session.rootPath ? index.getFileByPath(`${session.rootPath}/${path}`) : undefined))
 
 const working = ref(false)
 async function settle(apply: boolean) {
@@ -65,7 +64,7 @@ async function settle(apply: boolean) {
     }
 }
 async function openNote() {
-    if (node.value && session) await $navi.toWorkspaceTab(session.uuid, openTab(node.value.uuid))
+    if (node.value) await $navi.toWorkspaceTab(session.uuid, openTab(node.value.uuid))
 }
 </script>
 

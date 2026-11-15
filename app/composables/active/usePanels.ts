@@ -3,7 +3,9 @@ import type {PanelArea, PanelLayout, PanelSlot, PanelViewId} from "#shared/types
 import {DEFAULT_PANEL_LAYOUT, isPanelMarker, movePanelSlot, panelAreaOf, panesOf, tidySlots, type PanelSlotRef} from "#shared/utils/panelLayout";
 import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {withAt} from "#shared/utils/settings/paths";
-import {panelSlotMenu, panelViews, withRegisteredViews, type PanelActionContext, type PanelViewContext} from "~/utils/panelViews";
+import type {PanelActionContext, PanelViewContext} from "#shared/plugin/api";
+import {panelSlotMenu, panelViews, withRegisteredViews} from "~/utils/panelViews";
+import {viewerFor} from "~/utils/viewers";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -48,7 +50,8 @@ const LAYOUT_PATHS = ['viewConfig.panels.left', 'viewConfig.panels.right', 'view
  */
 export function usePanels(session?: ActiveSession) {
     const nuxtApp = useNuxtApp()
-    const {t} = useI18n()
+    // Not `useI18n`: plugins' session code (the chat builtin's sync, through `useChats`) runs outside a component.
+    const {t} = nuxtApp.$i18n
     const settings = useSettingsScope()
     const {config, save: saveSettings} = useAppSettings()
     const layouts = useActiveLayouts(session)
@@ -59,12 +62,16 @@ export function usePanels(session?: ActiveSession) {
     const style = computed(() => panels.value.style)
     const layout = computed<PanelLayout>(() => withRegisteredViews({left: panels.value.left, right: panels.value.right, bottom: panels.value.bottom, hidden: panels.value.hidden}))
 
-    const context = computed<PanelViewContext>(() => ({
-        session,
-        isWorkspace: !!session?.workspaceSession,
-        activeFile: getFileByUuid(activeTabUuid.value ?? undefined) ?? undefined,
-        settings: settings.effective.value ?? undefined,
-    }))
+    const context = computed<PanelViewContext>(() => {
+        const activeFile = getFileByUuid(activeTabUuid.value ?? undefined) ?? undefined
+        return {
+            session,
+            isWorkspace: !!session?.workspaceSession,
+            activeFile,
+            activeViewer: activeFile && viewerFor(activeFile.fileExt, session?.workspaceSession ? 'workspace' : 'singlespace')?.id,
+            settings: settings.effective.value ?? undefined,
+        }
+    })
     /** Registered, and its `when` holds in this window. */
     const available = (id: PanelViewId) => {
         const view = panelViews.get(id)
@@ -74,7 +81,10 @@ export function usePanels(session?: ActiveSession) {
     const shown = layouts.shownPanelViews
     const collapsedOf = {left: layouts.leftPanelCollapsed, right: layouts.rightPanelCollapsed, bottom: layouts.bottomPanelCollapsed}
 
-    const isView = (item: PanelSlotItem) => !isPanelMarker(item.slot) && !!panelViews.get(item.slot)?.component
+    const isView = (item: PanelSlotItem) => {
+        const view = isPanelMarker(item.slot) ? undefined : panelViews.get(item.slot)
+        return !!(view?.component || view?.mount)
+    }
 
     function areaState(area: PanelArea): PanelAreaState {
         const list = layout.value[area]

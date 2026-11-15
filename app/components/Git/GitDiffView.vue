@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {readTextFile} from "@tauri-apps/plugin-fs";
-import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import type {TabProps} from "#shared/plugin/api";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -9,26 +9,25 @@ import {gitClient} from "~/utils/gitClient";
 import TextDiff from "~/components/Diff/TextDiff.vue";
 
 /**
- * A git diff tab: one file's two versions from git, drawn by `TextDiff`. The working tree and staged sides reload
- * when the file or the repository's git folder changes on disk (an edit, a commit, a checkout), not on every save in
- * the workspace; a commit's never change.
+ * A git diff tab (tab kind `git-diff`): one file's two versions from git, drawn by `TextDiff`. The working tree and
+ * staged sides reload when the file or the repository's git folder changes on disk (an edit, a commit, a checkout),
+ * not on every save in the workspace; a commit's never change.
  */
-const props = defineProps<{ tabId: string }>()
+const props = defineProps<TabProps>()
 
 const {t} = useI18n()
-const $route = useRoute()
 const $navi = useAppNavigator()
-const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
+const session = props.session.session
 const index = useActiveWorkspaceIndex(session)
 const {openTab} = useActiveTabs(session)
-const spec = diffSpecOf(props.tabId)
+const spec = diffSpecOf(props.id)
 
 /** The two versions; `undefined` for a side the file isn't on (new, deleted). */
 const sides = shallowRef<{ before?: string, after?: string }>()
 const failed = ref(false)
 
 async function load() {
-    const root = session?.rootPath
+    const root = session.rootPath
     if (!spec || !root) return
     const show = (rev: string | null, path: string) => gitClient.showFile(root, rev, path).catch(() => undefined)
     const old = spec.origPath ?? spec.path
@@ -63,7 +62,7 @@ const note = computed(() => {
 const node = computed(() => (spec ? index.getFileByPath(`${spec.top}/${spec.path}`) : undefined))
 
 async function openFile() {
-    if (node.value && session) await $navi.toWorkspaceTab(session.uuid, openTab(node.value.uuid))
+    if (node.value) await $navi.toWorkspaceTab(session.uuid, openTab(node.value.uuid))
 }
 </script>
 
