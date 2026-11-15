@@ -1,5 +1,5 @@
 # Vertex
-![screenshot](alpha-screenshot.png)
+![screenshot](beta-screenshot.png)
 
 An OFM-compliant Markdown Editor built with Nuxt v4 + Nuxt UI v4 + Tauri v2.
 
@@ -32,6 +32,12 @@ For the history of this project, check out https://www.ctrl-neo.dev/projects/ver
 - [Windows](https://ctrl-neo.dev/apps/download/vertex/windows-x86_64)
 - [MacOS](https://ctrl-neo.dev/apps/download/vertex/darwin-aarch64)
 - [Linux](https://ctrl-neo.dev/apps/download/vertex/linux-x86_64)
+
+**Beta Channel:**
+
+- [Windows](https://ctrl-neo.dev/apps/download/vertex/windows-x86_64?channel=beta)
+- [MacOS](https://ctrl-neo.dev/apps/download/vertex/darwin-aarch64?channel=beta)
+- [Linux](https://ctrl-neo.dev/apps/download/vertex/linux-x86_64?channel=beta)
 
 ## Development Roadmap
 

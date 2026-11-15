@@ -14,6 +14,7 @@ export default defineNuxtConfig({
       "@type32/yaml-editor-form",
       "@nuxt/eslint",
       "@comark/vue",
+      "@type32/jsoncanvas-editor",
     ],
 
 	i18n: {
@@ -104,9 +105,13 @@ export default defineNuxtConfig({
                 "@tauri-apps/api/window",
                 "@tauri-apps/plugin-process",
                 "@tauri-apps/plugin-updater",
+                // Files' native drag (app/utils/outsideItems.ts); found at runtime otherwise, which reloads the window.
+                "@crabnebula/tauri-plugin-drag",
                 // Nuxt DevTools' client; discovered late otherwise, which reloads the page.
                 "@vue/devtools-core",
                 "@tauri-apps/api/event",
+                // Bases maps (its worker is set by URL in Bases/Map.vue).
+                "maplibre-gl",
                 "@tauri-apps/api/core",
                 "@tauri-apps/api/dpi",
                 // Imported by pages/settings/index.vue; found at runtime otherwise, which reloads the page mid-load ("head.hooks").
@@ -124,6 +129,10 @@ export default defineNuxtConfig({
                 // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
                 "katex",
                 "@type32/obsidian-bases-parser",
+                // Bases: cell HTML (Value.vue) and the formula field's completion; found when a base first opens otherwise,
+                // which reloads the window.
+                "xss",
+                "@codemirror/autocomplete",
                 "@type32/latex2vue",
                 "zod",
                 "@vue-flow/core",

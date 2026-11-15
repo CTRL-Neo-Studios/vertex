@@ -9,6 +9,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {StateKey} from "#shared/constants/app";
+import {useBaseCommandItems} from "~/composables/bases/useBaseCommands";
 
 const { t } = useI18n()
 
@@ -30,6 +31,8 @@ const session = $sesh.getSession(sessionId)
 const runner = session?.rootPath ? useWorkflowRunner(session) : undefined
 // Shared so the left sidebar's Search item can open it.
 const open = useState<boolean>(StateKey.fileSearchOpen(sessionId.value), () => false)
+// The Bases commands: the open base's, and Insert new base in a note.
+const baseCommands = useBaseCommandItems(session!)
 
 async function onClickFile(item: Partial<UITreeNode>) {
     if (!item || !item.uuid) return;
@@ -103,6 +106,32 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             },
             {
+                label: t('app.editor.ui.filetree.newCanvas'),
+                description: t('app.editor.ui.palette.newCanvasDescription'),
+                icon: 'i-lucide-layout-dashboard',
+                onSelect() {
+                    newFileModal.open({
+                        modalTitle: t('app.editor.ui.filetree.newCanvas'),
+                        asFolder: false,
+                        asLevel: 'same',
+                        fileExt: 'canvas'
+                    })
+                }
+            },
+            {
+                label: t('app.editor.ui.filetree.newBase'),
+                description: t('app.editor.ui.palette.newBaseDescription'),
+                icon: 'i-lucide-table',
+                onSelect() {
+                    newFileModal.open({
+                        modalTitle: t('app.editor.ui.filetree.newBase'),
+                        asFolder: false,
+                        asLevel: 'same',
+                        fileExt: 'base'
+                    })
+                }
+            },
+            {
                 label: t('app.editor.ui.filetree.newWorkflow'),
                 description: t('app.editor.ui.palette.newWorkflowDescription'),
                 icon: 'i-lucide-workflow',
@@ -116,6 +145,11 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             }
         ]
+    },
+    {
+        id: 'bases',
+        label: t('app.editor.ui.bases.commands.group'),
+        items: baseCommands.value,
     },
     {
         id: 'workflows',

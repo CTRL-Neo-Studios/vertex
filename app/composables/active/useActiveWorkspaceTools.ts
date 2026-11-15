@@ -7,7 +7,8 @@ import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
 import {parentPathOf} from "#shared/utils/index/parse";
-import {fileNameFromPath, freeName} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, freeName, getFileExtensionFromPath, isCanvasFile} from "#shared/utils/fs/filenames";
+import {rewriteCanvasLinks} from "#shared/utils/index/canvasLinks";
 import UpdateLinksModal from "~/components/Modals/UpdateLinksModal.vue";
 import FileConflictModal, {type ConflictAction} from "~/components/Modals/FileConflictModal.vue";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -485,7 +486,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             if (!ref) continue
             try {
                 const before = await readTextFile(ref.fullPath)
-                const result = rewriteLinks(before, targets)
+                const result = (isCanvasFile(getFileExtensionFromPath(ref.fileName)) ? rewriteCanvasLinks : rewriteLinks)(before, targets)
                 if (result.count === 0) continue
                 markSelfWrite(ref.fullPath)
                 await writeTextFile(ref.fullPath, result.text)
@@ -541,6 +542,26 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         await updateIndex(path, content)
     }
 
+    /**
+     * Writes new text into notes (a base's property edits) as one undo step named `label`; open tabs of those notes
+     * reload. Unchanged notes are skipped.
+     */
+    async function editNotes(edits: { uuid: string, text: string }[], label: string) {
+        const change = newChange()
+        for (const {uuid, text} of edits) {
+            const note = getFileByUuid(uuid)
+            if (!note) continue
+            const before = await readTextFile(note.fullPath)
+            if (before === text) continue
+            markSelfWrite(note.fullPath)
+            await writeTextFile(note.fullPath, text)
+            await updateIndex(note.fullPath, text)
+            notifyModified(note.fullPath)
+            change.notes.push({uuid, before, after: text})
+        }
+        remember(change, label)
+    }
+
     /** The workspace folder at `relative` (`''`: the top level), created and indexed if missing. Returns its full path. */
     async function ensureFolder(relative: string) {
         const root = session!.rootPath!
@@ -555,5 +576,5 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         return path
     }
 
-    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
+    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
 }

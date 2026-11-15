@@ -1,3 +1,5 @@
+import {readYaml, writeYaml} from "@type32/obsidian-bases-parser"
+
 /**
  * What workflow effects need from a vault, over vault-relative `/` paths. The app implements it over the
  * workspace index and Tauri fs; dry runs wrap it in an in-memory overlay; tests use a folder on disk.
@@ -36,11 +38,37 @@ export interface Vault {
     move(from: string, to: string): Promise<void>
 }
 
-/** Pure YAML helpers, injected like the index's parsers (the editor package's in the app, imported by path in tests). */
+/** Pure YAML helpers, injected so tests can supply `frontmatterRange` by path (the app's is auto-imported). */
 export interface YamlTools {
     frontmatterRange(markdown: string): { from: number, to: number, yaml: string } | { unclosed: true } | null
     parseYaml(text: string): { data?: unknown, error?: unknown }
     stringifyYaml(data: unknown): { yaml?: string, error?: unknown }
+}
+
+/**
+ * Frontmatter read and written as Obsidian does (YAML 1.2 core schema and its writer's quoting): dates stay text, and
+ * a key like `n` isn't quoted. Every frontmatter edit outside the editor goes through it: Bases' property writes and
+ * workflows. The editor's own writer keeps a note's formatting, but only works inside the editor.
+ */
+export function obsidianYaml(frontmatterRange: YamlTools['frontmatterRange']): YamlTools {
+    const attempt = <T>(run: () => T) => {
+        try {
+            return {value: run()}
+        } catch (error) {
+            return {error}
+        }
+    }
+    return {
+        frontmatterRange,
+        parseYaml: (text) => {
+            const {value, error} = attempt(() => readYaml(text) ?? {})
+            return error === undefined ? {data: value} : {error}
+        },
+        stringifyYaml: (data) => {
+            const {value, error} = attempt(() => writeYaml(data).trimEnd())
+            return error === undefined ? {yaml: value} : {error}
+        },
+    }
 }
 
 export const TRASH_DIR = '.vertex/trash'

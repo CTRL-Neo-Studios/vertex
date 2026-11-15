@@ -12,6 +12,7 @@ import type {ContextMenuItem} from "@nuxt/ui";
 import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
+import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions";
 import {useChats} from "~/composables/ai/useChats";
 import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -33,16 +34,11 @@ const props = withDefaults(defineProps<{
     filePath: '',
     disabled: false
 })
-const frontmatterOpen = useState<boolean>(props?.filePath, () => false)
 
 const emit = defineEmits<{
     (e: 'on-rename', oldValue: string, newValue: string): void
     (e: 'on-clicked-internal-link', detail: InternalLinkClickDetail): void
 }>()
-
-onBeforeUnmount(() => {
-    frontmatterOpen.value = false
-})
 
 // Header tools: the editor's latest state drives their enabled/active looks; each group sits where settings say.
 const {effective} = useSettingsScope()
@@ -61,9 +57,12 @@ function toolsAt(side: HeaderToolsPosition) {
 const {t} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
-const {root: chatsRoot, askInChat} = useChats(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
+const {root: chatsRoot, askInChat} = useChats(session)
+// The properties panel's suggestions: the workspace's property names and values.
+const properties = usePropertiesOptions(session)
 const selected = ref('')
-const readOnly = computed(() => props.disabled || frontmatterOpen.value || props.renaming)
+const readOnly = computed(() => props.disabled || props.renaming)
 
 function onMenuOpen(open: boolean) {
     const state = editorView.value?.state
@@ -132,8 +131,8 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
         :renaming="renaming"
     >
         <template #default>
-            <ViewerEditorComponentFrontmatterEditor class="max-w-2xl w-full" v-model:open="frontmatterOpen" v-model:editorInstance="editorInstance"/>
             <UContextMenu :items="menuItems" :content="{ onCloseAutoFocus }" @update:open="onMenuOpen">
+                <!-- Frontmatter shows as the editor's own properties panel, offering the workspace's names and values. -->
                 <Editor
                     :disabled="readOnly"
                     :extensions="editorExtensions"
@@ -142,16 +141,18 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
                     class="max-w-2xl w-full"
                     :special-code-block-map="props.specialCodeBlockMapping"
                     :internal-link-map="props.internalLinkList"
+                    :properties="properties"
+                    context-menu-size="sm"
                     @update:model-value="() => contentSaved = false"
                     @internal-link-click="(detail) => emit('on-clicked-internal-link', detail)"
                 />
             </UContextMenu>
         </template>
         <template #header-left>
-            <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('left')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="disabled || frontmatterOpen || renaming"/>
+            <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('left')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="readOnly"/>
         </template>
         <template #header-right>
-            <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('right')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="disabled || frontmatterOpen || renaming"/>
+            <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('right')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="readOnly"/>
         </template>
         <template #status-bar>
             <ViewerEditorComponentWordCounter v-model="content"/>

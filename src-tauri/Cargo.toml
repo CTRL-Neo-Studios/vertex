@@ -1,6 +1,6 @@
 [package]
 name = "Vertex"
-version = "0.2.0-beta.5"
+version = "0.2.0-beta.6"
 description = "A General Purpose Markdown Editor."
 authors = ["Type-32"]
 license = ""

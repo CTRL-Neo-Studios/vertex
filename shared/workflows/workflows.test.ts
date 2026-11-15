@@ -4,15 +4,15 @@ import {tmpdir} from 'node:os'
 import {dirname, join} from 'node:path'
 import {afterEach, beforeEach, describe, expect, it} from 'vitest'
 import {buildDocument, run} from '@type32/workflows/core/testing'
-import {frontmatterRange, parseFrontmatter, parseYaml, stringifyYaml} from '../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/frontmatter.js'
+import {frontmatterRange, parseFrontmatter} from '../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/frontmatter.js'
 import {getInternalLinks} from '../utils/index/rewriteLinks'
 import {LinkGraph} from '../utils/index/linkGraph'
 import {overlayVault} from './dryRun'
 import {createVertexEffects, undoOps, type Op} from './effects'
-import {hasTag, matchesPattern, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry, type YamlTools} from './vault'
+import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from './vault'
 import {vertexLanguage, type VertexEffects} from './vertex'
 
-const yaml = {frontmatterRange, parseYaml, stringifyYaml} as YamlTools
+const yaml = obsidianYaml(frontmatterRange)
 
 /** A real folder on disk as a Vault: hidden entries skipped, links resolved like the app's index. */
 function diskVault(root: string): Vault {
@@ -154,7 +154,7 @@ describe('§10 against a vault on disk', () => {
         const after = await snapshot(root)
         expect(Object.keys(after).sort()).toEqual(['Archive/.keep', 'Notes/a_archive.md', 'Notes/b_archive.md', 'c.md', 'index.md'])
         expect(after['Notes/a_archive.md']).toBe('---\ntags:\n  - draft\nstatus: archived\n---\n# A\n')
-        expect(after['Notes/b_archive.md']).toBe('---\ntags: \'#Draft/idea\'\ntitle: Bee\nstatus: archived\n---\nSee [[a_archive]].\n')
+        expect(after['Notes/b_archive.md']).toBe('---\ntags: "#Draft/idea"\ntitle: Bee\nstatus: archived\n---\nSee [[a_archive]].\n')
         expect(after['index.md']).toBe('Links: [[a_archive]], [[Notes/b_archive|Bee]], `[[a]]` in code.\n')
         expect(after['c.md']).toBe(files['c.md'])
         expect(ops.map(o => o.kind === 'move' ? `${o.why} ${o.from} → ${o.to}` : `${o.why} ${o.path}`)).toEqual([
@@ -378,6 +378,12 @@ describe('helpers', () => {
         expect(setFrontmatterProperty('---\ncount: 1\n---\nx', 'm', new Map([['k', [1, 2]]]), yaml))
             .toBe('---\ncount: 1\nm:\n  k:\n    - 1\n    - 2\n---\nx')
         expect(() => setFrontmatterProperty('---\ncount: 1\nbody', 'm', 1, yaml)).toThrow(/not closed/)
+    })
+
+    it('setFrontmatterProperty leaves the other properties as Obsidian wrote them', () => {
+        // A YAML 1.1 reader made `due` a Date, written back as `2026-02-03T00:00:00.000Z`, and quoted the key `n`.
+        expect(setFrontmatterProperty('---\ndue: 2026-02-03\nn: 1\n---\nx', 'status', 'done', yaml))
+            .toBe('---\ndue: 2026-02-03\nn: 1\nstatus: done\n---\nx')
     })
 
     it('matchesPattern: names with or without extension, globs on names or paths', () => {
