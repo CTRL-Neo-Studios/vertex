@@ -33,6 +33,12 @@ For the history of this project, check out https://www.ctrl-neo.dev/projects/ver
 - [MacOS](https://ctrl-neo.dev/apps/download/vertex/darwin-aarch64)
 - [Linux](https://ctrl-neo.dev/apps/download/vertex/linux-x86_64)
 
+**Beta Channel:**
+
+- [Windows](https://ctrl-neo.dev/apps/download/vertex/windows-x86_64?channel=beta)
+- [MacOS](https://ctrl-neo.dev/apps/download/vertex/darwin-aarch64?channel=beta)
+- [Linux](https://ctrl-neo.dev/apps/download/vertex/linux-x86_64?channel=beta)
+
 ## Development Roadmap
 
 https://github.com/orgs/CTRL-Neo-Studios/projects/5
