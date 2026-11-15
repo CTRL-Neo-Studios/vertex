@@ -1,6 +1,6 @@
 import {existsSync, readFileSync} from 'node:fs'
 import {basename, join} from 'node:path'
-import {addTemplate, addTypeTemplate, defineNuxtModule, getLayerDirectories} from 'nuxt/kit'
+import {addTemplate, defineNuxtModule, getLayerDirectories} from 'nuxt/kit'
 import {validateManifest, type PluginManifest} from '../shared/plugin/manifest'
 
 const TEMPLATE = 'core-plugins.mjs'
@@ -54,16 +54,6 @@ export default defineNuxtModule({
                     `  {manifest: ${JSON.stringify(manifest)}, source: 'core', load: () => import(${JSON.stringify(join(root, 'app/plugin'))})},`)
                 return `export const corePlugins = [\n${lines.join('\n')}\n]\n`
             },
-        })
-        addTypeTemplate({
-            filename: 'types/core-plugins.d.ts',
-            getContents: () => [
-                `declare module '#build/${TEMPLATE}' {`,
-                `  import type {PluginEntry} from '#shared/plugin/api'`,
-                '  export const corePlugins: PluginEntry[]',
-                '}',
-                '',
-            ].join('\n'),
         })
     },
 })

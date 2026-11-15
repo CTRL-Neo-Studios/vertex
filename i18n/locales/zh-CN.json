@@ -81,6 +81,7 @@
 				"about": "关于",
 				"general": "通用",
 				"theme": "主题",
+				"plugins": "插件",
 				"view": "视图",
 				"workflows": "工作流",
 				"git": "版本控制",
@@ -487,6 +488,34 @@
 					"noMatch": "没有匹配搜索的项。",
 					"remove": "移除"
 				}
+			},
+			"plugins": {
+				"title": "插件",
+				"core": "核心插件",
+				"coreDescription": "Vertex 自带。关闭后，它添加的内容随之移除，运行它的窗口会重新加载。",
+				"none": "没有插件。",
+				"version": "版本 {version}",
+				"needs": "依赖 {names}",
+				"optional": "{name}（可选）",
+				"uses": "使用{list}",
+				"permission": {
+					"network": "网络",
+					"secrets": "钥匙串",
+					"files-outside-workspace": "工作区以外的文件"
+				},
+				"reason": {
+					"missing": "已关闭：它依赖 {name}，但未安装",
+					"requirementOff": "已关闭：它依赖的 {name} 已关闭",
+					"cycle": "已关闭：它经由 {names} 依赖自身"
+				},
+				"untrusted": "此工作区开启了你在设置中关闭的插件。信任此工作区后它们才会运行。",
+				"waitsForTrust": "等待信任",
+				"settingsWaitForTrust": "此工作区在这里的部分更改需要信任此工作区后才会生效。",
+				"settings": "设置",
+				"noSettings": "此插件没有设置。",
+				"notFound": "没有插件“{id}”。",
+				"pick": "选择…",
+				"pickOutside": "请选择工作区内的内容。"
 			},
 			"scope": {
 				"label": "正在编辑",

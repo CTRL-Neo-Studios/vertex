@@ -1,9 +1,11 @@
 import {describe, expect, it} from 'vitest'
+import type {PluginManifest} from '#shared/plugin/manifest'
 import {resolveLocale} from './locale'
 
 // Bundled by Vite at test time, so no Node fs/path types are needed under the app tsconfig.
 const appFiles = import.meta.glob<Record<string, unknown>>('../../i18n/locales/*.json', {eager: true, import: 'default'})
 const layerFiles = import.meta.glob<Record<string, unknown>>('../../layers/*/i18n/locales/*.json', {eager: true, import: 'default'})
+const manifests = import.meta.glob<PluginManifest>('../../layers/*/plugin.json', {eager: true, import: 'default'})
 
 /** `app`, and each plugin layer by id → locale file name → messages. */
 const catalogs = new Map<string, Record<string, Record<string, unknown>>>()
@@ -46,6 +48,14 @@ describe.each([...catalogs.keys()])('%s strings', (catalog) => {
     if (catalog !== 'app') {
         it('keeps its strings under plugins.<id>', () => {
             for (const key of en.keys()) expect(key.startsWith(`plugins.${catalog}.`), key).toBe(true)
+        })
+
+        it('has every string its settings schema names', () => {
+            const manifest = Object.entries(manifests).find(([path]) => path.includes(`/layers/${catalog}/`))?.[1]
+            for (const field of manifest?.config?.schema ?? []) {
+                const keys = [field.label, field.description, ...(field.type === 'select' ? field.options.map(o => o.label) : [])]
+                for (const key of keys) if (key) expect(en.has(key), key).toBe(true)
+            }
         })
     }
 })

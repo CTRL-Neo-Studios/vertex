@@ -6,6 +6,8 @@ import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {SETTINGS_ROUTE_EVENT, SETTINGS_SCOPE_EVENT} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {pluginEnabled} from "#shared/plugin/resolve";
+import {pluginManifests} from "~/utils/plugins/catalog";
 
 const {t} = useI18n()
 const $route = useRoute()
@@ -30,6 +32,11 @@ const links = computed(() => [
             {label: t('app.settings.nav.aiFeatures'), icon: 'i-lucide-toggle-right', to: `${Routes.settings}/ai/features`},
         ],
     },
+    {label: t('app.settings.nav.plugins'), icon: 'i-lucide-puzzle', to: `${Routes.settings}/plugins`, active: $route.path === `${Routes.settings}/plugins`},
+    // The settings of the plugins that are on in the scope being edited.
+    ...pluginManifests()
+        .filter(m => m.config?.schema?.length && pluginEnabled(m, scope.effective.value?.plugins.enabled ?? {}))
+        .map(m => ({label: m.name, icon: m.icon ?? 'i-lucide-puzzle', to: `${Routes.settings}/plugins/${m.id}`})),
 ] satisfies NavigationMenuItem[])
 
 // User, or a workspace this app has opened. Select items need a non-empty value; a root is an absolute path.

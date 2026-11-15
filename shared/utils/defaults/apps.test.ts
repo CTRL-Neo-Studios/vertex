@@ -29,10 +29,17 @@ describe('defaultAppSettings recovery migration', () => {
 })
 
 describe('defaultAppPluginsConfig', () => {
-    it('keeps on/off for any plugin id and drops values that aren\'t booleans', () => {
-        expect(defaultAppPluginsConfig({enabled: {git: false, 'not-installed-here': true, broken: 'yes' as never}}))
-            .toEqual({enabled: {git: false, 'not-installed-here': true}})
-        expect(defaultAppSettings().plugins).toEqual({enabled: {}})
+    it('keeps on/off, config and source for any plugin id and drops values of the wrong kind', () => {
+        expect(defaultAppPluginsConfig({
+            enabled: {git: false, 'not-installed-here': true, broken: 'yes' as never},
+            config: {graph: {depth: 2}, broken: 'x' as never} as never,
+            sources: {graph: 'https://example.com/graph.zip', broken: 1 as never},
+        })).toEqual({
+            enabled: {git: false, 'not-installed-here': true},
+            config: {graph: {depth: 2}},
+            sources: {graph: 'https://example.com/graph.zip'},
+        })
+        expect(defaultAppSettings().plugins).toEqual({enabled: {}, config: {}, sources: {}})
     })
 })
 

@@ -1,7 +1,8 @@
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {PanelArea, PanelLayout, PanelSlot, PanelViewId} from "#shared/types/app/settings";
 import {DEFAULT_PANEL_LAYOUT, isPanelMarker, movePanelSlot, panelAreaOf, panesOf, tidySlots, type PanelSlotRef} from "#shared/utils/panelLayout";
-import {withAt, type AppSettingPath} from "#shared/utils/settings/scopes";
+import type {AppSettingPath} from "#shared/utils/settings/scopes";
+import {withAt} from "#shared/utils/settings/paths";
 import {panelSlotMenu, panelViews, withRegisteredViews, type PanelActionContext, type PanelViewContext} from "~/utils/panelViews";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";

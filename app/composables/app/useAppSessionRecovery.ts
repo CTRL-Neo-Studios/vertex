@@ -8,6 +8,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveLayouts} from "~/composables/active/useActiveLayouts";
 import {panelViews} from "~/utils/panelViews";
+import {isPluginReload} from "~/utils/plugins/runtime";
 
 /**
  * Brings a freshly created session window back to its persisted state:
@@ -25,7 +26,8 @@ export function useAppSessionRecovery() {
             return
         }
         const result = await $open.openFolderOrFileFromPath(appSession.rootFileOrFolderAbsolutePath)
-        await $win.getCurrentAppWindow().setFocus()
+        // A window that reloads because a plugin was turned off (from Settings, say) stays where it is.
+        if (!isPluginReload()) await $win.getCurrentAppWindow().setFocus()
         return result
     }
 

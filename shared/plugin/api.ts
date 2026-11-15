@@ -41,9 +41,29 @@ export interface SessionContext {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- filled by module augmentation
 export interface PluginApis {}
 
-export interface PluginContext {
+/**
+ * Plugins' config types by plugin id, for typed `plugins.config.<id>` setting paths. A plugin declares its own in its
+ * `app/api.ts`: `declare module '#shared/plugin/api' { interface PluginConfigs { 'my-plugin': MyConfig } }`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- filled by module augmentation
+export interface PluginConfigs {}
+
+/** Where a config write goes: the user's settings, or the window's workspace (only what the manifest lets it override). */
+export type ConfigScope = 'global' | 'workspace'
+
+export interface PluginConfigAccess<Config> {
+    /** The effective config in this window (the workspace's overrides applied), schema fields checked and defaulted. Reactive. */
+    readonly value: Config
+    /** Writes paths inside the config (`{depth: 2}`); `null` removes one. Default scope: `global`. */
+    set(patch: Record<string, unknown>, scope?: ConfigScope): Promise<void>
+    /** Whether this window's workspace overrides the path. */
+    overridden(path: string): boolean
+}
+
+export interface PluginContext<Config = Record<string, unknown>> {
     plugin: { id: string, version: string, source: PluginSource }
     window: { kind: WindowKind, label: string }
+    config: PluginConfigAccess<Config>
     commands: {
         /** Removed when the plugin stops, or with the session when called from an `onSession` callback. */
         register(command: PluginCommand): () => void
@@ -58,16 +78,16 @@ export interface PluginContext {
     whenPlugin<K extends keyof PluginApis>(id: K, fn: (api: PluginApis[K]) => void): void
 }
 
-export interface PluginDefinition {
+export interface PluginDefinition<Config = Record<string, unknown>> {
     /**
      * Runs once per window. Synchronous: what it registers belongs to the plugin's effect scope, which an `await` would
      * leave. Async work belongs in what it registers (commands, `onSession`).
      */
-    setup(ctx: PluginContext): void
+    setup(ctx: PluginContext<Config>): void
 }
 
-/** A plugin's entry (`app/plugin.ts`) default-exports `definePlugin({setup(ctx) {…}})`. */
-export const definePlugin = (definition: PluginDefinition): PluginDefinition => definition
+/** A plugin's entry (`app/plugin.ts`) default-exports `definePlugin({setup(ctx) {…}})`; `Config` types `ctx.config`. */
+export const definePlugin = <Config = Record<string, unknown>>(definition: PluginDefinition<Config>): PluginDefinition<Config> => definition
 
 /** A plugin the host can start: its manifest and how to load its entry. */
 export interface PluginEntry {

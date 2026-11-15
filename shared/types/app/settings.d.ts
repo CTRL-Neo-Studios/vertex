@@ -1,5 +1,6 @@
 import type {FileTrustMode} from "#shared/workflows/trust"
 import type {AppAiConfig} from "#shared/types/app/ai"
+import type {PluginConfigs} from "#shared/plugin/api"
 
 export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both'
 
@@ -18,7 +19,7 @@ export interface AppSettings {
     gitConfig: AppGitConfig,
     /** Moving and renaming files; workspace-overridable. */
     fileConfig: AppFileConfig,
-    /** Which plugins are on. Global only for now; the Plugin Architecture Plan's K2 adds workspace overrides and config. */
+    /** Plugins: which are on, and their config. Workspace-overridable as their manifests allow (`settingsAllowlist`). */
     plugins: AppPluginsConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
@@ -26,8 +27,18 @@ export interface AppSettings {
 }
 
 export interface AppPluginsConfig {
-    /** Plugin id → on or off; a plugin not listed follows its manifest's `enabledByDefault` (on). */
+    /**
+     * Plugin id → on or off; a plugin not listed follows its manifest's `enabledByDefault` (on). A workspace may turn
+     * any off; only a trusted one may turn one on.
+     */
     enabled: Record<string, boolean>,
+    /**
+     * Plugin id → its config, as stored: a plugin's schema defaults apply when it runs (`pluginConfig`). Kept for plugins
+     * this device doesn't have. Typed for the plugins that declare `PluginConfigs`.
+     */
+    config: { [Id in keyof PluginConfigs]?: PluginConfigs[Id] },
+    /** Plugin id → where it was installed from (C phases): a vault that uses it can offer to install it. */
+    sources: Record<string, string>,
 }
 
 export interface AppFileConfig {

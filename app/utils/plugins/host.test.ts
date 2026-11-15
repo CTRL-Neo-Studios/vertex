@@ -23,6 +23,7 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
     const reload = vi.fn()
     const host = createPluginHost(entries, {
         window: {kind: 'session', label: 'session-s1'},
+        config: () => ({value: {}, set: async () => {}, overridden: () => false}),
         registerCommand(command) {
             commands.set(command.id, command.plugin)
             return () => commands.delete(command.id)

@@ -1,28 +1,38 @@
 import type {AppSettings} from "#shared/types/app/settings";
 import type {DeepPartial} from "#shared/types/types";
+import type {OverrideLevel, PluginManifest} from "#shared/plugin/manifest";
 import {defaultAppSettings} from "#shared/utils/defaults/apps";
+import {getAt, isPlainObject, withAt} from "#shared/utils/settings/paths";
 
 /**
  * Global and workspace settings (VS Code's User and Workspace). There's one `AppSettings` type: a workspace's
- * `.vertex/settings.json` is a `DeepPartial<AppSettings>` holding only what it changes, and the list below says
- * which settings it may change. Everything else (trust, updates, sessions, language, workflow limits) stays global.
+ * `.vertex/settings.json` is a `DeepPartial<AppSettings>` holding only what it changes, and the allowlist says which
+ * settings it may change: the kernel's (`WORKSPACE_OVERRIDABLE`) and each plugin's (its manifest's
+ * `config.overridable`). Everything else (trust, updates, sessions, language, workflow limits) stays global.
  */
 
 /** Every dotted path into `T`, objects included: `themeConfig`, `themeConfig.primaryColor`. */
 export type SettingPath<T> = {
-    [K in keyof T & string]: T[K] extends readonly unknown[] ? K : T[K] extends object ? K | `${K}.${SettingPath<T[K]>}` : K
+    [K in keyof T & string]-?: NonNullable<T[K]> extends readonly unknown[]
+        ? K
+        : NonNullable<T[K]> extends object ? K | `${K}.${SettingPath<NonNullable<T[K]>>}` : K
 }[keyof T & string]
 
+/** The type at a path; `unknown` for one the type doesn't know (a plugin's config without `PluginConfigs`). */
 export type SettingAt<T, P extends string> = P extends `${infer K}.${infer Rest}`
-    ? K extends keyof T ? SettingAt<T[K], Rest> : never
-    : P extends keyof T ? T[P] : never
+    ? K extends keyof T ? SettingAt<NonNullable<T[K]>, Rest> : unknown
+    : P extends keyof T ? T[P] : unknown
 
-export type AppSettingPath = SettingPath<AppSettings>
+/** A plugin's config paths are typed through `PluginConfigs`; a plugin that doesn't declare its config still has them. */
+export type AppSettingPath = SettingPath<AppSettings> | `plugins.config.${string}`
+
+/** Path → who may override it; an entry covers everything under it. */
+export type Allowlist = Readonly<Record<string, OverrideLevel>>
 
 /**
- * What a workspace may override; an entry covers everything under it. `trustedWorkspace` only applies when the
- * workspace's folder is trusted (Settings → Workflows): custom CSS can restyle or hide anything, the trust prompt
- * included, and load remote URLs. Making another setting overridable is one line here.
+ * What a workspace may override of the kernel's settings. `trustedWorkspace` only applies when the workspace's folder
+ * is trusted (Settings → Workflows): custom CSS can restyle or hide anything, the trust prompt included, and load remote
+ * URLs. Making another setting overridable is one line here.
  */
 export const WORKSPACE_OVERRIDABLE = {
     themeConfig: 'workspace',
@@ -40,31 +50,28 @@ export const WORKSPACE_OVERRIDABLE = {
     // A shared vault's settings mustn't start committing and pushing a user's edits on their own.
     'gitConfig.autoSync': 'trustedWorkspace',
     fileConfig: 'workspace',
-} as const satisfies Partial<Record<AppSettingPath, 'workspace' | 'trustedWorkspace'>>
+    // Value-aware (`applicableOverrides`): any workspace may turn a plugin off; only a trusted one may turn one on, as
+    // that runs its code with the vault.
+    'plugins.enabled': 'workspace',
+} as const satisfies Partial<Record<AppSettingPath, OverrideLevel>>
 
-type Overridable = keyof typeof WORKSPACE_OVERRIDABLE
+/** The kernel's allowlist with each plugin's `config.overridable`, under `plugins.config.<id>`. */
+export function settingsAllowlist(manifests: readonly PluginManifest[]): Allowlist {
+    const out: Record<string, OverrideLevel> = {...WORKSPACE_OVERRIDABLE}
+    for (const manifest of manifests) {
+        for (const [path, level] of Object.entries(manifest.config?.overridable ?? {})) out[`plugins.config.${manifest.id}.${path}`] = level
+    }
+    return out
+}
 
 /** How `path` may be overridden, from the entry covering it; `undefined` = global only. */
-export function overridableAs(path: string): 'workspace' | 'trustedWorkspace' | undefined {
-    const entry = (Object.keys(WORKSPACE_OVERRIDABLE) as Overridable[]).find(k => path === k || path.startsWith(`${k}.`))
-    return entry && WORKSPACE_OVERRIDABLE[entry]
-}
-
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-
-export function getAt(target: unknown, path: string): unknown {
-    return path.split('.').reduce<unknown>((node, key) => (isObject(node) ? node[key] : undefined), target)
-}
-
-/** A copy of `target` with `value` at `path`. */
-export function withAt<T>(target: T, path: string, value: unknown): T {
-    const [key, ...rest] = path.split('.') as [string, ...string[]]
-    const node: Record<string, unknown> = isObject(target) ? target : {}
-    return {...node, [key]: rest.length ? withAt(node[key], rest.join('.'), value) : value} as T
+export function overridableAs(path: string, allowlist: Allowlist): OverrideLevel | undefined {
+    const entry = Object.keys(allowlist).find(k => path === k || path.startsWith(`${k}.`))
+    return entry ? allowlist[entry] : undefined
 }
 
 function merge(base: unknown, over: unknown): unknown {
-    if (!isObject(base) || !isObject(over)) return over === undefined ? base : over
+    if (!isPlainObject(base) || !isPlainObject(over)) return over === undefined ? base : over
     const out: Record<string, unknown> = {...base}
     for (const [key, value] of Object.entries(over)) out[key] = merge(base[key], value)
     return out
@@ -73,20 +80,27 @@ function merge(base: unknown, over: unknown): unknown {
 /** Whether the workspace overrides `path` (or, for a section, anything in it). */
 export function isOverridden(local: DeepPartial<AppSettings>, path: string): boolean {
     const value = getAt(local, path)
-    return value !== undefined && !(isObject(value) && Object.keys(value).length === 0)
+    return value !== undefined && !(isPlainObject(value) && Object.keys(value).length === 0)
 }
 
-/** The overrides that apply: allowlisted, and the trusted-only ones only in a trusted workspace. */
-export function applicableOverrides(local: DeepPartial<AppSettings>, trusted: boolean): DeepPartial<AppSettings> {
+/** The overrides that apply: allowlisted, the trusted-only ones only in a trusted workspace, and plugins turned on only there. */
+export function applicableOverrides(local: DeepPartial<AppSettings>, trusted: boolean, allowlist: Allowlist): DeepPartial<AppSettings> {
     let out: DeepPartial<AppSettings> = {}
-    for (const [path, level] of Object.entries(WORKSPACE_OVERRIDABLE)) {
+    for (const [path, level] of Object.entries(allowlist)) {
         const value = getAt(local, path)
-        if (value !== undefined && (level === 'workspace' || trusted)) out = withAt(out, path, value)
+        if (value === undefined || (level === 'trustedWorkspace' && !trusted)) continue
+        if (path === 'plugins.enabled') {
+            for (const [id, on] of Object.entries(isPlainObject(value) ? value : {})) {
+                if (on === false || (on === true && trusted)) out = withAt(out, `plugins.enabled.${id}`, on)
+            }
+            continue
+        }
+        out = withAt(out, path, value)
     }
     return out
 }
 
 /** A window's settings: the global ones with its workspace's applicable overrides on top, sanitized as one. */
-export function effectiveSettings(global: AppSettings, local: DeepPartial<AppSettings>, trusted: boolean): AppSettings {
-    return defaultAppSettings(merge(global, applicableOverrides(local, trusted)) as DeepPartial<AppSettings>)
+export function effectiveSettings(global: AppSettings, local: DeepPartial<AppSettings>, trusted: boolean, allowlist: Allowlist): AppSettings {
+    return defaultAppSettings(merge(global, applicableOverrides(local, trusted, allowlist)) as DeepPartial<AppSettings>)
 }

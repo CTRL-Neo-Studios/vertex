@@ -1,11 +1,14 @@
-import {watch} from 'vue'
+import {computed, watch} from 'vue'
 import {getCurrentWebviewWindow} from '@tauri-apps/api/webviewWindow'
-import {corePlugins} from '#build/core-plugins.mjs'
+import {pluginConfig} from '#shared/plugin/config'
 import {sessionUuidFromLabel, WindowLabel} from '#shared/constants/app'
 import type {SessionContext} from '#shared/plugin/api'
 import type {WindowKind} from '#shared/plugin/manifest'
 import {pluginEnabled} from '#shared/plugin/resolve'
+import {getAt, withAt, withoutAt} from '#shared/utils/settings/paths'
+import type {AppSettingPath} from '#shared/utils/settings/scopes'
 import {registerCommand} from '~/utils/commands'
+import {pluginEntries} from '~/utils/plugins/catalog'
 import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import useQuickToasts from '~/composables/utility/useQuickToasts'
@@ -14,6 +17,15 @@ import {createPluginHost, type PluginHost} from '~/utils/plugins/host'
 /** One host per window: each window is its own JavaScript realm. */
 let host: PluginHost | undefined
 const beforeReload = new Set<() => unknown>()
+/** Set across the reload a plugin's switch-off causes, so the reloaded window doesn't take focus. */
+const QUIET_RELOAD = 'vertex-plugin-reload'
+
+/** Whether this page load is a plugin switch-off's reload (answers once). */
+export function isPluginReload() {
+    const quiet = sessionStorage.getItem(QUIET_RELOAD) !== null
+    sessionStorage.removeItem(QUIET_RELOAD)
+    return quiet
+}
 
 /** Which kind of window a label names; `undefined` for windows without plugins (About). */
 export function windowKindOf(label: string): WindowKind | undefined {
@@ -31,19 +43,47 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     const kind = windowKindOf(label)
     if (!kind) return
     const toasts = useQuickToasts()
+    const appSettings = useAppSettings()
+    const scope = useSettingsScope()
     // The Settings window edits other scopes; its own plugins follow the global settings.
-    const settings = kind === 'settings' ? useAppSettings().config : useSettingsScope().effective
+    const settings = kind === 'settings' ? appSettings.config : scope.effective
     const enabled = () => settings.value?.plugins.enabled ?? {}
+    /** A session window's workspace, the one a plugin's `workspace` config writes go to. */
+    const workspace = () => (kind === 'session' ? scope.root.value : null)
 
-    host = createPluginHost(corePlugins, {
+    host = createPluginHost(pluginEntries(), {
         window: {kind, label},
         registerCommand,
+        config(manifest) {
+            const id = manifest.id
+            const at = (path: string) => `plugins.config.${id}.${path}` as AppSettingPath
+            const current = computed(() => pluginConfig(manifest, getAt(settings.value, `plugins.config.${id}`)))
+            return {
+                get value() {
+                    return current.value
+                },
+                async set(patch, target = 'global') {
+                    const entries = Object.entries(patch).map(([path, v]) => [at(path), v] as const)
+                    if (target === 'workspace') {
+                        if (!workspace()) throw new Error(`${id}: this window has no workspace to write to`)
+                        const refused = entries.filter(([path]) => !scope.overridable(path)).map(([path]) => path)
+                        if (refused.length) throw new Error(`${id}: a workspace can't override ${refused.join(', ')}`)
+                        await scope.set(Object.fromEntries(entries))
+                        return
+                    }
+                    const next = entries.reduce((s, [path, v]) => (v === null ? withoutAt(s, path) : withAt(s, path, v)), appSettings.config.value!)
+                    if (!(await appSettings.save(next))) throw new Error(`${id}: the settings couldn't be saved`)
+                },
+                overridden: path => !!workspace() && scope.overridden(at(path)),
+            }
+        },
         onFailed(manifest, error) {
             console.error(`[plugins] ${manifest.id} failed:`, error)
             toasts.error(t('app.plugins.failed', {name: manifest.name}), error instanceof Error ? error.message : String(error))
         },
         async reload() {
             for (const flush of beforeReload) await flush()
+            sessionStorage.setItem(QUIET_RELOAD, '1')
             window.location.reload()
         },
     })

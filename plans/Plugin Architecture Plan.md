@@ -13,7 +13,7 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
 ## Baseline (measured on `5f4a91b`; K0's numbers on `7b450db`)
 
 - **Size:** 14,814 lines of Vue, 14,378 of TypeScript, 4,249 of Rust; 36 test files, 268 tests passing; 36 Rust tests passing.
-- **Build:** `nuxt generate` takes 8 s; the entry chunk is 632,427 bytes (185,005 gzipped), of 331 JavaScript chunks totalling 11.3 MB.
+- **Build:** `nuxt generate` takes 8 s; the entry chunk is 632,427 bytes (185,005 gzipped), of 331 JavaScript chunks totalling 11.3 MB. The entry alone moves with how the bundler splits chunks, so from K2 on each phase records the startup closure too (the entry and every chunk it imports statically): 1,255,212 bytes (406,895 gzipped) at the end of K1.
 - **Startup** (release build, macOS, K0's harness): process start to the main window's last plugin 1.16 s on a first run and 0.40 s on a second; from navigation start, 168–175 ms.
 - **Index build** (`buildIndex`, 5,000 notes in 50 folders, 3 links each, 20 MB): 247–260 ms the first time and 170–175 ms again in a release build; 453 and 375 ms in `tauri dev`.
 - **Undeclared packages:** the app imports `tailwindcss` (CSS), `@codemirror/state` and `view`, and `@tauri-apps/api` without listing them in `package.json`; they resolve only because Bun hoists everything to the root.
@@ -83,7 +83,7 @@ enabled. The shape, which K1–K4 settle and C1 publishes:
 
 ```ts
 interface PluginManifest {
-    id: string, name: string, version: string, description?: string, author?: string
+    id: string, name: string, version: string, description?: string, icon?: string, author?: string
     apiVersion: 1, minAppVersion?: string
     /** Default `['session']`. */
     windows?: ('main' | 'session' | 'settings')[]
@@ -103,7 +103,8 @@ interface PluginManifest {
 interface PluginContext<Config = unknown> {
     plugin: { id: string, version: string, source: 'core' | 'global' | 'workspace' }
     window: { kind: 'main' | 'session' | 'settings', label: string }
-    config: { value: Readonly<Ref<Config>>, set(patch, scope?): Promise<void>, overridden(path): boolean }
+    /** `value` is a reactive getter (`ctx.config.value.depth`); `set` takes paths inside the config, `null` removes one. */
+    config: { readonly value: Config, set(patch, scope?: 'global' | 'workspace'): Promise<void>, overridden(path): boolean }
     data: { global: Store, workspace?: Store }
     secrets: { get(name), set(name, value), delete(name) }
     http: { fetch(url, init?) }
@@ -265,9 +266,27 @@ Blocked by K1.
 - **Settings nav:** the kernel's pages, then the pages of enabled core plugins, then community plugins'.
 
 ### Acceptance
-- [ ] Tests: a workspace can turn a plugin off but not on unless trusted; an undeclared config key is global only; unknown plugins' config survives a save; `LEGACY_PATHS` maps both files.
-- [ ] The trial plugin's schema page edits its config in User and in a workspace scope, with Changed in this workspace and Use global.
-- [ ] Concepts doc; en + zh-CN strings.
+- [x] Tests: a workspace can turn a plugin off but not on unless trusted; an undeclared config key is global only; unknown plugins' config survives a save; `LEGACY_PATHS` maps both files.
+- [x] The trial plugin's schema page edits its config in User and in a workspace scope, with Changed in this workspace and Use global.
+- [x] Concepts doc; en + zh-CN strings.
+
+### As built
+
+- **Manifest** gains `icon` and `config: {overridable, schema}` (`OVERRIDE_LEVELS`, `ConfigField`). Schema fields: `switch`, `text`, `color`, `number` (`min`, `max`, `step`), `select` (`options`), `list`, `path` (`kind`; a path inside the workspace), each with `key`, `label` and `description` (i18n keys), `default`. Validation checks each field's keys, its default against its type, range or options, and duplicate keys; it lists every problem.
+- **Config** (`shared/plugin/config.ts`): `pluginConfig(manifest, stored)` is what `ctx.config.value` returns: the stored config with each schema field checked and defaulted (`sanitizeField`: wrong types back to the default, numbers clamped, paths without leading or trailing slashes); keys outside the schema pass as stored. Defaults live in the manifest so the Settings window can show them without running the plugin.
+- **`ctx.config`** (`api.ts`; built by `runtime.ts`, the host only passes it on): `value` is a reactive getter rather than the planned `Ref`, so a plugin writes `ctx.config.value.depth`. `set(patch, scope = 'global')`; `'workspace'` writes the session window's workspace and throws for a key the manifest doesn't let it override. `definePlugin<Config>` types it; `PluginConfigs` (augmentation) types `plugins.config.<id>` setting paths, and `AppSettingPath` also accepts any `plugins.config.${string}` for plugins that don't declare it. `SettingPath`/`SettingAt` see through optional keys (`NonNullable`).
+- **Settings:** `AppSettings.plugins = {enabled, config, sources}`; `defaultAppPluginsConfig` keeps every id's values of the right kind.
+- **Scopes:** `settingsAllowlist(manifests)`; `overridableAs`, `applicableOverrides` and `effectiveSettings` take the allowlist explicitly (a caller can't forget the plugins' part). `plugins.enabled` is in `WORKSPACE_OVERRIDABLE`, value-aware in `applicableOverrides`. `useSettingsScope` builds the allowlist once from `pluginManifests()` (`app/utils/plugins/catalog.ts`, now the single list of plugins for the host, the scopes and Settings), and gains `levelOf(path)`. In User scope `set(path, null)` now removes the key, as it already did in a workspace.
+- **Moved settings** (`shared/utils/settings/legacy.ts`, empty table): `defaultAppSettings` reads the global file through `withMovedPaths`; `useSettingsScope` keeps a workspace's raw file beside its moved view, and its next write stores each moved value at the new path before removing the old (removing alone would lose it). `getAt`/`withAt`/`withoutAt` moved to `shared/utils/settings/paths.ts` to keep `defaults/apps.ts` free of an import cycle.
+- **Settings → Plugins** (`pages/settings/plugins/index.vue`, `[id].vue`; no `[...path]` yet, that comes with a plugin's own page in K3): as the Change list says, plus "Waits for trust" on a plugin an untrusted workspace turns on, and on a plugin's page an alert with Trust workspace while a trusted-only override waits. Off reasons come from `resolvePlugins` over the scope's effective settings; a failure at runtime still shows only as its window's toast (C2 shows failed loads here).
+- **i18n test:** a layer's schema labels, descriptions and option labels must exist in its `en.json`.
+- **Focus:** the reload a plugin's switch-off causes no longer brings the window to the front (`isPluginReload`, `useAppSessionRecovery`); before, turning a plugin off from Settings put every session window over it.
+- **Discovery:** the type template is gone: Nuxt declares every template as an untyped module, which won over it. `catalog.ts` types the list once.
+- **Checked in `tauri dev`** (separate app identifier; a throwaway plugin with one field of each type and every override level, and a harness clicking the real page; both deleted after):
+  - User scope: every field drawn with its default; a switch, a text field and the number stepper changed and saved globally, and the plugin's `ctx.config.value` followed each change at once;
+  - workspace scope: keys the manifest doesn't list show Global only; the stepper's override shows Changed in this workspace and Use global, `.vertex/settings.json` holds it, and the plugin sees it with `overridden('depth')`; a trusted-only override is stored but doesn't reach the plugin, with the alert; Use global removes it from the file and the plugin is back to the global value;
+  - Settings → Plugins: off in User reloads the session window (plugin off, Settings stays in front); on from the untrusted workspace is stored, the plugin stays off, the row says Waits for trust and the alert shows; the plugin's settings page leaves the nav where it isn't on.
+- **Numbers:** 312 tests (42 files); typecheck unchanged (the 7 errors in `@type32/latex2vue`); startup closure 1,263,641 bytes (414,279 gzipped), 8 KB more than K1. The entry chunk alone fell to 239,795 bytes, but only because the bundler split it differently.
 
 ## K3: Workbench contribution points
 

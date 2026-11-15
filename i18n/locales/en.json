@@ -81,6 +81,7 @@
 				"about": "About",
 				"general": "General",
 				"theme": "Theme",
+				"plugins": "Plugins",
 				"view": "View",
 				"workflows": "Workflows",
 				"git": "Git",
@@ -487,6 +488,34 @@
 					"noMatch": "Nothing matches the search.",
 					"remove": "Remove"
 				}
+			},
+			"plugins": {
+				"title": "Plugins",
+				"core": "Core plugins",
+				"coreDescription": "Built into Vertex. Turning one off removes what it adds; windows that run it reload.",
+				"none": "No plugins.",
+				"version": "Version {version}",
+				"needs": "Needs {names}",
+				"optional": "{name} (optional)",
+				"uses": "Uses {list}",
+				"permission": {
+					"network": "the network",
+					"secrets": "the keychain",
+					"files-outside-workspace": "files outside the workspace"
+				},
+				"reason": {
+					"missing": "Off: it needs {name}, which isn't installed",
+					"requirementOff": "Off: it needs {name}, which is off",
+					"cycle": "Off: it requires itself through {names}"
+				},
+				"untrusted": "This workspace turns on plugins that are off in your settings. They run once you trust it.",
+				"waitsForTrust": "Waits for trust",
+				"settingsWaitForTrust": "Some of this workspace's changes here apply only once you trust it.",
+				"settings": "Settings",
+				"noSettings": "This plugin has no settings.",
+				"notFound": "There's no plugin \"{id}\".",
+				"pick": "Choose…",
+				"pickOutside": "Choose something inside the workspace."
 			},
 			"scope": {
 				"label": "Editing",

@@ -5,6 +5,7 @@ import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import {isPanelViewId, normalizePanelLayout} from "#shared/utils/panelLayout";
 import {sanitizeModelParams} from "#shared/utils/aiParams";
+import {withMovedPaths} from "#shared/utils/settings/legacy";
 import type {DeepPartial} from "#shared/types/types";
 
 const RECOVERY_MODES: readonly SessionRecoveryMode[] = ['none', 'workspaces', 'singlespaces', 'both']
@@ -16,7 +17,9 @@ const headerToolsPosition = (value: unknown, fallback: HeaderToolsPosition) =>
 /** Settings written before `recoverSessions` existed only had `openLastOpenedWindows`, which recovered workspaces. */
 type LegacySettings = DeepPartial<AppSettings> & { openLastOpenedWindows?: boolean }
 
-export function defaultAppSettings(data?: LegacySettings): AppSettings {
+export function defaultAppSettings(raw?: LegacySettings): AppSettings {
+    // Settings that moved (`LEGACY_PATHS`) are read at their new paths, and written there with the next save.
+    const data = withMovedPaths(raw)
     const recoverSessions = RECOVERY_MODES.includes(data?.recoverSessions as SessionRecoveryMode)
         ? data!.recoverSessions as SessionRecoveryMode
         : data?.openLastOpenedWindows ? 'workspaces' : 'none'
@@ -48,10 +51,17 @@ export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFile
     }
 }
 
-/** Keeps every plugin's on/off, known here or not (a plugin may be installed on another device only). */
+/**
+ * Keeps every plugin's on/off, config and source, known here or not (a vault's plugin, or one installed on another
+ * device only). A plugin's config is checked against its schema when it runs (`pluginConfig`), not here.
+ */
 export function defaultAppPluginsConfig(data?: DeepPartial<AppPluginsConfig>): AppPluginsConfig {
-    const enabled = isLoose(data?.enabled) ? data.enabled : {}
-    return {enabled: Object.fromEntries(Object.entries(enabled).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))}
+    const entries = (value: unknown) => Object.entries(isLoose(value) ? value : {})
+    return {
+        enabled: Object.fromEntries(entries(data?.enabled).filter((e): e is [string, boolean] => typeof e[1] === 'boolean')),
+        config: Object.fromEntries(entries(data?.config).filter(([, c]) => isLoose(c))),
+        sources: Object.fromEntries(entries(data?.sources).filter((e): e is [string, string] => typeof e[1] === 'string')),
+    }
 }
 
 const positiveInt = (value: unknown, fallback: number) =>
