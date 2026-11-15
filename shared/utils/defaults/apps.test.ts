@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppAiConfig, defaultAppGitConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
+import { defaultAppAiConfig, defaultAppGitConfig, defaultAppPluginsConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -25,6 +25,14 @@ describe('defaultAppSettings recovery migration', () => {
 
     it('keeps an existing deviceId', () => {
         expect(defaultAppSettings({ deviceId: 'abc' }).deviceId).toBe('abc')
+    })
+})
+
+describe('defaultAppPluginsConfig', () => {
+    it('keeps on/off for any plugin id and drops values that aren\'t booleans', () => {
+        expect(defaultAppPluginsConfig({enabled: {git: false, 'not-installed-here': true, broken: 'yes' as never}}))
+            .toEqual({enabled: {git: false, 'not-installed-here': true}})
+        expect(defaultAppSettings().plugins).toEqual({enabled: {}})
     })
 })
 

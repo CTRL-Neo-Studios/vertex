@@ -1,11 +1,14 @@
+import {shallowReactive} from 'vue'
+import type {MenuSection, PluginCommand} from '#shared/plugin/api'
+
 /**
- * App commands: the single source for the native menu (and anything else that lists actions).
+ * App commands: the single source for the native menu and the palette's Commands group.
  *
- * Components register the commands they can actually perform while mounted. The menu is rebuilt from
- * what is registered, so an item is only enabled when something handles it — no more menu entries that
- * silently do nothing.
+ * The kernel's menu items are `MENU_LAYOUT`; components register the handlers they can actually perform while mounted
+ * (`useCommands`), so an item is only enabled when something handles it. Plugins register whole commands
+ * (`registerCommand`, through `ctx.commands`), placed after the kernel's items.
  */
-export type MenuSection = 'app' | 'file' | 'edit' | 'view' | 'help'
+export type {MenuSection}
 
 export interface Command {
     id: string
@@ -60,12 +63,41 @@ export interface MenuEntry extends MenuLayoutItem {
     enabled: boolean
 }
 
-/** Resolves the menu: one entry per layout item, enabled only when a handler is registered and allows it. */
-export function resolveMenu(handlers: CommandHandlers): MenuEntry[] {
-    return MENU_LAYOUT.map(item => {
+/** A plugin's command, its id `<plugin>:<id>`. */
+export interface RegisteredCommand extends PluginCommand {
+    plugin: string
+}
+
+/** This window's registered commands, by id. */
+export const registeredCommands = shallowReactive(new Map<string, RegisteredCommand>())
+
+/** Adds a command; returns its removal. A second command with the same id is an error. */
+export function registerCommand(command: RegisteredCommand): () => void {
+    if (registeredCommands.has(command.id)) throw new Error(`the command ${command.id} is already registered`)
+    registeredCommands.set(command.id, command)
+    return () => {
+        if (registeredCommands.get(command.id) === command) registeredCommands.delete(command.id)
+    }
+}
+
+/** Plugins' menu groups come after the kernel's (0–2). */
+const PLUGIN_GROUP = 100
+
+/**
+ * Resolves the menu: one entry per layout item, enabled only when a handler is registered and allows it; then the
+ * registered commands that ask for the menu, by group, in registration order.
+ */
+export function resolveMenu(handlers: CommandHandlers, registered: Iterable<RegisteredCommand> = []): MenuEntry[] {
+    const kernel = MENU_LAYOUT.map(item => {
         const handler = handlers[item.id]
         return {...item, run: handler?.run, enabled: !!handler && (handler.enabled?.() ?? true)}
     })
+    const plugin = [...registered]
+        .filter(c => c.menu)
+        .map((c, i) => ({c, i, group: PLUGIN_GROUP + (c.menu!.group ?? 0)}))
+        .sort((a, b) => a.group - b.group || a.i - b.i)
+        .map(({c, group}) => ({id: c.id, section: c.menu!.section, group, label: c.label, accelerator: c.accelerator, run: c.run, enabled: c.enabled?.() ?? true}))
+    return [...kernel, ...plugin]
 }
 
 /** Groups resolved entries into sections; `null` marks a separator between groups. */

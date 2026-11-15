@@ -2,9 +2,16 @@ import {describe, expect, it} from 'vitest'
 import {resolveLocale} from './locale'
 
 // Bundled by Vite at test time, so no Node fs/path types are needed under the app tsconfig.
-const files = import.meta.glob<Record<string, unknown>>('../../i18n/locales/*.json', {eager: true, import: 'default'})
-const locales = Object.fromEntries(Object.entries(files).map(([path, data]) => [path.split('/').pop()!, data]))
-const load = (f: string) => locales[f]!
+const appFiles = import.meta.glob<Record<string, unknown>>('../../i18n/locales/*.json', {eager: true, import: 'default'})
+const layerFiles = import.meta.glob<Record<string, unknown>>('../../layers/*/i18n/locales/*.json', {eager: true, import: 'default'})
+
+/** `app`, and each plugin layer by id → locale file name → messages. */
+const catalogs = new Map<string, Record<string, Record<string, unknown>>>()
+for (const [path, data] of [...Object.entries(appFiles), ...Object.entries(layerFiles)]) {
+    const catalog = /layers\/([^/]+)\//.exec(path)?.[1] ?? 'app'
+    catalogs.set(catalog, {...catalogs.get(catalog), [path.split('/').pop()!]: data})
+}
+const appLocales = Object.keys(catalogs.get('app')!).sort()
 
 function leaves(obj: Record<string, unknown>, prefix = ''): Map<string, string> {
     const out = new Map<string, string>()
@@ -17,19 +24,30 @@ function leaves(obj: Record<string, unknown>, prefix = ''): Map<string, string> 
 }
 
 const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort()
-const en = leaves(load('en.json'))
-const others = Object.keys(locales).filter(f => f !== 'en.json')
 
-describe.each(others)('%s', (file) => {
-    const other = leaves(load(file))
+describe.each([...catalogs.keys()])('%s strings', (catalog) => {
+    const files = catalogs.get(catalog)!
+    const en = leaves(files['en.json'] ?? {})
+    const others = Object.keys(files).filter(f => f !== 'en.json')
 
-    it('has exactly the same keys as en.json', () => {
-        expect([...other.keys()].sort()).toEqual([...en.keys()].sort())
+    it('has a file for every locale the app has', () => {
+        expect(Object.keys(files).sort()).toEqual(appLocales)
     })
 
-    it('uses the same interpolation params as en.json', () => {
+    it.each(others)('%s has exactly the same keys as en.json', (file) => {
+        expect([...leaves(files[file]!).keys()].sort()).toEqual([...en.keys()].sort())
+    })
+
+    it.each(others)('%s uses the same interpolation params as en.json', (file) => {
+        const other = leaves(files[file]!)
         for (const [key, text] of en) expect(params(other.get(key) ?? ''), key).toEqual(params(text))
     })
+
+    if (catalog !== 'app') {
+        it('keeps its strings under plugins.<id>', () => {
+            for (const key of en.keys()) expect(key.startsWith(`plugins.${catalog}.`), key).toBe(true)
+        })
+    }
 })
 
 describe('resolveLocale', () => {

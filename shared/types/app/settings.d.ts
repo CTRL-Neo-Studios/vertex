@@ -18,9 +18,16 @@ export interface AppSettings {
     gitConfig: AppGitConfig,
     /** Moving and renaming files; workspace-overridable. */
     fileConfig: AppFileConfig,
+    /** Which plugins are on. Global only for now; the Plugin Architecture Plan's K2 adds workspace overrides and config. */
+    plugins: AppPluginsConfig,
 	deviceId: string,
     /** Update channel (stable, beta, …); sent to the updater backend as `x-updater-channel`. */
     updateChannel: string
+}
+
+export interface AppPluginsConfig {
+    /** Plugin id → on or off; a plugin not listed follows its manifest's `enabledByDefault` (on). */
+    enabled: Record<string, boolean>,
 }
 
 export interface AppFileConfig {

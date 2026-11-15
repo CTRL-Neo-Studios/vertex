@@ -12,6 +12,7 @@ import {cssFontName} from "~/composables/app/useAppTheme";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {Routes} from "#shared/constants/app";
 import {stateClient} from "~/utils/stateClient";
+import {registeredCommands} from "~/utils/commands";
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
@@ -64,7 +65,7 @@ onBeforeUnmount(() => {
     unlistenOpen?.()
 })
 const {locale} = useI18n()
-watch([() => $route.path, $menu.handlers, locale], () => rebuildMenu())
+watch([() => $route.path, $menu.handlers, () => [...registeredCommands.keys()], locale], () => rebuildMenu())
 
 const color = computed(() => colorMode.value === 'dark' ? (colors as unknown as Record<string, Record<number, string>>)[appConfig.ui.colors.neutral]?.[900] ?? 'white' : 'white')
 const radius = computed(() => `:root { --ui-radius: ${appConfig.theme.radius}rem; }`)

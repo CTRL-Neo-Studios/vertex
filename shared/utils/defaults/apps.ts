@@ -1,4 +1,4 @@
-import type {AppCanvasConfig, AppFileConfig, AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppCanvasConfig, AppFileConfig, AppGitConfig, AppPluginsConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
@@ -30,6 +30,7 @@ export function defaultAppSettings(data?: LegacySettings): AppSettings {
         aiConfig: defaultAppAiConfig(data?.aiConfig),
         gitConfig: defaultAppGitConfig(data?.gitConfig),
         fileConfig: defaultAppFileConfig(data?.fileConfig),
+        plugins: defaultAppPluginsConfig(data?.plugins),
 		deviceId: data?.deviceId || crypto.randomUUID(),
         updateChannel: data?.updateChannel || 'stable'
     } satisfies AppSettings
@@ -45,6 +46,12 @@ export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFile
         importToChat: data?.importToChat === 'always' ? 'always' : 'ask',
         deletedFiles: DELETED_FILES.includes(data?.deletedFiles as AppFileConfig['deletedFiles']) ? data!.deletedFiles! : 'trash',
     }
+}
+
+/** Keeps every plugin's on/off, known here or not (a plugin may be installed on another device only). */
+export function defaultAppPluginsConfig(data?: DeepPartial<AppPluginsConfig>): AppPluginsConfig {
+    const enabled = isLoose(data?.enabled) ? data.enabled : {}
+    return {enabled: Object.fromEntries(Object.entries(enabled).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))}
 }
 
 const positiveInt = (value: unknown, fallback: number) =>

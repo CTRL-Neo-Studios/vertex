@@ -18,6 +18,7 @@ import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
 import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import TabSwitcher from "~/components/TabSwitcher.vue";
 import {Routes} from "#shared/constants/app";
+import {onBeforePluginReload, pluginSessions} from "~/utils/plugins/runtime";
 
 /**
  * Frame for a session window (workspace or singlespace): builds the index, restores tabs,
@@ -35,6 +36,8 @@ const index = useActiveWorkspaceIndex(activeSesh)
 const {clearTabs} = useActiveTabs(activeSesh)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
+// Turning a running plugin off reloads the window; its tabs are saved first, so /loading brings them back.
+const offBeforePluginReload = onBeforePluginReload(() => $persistence?.flush())
 const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
 useSessionCommands(activeSesh)
 const panels = usePanels(activeSesh)
@@ -78,9 +81,13 @@ onMounted(async () => {
     await index.startWatcher(activeSesh.rootPath)
     // Track changes only after restore, so the restored state is never overwritten by an empty one.
     $persistence?.start()
+    // Plugins' `onSession` callbacks: the index is built and the tabs are back.
+    pluginSessions.start({session: activeSesh})
 })
 
 onBeforeUnmount(async () => {
+    pluginSessions.end()
+    offBeforePluginReload()
     unregisterClose?.()
     clearTabs()
     await index.stopWatcher()

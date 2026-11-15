@@ -7,6 +7,7 @@ import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {useAppTheme} from "~/composables/app/useAppTheme";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {resolveLocale} from "#shared/utils/locale";
+import {startPlugins} from "~/utils/plugins/runtime";
 
 /**
  * Runs once per window. Only wires services: every window mirrors the Rust-owned sessions/settings via
@@ -47,6 +48,9 @@ export default defineNuxtPlugin({
         }
         await applyLocale()
         watch(() => $settings.config.value?.language, applyLocale)
+
+        // After the settings, their scope and the language: the first activation sees the right on/off and strings.
+        await startPlugins((key, params) => i18n.t(key, params ?? {}))
 
         if (!$win.isCurrentAppWindowMain()) return
 

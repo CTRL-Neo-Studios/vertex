@@ -545,6 +545,7 @@
 				"copiedMermaid": "Copied Mermaid diagram code.",
 				"palette": {
 					"quickActions": "Quick Actions",
+					"commands": "Commands",
 					"newFileDescription": "Creates a new Markdown file in the workspace root.",
 					"newFolderDescription": "Creates a new folder in the workspace root.",
 					"newCanvasDescription": "Creates a new canvas in the workspace root.",
@@ -2129,6 +2130,9 @@
 			"open": "Open…",
 			"openList": "Open Workspaces",
 			"recent": "Recent Workspaces"
+		},
+		"plugins": {
+			"failed": "{name} couldn't start"
 		},
 		"panels": {
 			"moveUp": "Move up",

@@ -1,0 +1,213 @@
+import {effectScope, getCurrentScope, onScopeDispose, shallowReactive, type EffectScope} from 'vue'
+import type {PluginApis, PluginCommand, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
+import {parseRequirement, pluginWindows, type PluginManifest, type WindowKind} from '#shared/plugin/manifest'
+import {resolvePlugins, type OffReason} from '#shared/plugin/resolve'
+
+export type PluginState =
+    | { status: 'off', reason: OffReason }
+    | { status: 'starting' }
+    | { status: 'active' }
+    | { status: 'failed', error: string }
+
+export interface PluginHostOptions {
+    window: { kind: WindowKind, label: string }
+    /** Adds a command, its id already `<plugin>:<id>`; returns its removal. */
+    registerCommand(command: PluginCommand & { plugin: string }): () => void
+    /** A plugin failed to load or start, or one of its callbacks threw. */
+    onFailed(manifest: PluginManifest, error: unknown): void
+    /** A running plugin was turned off: the window starts over, as nothing guarantees a plugin can undo itself. */
+    reload(): unknown
+}
+
+interface Running {
+    entry: PluginEntry
+    scope: EffectScope
+    api?: object
+    hooks: ((session: SessionContext) => unknown)[]
+    /** Child of `scope`, for what `onSession` callbacks start; stopped when the session ends. */
+    sessionScope?: EffectScope
+}
+
+interface Waiter {
+    owner: Running
+    fn: (api: object) => void
+}
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+    !!value && typeof (value as PromiseLike<unknown>).then === 'function'
+
+export type PluginHost = ReturnType<typeof createPluginHost>
+
+/** One window's plugins: which run, starting them in order, their scopes, their session callbacks and their APIs. */
+export function createPluginHost(entries: readonly PluginEntry[], options: PluginHostOptions) {
+    /** Every plugin made for this window, by id; reactive, for Settings → Plugins. */
+    const states = shallowReactive(new Map<string, PluginState>())
+    const byId = new Map(entries.map(e => [e.manifest.id, e]))
+    const installed = new Set(byId.keys())
+    const forWindow = entries.filter(e => pluginWindows(e.manifest).includes(options.window.kind))
+    const running = new Map<string, Running>()
+    /** Failed while on: not retried until it's turned off and on again. */
+    const failed = new Set<string>()
+    const waiting = new Map<string, Waiter[]>()
+    let session: SessionContext | undefined
+
+    function fail(id: string, error: unknown) {
+        running.get(id)?.scope.stop()
+        running.delete(id)
+        failed.add(id)
+        states.set(id, {status: 'failed', error: messageOf(error)})
+        options.onFailed(byId.get(id)!.manifest, error)
+    }
+
+    /** Runs `fn` in one of the plugin's scopes; a throw or a rejected promise fails the plugin. */
+    function guarded(r: Running, scope: EffectScope, fn: () => unknown) {
+        const id = r.entry.manifest.id
+        try {
+            const result = scope.run(fn)
+            if (isThenable(result)) result.then(undefined, error => fail(id, error))
+        } catch (error) {
+            fail(id, error)
+        }
+    }
+
+    function runHooks(r: Running) {
+        r.sessionScope = r.scope.run(() => effectScope())!
+        for (const hook of [...r.hooks]) {
+            if (!running.has(r.entry.manifest.id)) return
+            guarded(r, r.sessionScope, () => hook(session!))
+        }
+    }
+
+    function context(r: Running): PluginContext {
+        const {manifest, source} = r.entry
+        const id = manifest.id
+        /**
+         * Ties a removal to the scope that's current when something is registered: the plugin's in `setup`, the
+         * session's in an `onSession` callback, a component's in its setup. Outside any, to the plugin's.
+         */
+        const own = (dispose: () => void) => {
+            if (getCurrentScope()) onScopeDispose(dispose)
+            else if (r.scope.active) r.scope.run(() => onScopeDispose(dispose))
+        }
+        const use = <K extends keyof PluginApis>(target: K) =>
+            (states.get(target as string)?.status === 'active' ? running.get(target as string)?.api : undefined) as PluginApis[K] | undefined
+
+        return {
+            plugin: {id, version: manifest.version, source},
+            window: {...options.window},
+            commands: {
+                register(command) {
+                    const remove = options.registerCommand({...command, id: `${id}:${command.id}`, plugin: id})
+                    let removed = false
+                    const once = () => {
+                        if (removed) return
+                        removed = true
+                        remove()
+                    }
+                    own(once)
+                    return once
+                },
+            },
+            onSession(fn) {
+                r.hooks.push(fn)
+                // During `setup` the host runs it once `setup` is done; later, now.
+                if (session && r.sessionScope) guarded(r, r.sessionScope, () => fn(session!))
+            },
+            provide(api) {
+                r.api = api
+            },
+            use,
+            whenPlugin(target, fn) {
+                const api = use(target)
+                if (api) return fn(api)
+                const waiter: Waiter = {owner: r, fn: fn as (api: object) => void}
+                waiting.set(target, [...waiting.get(target) ?? [], waiter])
+                own(() => waiting.set(target, (waiting.get(target) ?? []).filter(w => w !== waiter)))
+            },
+        }
+    }
+
+    function start(entry: PluginEntry, definition: PluginDefinition) {
+        const id = entry.manifest.id
+        for (const {id: requirement, optional} of (entry.manifest.requires ?? []).map(parseRequirement)) {
+            if (optional || states.get(requirement)?.status === 'active') continue
+            states.set(id, {status: 'off', reason: {kind: 'requirementFailed', requirement}})
+            return
+        }
+        const r: Running = {entry, scope: effectScope(true), hooks: []}
+        running.set(id, r)
+        try {
+            const result = r.scope.run(() => definition.setup(context(r)))
+            if (isThenable(result)) {
+                result.then(undefined, () => {})
+                throw new Error('setup must be synchronous, but it returned a promise')
+            }
+        } catch (error) {
+            fail(id, error)
+            return
+        }
+        states.set(id, {status: 'active'})
+        if (r.api) {
+            const waiters = waiting.get(id) ?? []
+            waiting.delete(id)
+            for (const w of waiters) if (running.get(w.owner.entry.manifest.id) === w.owner) guarded(w.owner, w.owner.scope, () => w.fn(r.api!))
+        }
+        if (session) runHooks(r)
+    }
+
+    async function applyNow(isOn: (manifest: PluginManifest) => boolean) {
+        const {order, off} = resolvePlugins(forWindow.map(e => e.manifest), isOn, installed)
+        if ([...running.keys()].some(id => !order.includes(id))) {
+            await options.reload()
+            return
+        }
+        for (const [id, reason] of off) {
+            failed.delete(id)
+            states.set(id, {status: 'off', reason})
+        }
+        const toStart = order.filter(id => !running.has(id) && !failed.has(id))
+        for (const id of toStart) states.set(id, {status: 'starting'})
+        // Fetched together, started in order.
+        const loaded = await Promise.all(toStart.map(id => byId.get(id)!.load().then(
+            module => ({id, definition: module?.default as PluginDefinition | undefined, error: undefined as unknown}),
+            (error: unknown) => ({id, definition: undefined, error}),
+        )))
+        for (const {id, definition, error} of loaded) {
+            if (!definition || typeof definition.setup !== 'function') {
+                fail(id, error ?? new Error('its entry has no default export from definePlugin'))
+                continue
+            }
+            start(byId.get(id)!, definition)
+        }
+    }
+
+    let queue: Promise<void> = Promise.resolve()
+
+    return {
+        states,
+        /** Starts what's newly on (in order) and reloads the window when something running is now off. Serialized. */
+        apply(isOn: (manifest: PluginManifest) => boolean) {
+            queue = queue.then(() => applyNow(isOn))
+            return queue
+        },
+        /** The window's session is ready: run every `onSession` callback, in start order. */
+        startSession(context: SessionContext) {
+            session = context
+            for (const r of [...running.values()]) runHooks(r)
+        },
+        /** Stops what the callbacks started; their registrations go with it. */
+        endSession() {
+            for (const r of running.values()) {
+                r.sessionScope?.stop()
+                r.sessionScope = undefined
+            }
+            session = undefined
+        },
+        /** Stops every plugin (tests; a window never needs it, it reloads instead). */
+        stop() {
+            for (const r of running.values()) r.scope.stop()
+            running.clear()
+        },
+    }
+}

@@ -208,7 +208,7 @@ Blocked by K0.
 - **Activation** (`app/utils/plugins/`): `initialize.client.ts` activates after the settings and the scope load. Each plugin's `setup` runs in its own `effectScope` with its own `ctx`; a `setup` that throws marks that plugin failed (toast, Settings → Plugins says why) and the rest go on.
 - **Session scope:** the session layout runs every `onSession` callback after the index is built, inside the layout's scope.
 - **On and off:** a watch on the effective `plugins.enabled`. Newly on: activate. Newly off: flush the session's pending write, then reload the window.
-- **`PluginMount.vue`:** draws a `component` or runs a `mount`, inside an error boundary that shows the plugin's name and the error instead of taking the window down. Every UI slot in K3 and K4 uses it.
+- **`PluginMount.vue`:** moved to K3, where the first UI slot uses it (see As built).
 - **Plugin APIs:** `provide`, `use`, `whenPlugin`; `PluginApis` is extended by each plugin's `app/api.ts` (module augmentation).
 - **Boundaries** (`shared/plugin/boundaries.test.ts`, in `bun run test`): reads the sources and fails when
   - `app/` or `shared/` imports from `layers/`, or uses a layer's component tag;
@@ -219,17 +219,43 @@ Blocked by K0.
 - Vitest includes `layers/*/{app,shared}/**/*.test.ts` and maps `#layers` to `./layers`; the i18n parity test covers every layer's locales.
 
 ### Acceptance
-- [ ] Tests: dependency order, a missing and a cyclic requirement, a failing `setup`, a scope stop removing registrations.
-- [ ] A trial core plugin registers a command, shows when on, is not fetched when off, and turning it off reloads the window with its tabs back.
-- [ ] The boundary test fails on a planted violation of each rule.
-- [ ] Concepts doc: the plugin host.
+- [x] Tests: dependency order, a missing and a cyclic requirement, a failing `setup`, a scope stop removing registrations.
+- [x] A trial core plugin registers a command, shows when on, is not fetched when off, and turning it off reloads the window with its tabs back.
+- [x] The boundary test fails on a planted violation of each rule.
+- [x] Concepts doc: the plugin host.
+
+### As built
+
+- **Contract** (`shared/plugin/`): `manifest.ts` (`PluginManifest`, `validateManifest` listing every problem, `API_VERSION = 1`, `WINDOW_KINDS`, `PLUGIN_PERMISSIONS`; ids at most 50 characters so `vertex-<id>` fits Tauri's 64; unknown keys are errors), `resolve.ts` (`resolvePlugins`, `pluginEnabled`; reasons `disabled`, `missing`, `requirementOff` (turned off, off itself, or made for other windows), `cycle`, and the host's `requirementFailed`), `api.ts`.
+  - `api.ts` holds only what's implemented, not the whole contract above: `plugin`, `window`, `commands.register`, `onSession`, `provide`, `use`, `whenPlugin`; `SessionContext` is `{session}`. Each phase adds its part, so the types never promise what the host doesn't do. It re-exports `ActiveSession`, `PluginManifest` and `WindowKind`, so a plugin needs no kernel-internal import for them.
+  - `setup` is synchronous: an `await` would leave the plugin's effect scope. A returned promise fails the plugin.
+- **Discovery** (`modules/core-plugins.ts`, auto-registered from `modules/`): validates every `layers/*/plugin.json` at startup (also: id equals the folder, `app/plugin.ts` exists) and generates `#build/core-plugins.mjs` with a type template. A manifest change restarts Nuxt (`nuxt.options.watch`). It uses `nuxt/kit`, which `nuxt` exports, so no new dependency.
+- **Host** (`app/utils/plugins/host.ts`, Vue only, 11 tests; `runtime.ts` wires it to Nuxt and Tauri): `startPlugins` runs in `initialize.client.ts` after the settings, the scope and the language, in `main`, `session-*` and `settings` (not About). The Settings window follows the global `plugins.enabled`, other windows their effective settings.
+  - **Registrations** belong to the scope current when they're made (the plugin's in `setup`, the session's in an `onSession` callback, a component's in its setup), else to the plugin's.
+  - **Sessions:** `onSession` callbacks run in a child scope of the plugin's (not the layout's, as planned): a failing plugin then stops its session work too, and `pluginSessions.end()` on the layout's unmount stops all of them. The layout calls `pluginSessions.start` after `useAppSessionPersistence.start()`.
+  - **Failures** (a load, `setup`, a callback's throw or rejection) stop the plugin's scope, toast "{name} couldn't start" (`app.plugins.failed`), and aren't retried until it's turned off and on. `apply` calls are serialized.
+  - **Reload:** `onBeforePluginReload` hooks run first; the session layout's flushes `useAppSessionPersistence` (`flush`, new).
+- **Command registry** (here rather than in K3, as the trial plugin needed one): `registerCommand` and `registeredCommands` in `app/utils/commands.ts`; `resolveMenu` appends commands with `menu` after the kernel's items of their section (groups from 100); the palette has a Commands group (`app.editor.ui.palette.commands`) for those with `palette` (a boolean for now). `app.vue` rebuilds the menu when the registry changes. K3 moves the kernel's own items onto it.
+- **Settings:** `AppSettings.plugins = {enabled}` (`defaultAppPluginsConfig` keeps every id's boolean). K2 adds `config`, `sources` and the scopes.
+- **Install:** `workspaces: ["layers/*"]`, `bunfig.toml` (hoisted). Declared what the app imported without declaring it: `@codemirror/{autocomplete,commands,state,view}`, `@tauri-apps/api`, `@vueuse/core`, `comark`, `tailwindcss`, and `untyped` (dev); each at the version already installed, so nothing changed in `node_modules` but hoisting order.
+- **Boundaries:** the four rules of the Change list, plus what keeps them sound: a layer may not have `app/composables`, `app/utils`, `shared/utils` or `shared/types` (Nuxt auto-imports them app-wide), and may not use a kernel auto-import without importing it; an exception a layer no longer uses fails. The source check asserts its globs found the app, so it can't pass on nothing.
+- **Layer convention addition:** a layer's `package.json` needs `"type": "module"`, or Node warns while loading its `nuxt.config.ts`.
+- **i18n test:** every catalog (the app, and each layer) has a file per app locale with en's keys and parameters; a layer's keys are under `plugins.<id>`.
+- **Checked in `tauri dev`** (a separate app identifier; three throwaway trial plugins and a harness, deleted after):
+  - start: `trial-a` and `trial-b` (requires `trial-a`) active, `trial-c` failed with its own error; `trial-b` got `trial-a`'s API; commands in the menu and the palette, in the main and the session window;
+  - session: `trial-a`'s `onSession` callback registered a session command; 3 tabs open;
+  - `trial-b` off: both windows reloaded; the same 3 tabs came back; `trial-b`'s chunk was never fetched; its command gone;
+  - `trial-b` on: started without a reload, fetched, command back;
+  - `trial-a` off: reload; `trial-b` off for `requirementOff: trial-a`; nothing fetched; all on: both started live, `trial-a`'s session callback ran at once.
+  - Not seen: the failure toast itself (its state was; the main window is hidden once a session window opens).
+- **Numbers:** 301 tests (36 files before, 40 now); typecheck unchanged (the 7 errors inside `@type32/latex2vue`); the entry chunk 637,484 bytes (186,966 gzipped), 5 KB more.
 
 ## K2: Enablement and plugin config
 
 Blocked by K1.
 
 ### Change
-- **Settings:** `AppSettings.plugins = {enabled: Record<string, boolean>, config: Record<string, unknown>, sources: Record<string, string>}`. `defaultAppSettings` keeps the config of plugins it doesn't know (a vault's, or one not installed on this device).
+- **Settings:** `AppSettings.plugins` gains `config: Record<string, unknown>` and `sources: Record<string, string>` beside K1's `enabled`. `defaultAppSettings` keeps the config of plugins it doesn't know (a vault's, or one not installed on this device). The Settings window's own plugins follow the global settings (K1); this phase's scope rules apply to the windows of a workspace.
 - **Types:** `PluginConfigs` (module augmentation) types `plugins.config.<id>` paths, so `SettingsRow`'s `setting` and `useSettingsScope` stay typed for core plugins.
 - **Scopes** (`shared/utils/settings/scopes.ts`): the allowlist becomes the kernel's list plus what the installed manifests declare. `plugins.enabled.<id>` is value-aware: `false` from any workspace, `true` only from a trusted one. `applicableOverrides` takes the manifests.
 - **Reading old settings:** `LEGACY_PATHS` (old path → new path), applied when the global or a workspace's settings are read. Empty until the X phases add their rows.
@@ -248,7 +274,8 @@ Blocked by K1.
 Blocked by K2. Each registry replaces a closed list; what's built in today registers through it from where it is. No file moves yet.
 
 ### Change
-- **Commands** (`app/utils/commands.ts`): one registry for the native menu, the palette and shortcuts: `{id, label, icon?, run, enabled?, accelerator?, menu?: {section, group}, palette?: {group}}`. `MENU_LAYOUT` keeps the kernel's items; `useCommands` stays as the component-lifetime form.
+- **Commands** (`app/utils/commands.ts`): the registry exists since K1 (`registerCommand`, the menu after the kernel's items, the palette's Commands group). This phase moves the kernel's own items onto it (`MENU_LAYOUT`'s and the palette's Quick actions, with `palette` groups), and adds shortcuts beyond menu accelerators. `useCommands` stays as the component-lifetime form.
+- **`PluginMount.vue`** (from K1): draws a `component` or runs a `mount` (`mount(el, props)` returning a disposer), inside an error boundary that shows the plugin's name and the error instead of taking the window down. Every UI slot in K3 and K4 uses it.
 - **Tab kinds:** `ActiveTab.kind` becomes a string. A kind is `{kind, label(tab), icon(tab), component | mount, persist?, exists?(id)}`. The tab page draws the registered kind; `useTabLabel` asks it.
 - **Tab persistence:** `AppSessionContext.openedTabs: {kind, id}[]` and `lastFocusedTab`, replacing `openedChatIds`, `lastFocusedChatId`, `openedViewIds`, `lastFocusedViewId` (read by `defaultAppSessionContext`). A tab whose kind isn't registered is skipped.
 - **File viewers:** `ViewerId` becomes a string; the definition carries its component or mount and replaces `viewerComponents.ts`. A viewer gets a documented prop set: the text model for `loadsText`, the path and asset URL otherwise, and the session. `extras` goes; the markdown viewer's extras become its own props.

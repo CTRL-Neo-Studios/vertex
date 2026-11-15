@@ -1,0 +1,4 @@
+[install]
+# With workspaces (`layers/*`), Bun would default to isolated installs. Hoisted keeps one copy of each package at the
+# root, which the host and every plugin layer share (one Vue, one CodeMirror).
+linker = "hoisted"

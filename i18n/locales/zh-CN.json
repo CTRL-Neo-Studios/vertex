@@ -545,6 +545,7 @@
 				"copiedMermaid": "已复制 Mermaid 图表代码。",
 				"palette": {
 					"quickActions": "快捷操作",
+					"commands": "命令",
 					"newFileDescription": "在工作区根目录新建 Markdown 文件。",
 					"newFolderDescription": "在工作区根目录新建文件夹。",
 					"newCanvasDescription": "在工作区根目录新建画布。",
@@ -2129,6 +2130,9 @@
 			"open": "打开…",
 			"openList": "已打开的工作区",
 			"recent": "最近的工作区"
+		},
+		"plugins": {
+			"failed": "{name} 无法启动"
 		},
 		"panels": {
 			"moveUp": "上移",

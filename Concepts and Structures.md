@@ -391,6 +391,30 @@ before `open` existed count as closed, so the first launch after that change reo
 
 ---
 
+## Plugins
+
+Vertex is a kernel plus plugins (plan and phases: `plans/Plugin Architecture Plan.md`). A core plugin ships with Vertex
+as a Nuxt layer in `layers/<id>/`; community plugins come later (C phases). Every plugin has one contract,
+`shared/plugin/`.
+
+- **Manifest** (`layers/<id>/plugin.json`, `shared/plugin/manifest.ts`): `id` (lowercase, digits, inner hyphens, at most 50, the folder's name), `name`, `version`, `apiVersion` (refused when newer than `API_VERSION`), `windows` (`main`, `session`, `settings`; default `session`), `requires` (ids, `?` for optional), `permissions` (`network`, `secrets`, `files-outside-workspace`; shown, not enforced), `enabledByDefault` (default on). Unknown keys are errors. `validateManifest` lists every problem.
+- **Discovery** (`modules/core-plugins.ts`): validates every `layers/*/plugin.json` at startup (a bad one stops `nuxt dev`/`generate` with what's wrong) and generates `#build/core-plugins.mjs`, each manifest with `load: () => import('<layer>/app/plugin')`. A plugin that's off is never fetched. A manifest change restarts Nuxt.
+- **Entry** (`app/plugin.ts`): `export default definePlugin({setup(ctx) {…}})`. `setup` runs once per window it's made for, synchronously, inside the plugin's own `effectScope`; a promise returned from it fails the plugin.
+- **`ctx`** (`shared/plugin/api.ts`, grows with each phase): `plugin` (id, version, source), `window` (kind, label), `commands.register`, `onSession`, `provide` / `use` / `whenPlugin`.
+  - Registrations belong to the scope that's current when they're made: the plugin's in `setup`, the session's in an `onSession` callback, a component's in its setup. Stopping that scope removes them.
+  - `onSession(fn)`: runs once the session layout has built the index, restored the tabs and started persistence (`pluginSessions.start`), in a child scope of the plugin's that ends with the session (`pluginSessions.end` on unmount). A plugin turned on during a session runs it at once.
+  - `provide(api)` / `use(id)` (`undefined` unless that plugin is running here) / `whenPlugin(id, fn)` (now, or when it starts). `PluginApis` is typed by each plugin's `app/api.ts` (module augmentation of `#shared/plugin/api`).
+- **Host** (`app/utils/plugins/host.ts`, Vue only, unit-tested; wired by `runtime.ts`): `startPlugins` runs in `initialize.client.ts` after the settings, the workspace scope and the language, in every window but About.
+  - **Which run** (`resolvePlugins`, `shared/plugin/resolve.ts`): those made for the window and on (`settings.plugins.enabled[id]`, else the manifest's default); a plugin whose requirement is missing, off, made for other windows, or in a cycle is off with the reason; the rest in dependency order. Entries are fetched together and started in order; one whose requirement failed to start is off (`requirementFailed`).
+  - **States** (`pluginStates()`, reactive): `off` with its reason, `starting`, `active`, `failed` with the error. A failure (load, `setup`, a callback's throw or rejection) stops the plugin's scope, toasts "{name} couldn't start", and isn't retried until the plugin is turned off and on again.
+  - **On and off:** a watch on `plugins.enabled` (the Settings window follows the global settings, other windows their effective ones). Newly on: started at once. A running plugin turned off: the window reloads (`onBeforePluginReload` hooks first; a session window flushes `useAppSessionPersistence`), and `/loading` rebuilds it with its tabs. No plugin has to undo itself.
+- **Commands** (`app/utils/commands.ts`): `ctx.commands.register({id, label, icon?, run, enabled?, accelerator?, menu?: {section, group?}, palette?})` adds `<plugin>:<id>` to `registeredCommands` (a duplicate id is an error). The native menu puts those with `menu` after the kernel's `MENU_LAYOUT` items of their section (groups from 100, separated); the palette lists those with `palette` in its Commands group. `useCommands` stays the kernel's way to handle `MENU_LAYOUT` items.
+- **Settings:** `plugins.enabled` (id → on/off, kept for plugins this device doesn't have). Global only until K2.
+- **A layer** (`layers/<id>/`): `plugin.json`; `package.json` (`"type": "module"`, its dependencies; the root lists `layers/*` as Bun workspaces, with `bunfig.toml`'s hoisted linker so there's one copy of each package); `nuxt.config.ts` (its `optimizeDeps`, CSS, `i18n.locales`, `components: [{path: 'components', prefix: '<Prefix>'}]`); `app/plugin.ts`; `app/api.ts`; `app/components/`; `app/lib/` (imported explicitly); `i18n/locales/` (every app locale, keys under `plugins.<id>`); `shared/` (pure logic and tests). Vitest runs `layers/*/{app,shared}/**/*.test.ts` and maps `#layers` to `./layers`.
+- **Boundaries** (`shared/plugin/boundaries.test.ts`, in `bun run test`): the kernel never imports a layer or uses its components; a layer reaches another only through its `app/api.ts`, and only one it requires; a layer reaches the kernel only through `shared/plugin/`, or a module listed for it in `EXCEPTIONS` with the reason (an unused exception fails, so the lists only shrink); a layer has no `app/composables`, `app/utils`, `shared/utils` or `shared/types` (auto-imported app-wide) and uses no kernel auto-import without importing it. The i18n test checks every layer's locales.
+
+---
+
 ## Composables
 
 | Composable | Responsibility |
@@ -418,6 +442,7 @@ sequenceDiagram
     Plugin->>S: settings.load(), apply theme
     Plugin->>S: listen for sessions/settings changes
     Plugin->>S: initializeCurrentAppSession() (from window label)
+    Plugin->>Plugin: startPlugins() (this window's plugins, then follow plugins.enabled)
     alt main window
         Plugin->>S: recoverSavedAppSessions(settings.recoverSessions)
         Plugin->>Rust: take_open_requests (and on every open-requested)

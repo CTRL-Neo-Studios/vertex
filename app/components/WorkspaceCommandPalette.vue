@@ -10,6 +10,7 @@ import {useWorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import {StateKey} from "#shared/constants/app";
 import {useBaseCommandItems} from "~/composables/bases/useBaseCommands";
+import {registeredCommands} from "~/utils/commands";
 
 const { t } = useI18n()
 
@@ -74,6 +75,11 @@ const paletteItemWorkflows = computed<CommandPaletteItem[]>(() => {
             onSelect: () => runner.runFile(f.relativePath, false, {note}),
         }))
 })
+
+// Plugins' commands that ask for the palette.
+const paletteItemCommands = computed<CommandPaletteItem[]>(() => [...registeredCommands.values()]
+    .filter(c => c.palette)
+    .map(c => ({id: c.id, label: t(c.label), icon: c.icon, disabled: c.enabled ? !c.enabled() : false, onSelect: () => void c.run()})))
 
 const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
     {
@@ -145,6 +151,11 @@ const commandPaletteGroups = computed<CommandPaletteGroup<CommandPaletteItem>[]>
                 }
             }
         ]
+    },
+    {
+        id: 'commands',
+        label: t('app.editor.ui.palette.commands'),
+        items: paletteItemCommands.value,
     },
     {
         id: 'bases',

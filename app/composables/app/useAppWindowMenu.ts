@@ -1,5 +1,5 @@
 import {Menu, MenuItem, PredefinedMenuItem, Submenu} from '@tauri-apps/api/menu';
-import {type CommandHandlers, type MenuSection, menuSections, resolveMenu} from "~/utils/commands";
+import {type CommandHandlers, type MenuSection, menuSections, registeredCommands, resolveMenu} from "~/utils/commands";
 
 /**
  * Per-window native menu, built from the commands currently registered via `useCommands`.
@@ -40,7 +40,7 @@ export function useAppWindowMenu() {
     const {t} = useNuxtApp().$i18n
 
     async function buildMenu() {
-        const sections = menuSections(resolveMenu(handlers.value))
+        const sections = menuSections(resolveMenu(handlers.value, registeredCommands.values()))
         const submenus: Submenu[] = []
         for (const section of ['app', 'file', 'edit', 'view', 'help'] as MenuSection[]) {
             const items = await Promise.all((sections.get(section) ?? []).map(entry => entry

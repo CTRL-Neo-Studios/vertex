@@ -89,5 +89,6 @@ export function useAppSessionPersistence(session: ActiveSession) {
         }
     }
 
-    return {start, registerCloseHandlers}
+    /** Writes the current state now (before a reload that a plugin's switch-off causes). */
+    return {start, registerCloseHandlers, flush: persist}
 }
