@@ -10,9 +10,13 @@ config and workspace-installed plugins on top, through the settings scopes Verte
 The foundations (K) are built whole before anything moves, so the extractions (X) and the community loader (C) only
 use what is there. Each phase ends with `typecheck`, the tests and lint clean, and the app working.
 
-## Baseline (measured on `5f4a91b`)
+## Baseline (measured on `5f4a91b`; K0's numbers on `7b450db`)
 
-- **Size:** 14,814 lines of Vue, 14,378 of TypeScript, 4,249 of Rust; 36 test files, 268 tests passing.
+- **Size:** 14,814 lines of Vue, 14,378 of TypeScript, 4,249 of Rust; 36 test files, 268 tests passing; 36 Rust tests passing.
+- **Build:** `nuxt generate` takes 8 s; the entry chunk is 632,427 bytes (185,005 gzipped), of 331 JavaScript chunks totalling 11.3 MB.
+- **Startup** (release build, macOS, K0's harness): process start to the main window's last plugin 1.16 s on a first run and 0.40 s on a second; from navigation start, 168–175 ms.
+- **Index build** (`buildIndex`, 5,000 notes in 50 folders, 3 links each, 20 MB): 247–260 ms the first time and 170–175 ms again in a release build; 453 and 375 ms in `tauri dev`.
+- **Undeclared packages:** the app imports `tailwindcss` (CSS), `@codemirror/state` and `view`, and `@tauri-apps/api` without listing them in `package.json`; they resolve only because Bun hoists everything to the root.
 - **Feature coupling** (files / lines / files outside the feature that import it):
   - Canvas 4 / 371 / 3; Bases 45 / 3,905 / 3; Git 17 / 1,976 / 6; Workflows 19 / 2,482 / 14; AI and Chat 45 / 5,835 / 13.
   - Workflows' importers mostly want `shared/workflows/trust.ts` and `shared/workflows/vault.ts`, which are kernel services.
@@ -30,7 +34,8 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
   - `shared/utils/index/parse.ts` and `useActiveWorkspaceTools.ts`: canvas links; `useActiveWorkspaceIndex.ts`: `.vertex/chats/`.
   - `app/composables/app/useAppSessionActions.ts`: `GitCloneModal`; `app/layouts/settings.vue`: the Workflows, Git and AI pages.
   - `shared/types/app/settings.d.ts`, `shared/utils/defaults/apps.ts`: `aiConfig`, `gitConfig`, `workflowConfig`, `viewConfig.canvas`; `shared/constants/ai.ts`: `AI_FEATURES`; `shared/constants/app.ts`: the chat state keys.
-- **Rust:** one crate, one `generate_handler!` with every command, `build.rs` is `tauri_build::build()`, and `capabilities/default.json` gives all 170 permissions to every window.
+- **Rust:** one crate, one `generate_handler!` with every command, `build.rs` is `tauri_build::build()`, and the capabilities give the same 169 permissions to every window kind (`main`, `session-*`, `settings`).
+  - The app's own commands (everything in `generate_handler!`) aren't covered by capabilities at all: any window can call any of them. K0's harness called `scan_directory_recursive` with no capability naming it.
   - `git.rs`, `chats.rs` and `notes.rs` take `blocking` and `KEYRING_SERVICE` from `ai.rs`; `notes.rs` takes `snippet` from `chats.rs`; `web.rs` takes `install_crypto` from `ai.rs`.
   - `state.rs` knows features: `ai_provider_base_url`, `git_path`, and `settings_set` deleting AI keys (`ai::delete_key`).
 - **Checked in the docs:** Nuxt registers `layers/*` by itself, with `#layers/<name>` aliases; a layer holds `nuxt.config.ts`, `app/` and `shared/`; `~` inside a layer means the project's `app/`. `@nuxtjs/i18n` merges the locales of layers. A Tauri plugin is a crate named `tauri-plugin-<name>` whose commands are called as `plugin:<name>|<command>` and are denied until a capability allows them; `tauri_plugin::Builder::new(COMMANDS)` in its `build.rs` generates `allow-<command>`.
@@ -43,7 +48,7 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
 | Kernel | Windows, sessions, settings and scopes, trust, updater, theme, i18n host, native menu; the workspace index, link graph, watcher, file operations and their undo history; tabs and the tab switcher; the panel layout; the command registry; the markdown editor host and the plain code viewer; text diff; the plugin host. |
 | Core plugins | `files`, `palette`, `outline`, `backlinks`, `outgoing-links`, `writers-tools`, `mermaid`, `image`, `yaml-form`, `latex`, `canvas`, `bases`, `workflows`, `ai`, `git`, `chat`, `ai-assistant`. |
 | Frontend of a plugin | A Nuxt layer, `layers/<id>/`, in this repository. |
-| A plugin's npm dependencies | In its own `layers/<id>/package.json`; the root `package.json` lists `layers/*` as workspaces, so there's one install and one lockfile, and a dependency leaves with its plugin. The root keeps only what the kernel uses. A community plugin bundles its dependencies into `main.js`, except the shared modules (C1). |
+| A plugin's npm dependencies | In its own `layers/<id>/package.json`; the root `package.json` lists `layers/*` as workspaces, so there's one install and one lockfile, and a dependency leaves with its plugin. The root keeps what the kernel uses, all of it declared. Bun's hoisted linker is pinned in `bunfig.toml`: with workspaces Bun otherwise switches to isolated installs. A community plugin bundles its dependencies into `main.js`, except the shared modules (C1). |
 | Rust of a plugin | A Cargo workspace under `src-tauri/`: a kernel crate and one crate per plugin that needs Rust, each a Tauri plugin. The app crate only composes them. |
 | Community plugins and Rust | They never ship native code. They use the kernel's host services (files, HTTP, secrets, data, search) and may ship WASM that runs in the webview. |
 | Realm | Plugins run in the window's own JavaScript realm, as Obsidian's do, so they can add editor extensions and draw anywhere. It follows that a plugin can call any command: installing or trusting one is trusting it completely, and the prompts say so. |
@@ -157,8 +162,41 @@ Three assumptions carry the plan. Each gets a throwaway spike, and its result is
 - Record: startup and index-build times, the size of the entry chunk, and the count of permissions per window.
 
 ### Acceptance
-- [ ] Each spike's result and any change it forces to the Decisions are written in this plan.
-- [ ] The spikes are deleted; the branch is back at the baseline.
+- [x] Each spike's result and any change it forces to the Decisions are written in this plan.
+- [x] The spikes are deleted; the branch is back at the baseline.
+
+### Results
+
+All three hold on macOS, in `tauri dev` and in a release build, under a separate app identifier (`--config '{"identifier": …}'`), so no real sessions, settings or keychain entries were touched. The numbers are in the Baseline.
+
+**Layers**
+- `layers/spike/` with `nuxt.config.ts`, `app/components/Hello.vue`, `app/plugin.ts`, `i18n/locales/{en,zh-CN}.json`, `shared/` with a test, and `package.json` depending on `d3-force`. `bun install`, `nuxt dev`, `nuxt generate`, `tauri dev` and `tauri build` all work.
+- **Workspaces switch Bun's linker.** With `"workspaces"` in the root `package.json`, Bun 1.4 installed in isolated mode: the build failed (`Can't resolve 'tailwindcss'`) and three test files couldn't load (`@tauri-apps/api/core`). With `bunfig.toml` setting `linker = "hoisted"`, everything resolves as before, the layer's `d3-force` is hoisted to the root, and `bun install --frozen-lockfile` (what CI runs) passes.
+- **Components:** `components: [{path: 'components', prefix: 'Spike'}]` in the layer's config is resolved against the layer's `app/`, and registers `SpikeHello` and `LazySpikeHello` only, with no unprefixed copy.
+- **Alias:** `#layers/spike` is the layer's root, so the entry is `#layers/<id>/app/plugin` as planned. Vitest needs the alias itself; one `'#layers': './layers'` alias covers every layer.
+- **Locales:** the layer's `i18n.locales` (files in `layers/<id>/i18n/locales/`) merge with the app's: the layer's key and the app's keys both resolve in the same render. Each locale of the layer gets its own chunk.
+- **Chunks:** a lazy `import('#layers/spike/app/plugin')` puts the entry and `d3-force` in a 4.5 KB chunk of their own; nothing of the layer is in the entry chunk. The layer's `optimizeDeps` entry kept `tauri dev` from re-optimizing on the first lazy import.
+
+**Crates**
+- `src-tauri/Cargo.toml` with `[workspace] members = ["crates/*"]`, and `crates/tauri-plugin-vertex-spike/` (`links = "tauri-plugin-vertex-spike"`, `tauri-plugin` with `build` in `build-dependencies`, `Builder::new("vertex-spike")`). `cargo build`, `tauri dev` and `tauri build` work; the incremental build took 10 s and the release build 77 s.
+- **Permissions:** the crate's `build.rs` writes `permissions/autogenerated/` (one `allow-`/`deny-` pair per command, kebab-case: `read_module` → `allow-read-module`) and `permissions/schemas/` into the crate's own folder; they're committed with it. A capability naming a permission that doesn't exist fails `cargo build` and lists the valid ones.
+- **Calls:** `plugin:vertex-spike|report` from the webview runs; a command no capability allows is refused (`Command plugin:vertex-spike|denied not allowed by ACL`).
+- **One `target/`:** the workspace keeps it at `src-tauri/target`, where the release workflow's `rust-cache` and bundle paths look. The shared release workflow (`tauri-updater-backend`'s `tauri-release.yml`) has nothing that depends on a single crate.
+
+**Runtime loading**
+- An SDK-style build: Vite 8 in library mode with one ~20-line plugin that turns `import … from 'vue'` (and `@codemirror/state`, `@codemirror/view`) into reads from `globalThis.__vertexModules[…]`, taking the export names from the real package at build time. Output: one 4.2 KB `main.js` with no bare imports.
+- Read from disk by a Rust command and imported from a blob URL, in dev and in the release build (`tauri://`, `csp: null`):
+  - its `ref`, `EditorState` and `EditorView` are the host's (`===`);
+  - a component it defines, rendered with the host's app context, gets a value the host app provides and re-renders when its own `ref` changes;
+  - a `StateField` it defines sits beside the editor library's `headingsField` in one `EditorState`, in a mounted `EditorView`, without the duplicate-instance error.
+- **Not checked:** Windows (WebView2) and Linux (WebKitGTK). Moved to C2's acceptance.
+
+**What this changes**
+- Decisions: Bun's hoisted linker and declared kernel dependencies (the npm row).
+- K1: `bunfig.toml`, the workspaces, the declared dependencies, the layer component config and the `#layers` alias (below).
+- K5: moving the app's commands into `tauri-plugin-vertex` is what first puts them under capabilities (below).
+- C1: the shared modules' export names come from the versions the SDK pins (below).
+- C2: Windows and Linux runtime loading (below).
 
 ## K1: Plugin host
 
@@ -176,8 +214,9 @@ Blocked by K0.
   - `app/` or `shared/` imports from `layers/`, or uses a layer's component tag;
   - a layer imports another layer, except its `app/api.ts` when its manifest requires it;
   - a layer imports a kernel module that's neither public (`shared/plugin/`, the published UI components) nor in that layer's list of exceptions in the test.
-- **Layer conventions:** `plugin.json`, `package.json` (its dependencies), `nuxt.config.ts` (its `optimizeDeps`, CSS, locales, one component prefix), `app/plugin.ts`, `app/api.ts`, `app/components/`, `app/lib/` (composables and utilities, imported explicitly: never auto-imported, so the boundary test sees every use), `i18n/locales/`, `shared/` (pure logic and its tests).
-- Vitest includes `layers/**/*.test.ts` and resolves `#layers/*`; the i18n parity test covers every layer's locales.
+- **Install:** the root `package.json` lists `layers/*` as workspaces; `bunfig.toml` sets `linker = "hoisted"`; the root `package.json` declares every package `app/` and `shared/` import directly (`tailwindcss`, `@codemirror/state`, `@codemirror/view`, `@tauri-apps/api` and any others a check finds).
+- **Layer conventions:** `plugin.json`, `package.json` (its dependencies), `nuxt.config.ts` (its `optimizeDeps`, CSS, `i18n.locales`, and `components: [{path: 'components', prefix: '<Prefix>'}]`), `app/plugin.ts`, `app/api.ts`, `app/components/`, `app/lib/` (composables and utilities, imported explicitly: never auto-imported, so the boundary test sees every use), `i18n/locales/`, `shared/` (pure logic and its tests).
+- Vitest includes `layers/*/{app,shared}/**/*.test.ts` and maps `#layers` to `./layers`; the i18n parity test covers every layer's locales.
 
 ### Acceptance
 - [ ] Tests: dependency order, a missing and a cyclic requirement, a failing `setup`, a scope stop removing registrations.
@@ -258,7 +297,7 @@ Blocked by K3.
 Blocked by K0. Independent of K1–K4.
 
 ### Change
-- **Workspace:** `src-tauri/Cargo.toml` gains `[workspace]`; crates in `src-tauri/crates/`.
+- **Workspace:** `src-tauri/Cargo.toml` gains `[workspace]`; crates in `src-tauri/crates/`. Each plugin crate sets `links = "tauri-plugin-<name>"`, builds its permissions with `tauri_plugin::Builder::new(COMMANDS)`, and commits its generated `permissions/`.
 - **`tauri-plugin-vertex`** (the kernel, plugin `vertex`), from `state.rs`, `lib.rs`, `trash.rs`, `fonts.rs`, `updater.rs`, `web.rs`, `notes.rs`:
   - commands: sessions, settings, trust, workspace settings, the open queue, quit; directory scan and batch read; trash; clipboard files; fonts; update channels;
   - host services for every plugin: `http_fetch` (from `web_fetch`), `search_notes`, `secret_get` / `secret_set` / `secret_delete` (keychain, named `plugin:<id>:<name>`), `data_get` / `data_set` (a JSON store per plugin, global in app data or per workspace in `.vertex/plugins-data/`, atomic writes, a change event);
@@ -266,7 +305,7 @@ Blocked by K0. Independent of K1–K4.
 - **Feature knowledge leaves the kernel:** `ai_provider_base_url`, `git_path` and the AI key cleanup in `settings_set` become their plugins' use of `plugin_config` and `on_settings_change` (in X6 and X7; until then they stay behind the same API inside the old modules).
 - **The app crate** (`src-tauri/src/lib.rs`) only builds: the plugins, window lifecycle, file-open handling.
 - **Calls:** `stateClient.ts` and the other clients call `plugin:vertex|…`.
-- **Capabilities** by window kind, replacing one grant for all: `main`, `session-*`, `settings`, each with what it uses.
+- **Capabilities** by window kind, replacing one grant for all: `main`, `session-*`, `settings`, each with what it uses. The app's commands aren't checked against capabilities today; as `plugin:vertex|…` commands they are, so every window's capability must name what it calls, and K5 is the first time a window can be refused one.
 
 ### Acceptance
 - [ ] The Rust tests pass in their new crates; `tauri dev` and a release build work on the three systems.
@@ -386,7 +425,7 @@ Blocked by X8.
 
 ### Change
 - **Package:** a folder with `plugin.json`, `main.js` (one ES module, no relative imports), optional `styles.css` and assets.
-- **Shared modules:** the host puts `vue`, the `@codemirror/*` and `@lezer/*` packages it uses, the editor's kit, the published UI components and the plugin API on one registry.
+- **Shared modules:** the host puts `vue`, the `@codemirror/*` and `@lezer/*` packages it uses, the editor's kit, the published UI components and the plugin API on one registry. The preset (K0's spike shows its shape) takes each one's export names from the version the SDK pins, which is the host's for that `apiVersion`; a plugin built against a newer one than the host's would read `undefined`, so a shared module's major version is part of `apiVersion`.
 - **SDK** (`@type32/vertex-plugin`, built from `shared/plugin/`): the types, `definePlugin`, and a Vite preset that points those imports at the registry and builds `main.js`.
 - **Styles:** the host's CSS holds only the classes the host uses, so a plugin's own Tailwind classes wouldn't exist. The SDK's preset compiles a plugin's utilities into its `styles.css` against the host's theme variables, without the base styles. Plain CSS on the `--ui-*` variables works without it.
 - **One file:** a blob module can't import a sibling file, so `main.js` isn't split; a plugin loads a heavy part later by asking for an asset by path.
@@ -409,6 +448,7 @@ Blocked by C1.
 
 ### Acceptance
 - [ ] Install, turn on, turn off (the window reloads), remove; a plugin with a bad manifest or a newer `apiVersion` is refused with the reason.
+- [ ] A plugin loads and runs on Windows (WebView2) and Linux (WebKitGTK) as on macOS: imported from a blob URL, sharing the host's Vue and CodeMirror (K0 checked macOS only).
 - [ ] A plugin that throws in `setup` or while drawing doesn't break the window.
 - [ ] Concepts doc; en + zh-CN strings.
 
