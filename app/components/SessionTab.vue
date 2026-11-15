@@ -6,8 +6,8 @@ import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsid
 import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit"
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {SessionMode} from "#shared/constants/app";
-import {fileNameFromPath, getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
-import {EditorProseEmbedImageDisplay} from "#components";
+import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
+import {EditorProseEmbedImageDisplay, ViewerEditorBasesEmbed} from "#components";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorContent} from "~/composables/active/editor/useActiveEditorContent";
@@ -16,6 +16,7 @@ import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEd
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import {BASE_EMBED} from "~/composables/bases/useBaseContext";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -59,6 +60,8 @@ const editorRef = ref()
 const INVALID_CHARS = /[\\/:*?"<>|]/
 
 watch(isContentSaved, v => setTabSavedState(tabId, v))
+// Bases embedded in this file (`![[x.base]]`, ` ```base `, canvas cards) query this workspace, with this file as `this`.
+if (mode === 'workspace') provide(BASE_EMBED, {session: session!, thisPath: () => file.value?.relativePath ?? ''})
 
 const internalLinkList = computed<InternalLink[]>(() => {
     if (mode !== 'workspace') return []
@@ -66,11 +69,14 @@ const internalLinkList = computed<InternalLink[]>(() => {
         const ext = getFileExtensionFromPath(f.fileName)
         const name = fileNameFromPath(f.fullPath, true)
         if (isPlainTextFile(ext)) return [{name, filePath: f.relativePath, referenceId: f.uuid} satisfies InternalLink]
+        // Files other than notes are linked by their full name, as Obsidian links them: `![[pic.png]]` resolves there,
+        // `![[pic]]` doesn't.
         if (isImage(ext)) return [{
-            name, filePath: f.relativePath, referenceId: f.uuid,
+            name: f.fileName, filePath: f.relativePath, referenceId: f.uuid,
             embedComponent: EditorProseEmbedImageDisplay,
             componentProps: {srcPath: convertFileSrc(f.fullPath), display: name},
         } satisfies InternalLink]
+        if (isBasesFile(ext)) return [{name: f.fileName, filePath: f.relativePath, referenceId: f.uuid, embedComponent: ViewerEditorBasesEmbed} satisfies InternalLink]
         return []
     })
 })
@@ -107,12 +113,19 @@ async function onInternalLinkClick({referenceId}: InternalLinkClickDetail) {
     if (mode === 'workspace' && referenceId) await goToTab(openTab(referenceId).fileUuid)
 }
 
+// The file's text as this tab last read or wrote it. Loading and reloading set `content` too; only a change is written,
+// so opening a file never rewrites it.
+let diskText: string | undefined
+
 debouncedWatch(content, async () => {
     if (!isContentLoaded.value || !viewer.value?.loadsText) return
+    if (content.value === diskText) return void (isContentSaved.value = true)
     isContentSaved.value = false
     await until(renaming).toBe(false)
     try {
-        await $tools.saveContent(tabId.value, content.value)
+        const text = content.value
+        await $tools.saveContent(tabId.value, text)
+        diskText = text
         isContentSaved.value = true
     } catch (error) {
         // Keep the tab marked unsaved so the user knows; previously a failed write was silent.
@@ -123,7 +136,7 @@ debouncedWatch(content, async () => {
 
 onMounted(async () => {
     if (!isTabOpened(tabId.value)) return goToTab()
-    if (viewer.value?.loadsText && fullFilePath.value) content.value = await readTextFile(fullFilePath.value)
+    if (viewer.value?.loadsText && fullFilePath.value) content.value = diskText = await readTextFile(fullFilePath.value)
     isContentLoaded.value = true
 })
 
@@ -140,7 +153,7 @@ const unsubscribe = $index.on(async (event) => {
         const fresh = await readTextFile(event.path)
         if (fresh === content.value) return
         isContentLoaded.value = false
-        content.value = fresh
+        content.value = diskText = fresh
         await nextTick()
         isContentLoaded.value = true
     } else if (event.type === 'rename' && event.newPath === current) {
@@ -178,6 +191,18 @@ function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryPr
 }
 
 editorDispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
+
+/** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
+function insertBlock({text}: { text: string }) {
+    const view = unref(editorRef.value?.view) as EditorView | undefined
+    if (!view) return
+    const {from, to} = view.state.selection.main
+    const line = view.state.doc.lineAt(from)
+    const insert = `${from > line.from ? '\n' : ''}${text}\n`
+    view.dispatch({changes: {from, to, insert}, selection: {anchor: from + insert.length - 1}, scrollIntoView: true})
+    view.focus()
+}
+editorDispatcher.on('editor.insertBlock', insertBlock)
 </script>
 
 <template>

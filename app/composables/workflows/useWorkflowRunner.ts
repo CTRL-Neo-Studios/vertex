@@ -4,7 +4,7 @@ import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps"
 import {overlayVault} from "#shared/workflows/dryRun"
 import {createVertexEffects, undoOps, type Op, type UndoResult} from "#shared/workflows/effects"
 import {coveringFolder, normalizeTrustPath, trustedBy} from "#shared/workflows/trust"
-import {baseNameOf, type Vault, type YamlTools} from "#shared/workflows/vault"
+import {baseNameOf, obsidianYaml, type Vault} from "#shared/workflows/vault"
 import {vertexLanguage, type PickOptions, type VertexEffects} from "#shared/workflows/vertex"
 import WorkflowAskModal, {type Ask} from "~/components/Modals/WorkflowAskModal.vue"
 import WorkflowPickModal from "~/components/Modals/WorkflowPickModal.vue"
@@ -82,8 +82,8 @@ export function useWorkflowRunner(session: ActiveSession) {
     const trashModal = overlay.create(WorkflowTrashModal)
     const askModal = overlay.create(WorkflowAskModal)
     const pickModal = overlay.create(WorkflowPickModal)
-    // The editor package's helpers, auto-imported.
-    const yaml: YamlTools = {frontmatterRange, parseYaml, stringifyYaml}
+    // Frontmatter as Obsidian writes it (the editor package's `frontmatterRange` is auto-imported).
+    const yaml = obsidianYaml(frontmatterRange)
     const undoable = shallowRef<Op[]>([])
 
     const settings = () => config.value?.workflowConfig ?? defaultAppWorkflowConfig()

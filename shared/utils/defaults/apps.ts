@@ -1,4 +1,4 @@
-import type {AppFileConfig, AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppCanvasConfig, AppFileConfig, AppGitConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext} from "#shared/types/app/sessions";
@@ -228,9 +228,25 @@ export function defaultAppViewConfig(data?: DeepPartial<AppViewConfig>): AppView
             headerHistory: headerToolsPosition(data?.editorPanel?.headerHistory, 'left'),
             headerFormatting: headerToolsPosition(data?.editorPanel?.headerFormatting, 'right'),
         },
+        canvas: defaultAppCanvasConfig(data?.canvas),
         panels: {
             style: data?.panels?.style === 'strip' ? 'strip' : 'buttons',
             ...normalizePanelLayout(data?.panels),
         },
     } satisfies AppViewConfig
+}
+
+const oneOf = <T extends string>(options: readonly T[], value: unknown, fallback: T) => options.includes(value as T) ? value as T : fallback
+
+/** Obsidian's canvas defaults. */
+export function defaultAppCanvasConfig(data?: DeepPartial<AppCanvasConfig>): AppCanvasConfig {
+    const breakpoint = Number(data?.zoomBreakpoint)
+    return {
+        wheelBehavior: oneOf(['pan', 'zoom'], data?.wheelBehavior, 'pan'),
+        modDragBehavior: oneOf(['menu', 'card', 'file', 'media', 'webpage', 'group'], data?.modDragBehavior, 'menu'),
+        cardLabels: oneOf(['always', 'hover', 'never'], data?.cardLabels, 'always'),
+        snapToGrid: data?.snapToGrid ?? true,
+        snapToObjects: data?.snapToObjects ?? true,
+        zoomBreakpoint: Number.isFinite(breakpoint) ? Math.min(2, Math.max(-2, breakpoint)) : 0,
+    }
 }

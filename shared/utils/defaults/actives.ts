@@ -15,6 +15,7 @@ export function defaultActiveWorkspaceFileIndex(data?: Partial<ActiveWorkspaceFi
         relativePath: data?.relativePath ?? '',
         forelinks: data?.forelinks ?? [],
         backlinks: data?.backlinks ?? [],
+        meta: data?.meta ?? {tags: [], links: [], embeds: []},
         createdTime: data?.createdTime ?? new Date(),
         modifiedTime: data?.modifiedTime ?? new Date(),
     } satisfies ActiveWorkspaceFileIndex

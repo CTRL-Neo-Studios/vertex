@@ -4,6 +4,7 @@ import type {AppViewConfig, PanelLayout} from "#shared/types/app/settings";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import PanelArrangement from "~/components/Settings/PanelArrangement.vue";
+import {platform} from "@tauri-apps/plugin-os";
 
 definePageMeta({
     layout: 'settings'
@@ -60,6 +61,16 @@ const editorPanelPaths = [
     ...[...editorToggles, ...headerTools].map(k => `viewConfig.editorPanel.${k}` as const),
 ]
 const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as const)
+
+const mod = platform() === 'macos' ? '⌘' : 'Ctrl'
+const canvasOption = (key: string) => t(`app.settings.view.canvasOptions.${key}`, {mod})
+const canvasSelects = computed(() => [
+    {key: 'wheelBehavior' as const, items: [{label: canvasOption('wheelPan'), value: 'pan'}, {label: canvasOption('wheelZoom'), value: 'zoom'}]},
+    {key: 'modDragBehavior' as const, items: ['menu', 'card', 'file', 'media', 'webpage', 'group'].map(value => ({label: canvasOption(`modDrag.${value}`), value}))},
+    {key: 'cardLabels' as const, items: ['always', 'hover', 'never'].map(value => ({label: canvasOption(`cardLabel.${value}`), value}))},
+] satisfies {key: string, items: SelectItem[]}[])
+const canvasToggles = ['snapToGrid', 'snapToObjects'] as const
+const canvasPaths = (['wheelBehavior', 'modDragBehavior', 'cardLabels', ...canvasToggles, 'zoomBreakpoint'] as const).map(k => `viewConfig.canvas.${k}` as const)
 
 const panelStyleItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.panelStyleButtons'), value: 'buttons'},
@@ -166,6 +177,46 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         :items="headerToolsItems"
                         class="w-52"
                         @update:model-value="scope.set({[`viewConfig.editorPanel.${key}`]: $event})"
+                    />
+                </SettingsRow>
+            </SettingsSection>
+
+            <SettingsSection :title="t('app.settings.view.canvas')" :dirty="scope.isDirty(canvasPaths)" @reset="scope.reset(canvasPaths)">
+                <SettingsRow
+                    v-for="row in canvasSelects"
+                    :key="row.key"
+                    :setting="`viewConfig.canvas.${row.key}`"
+                    :label="canvasOption(row.key)"
+                    :description="canvasOption(`${row.key}Description`)"
+                >
+                    <USelect
+                        :model-value="scope.value(`viewConfig.canvas.${row.key}`)"
+                        :items="row.items"
+                        class="w-52"
+                        @update:model-value="scope.set({[`viewConfig.canvas.${row.key}`]: $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow
+                    v-for="key in canvasToggles"
+                    :key="key"
+                    :setting="`viewConfig.canvas.${key}`"
+                    :label="canvasOption(key)"
+                    :description="canvasOption(`${key}Description`)"
+                >
+                    <USwitch
+                        :model-value="scope.value(`viewConfig.canvas.${key}`)"
+                        @update:model-value="scope.set({[`viewConfig.canvas.${key}`]: $event})"
+                    />
+                </SettingsRow>
+                <SettingsRow setting="viewConfig.canvas.zoomBreakpoint" :label="canvasOption('zoomBreakpoint')" :description="canvasOption('zoomBreakpointDescription')">
+                    <USlider
+                        :model-value="scope.value('viewConfig.canvas.zoomBreakpoint')"
+                        :min="-2"
+                        :max="2"
+                        :step="0.25"
+                        class="w-52"
+                        tooltip
+                        @update:model-value="scope.set({'viewConfig.canvas.zoomBreakpoint': $event})"
                     />
                 </SettingsRow>
             </SettingsSection>
