@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {parseYaml, parseFrontmatter} from '../../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/frontmatter.js'
+import {parseYaml, parseFrontmatter} from '@type32/codemirror-rich-obsidian-editor'
 import {getInternalLinks} from './rewriteLinks'
 import {isPropertiesFile, parentPathOf, parseLinkTargets, parseProperties} from './parse'
 import {RecentWrites} from './selfWrites'

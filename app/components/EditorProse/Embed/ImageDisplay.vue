@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {InternalLink} from "@type32/codemirror-rich-obsidian-editor"
 defineProps<{
     srcPath: string;
     display: string;

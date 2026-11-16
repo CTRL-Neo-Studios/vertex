@@ -1,4 +1,4 @@
-import type {SpecialCodeBlockMapping} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {SpecialCodeBlockMapping} from "@type32/codemirror-rich-obsidian-editor";
 import {EditorProseCodeBlockMermaidGraph, ViewerEditorBasesEmbed} from "#components";
 
 export function useActiveEditorCodeblockMappings() {

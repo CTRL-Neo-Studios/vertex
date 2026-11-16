@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type {InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {ExternalLinkClickDetail, InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor";
 import type {EditorState} from "@codemirror/state";
 import {EditorView} from "@codemirror/view";
 import {selectAll} from "@codemirror/commands";
@@ -10,6 +10,7 @@ import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
@@ -74,6 +75,9 @@ const {openTab} = useActiveTabs(session)
 async function openLink({referenceId}: InternalLinkClickDetail) {
     if (session?.workspaceSession && referenceId) await $navi.toWorkspaceTab(props.sessionId, openTab(referenceId))
 }
+// The editor follows no link itself: a web or mail link opens in the default app.
+const {openUrlInBrowser} = useAppOpener()
+const openExternalLink = ({url}: ExternalLinkClickDetail) => openUrlInBrowser(url)
 
 // The outline's jumps and Insert new base arrive through the session's editor dispatcher.
 const {dispatcher} = useActiveEditorDispatcher(session)
@@ -189,6 +193,7 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
                     context-menu-size="sm"
                     @update:model-value="() => contentSaved = false"
                     @internal-link-click="openLink"
+                    @external-link-click="openExternalLink"
                 />
             </UContextMenu>
         </template>

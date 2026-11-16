@@ -1,4 +1,4 @@
-import type {PropertiesOptions, PropertyType} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {PropertiesOptions, PropertyType} from "@type32/codemirror-rich-obsidian-editor";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {isPlainTextFile} from "#shared/utils/fs/filenames";
 import {propertySuggestions} from "#shared/utils/index/propertySuggestions";

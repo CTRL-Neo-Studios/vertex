@@ -1,5 +1,5 @@
 import {convertFileSrc} from "@tauri-apps/api/core";
-import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {InternalLink} from "@type32/codemirror-rich-obsidian-editor";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {fileNameFromPath, getFileExtensionFromPath, isBasesFile, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {EditorProseEmbedImageDisplay, ViewerEditorBasesEmbed} from "#components";

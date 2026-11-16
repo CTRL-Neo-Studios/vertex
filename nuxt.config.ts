@@ -8,7 +8,7 @@ export default defineNuxtConfig({
       "@nuxt/icon",
       "@nuxt/fonts",
       "@nuxtjs/i18n",
-      "@type32/codemirror-rich-obsidian-editor",
+      "@type32/codemirror-rich-obsidian-editor/nuxt",
       "@type32/dispatcher",
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
@@ -33,15 +33,6 @@ export default defineNuxtConfig({
 
     // The workflow canvas ships compiled SFCs that import Nuxt UI components by path; let Vite process them.
     build: {transpile: ["@type32/workflows"]},
-
-    hooks: {
-        // @type32/codemirror-rich-obsidian-editor 0.2.3 adds the CommonJS `alfaaz` to build.transpile, which keeps it
-        // out of pre-bundling; served raw, its named imports fail and every window shows a 500. Pre-bundle it again.
-        'vite:extendConfig'(config) {
-            const deps = config.optimizeDeps
-            if (deps?.exclude) deps.exclude = deps.exclude.filter(dep => dep !== 'alfaaz')
-        },
-    },
 
     compatibilityDate: "2026-10-14",
 

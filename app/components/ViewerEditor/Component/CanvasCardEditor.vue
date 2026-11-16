@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type {EditorView} from "@codemirror/view"
-import type {InternalLink, InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {ExternalLinkClickDetail, InternalLink, InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
+import {useAppOpener} from "~/composables/app/useAppOpener"
 
 /**
  * The markdown editor inside a canvas card being edited (a text card, or a note card): the note editor's own
@@ -14,6 +15,8 @@ const emit = defineEmits<{ update: [text: string], done: [], openLink: [detail: 
 const editor = useTemplateRef<{ view: EditorView | undefined }>('editor')
 const $route = useRoute()
 const properties = usePropertiesOptions(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+// The editor follows no link itself: a web or mail link opens in the default app.
+const {openUrlInBrowser} = useAppOpener()
 
 // Focused at the end, as a double-clicked card starts editing there; without scrolling, which would move the canvas
 // out of its tab.
@@ -35,6 +38,7 @@ watch(() => editor.value?.view, (view) => {
             context-menu-size="sm"
             @update:model-value="(text?: string) => emit('update', text ?? '')"
             @internal-link-click="(detail: InternalLinkClickDetail) => emit('openLink', detail)"
+            @external-link-click="({url}: ExternalLinkClickDetail) => openUrlInBrowser(url)"
         />
     </div>
 </template>

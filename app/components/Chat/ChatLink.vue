@@ -27,7 +27,7 @@ const file = computed(() => {
 async function onClick() {
     if (props.note !== undefined) {
         if (file.value) await $navi.toWorkspaceTab(session?.uuid, openTab(file.value.uuid))
-    } else if (props.href && /^(https?:|mailto:)/.test(props.href)) {
+    } else if (props.href) {
         await openUrlInBrowser(props.href)
     }
 }

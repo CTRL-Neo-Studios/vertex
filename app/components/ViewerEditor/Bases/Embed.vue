@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {EditorView} from "@codemirror/view";
 import {readTextFile} from "@tauri-apps/plugin-fs";
-import type {InternalLink} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {InternalLink} from "@type32/codemirror-rich-obsidian-editor";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {BASE_EMBED} from "~/composables/bases/useBaseContext";
@@ -68,7 +68,7 @@ watch(view, name => views.value[viewKey.value] = name)
 
 /** The block's editor and the position of its opening fence. */
 function blockPlace() {
-    const widget = root.value?.closest<HTMLElement>('.vue-embed-widget')
+    const widget = root.value?.closest<HTMLElement>('.cm-embed-widget')
     const editor = widget?.closest<HTMLElement>('.cm-editor')
     const cm = editor ? EditorView.findFromDOM(editor) : null
     return cm && widget ? {cm, pos: cm.posAtDOM(widget), nested: !!editor?.parentElement?.closest('.cm-editor')} : null

@@ -1,4 +1,4 @@
-import type {PropertyType} from "#codemirror-rich-obsidian-editor/editor-types";
+import type {PropertyType} from "@type32/codemirror-rich-obsidian-editor";
 import type {PropertyKind} from "@type32/obsidian-bases-parser";
 
 /**

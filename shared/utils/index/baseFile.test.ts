@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {RowScope, toText, type BaseHost} from '@type32/obsidian-bases-parser'
-import {parseYaml, parseFrontmatter} from '../../../node_modules/@type32/codemirror-rich-obsidian-editor/dist/runtime/utils/frontmatter.js'
+import {parseYaml, parseFrontmatter} from '@type32/codemirror-rich-obsidian-editor'
 import {defaultActiveWorkspaceFileIndex} from '#shared/utils/defaults/actives'
 import {baseFile} from './baseFile'
 import {LinkGraph} from './linkGraph'

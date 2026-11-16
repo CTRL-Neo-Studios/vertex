@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
 import {MESSAGES, type CanvasError, type CanvasMessages, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
-import type {InternalLinkClickDetail} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
 import {defaultAppCanvasConfig} from "#shared/utils/defaults/apps"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"

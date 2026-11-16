@@ -1,5 +1,5 @@
 import type {ComputedRef, Ref, ShallowRef} from "vue";
-import type {Frontmatter} from "#codemirror-rich-obsidian-editor/editor-types"
+import type {Frontmatter} from "@type32/codemirror-rich-obsidian-editor"
 
 export type FrontmatterProperties = Frontmatter
 
