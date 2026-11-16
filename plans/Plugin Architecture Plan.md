@@ -59,7 +59,7 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
 | Workspace-installed plugins | Run only in a trusted workspace, and only the code that was accepted: pinned by content hash, so changed code asks again. With the same id as a global plugin, the workspace's copy wins there. |
 | Turning off | Turning a plugin on takes effect at once. Turning one off asks to restart the app (Window Permissions Plan: Tauri can't take a window's grant back); until then it runs on, so no plugin has to undo itself. Registrations are still tied to a scope that removes them. |
 | UI contract | A mount function (`mount(el, props)` returning a disposer) is the stable contract. Vue components are accepted everywhere too: core plugins use them, and community plugins may, through the host's Vue and a published set of UI components, knowing a Nuxt UI major can break those. |
-| A plugin's settings | On its own page, drawn from the manifest's schema or by the plugin. Settings → View keeps only the kernel's options. |
+| A plugin's settings | On its own page, drawn from the manifest's schema or by the plugin. Settings → View keeps only the kernel's options. The Settings nav is in three groups: Vertex's own pages, core plugins, community plugins (K6). |
 | Core plugins and kernel internals | Core plugins import the public API. What they still take from the kernel's internals is listed per plugin in the boundary test; that list is the API backlog and each X phase shrinks it. |
 | Names | i18n keys `plugins.<id>.*`; state keys `plugin.<id>.*`; commands `<id>:<name>`; Rust plugins `vertex` (kernel) and `vertex-<id>`. |
 | Old settings | Read forever through one table of old path → new path, for the global file and every workspace's; written at the new paths. A workspace file is rewritten only when it is next changed. |
@@ -423,6 +423,47 @@ Blocked by K0. Independent of K1–K4.
   - A release build (`tauri build --no-bundle`, 1 m 10 s) starts.
 - **Numbers:** 319 tests (43 files); 37 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
+## K6: Settings layout
+
+Blocked by K3. No X phase blocks it or waits for it; the community group stays empty until C2.
+
+The Settings nav today is one flat list: About, General, Theme, View, then the pages plugins register (Workflows, Git, Assistive AI), then Plugins, then the schema pages of plugins that are on (Canvas). So a plugin's settings sit before or after Plugins by how its page is drawn, not by what it is. `PluginManifest.icon` exists (K2) but no manifest sets it, a schema page's nav entry is a puzzle piece, and the rows of Settings → Plugins have no icon.
+
+### Decisions
+
+- **Three groups rather than dividers in the flat list.** Dividers alone would keep Git above Plugins and Canvas below it. The groups are the three kinds of settings, as Obsidian has them (Options, Core plugins, Community plugins).
+- **Plugin settings stay in the nav**, rather than only behind a plugin's row in Settings → Plugins: AI's pages have sub-entries and are opened often.
+- **No search over settings.** Add it when the nav is too long to scan.
+- **Routes don't change** (`/settings/<page id>`, `/settings/plugins/<id>`), so what opens Settings at a page (`SETTINGS_ROUTE_EVENT`) still works.
+
+### Change
+
+- **Nav** (`app/layouts/settings.vue`): `UNavigationMenu` takes its items as lists and draws a separator between them; a heading is an item of `type: 'label'`.
+  1. No heading: About, General, Theme, View, Plugins.
+  2. **Core plugins**: one entry per core or built-in plugin that is on and has settings.
+  3. **Community plugins**: the same for installed plugins. Not drawn while it's empty.
+  - A plugin's entry is the pages it registers (`ctx.settings.page`, with their sub-entries), or its schema page when it registers none. Never both.
+  - A group is sorted by label in the UI language.
+  - The group comes from `PluginEntry.source`; the plugin behind a registered page from the `owners` map in `runtime.ts`.
+  - The grouping is one function over the registered pages, the manifests, their sources and what's on, so it can be tested without the window.
+- **Icons:**
+  - A plugin's `icon` shows on its row in Settings → Plugins, on its nav entry and in its schema page's header; the puzzle piece when it has none.
+  - `SettingsPageDef.icon` becomes optional, defaulting to the manifest's.
+  - Every `layers/*/plugin.json` and built-in gets its icon: the one its panel, file type or settings page already uses.
+  - `SettingsRow` gains `icon?`.
+  - `icon` stays an Iconify name. A community plugin shipping its own icon file is C1's (the package format).
+- **Settings → Plugins:** its sections are Core plugins, Community plugins (C2 fills it and adds Install…) and This workspace (C3). A plugin's gear opens its nav entry.
+
+### Found while planning, not changed here
+
+The release build bundles 61 icons (Nuxt UI's own and the provider logos); the app's code names about 200. The generated app's icon provider is `https://api.iconify.design`, so the rest are fetched there when first drawn. Read from `.nuxt/app.config.mjs` and `.output/public/_nuxt`; not run offline. A plugin's icon resolves the same way.
+
+### Acceptance
+
+- [ ] Test of the grouping: a schema-only plugin, one that registers a page, one with both (one entry), one that's off (none), a community source (third group), an empty group (dropped), the order.
+- [ ] In `tauri dev`: the three groups with their headings and separators; Canvas and Git both under Core plugins; no Community plugins group; each core plugin's icon on its Plugins row and nav entry; a plugin's gear and `SETTINGS_ROUTE_EVENT` land on the right page.
+- [ ] Concepts doc; en + zh-CN strings.
+
 ## X phases: what each one does
 
 Every extraction:
@@ -645,7 +686,7 @@ Blocked by C1.
 ### Change
 - **Rust** (`tauri-plugin-vertex`): `plugins_list` (manifests in the global folder and a workspace's), `plugin_read` (the code and its hash), `plugin_install` (from a folder or a `.zip`, or a URL to one; validates the manifest and id), `plugin_remove`.
 - **Loading:** `main.js` is imported from a blob URL of what `plugin_read` returned, so what was hashed is what runs; `styles.css` goes in a `<style data-plugin>`; assets are read by path.
-- **Settings → Plugins:** Install…, Remove, the permissions it lists, its version; a failed load says why.
+- **Settings → Plugins:** Install…, Remove, the permissions it lists, its version; a failed load says why. Installed plugins fill the Community plugins section and the nav's Community plugins group (K6).
 - **Development:** Load a plugin from a folder; a change to its files reloads the windows using it.
 - `plugins.sources.<id>` records where a plugin came from.
 
