@@ -1030,6 +1030,9 @@ async fn git_token_set(host: String, username: String, token: String) -> Result<
     .await
 }
 
+/// The plugin these commands belong to: its windows get them where it's on.
+pub const PLUGIN: &str = "git";
+
 /// What each window kind may call here: the start window clones, Settings keeps tokens, workspaces do the rest.
 pub const GRANTS: api::Grants = &[
     (
@@ -1108,7 +1111,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(Git::default());
-            api::grant(app, GRANTS);
+            api::grant(app, PLUGIN, GRANTS);
             Ok(())
         })
         .build()

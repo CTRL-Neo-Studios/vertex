@@ -82,4 +82,8 @@ export const stateClient = {
     onFlushRequested: (cb: () => Promise<void>): Promise<UnlistenFn> => listen(StateEvent.flushRequested, () => cb()),
     flushDone: (windowLabel: string) => emit(StateEvent.flushDone, windowLabel),
     quit: () => invoke('quit_app'),
+    /** Quits as `quit` does and starts again, reopening the session windows that were open. */
+    restart: () => invoke('restart_app'),
+    /** Plugins turned off that some window still runs (and may call) until the app restarts. */
+    pluginsWaitingRestart: () => invoke<string[]>('plugins_waiting_restart'),
 }

@@ -14,6 +14,8 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 pub const SESSIONS_FILE: &str = "sessions.json";
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const TRUST_FILE: &str = "trust.json";
+/// Left by `restart_app`: the next launch reopens the windows that were open, whatever the recovery setting.
+const RESTART_FILE: &str = "restarting";
 pub const EVENT_SESSIONS_CHANGED: &str = "vertex://sessions-changed";
 pub const EVENT_SETTINGS_CHANGED: &str = "vertex://settings-changed";
 pub const EVENT_TRUST_CHANGED: &str = "vertex://trust-changed";
@@ -58,6 +60,15 @@ fn read_json<R: Runtime>(app: &AppHandle<R>, file: &str) -> Value {
         .unwrap_or(Value::Null)
 }
 
+pub(crate) fn mark_restart<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    std::fs::write(store_path(app, RESTART_FILE)?, b"").map_err(|e| e.to_string())
+}
+
+/// Whether this launch follows `restart_app` (answers once).
+pub(crate) fn take_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
+    store_path(app, RESTART_FILE).is_ok_and(|p| std::fs::remove_file(p).is_ok())
+}
+
 /// Write via temp file + rename so a crash mid-write never leaves a truncated store.
 pub fn write_atomic(path: &Path, value: &Value) -> Result<(), String> {
     write_bytes_atomic(path, &serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?)
@@ -73,6 +84,13 @@ pub fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 fn write_json<R: Runtime>(app: &AppHandle<R>, file: &str, value: &Value) -> Result<(), String> {
     write_atomic(&store_path(app, file)?, value)
+}
+
+/// A store changed (with its lock released): the windows' grants follow first, so a plugin it turns on may call its
+/// commands as soon as its window hears, then every window hears.
+fn changed<R: Runtime>(app: &AppHandle<R>, event: &str, payload: Value) -> Result<(), String> {
+    crate::grants::regrant(app);
+    app.emit(event, payload).map_err(|e| e.to_string())
 }
 
 fn session_uuid(v: &Value) -> Option<&str> {
@@ -266,6 +284,31 @@ fn under(path: &str, base: &str) -> bool {
     path.strip_prefix(base).is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
+/// Whether `folder` is trusted: its own record, or a parent's that covers its subfolders (`nested`). The frontend's
+/// `folderTrustedBy`, for which plugins a workspace may turn on.
+pub fn folder_trusted(trust: &Value, folder: &str) -> bool {
+    let normalized = folder.replace('\\', "/");
+    let own = match normalized.trim_end_matches('/') {
+        "" => &normalized[..1.min(normalized.len())],
+        trimmed => trimmed,
+    };
+    let record = |at: &str| trust.pointer("/folders").and_then(|f| f.get(at)).filter(|r| r.get("trustedAt").is_some_and(Value::is_string));
+    let mut at = own;
+    loop {
+        if record(at).is_some_and(|r| at == own || r.get("nested") == Some(&Value::Bool(true))) {
+            return true;
+        }
+        let parent = match at.rfind('/') {
+            Some(0) | None => "/",
+            Some(i) => &at[..i],
+        };
+        if parent == at {
+            return false;
+        }
+        at = parent;
+    }
+}
+
 fn rename_keys(list: &mut Map<String, Value>, from: &str, to: &str) {
     let moved: Vec<String> = list.keys().filter(|k| under(k, from)).cloned().collect();
     for key in moved {
@@ -353,6 +396,11 @@ fn workspace_settings_file(root: &str) -> Result<PathBuf, String> {
     Ok(WORKSPACE_SETTINGS.iter().fold(workspace_root(root)?.to_path_buf(), |p, part| p.join(part)))
 }
 
+/// A workspace's `.vertex/settings.json` as on disk; `{}` when it has none or it can't be read.
+pub(crate) fn workspace_settings(root: &str) -> Value {
+    workspace_settings_file(root).map(|file| read_object(&file)).unwrap_or_else(|_| Value::Object(Map::new()))
+}
+
 /// The file's object; anything else (missing, unreadable, not an object) is no overrides.
 fn read_object(path: &Path) -> Value {
     std::fs::read(path)
@@ -438,20 +486,25 @@ impl AppState {
         f: impl FnOnce(&mut Value) -> T,
         persist: bool,
     ) -> Result<T, String> {
-        let mut guard = self.settings.lock().map_err(|e| e.to_string())?;
-        let settings = guard.get_or_insert_with(|| {
-            read_json(app, SETTINGS_FILE)
-                .get(SETTINGS_ROOT)
-                .cloned()
-                .unwrap_or(Value::Null)
-        });
-        let out = f(settings);
-        if persist {
-            let mut root = Map::new();
-            root.insert(SETTINGS_ROOT.into(), settings.clone());
-            write_json(app, SETTINGS_FILE, &Value::Object(root))?;
-            app.emit(EVENT_SETTINGS_CHANGED, settings.clone())
-                .map_err(|e| e.to_string())?;
+        let (out, saved) = {
+            let mut guard = self.settings.lock().map_err(|e| e.to_string())?;
+            let settings = guard.get_or_insert_with(|| {
+                read_json(app, SETTINGS_FILE)
+                    .get(SETTINGS_ROOT)
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            });
+            let out = f(settings);
+            let saved = persist.then(|| settings.clone());
+            if let Some(settings) = &saved {
+                let mut root = Map::new();
+                root.insert(SETTINGS_ROOT.into(), settings.clone());
+                write_json(app, SETTINGS_FILE, &Value::Object(root))?;
+            }
+            (out, saved)
+        };
+        if let Some(settings) = saved {
+            changed(app, EVENT_SETTINGS_CHANGED, settings)?;
         }
         Ok(out)
     }
@@ -462,27 +515,32 @@ impl AppState {
         f: impl FnOnce(&mut Value) -> Result<T, String>,
         persist: bool,
     ) -> Result<T, String> {
-        let mut guard = self.trust.lock().map_err(|e| e.to_string())?;
-        if guard.is_none() {
-            let stored = read_json(app, TRUST_FILE);
-            let trust = if stored.is_null() {
-                let settings = read_json(app, SETTINGS_FILE);
-                let migrated = migrate_trust(settings.get(SETTINGS_ROOT).unwrap_or(&Value::Null));
-                // Written now: the settings that held the old records drop them on their next save.
-                write_json(app, TRUST_FILE, &migrated)?;
-                migrated
-            } else {
-                stored
-            };
-            *guard = Some(trust);
-        }
-        let trust = guard.as_mut().unwrap();
-        let before = persist.then(|| trust.clone());
-        let out = f(trust)?;
-        if before.is_some_and(|b| b != *trust) {
-            write_json(app, TRUST_FILE, trust)?;
-            app.emit(EVENT_TRUST_CHANGED, trust.clone())
-                .map_err(|e| e.to_string())?;
+        let (out, saved) = {
+            let mut guard = self.trust.lock().map_err(|e| e.to_string())?;
+            if guard.is_none() {
+                let stored = read_json(app, TRUST_FILE);
+                let trust = if stored.is_null() {
+                    let settings = read_json(app, SETTINGS_FILE);
+                    let migrated = migrate_trust(settings.get(SETTINGS_ROOT).unwrap_or(&Value::Null));
+                    // Written now: the settings that held the old records drop them on their next save.
+                    write_json(app, TRUST_FILE, &migrated)?;
+                    migrated
+                } else {
+                    stored
+                };
+                *guard = Some(trust);
+            }
+            let trust = guard.as_mut().unwrap();
+            let before = persist.then(|| trust.clone());
+            let out = f(trust)?;
+            let saved = before.is_some_and(|b| b != *trust).then(|| trust.clone());
+            if let Some(trust) = &saved {
+                write_json(app, TRUST_FILE, trust)?;
+            }
+            (out, saved)
+        };
+        if let Some(trust) = saved {
+            changed(app, EVENT_TRUST_CHANGED, trust)?;
         }
         Ok(out)
     }
@@ -490,6 +548,28 @@ impl AppState {
     /// Reads (or first creates, migrating old settings) `trust.json`, so it exists from launch.
     pub fn ensure_trust<R: Runtime>(&self, app: &AppHandle<R>) -> Result<(), String> {
         self.with_trust(app, |_| Ok(()), false)
+    }
+
+    /// Whether the folder `root` is trusted ([`folder_trusted`]).
+    pub(crate) fn folder_trusted<R: Runtime>(&self, app: &AppHandle<R>, root: &str) -> bool {
+        self.with_trust(app, |t| Ok(folder_trusted(t, root)), false).unwrap_or(false)
+    }
+
+    /// The root of session `uuid` when it's a workspace's (a single file's window has no workspace settings).
+    pub(crate) fn workspace_of<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str) -> Option<String> {
+        self.with_sessions(
+            app,
+            |list| {
+                Ok(list
+                    .iter()
+                    .find(|s| session_uuid(s) == Some(uuid))
+                    .filter(|s| s.get("sessionType").and_then(Value::as_str) == Some("workspace"))
+                    .and_then(|s| s.get("rootFileOrFolderAbsolutePath")?.as_str().map(str::to_owned)))
+            },
+            false,
+        )
+        .ok()
+        .flatten()
     }
 
     /// `f` on the global settings as they are (read from disk the first time); `T`'s default if the lock is poisoned.
@@ -510,6 +590,25 @@ impl AppState {
     pub fn has_session<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str) -> bool {
         self.with_sessions(app, |list| Ok(list.iter().any(|s| s.get("uuid").and_then(Value::as_str) == Some(uuid))), false)
             .unwrap_or(false)
+    }
+
+    /// The sessions whose window was open when the app last quit and whose folder or file is still there, as
+    /// `(uuid, root)`, oldest first (as recovery reopens them, so the newest ends up in front).
+    pub(crate) fn reopenable<R: Runtime>(&self, app: &AppHandle<R>) -> Vec<(String, String)> {
+        self.with_sessions(
+            app,
+            |list| {
+                Ok(list
+                    .iter()
+                    .rev()
+                    .filter(|s| flag(s, "reopen"))
+                    .filter_map(|s| Some((session_uuid(s)?.to_owned(), s.get("rootFileOrFolderAbsolutePath")?.as_str()?.to_owned())))
+                    .filter(|(_, root)| Path::new(root).exists())
+                    .collect())
+            },
+            false,
+        )
+        .unwrap_or_default()
     }
 
     /// A `session-{uuid}` window was created (`open`) or destroyed; a destroy while quitting changes nothing,
@@ -705,8 +804,8 @@ pub fn workspace_settings_update<R: Runtime>(
         write_atomic(&file, &settings)?;
     }
     cache.insert(root.clone(), settings.clone());
-    app.emit(EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
-        .map_err(|e| e.to_string())
+    drop(cache);
+    changed(&app, EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
 }
 
 /// The workspace's watcher saw the file change (an external edit, git, sync): re-reads it and broadcasts it when
@@ -723,8 +822,8 @@ pub fn workspace_settings_reload<R: Runtime>(
         return Ok(());
     }
     cache.insert(root.clone(), settings.clone());
-    app.emit(EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
-        .map_err(|e| e.to_string())
+    drop(cache);
+    changed(&app, EVENT_WORKSPACE_SETTINGS_CHANGED, serde_json::json!({"root": root, "settings": settings}))
 }
 
 /// Returns and clears every path the OS asked us to open (file associations, second launches).
@@ -913,5 +1012,21 @@ mod tests {
         assert_eq!(trust["folders"]["/v/Z"]["files"], json!({"/v/Z/C/new.workflow": "n2"}));
         pin_trust(&mut trust, "/v/Z", "/v/Z/C/new.workflow", None).unwrap();
         assert_eq!(trust["folders"]["/v/Z"]["files"], json!({}));
+    }
+
+    #[test]
+    fn a_folder_is_trusted_by_its_own_record_or_a_nested_parent() {
+        let trust = json!({"folders": {
+            "/v/Flat": {"trustedAt": "t", "nested": false},
+            "/v/Deep": {"trustedAt": "t", "nested": true},
+            "/v/Broken": {"nested": true},
+        }});
+        assert!(folder_trusted(&trust, "/v/Flat"));
+        assert!(folder_trusted(&trust, "/v/Flat/"));
+        assert!(!folder_trusted(&trust, "/v/Flat/sub"));
+        assert!(folder_trusted(&trust, "/v/Deep/a/b"));
+        assert!(!folder_trusted(&trust, "/v/Broken/a"), "a record needs its trustedAt");
+        assert!(!folder_trusted(&trust, "/v"));
+        assert!(!folder_trusted(&json!({}), "/"));
     }
 }

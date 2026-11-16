@@ -18,6 +18,8 @@ const COMMANDS: &[&str] = &[
     "workspace_settings_reload",
     "take_open_requests",
     "quit_app",
+    "restart_app",
+    "plugins_waiting_restart",
     "clipboard_files_get",
     "clipboard_files_set",
     "trash_item",

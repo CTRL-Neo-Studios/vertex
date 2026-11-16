@@ -19,7 +19,7 @@ import TabSwitcher from "~/components/TabSwitcher.vue";
 import {Routes} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {SessionContext} from "#shared/plugin/api";
-import {onBeforePluginReload, pluginSessions} from "~/utils/plugins/runtime";
+import {pluginSessions} from "~/utils/plugins/runtime";
 
 /**
  * Frame for a session window (workspace or singlespace): builds the index, restores tabs, starts persistence,
@@ -37,8 +37,6 @@ const index = useActiveWorkspaceIndex(activeSesh)
 const $tabs = useActiveTabs(activeSesh)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
-// Turning a running plugin off reloads the window; its tabs are saved first, so /loading brings them back.
-const offBeforePluginReload = onBeforePluginReload(() => $persistence?.flush())
 const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
 useSessionCommands(activeSesh)
 const panels = usePanels(activeSesh)
@@ -106,7 +104,6 @@ onMounted(async () => {
 
 onBeforeUnmount(async () => {
     pluginSessions.end()
-    offBeforePluginReload()
     unregisterClose?.()
     $tabs.clearTabs()
     await index.stopWatcher()

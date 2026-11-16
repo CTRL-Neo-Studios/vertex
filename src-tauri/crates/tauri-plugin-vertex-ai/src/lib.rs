@@ -276,6 +276,9 @@ async fn ai_model_catalog<R: Runtime>(app: AppHandle<R>) -> Result<Value, String
     }
 }
 
+/// The plugin these commands belong to: its windows get them where it's on.
+pub const PLUGIN: &str = "ai";
+
 /// What each window kind may call here: workspaces send requests; Settings also keeps keys and lists models.
 pub const GRANTS: api::Grants = &[
     (api::WindowKind::Session, &["vertex-ai:allow-ai-request", "vertex-ai:allow-ai-request-cancel"]),
@@ -304,7 +307,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(AiRequests::default());
-            api::grant(app, GRANTS);
+            api::grant(app, PLUGIN, GRANTS);
             api::on_settings_change(app, |old, new| {
                 for id in stale_ai_providers(old, new) {
                     if let Err(e) = delete_key(&id) {

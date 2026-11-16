@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindo
 /// runtime the styling plugin works with ([`crate::api::set_window_style`]).
 pub struct WindowStyle<R: Runtime>(pub Box<dyn Fn(&WebviewWindow<R>) + Send + Sync>);
 
-/// The start window. `tauri.conf.json` describes it (`create: false`); [`open_main`] builds it.
+/// The start window. `tauri.conf.json` describes it (`create: false`); [`open_launch_windows`] builds it.
 pub const MAIN_WINDOW: &str = "main";
 pub const SETTINGS_WINDOW: &str = "settings";
 pub const ABOUT_WINDOW: &str = "about";
@@ -92,7 +92,12 @@ pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) 
         let _ = window.set_focus();
         return Ok(());
     }
-    let mut builder = WebviewWindowBuilder::new(&app, &plan.label, WebviewUrl::App(plan.route.into()))
+    build(&app, &plan)
+}
+
+/// Builds the window `plan` describes, after granting what it may call.
+fn build<R: Runtime>(app: &AppHandle<R>, plan: &WindowPlan) -> Result<(), String> {
+    let mut builder = WebviewWindowBuilder::new(app, &plan.label, WebviewUrl::App(plan.route.clone().into()))
         .title(&plan.title)
         .inner_size(plan.size.0, plan.size.1)
         .resizable(plan.resizable)
@@ -109,18 +114,27 @@ pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) 
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .traffic_light_position(tauri::LogicalPosition::new(14.0, 21.0));
     }
-    crate::grants::grant_window(&app, &plan.label)?;
+    crate::grants::grant_window(app, &plan.label)?;
     let window = builder.build().map_err(|e| e.to_string())?;
-    opened(&app, &window);
+    opened(app, &window);
     Ok(())
 }
 
-/// Builds the start window from its entry in `tauri.conf.json` (`create: false` there, so this is the only way).
-pub fn open_main<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+/// The windows at launch: the start window, from its entry in `tauri.conf.json` (`create: false` there, so this is the
+/// only way), and after `restart_app` every session window that was open, whatever the recovery setting.
+pub fn open_launch_windows<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let config = app.config().app.windows.iter().find(|w| w.label == MAIN_WINDOW).ok_or("no `main` window in tauri.conf.json")?;
     crate::grants::grant_window(app, MAIN_WINDOW)?;
     let window = WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()).map_err(|e| e.to_string())?;
     opened(app, &window);
+    if crate::state::take_restart(app) {
+        for (uuid, root) in app.state::<AppState>().reopenable(app) {
+            let title = std::path::Path::new(&root).file_name().map_or(root.clone(), |n| n.to_string_lossy().into_owned());
+            if let Err(e) = plan(WindowRequest::Session { uuid, title }, |_| true).and_then(|plan| build(app, &plan)) {
+                eprintln!("[windows] could not reopen {root} after the restart: {e}");
+            }
+        }
+    }
     Ok(())
 }
 

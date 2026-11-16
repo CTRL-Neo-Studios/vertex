@@ -19,8 +19,6 @@ export interface PluginHostOptions {
     services(id: string, own: (dispose: () => void) => void): HostServices
     /** A plugin failed to load or start, or one of its callbacks threw. */
     onFailed(manifest: PluginManifest, error: unknown): void
-    /** A running plugin was turned off: the window starts over, as nothing guarantees a plugin can undo itself. */
-    reload(): unknown
 }
 
 interface Running {
@@ -189,11 +187,10 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
 
     async function applyNow(isOn: (manifest: PluginManifest) => boolean) {
         const {order, off} = resolvePlugins(forWindow.map(e => e.manifest), isOn, installed)
-        if ([...running.keys()].some(id => !order.includes(id))) {
-            await options.reload()
-            return
-        }
+        // A running plugin turned off runs on until the app restarts: Rust can't take its window's grants back before
+        // then, and nothing guarantees a plugin can undo itself.
         for (const [id, reason] of off) {
+            if (running.has(id)) continue
             failed.delete(id)
             states.set(id, {status: 'off', reason})
         }
@@ -217,7 +214,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
 
     return {
         states,
-        /** Starts what's newly on (in order) and reloads the window when something running is now off. Serialized. */
+        /** Starts what's newly on, in order; what's turned off runs on until the app restarts. Serialized. */
         apply(isOn: (manifest: PluginManifest) => boolean) {
             queue = queue.then(() => applyNow(isOn))
             return queue
@@ -235,7 +232,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
             }
             session = undefined
         },
-        /** Stops every plugin (tests; a window never needs it, it reloads instead). */
+        /** Stops every plugin (tests; a window never needs it, the app restarts instead). */
         stop() {
             for (const r of running.values()) r.scope.stop()
             running.clear()

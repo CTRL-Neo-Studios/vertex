@@ -22,7 +22,6 @@ import {hostServices} from '~/utils/plugins/services'
 
 /** One host per window: each window is its own JavaScript realm. */
 let host: PluginHost | undefined
-const beforeReload = new Set<() => unknown>()
 /** Reactive: tabs and views restored before the session starts draw once it does. */
 const session = shallowRef<SessionContext>()
 /** Which plugin registered a definition, for `PluginMount`'s error message. */
@@ -54,15 +53,6 @@ const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]
     toolbarItem: toolbarItems.register,
     noteMenuItem: noteMenuItems.register,
     linkExtractor: linkExtractors.register,
-}
-/** Set across the reload a plugin's switch-off causes, so the reloaded window doesn't take focus. */
-const QUIET_RELOAD = 'vertex-plugin-reload'
-
-/** Whether this page load is a plugin switch-off's reload (answers once). */
-export function isPluginReload() {
-    const quiet = sessionStorage.getItem(QUIET_RELOAD) !== null
-    sessionStorage.removeItem(QUIET_RELOAD)
-    return quiet
 }
 
 /** Which kind of window a label names; `undefined` for windows without plugins (About). */
@@ -123,11 +113,6 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
             console.error(`[plugins] ${manifest.id} failed:`, error)
             toasts.error(t('app.plugins.failed', {name: manifest.name}), error instanceof Error ? error.message : String(error))
         },
-        async reload() {
-            for (const flush of beforeReload) await flush()
-            sessionStorage.setItem(QUIET_RELOAD, '1')
-            window.location.reload()
-        },
     })
     // Every way into the host runs in the Nuxt app's context, so a plugin's `setup` and `onSession` callbacks may use
     // Nuxt's composables, also when a settings change turns one on later.
@@ -158,12 +143,6 @@ export const pluginSessions = {
  * one and until it starts. Reactive.
  */
 export const pluginSession = (): SessionContext | undefined => session.value
-
-/** Runs before a plugin's switch-off reloads the window (a session window saves its state first). */
-export function onBeforePluginReload(flush: () => unknown) {
-    beforeReload.add(flush)
-    return () => beforeReload.delete(flush)
-}
 
 /** Each plugin's state in this window, for Settings → Plugins. */
 export const pluginStates = () => host?.states

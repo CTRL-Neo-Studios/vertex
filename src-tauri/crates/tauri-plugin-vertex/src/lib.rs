@@ -160,11 +160,10 @@ fn clipboard_files_set(paths: Vec<String>) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Quits the app after every session window has flushed its pending session write.
-/// Each window answers `vertex://flush-requested` by awaiting its last write and calling `flush_done`.
-/// The timeout only guards against a hung webview; normal flushes finish in milliseconds.
-#[tauri::command]
-async fn quit_app<R: Runtime>(app: AppHandle<R>) {
+/// Asks every session window to flush its pending session write (`vertex://flush-requested`; each answers with
+/// `flush_done` once its last write is done) and waits for them. The timeout only guards against a hung webview; normal
+/// flushes finish in milliseconds. From now on a destroyed session window keeps its session `open`, for the next launch.
+async fn flush_windows<R: Runtime>(app: &AppHandle<R>) {
     use std::sync::{Arc, Mutex};
     use tauri::{Emitter, Listener};
 
@@ -174,28 +173,45 @@ async fn quit_app<R: Runtime>(app: AppHandle<R>) {
         .into_keys()
         .filter(|l| l.starts_with(SESSION_WINDOW_PREFIX))
         .collect();
-    if !pending.is_empty() {
-        let pending = Arc::new(Mutex::new(pending));
-        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-        let tx = Arc::new(Mutex::new(Some(tx)));
-        let id = {
-            let (pending, tx) = (pending.clone(), tx.clone());
-            app.listen_any(state::EVENT_FLUSH_DONE, move |event| {
-                let label = event.payload().trim_matches('"').to_owned();
-                let mut p = pending.lock().unwrap();
-                p.remove(&label);
-                if p.is_empty() {
-                    if let Some(tx) = tx.lock().unwrap().take() {
-                        let _ = tx.send(());
-                    }
-                }
-            })
-        };
-        let _ = app.emit(state::EVENT_FLUSH_REQUESTED, ());
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(3), rx).await;
-        app.unlisten(id);
+    if pending.is_empty() {
+        return;
     }
+    let pending = Arc::new(Mutex::new(pending));
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let tx = Arc::new(Mutex::new(Some(tx)));
+    let id = {
+        let (pending, tx) = (pending.clone(), tx.clone());
+        app.listen_any(state::EVENT_FLUSH_DONE, move |event| {
+            let label = event.payload().trim_matches('"').to_owned();
+            let mut p = pending.lock().unwrap();
+            p.remove(&label);
+            if p.is_empty() {
+                if let Some(tx) = tx.lock().unwrap().take() {
+                    let _ = tx.send(());
+                }
+            }
+        })
+    };
+    let _ = app.emit(state::EVENT_FLUSH_REQUESTED, ());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(3), rx).await;
+    app.unlisten(id);
+}
+
+/// Quits the app after every session window has flushed its pending session write.
+#[tauri::command]
+async fn quit_app<R: Runtime>(app: AppHandle<R>) {
+    flush_windows(&app).await;
     app.exit(0);
+}
+
+/// Restarts the app as quitting does, and the next launch reopens every session window that was open, whatever the
+/// recovery setting. How a plugin turned off loses its grants: Tauri can't take one back from a running app.
+#[tauri::command]
+async fn restart_app<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    flush_windows(&app).await;
+    state::mark_restart(&app)?;
+    app.request_restart();
+    Ok(())
 }
 
 /// The kernel plugin. Register it before every plugin that uses [`api`] in its setup (Tauri sets plugins up in
@@ -221,6 +237,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             state::workspace_settings_reload,
             state::take_open_requests,
             quit_app,
+            restart_app,
+            grants::plugins_waiting_restart,
             clipboard_files_get,
             clipboard_files_set,
             trash::trash_item,

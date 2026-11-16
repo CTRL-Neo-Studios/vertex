@@ -7,6 +7,7 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifests} from "~/utils/plugins/catalog";
+import {stateClient} from "~/utils/stateClient";
 
 definePageMeta({
     layout: 'settings'
@@ -14,7 +15,8 @@ definePageMeta({
 
 /**
  * Settings → Plugins: every plugin with its switch, in the scope being edited. A workspace may turn any plugin off;
- * one it turns on that's off in the user's settings runs only once the workspace is trusted.
+ * one it turns on that's off in the user's settings runs only once the workspace is trusted. A plugin turned off runs
+ * on until Vertex restarts (its windows keep their grants till then), which the page says, with Restart now.
  */
 const {t} = useI18n()
 const {load} = useAppSettings()
@@ -39,6 +41,12 @@ const resolution = computed(() => resolvePlugins(
 const blocked = (m: PluginManifest) => scope.root.value !== null && !scope.trusted.value && isOn(m)
     && resolution.value.off.get(m.id)?.kind === 'disabled'
 const anyBlocked = computed(() => manifests.some(blocked))
+
+/** Turned off somewhere but still running there; Rust has updated its grants before this window hears of a change. */
+const waiting = ref<string[]>([])
+watch(() => JSON.stringify(scope.effective.value?.plugins.enabled), async () => {
+    waiting.value = await stateClient.pluginsWaitingRestart()
+}, {immediate: true})
 
 function reasonText(reason: OffReason | undefined): string | undefined {
     switch (reason?.kind) {
@@ -73,6 +81,15 @@ function describe(m: PluginManifest) {
                 :title="t('app.settings.plugins.untrusted')"
                 :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                 data-plugins-untrusted
+            />
+            <UAlert
+                v-if="waiting.length"
+                color="info"
+                variant="subtle"
+                icon="i-lucide-rotate-ccw"
+                :title="t('app.settings.plugins.waitsForRestart', {names: waiting.map(nameOf).join(', ')})"
+                :actions="[{label: t('app.settings.plugins.restartNow'), color: 'neutral', variant: 'outline', onClick: () => stateClient.restart()}]"
+                data-plugins-restart
             />
             <SettingsSection :title="t('app.settings.plugins.core')" :description="t('app.settings.plugins.coreDescription')">
                 <p v-if="!manifests.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.plugins.none') }}</p>

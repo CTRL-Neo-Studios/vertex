@@ -1,6 +1,7 @@
 //! The kernel's Rust API, for plugin crates (`tauri-plugin-vertex-*`) and the app crate's startup: files, the
-//! keychain, the global settings and what changes them, the start window, and the events the app reports to the kernel.
-//! Everything that takes an `AppHandle` needs the kernel plugin ([`crate::init`]) registered first.
+//! keychain, the global settings and what changes them, the windows at launch and what they may call, and the events
+//! the app reports to the kernel. Everything that takes an `AppHandle` needs the kernel plugin ([`crate::init`])
+//! registered first.
 
 use crate::state::AppState;
 use serde_json::Value;
@@ -8,16 +9,22 @@ use tauri::{AppHandle, Manager, Runtime};
 
 pub use crate::notes::snippet;
 pub use crate::state::{workspace_root, write_atomic, write_bytes_atomic};
-pub use crate::grants::{capability, Grants, WindowKind};
-pub use crate::windows::{open_main, show_main, MAIN_WINDOW};
+pub use crate::grants::{capabilities, plugins_on, Grants, PluginManifest, WindowKind};
+pub use crate::windows::{open_launch_windows, show_main, MAIN_WINDOW};
 
-/// Lets every window of the kinds `grants` names call those commands, from the next window built (call it in the
-/// plugin's setup, before any window opens). How a core crate's commands reach the windows, with no capability file.
-pub fn grant<R: Runtime>(app: &AppHandle<R>, grants: Grants) {
-    crate::grants::register(app, grants);
+/// Lets the windows where plugin `plugin` is on call the crate's commands, per kind (`grants`). Call it in the crate's
+/// setup, before any window opens. A plugin with no manifest is a built-in, always on.
+pub fn grant<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, grants: Grants) {
+    crate::grants::register(app, plugin, grants);
 }
 
-/// What the app does to each window the kernel builds (its title bar style): set once, before [`open_main`].
+/// The core plugins' `plugin.json`s (the app crate embeds them at build time), before [`open_launch_windows`]: which
+/// windows each runs in, whether it's on by default, and what its `permissions` grant there.
+pub fn set_core_plugins<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
+    crate::grants::set_catalog(app, manifests)
+}
+
+/// What the app does to each window the kernel builds (its title bar style): set once, before [`open_launch_windows`].
 pub fn set_window_style<R: Runtime>(app: &AppHandle<R>, style: impl Fn(&tauri::WebviewWindow<R>) + Send + Sync + 'static) {
     app.manage(crate::windows::WindowStyle(Box::new(style)));
 }

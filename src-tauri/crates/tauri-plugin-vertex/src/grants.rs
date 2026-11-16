@@ -1,17 +1,23 @@
-//! What each window may call (Window Permissions Plan, W2). There's no capability file: before the kernel builds a
-//! window it adds that window's capability, made of its kind's base ([`SHARED`], [`SCOPED`], the kernel's commands) and
-//! what each core crate registered for the kind ([`crate::api::grant`]). Tauri can't take a grant back, so a label keeps
-//! its grant after its window closes, and a reopened window isn't granted twice.
+//! What each window may call (Window Permissions Plan, W2 and W3). There's no capability file: before the kernel builds
+//! a window it adds that window's grants, its kind's base ([`SHARED`], [`SCOPED`], the kernel's commands) and one per
+//! plugin on for it: what its manifest's `permissions` stand for (the permission table, `shared/plugin/permissions.json`)
+//! and its crate's commands ([`crate::api::grant`]). A plugin turned on later is granted to the open windows at once
+//! ([`regrant`]). Tauri can't take a grant back: a label keeps its grants after its window closes, and a plugin turned
+//! off keeps its grants until the app restarts ([`plugins_waiting_restart`]).
 
 use crate::api::SESSION_WINDOW_PREFIX;
+use crate::state::AppState;
 use crate::windows::{ABOUT_WINDOW, MAIN_WINDOW, SETTINGS_WINDOW};
-use std::collections::HashSet;
-use std::sync::{Mutex, PoisonError};
+use serde::Deserialize;
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::{LazyLock, Mutex, PoisonError};
 use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, Runtime};
 
 /// The kinds of window, each with its own grant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum WindowKind {
     Main,
     Session,
@@ -34,6 +40,39 @@ impl WindowKind {
 
 /// Tauri permission identifiers, per window kind: a crate's commands each kind may call.
 pub type Grants = &'static [(WindowKind, &'static [&'static str])];
+
+/// What the kernel reads of a plugin's `plugin.json` (validated when it's built or installed).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginManifest {
+    pub id: String,
+    #[serde(default = "session_only")]
+    pub windows: Vec<WindowKind>,
+    #[serde(default)]
+    pub permissions: Vec<String>,
+    #[serde(default = "on")]
+    pub enabled_by_default: bool,
+}
+
+fn session_only() -> Vec<WindowKind> {
+    vec![WindowKind::Session]
+}
+
+fn on() -> bool {
+    true
+}
+
+impl PluginManifest {
+    pub fn parse(json: &str) -> Result<Self, String> {
+        serde_json::from_str(json).map_err(|e| format!("a plugin.json: {e}"))
+    }
+}
+
+/// A manifest's permission names → Tauri permissions. `files-outside-workspace` stands for nothing until W4 holds a
+/// session window to its workspace's files.
+static PERMISSION_TABLE: LazyLock<BTreeMap<String, Vec<String>>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../../shared/plugin/permissions.json")).expect("shared/plugin/permissions.json")
+});
 
 /// Every window, whatever its kind: Tauri's own and the third-party plugins' (which the app crate registers).
 const SHARED: &[&str] = &[
@@ -134,7 +173,8 @@ const SCOPED: &[(&str, &[&str])] = &[
     ("opener:allow-reveal-item-in-dir", &["**/*"]),
 ];
 
-/// The kernel's own commands, per kind (what each kind's frontend calls).
+/// The kernel's own commands, per kind: what the kernel and the built-ins call in each. A plugin gets `http_fetch` and
+/// the secret commands through its `network` and `secrets`.
 const KERNEL: Grants = &[
     (
         WindowKind::Main,
@@ -148,10 +188,6 @@ const KERNEL: Grants = &[
             "vertex:allow-take-open-requests",
             "vertex:allow-quit-app",
             "vertex:allow-update-token-get",
-            "vertex:allow-http-fetch",
-            "vertex:allow-secret-get",
-            "vertex:allow-secret-set",
-            "vertex:allow-secret-delete",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
         ],
@@ -181,11 +217,9 @@ const KERNEL: Grants = &[
             "vertex:allow-trash-item",
             "vertex:allow-trash-restore",
             "vertex:allow-update-token-get",
+            // The chat built-in's web fetch tool (`webPage.ts`); X8 moves it to chat's manifest as `network`.
             "vertex:allow-http-fetch",
             "vertex:allow-search-notes",
-            "vertex:allow-secret-get",
-            "vertex:allow-secret-set",
-            "vertex:allow-secret-delete",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
         ],
@@ -205,16 +239,14 @@ const KERNEL: Grants = &[
             "vertex:allow-workspace-settings-get",
             "vertex:allow-workspace-settings-update",
             "vertex:allow-quit-app",
+            "vertex:allow-restart-app",
+            "vertex:allow-plugins-waiting-restart",
             "vertex:allow-read-text-files-batch",
             "vertex:allow-scan-directory-recursive",
             "vertex:allow-update-token-get",
             "vertex:allow-update-token-set",
             "vertex:allow-update-channels",
             "vertex:allow-system-fonts",
-            "vertex:allow-http-fetch",
-            "vertex:allow-secret-get",
-            "vertex:allow-secret-set",
-            "vertex:allow-secret-delete",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
         ],
@@ -232,45 +264,211 @@ const KERNEL: Grants = &[
     ),
 ];
 
-/// The capability of the window `label`, of kind `kind`: the shared and file grants, and the kernel's and each of
-/// `crates`' commands for `kind`. Tauri panics on an identifier it doesn't know, so the app crate's test resolves every
-/// kind against the real ACL.
-pub fn capability(label: &str, kind: WindowKind, crates: &[Grants]) -> CapabilityBuilder {
-    let mut capability = CapabilityBuilder::new(format!("window-{label}")).window(label);
-    for permission in SHARED {
-        capability = capability.permission(*permission);
+/// Whether plugin `manifest` is on in a window of `kind`: the global `plugins.enabled`, and in a workspace's window
+/// (`workspace`: its `.vertex/settings.json`, whether its folder is trusted) that file's, which may turn a plugin off
+/// and, only when trusted, on (`applicableOverrides`). Else the manifest's default.
+pub fn plugin_on(manifest: &PluginManifest, kind: WindowKind, global: &Value, workspace: Option<(&Value, bool)>) -> bool {
+    if !manifest.windows.contains(&kind) {
+        return false;
     }
-    for (permission, paths) in SCOPED {
-        let allow = paths.iter().map(|path| serde_json::json!({ "path": path })).collect();
-        capability = capability.permission_scoped(*permission, allow, Vec::new());
-    }
-    let commands = std::iter::once(&KERNEL).chain(crates).flat_map(|grants| grants.iter());
-    for (_, permissions) in commands.filter(|(k, _)| *k == kind) {
-        for permission in *permissions {
-            capability = capability.permission(*permission);
+    let pointer = format!("/plugins/enabled/{}", manifest.id);
+    if let Some((local, trusted)) = workspace {
+        match local.pointer(&pointer).and_then(Value::as_bool) {
+            Some(false) => return false,
+            Some(true) if trusted => return true,
+            _ => {}
         }
     }
-    capability
+    global.pointer(&pointer).and_then(Value::as_bool).unwrap_or(manifest.enabled_by_default)
 }
 
-/// The core crates' grants, and the labels granted so far.
+/// The plugins on in a window: those of `catalog` [`plugin_on`] says are, and every crate's plugin without a manifest
+/// (a built-in, not extracted yet, so always on).
+pub fn plugins_on(kind: WindowKind, catalog: &[PluginManifest], crates: &[(&str, Grants)], global: &Value, workspace: Option<(&Value, bool)>) -> BTreeSet<String> {
+    let builtins = crates.iter().map(|(id, _)| *id).filter(|id| !catalog.iter().any(|m| m.id == *id));
+    catalog
+        .iter()
+        .filter(|m| plugin_on(m, kind, global, workspace))
+        .map(|m| m.id.as_str())
+        .chain(builtins)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// What a window's grants are made of: its kind's base (when `base`), and one capability per plugin in `plugins` with
+/// anything to grant. Tauri panics on an identifier it doesn't know, so the app crate's test resolves these against the
+/// real ACL; a permission name outside the table is an error here.
+pub fn capabilities<'a>(
+    label: &str,
+    kind: WindowKind,
+    base: bool,
+    plugins: impl IntoIterator<Item = &'a str>,
+    catalog: &[PluginManifest],
+    crates: &[(&str, Grants)],
+) -> Result<Vec<CapabilityBuilder>, String> {
+    let mut out = Vec::new();
+    if base {
+        let mut capability = CapabilityBuilder::new(format!("window-{label}")).window(label);
+        for permission in SHARED {
+            capability = capability.permission(*permission);
+        }
+        for (permission, paths) in SCOPED {
+            let allow = paths.iter().map(|path| serde_json::json!({ "path": path })).collect();
+            capability = capability.permission_scoped(*permission, allow, Vec::new());
+        }
+        for (_, permissions) in KERNEL.iter().filter(|(k, _)| *k == kind) {
+            for permission in *permissions {
+                capability = capability.permission(*permission);
+            }
+        }
+        out.push(capability);
+    }
+    for plugin in plugins {
+        let mut permissions = Vec::new();
+        for name in catalog.iter().filter(|m| m.id == plugin).flat_map(|m| &m.permissions) {
+            let granted = PERMISSION_TABLE.get(name).ok_or_else(|| format!("plugin {plugin:?} asks for an unknown permission {name:?}"))?;
+            permissions.extend(granted.iter().cloned());
+        }
+        for (_, commands) in crates.iter().filter(|(id, _)| *id == plugin).flat_map(|(_, grants)| grants.iter()).filter(|(k, _)| *k == kind) {
+            permissions.extend(commands.iter().map(|c| c.to_string()));
+        }
+        if permissions.is_empty() {
+            continue;
+        }
+        let capability = permissions.into_iter().fold(CapabilityBuilder::new(format!("window-{label}-plugin-{plugin}")).window(label), |c, p| c.permission(p));
+        out.push(capability);
+    }
+    Ok(out)
+}
+
+/// The core plugins' manifests, the core crates' grants, and what each label was granted.
 #[derive(Default)]
 pub(crate) struct WindowGrants {
-    crates: Mutex<Vec<Grants>>,
-    granted: Mutex<HashSet<String>>,
+    catalog: Mutex<Vec<PluginManifest>>,
+    crates: Mutex<Vec<(&'static str, Grants)>>,
+    /// Label → the plugins granted to it. A label is here once its base is granted.
+    granted: Mutex<HashMap<String, BTreeSet<String>>>,
 }
 
-pub(crate) fn register<R: Runtime>(app: &AppHandle<R>, grants: Grants) {
-    app.state::<WindowGrants>().crates.lock().unwrap_or_else(PoisonError::into_inner).push(grants);
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Adds `label`'s capability, before its window is built; once per label.
+pub(crate) fn register<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, grants: Grants) {
+    lock(&app.state::<WindowGrants>().crates).push((plugin, grants));
+}
+
+pub(crate) fn set_catalog<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
+    let catalog = manifests.iter().map(|json| PluginManifest::parse(json)).collect::<Result<Vec<_>, _>>()?;
+    *lock(&app.state::<WindowGrants>().catalog) = catalog;
+    Ok(())
+}
+
+/// The plugins on in the window `label` now, from what Rust owns: the settings, a workspace window's
+/// `.vertex/settings.json` and whether its folder is trusted.
+fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog: &[PluginManifest], crates: &[(&str, Grants)]) -> BTreeSet<String> {
+    let state = app.state::<AppState>();
+    let global = state.read_settings(app, Value::clone);
+    let root = label.strip_prefix(SESSION_WINDOW_PREFIX).and_then(|uuid| state.workspace_of(app, uuid));
+    let workspace = root.map(|root| (crate::state::workspace_settings(&root), state.folder_trusted(app, &root)));
+    plugins_on(kind, catalog, crates, &global, workspace.as_ref().map(|(local, trusted)| (local, *trusted)))
+}
+
+/// Adds what the window `label` isn't granted yet: its base, before it's first built, and the plugins on for it.
 pub(crate) fn grant_window<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<(), String> {
     let kind = WindowKind::of(label).ok_or_else(|| format!("no grant for a window labelled {label:?}"))?;
     let state = app.state::<WindowGrants>();
-    if !state.granted.lock().unwrap_or_else(PoisonError::into_inner).insert(label.to_owned()) {
-        return Ok(());
+    let catalog = lock(&state.catalog);
+    let crates = lock(&state.crates);
+    // Held throughout, so two callers can't add the same grant twice.
+    let mut granted = lock(&state.granted);
+    let base = !granted.contains_key(label);
+    let on = on_for(app, label, kind, &catalog, &crates);
+    let had = granted.entry(label.to_owned()).or_default();
+    let new: Vec<&str> = on.iter().filter(|id| !had.contains(*id)).map(String::as_str).collect();
+    for capability in capabilities(label, kind, base, new.iter().copied(), &catalog, &crates)? {
+        app.add_capability(capability).map_err(|e| e.to_string())?;
     }
-    let crates = state.crates.lock().unwrap_or_else(PoisonError::into_inner).clone();
-    app.add_capability(capability(label, kind, &crates)).map_err(|e| e.to_string())
+    had.extend(new.into_iter().map(str::to_owned));
+    Ok(())
+}
+
+/// After a change to what's on (the settings, a workspace's, trust): grants every open window the plugins newly on for
+/// it, before the windows hear of the change.
+pub(crate) fn regrant<R: Runtime>(app: &AppHandle<R>) {
+    for label in app.webview_windows().into_keys() {
+        if let Err(e) = grant_window(app, &label) {
+            eprintln!("[grants] {label}: {e}");
+        }
+    }
+}
+
+/// The plugins some window was granted but which are off for it now: on until the app restarts.
+#[tauri::command]
+pub(crate) fn plugins_waiting_restart<R: Runtime>(app: AppHandle<R>) -> Vec<String> {
+    let state = app.state::<WindowGrants>();
+    let (catalog, crates) = (lock(&state.catalog), lock(&state.crates));
+    let granted = lock(&state.granted).clone();
+    let mut waiting = BTreeSet::new();
+    for (label, had) in granted {
+        let Some(kind) = WindowKind::of(&label) else { continue };
+        let on = on_for(&app, &label, kind, &catalog, &crates);
+        waiting.extend(had.into_iter().filter(|id| !on.contains(id)));
+    }
+    waiting.into_iter().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn manifest(json: Value) -> PluginManifest {
+        PluginManifest::parse(&json.to_string()).unwrap()
+    }
+
+    #[test]
+    fn a_plugin_is_on_by_its_settings_and_only_in_its_windows() {
+        let graph = manifest(json!({"id": "graph", "name": "Graph", "version": "1", "apiVersion": 1}));
+        let off_by_default = manifest(json!({"id": "quiet", "windows": ["main", "session"], "enabledByDefault": false}));
+        let none = json!({});
+        assert!(plugin_on(&graph, WindowKind::Session, &none, None));
+        assert!(!plugin_on(&graph, WindowKind::Main, &none, None));
+        assert!(!plugin_on(&off_by_default, WindowKind::Main, &none, None));
+        assert!(plugin_on(&off_by_default, WindowKind::Main, &json!({"plugins": {"enabled": {"quiet": true}}}), None));
+        assert!(!plugin_on(&graph, WindowKind::Session, &json!({"plugins": {"enabled": {"graph": false}}}), None));
+    }
+
+    #[test]
+    fn a_workspace_turns_a_plugin_off_always_and_on_only_when_trusted() {
+        let graph = manifest(json!({"id": "graph"}));
+        let global_off = json!({"plugins": {"enabled": {"graph": false}}});
+        let local_on = json!({"plugins": {"enabled": {"graph": true}}});
+        let local_off = json!({"plugins": {"enabled": {"graph": false}}});
+        assert!(!plugin_on(&graph, WindowKind::Session, &json!({}), Some((&local_off, false))));
+        assert!(!plugin_on(&graph, WindowKind::Session, &global_off, Some((&local_on, false))));
+        assert!(plugin_on(&graph, WindowKind::Session, &global_off, Some((&local_on, true))));
+        assert!(!plugin_on(&graph, WindowKind::Session, &json!({}), Some((&local_off, true))));
+    }
+
+    #[test]
+    fn a_plugins_grant_is_its_permissions_and_its_crates_commands() {
+        const GIT: Grants = &[(WindowKind::Session, &["vertex-git:allow-git-status"]), (WindowKind::Main, &["vertex-git:allow-git-clone"])];
+        let crates: &[(&str, Grants)] = &[("git", GIT)];
+        let catalog = [manifest(json!({"id": "fetcher", "windows": ["main"], "permissions": ["network", "secrets"]}))];
+        let on = plugins_on(WindowKind::Main, &catalog, crates, &json!({}), None);
+        assert_eq!(on, BTreeSet::from(["fetcher".to_owned(), "git".to_owned()]), "git has no manifest: a built-in, always on");
+        assert_eq!(capabilities("main", WindowKind::Main, false, on.iter().map(String::as_str), &catalog, crates).unwrap().len(), 2);
+
+        let unknown = [manifest(json!({"id": "odd", "permissions": ["camera"]}))];
+        let Err(error) = capabilities("session-a", WindowKind::Session, false, ["odd"], &unknown, &[]) else { panic!("an unknown permission was granted") };
+        assert!(error.contains("camera"), "{error}");
+        assert!(capabilities("session-a", WindowKind::Session, false, ["plain"], &[manifest(json!({"id": "plain"}))], &[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_table_names_what_manifests_may_ask_for() {
+        let names: Vec<&str> = PERMISSION_TABLE.keys().map(String::as_str).collect();
+        assert_eq!(names, ["files-outside-workspace", "network", "secrets"]);
+    }
 }

@@ -30,7 +30,6 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
         },
     }))
     const onFailed = vi.fn()
-    const reload = vi.fn()
     const host = createPluginHost(entries, {
         window: {kind: 'session', label: 'session-s1'},
         config: () => ({value: {}, set: async () => {}, overridden: () => false}),
@@ -42,9 +41,8 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
             return () => commands.delete(key)
         },
         onFailed,
-        reload,
     })
-    return {host, log, commands, loaded, onFailed, reload}
+    return {host, log, commands, loaded, onFailed}
 }
 
 const allOn = () => true
@@ -134,12 +132,11 @@ describe('createPluginHost', () => {
 
     it('runs the callbacks of a plugin turned on during a session right away', async () => {
         const sessions: string[] = []
-        const {host, reload} = setup({late: {setup: ctx => ctx.onSession(({session}) => { sessions.push(session.uuid) })}})
+        const {host} = setup({late: {setup: ctx => ctx.onSession(({session}) => { sessions.push(session.uuid) })}})
         await host.apply(() => false)
         host.startSession(SESSION)
         await host.apply(allOn)
         expect(sessions).toEqual(['s1'])
-        expect(reload).not.toHaveBeenCalled()
     })
 
     it('fails a plugin whose onSession callback throws or rejects', async () => {
@@ -154,17 +151,18 @@ describe('createPluginHost', () => {
         expect(host.states.get('async')).toEqual({status: 'failed', error: 'async'})
     })
 
-    it('reloads instead of stopping a running plugin that is turned off', async () => {
-        const {host, reload} = setup({a: {}, b: {}})
+    it('keeps a running plugin that is turned off running until the app restarts', async () => {
+        const {host, log} = setup({a: {}, b: {}})
         await host.apply(allOn)
         await host.apply(m => m.id !== 'b')
-        expect(reload).toHaveBeenCalledOnce()
         expect(host.states.get('b')).toEqual({status: 'active'})
+        await host.apply(allOn)
+        expect(log).toEqual(['a', 'b'])
     })
 
-    it('retries a failed plugin only after it is turned off and on again, without a reload', async () => {
+    it('retries a failed plugin only after it is turned off and on again', async () => {
         let attempts = 0
-        const {host, reload} = setup({flaky: {setup: () => { if (++attempts === 1) throw new Error('first') }}})
+        const {host} = setup({flaky: {setup: () => { if (++attempts === 1) throw new Error('first') }}})
         await host.apply(allOn)
         await host.apply(allOn)
         expect(attempts).toBe(1)
@@ -172,7 +170,6 @@ describe('createPluginHost', () => {
         await host.apply(allOn)
         expect(attempts).toBe(2)
         expect(host.states.get('flaky')).toEqual({status: 'active'})
-        expect(reload).not.toHaveBeenCalled()
     })
 
     it('hands a plugin\'s API to the plugins that use it, now or once it starts', async () => {

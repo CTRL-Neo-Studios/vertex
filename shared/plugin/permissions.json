@@ -1,0 +1,5 @@
+{
+	"network": ["vertex:allow-http-fetch"],
+	"secrets": ["vertex:allow-secret-get", "vertex:allow-secret-set", "vertex:allow-secret-delete"],
+	"files-outside-workspace": []
+}

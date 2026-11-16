@@ -509,6 +509,9 @@ async fn chat_search<R: Runtime>(app: AppHandle<R>, root: String, storage: Stora
     with_store(app, root, storage, move |s| s.search(&query)).await
 }
 
+/// The plugin these commands belong to: its windows get them where it's on.
+pub const PLUGIN: &str = "chat";
+
 /// What each window kind may call here: the chats live in workspace windows only.
 pub const GRANTS: api::Grants = &[(
     api::WindowKind::Session,
@@ -549,7 +552,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(ChatVaults::default());
-            api::grant(app, GRANTS);
+            api::grant(app, PLUGIN, GRANTS);
             Ok(())
         })
         .build()

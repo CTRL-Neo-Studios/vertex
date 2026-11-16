@@ -3,15 +3,20 @@
  * (`modules/core-plugins.ts`) and, later, when a community plugin is installed.
  */
 
+import permissionTable from './permissions.json'
+
 /** The plugin API this build of Vertex implements. A manifest asking for a newer one is refused. */
 export const API_VERSION = 1
 
 export const WINDOW_KINDS = ['main', 'session', 'settings'] as const
 export type WindowKind = typeof WINDOW_KINDS[number]
 
-/** What a plugin says it uses, shown before it's installed or trusted. Disclosure, not a sandbox. */
-export const PLUGIN_PERMISSIONS = ['network', 'secrets', 'files-outside-workspace'] as const
-export type PluginPermission = typeof PLUGIN_PERMISSIONS[number]
+/**
+ * What a plugin may use beyond the window's own grant. Rust grants a window what each name stands for
+ * (`permissions.json`, the kernel's `grants.rs`) while a plugin asking for it is on there.
+ */
+export const PLUGIN_PERMISSIONS = Object.keys(permissionTable) as PluginPermission[]
+export type PluginPermission = keyof typeof permissionTable
 
 /** Who may override a plugin's setting from a workspace's `.vertex/settings.json`. */
 export const OVERRIDE_LEVELS = ['workspace', 'trustedWorkspace'] as const

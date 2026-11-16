@@ -492,7 +492,7 @@
 			"plugins": {
 				"title": "Plugins",
 				"core": "Core plugins",
-				"coreDescription": "Built into Vertex. Turning one off removes what it adds; windows that run it reload.",
+				"coreDescription": "Built into Vertex. Turning one off removes what it adds once Vertex restarts.",
 				"none": "No plugins.",
 				"version": "Version {version}",
 				"needs": "Needs {names}",
@@ -510,6 +510,8 @@
 				},
 				"untrusted": "This workspace turns on plugins that are off in your settings. They run once you trust it.",
 				"waitsForTrust": "Waits for trust",
+				"waitsForRestart": "Turned off, but running until Vertex restarts: {names}.",
+				"restartNow": "Restart now",
 				"settingsWaitForTrust": "Some of this workspace's changes here apply only once you trust it.",
 				"settings": "Settings",
 				"noSettings": "This plugin has no settings.",

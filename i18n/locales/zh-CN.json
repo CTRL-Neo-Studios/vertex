@@ -492,7 +492,7 @@
 			"plugins": {
 				"title": "插件",
 				"core": "核心插件",
-				"coreDescription": "Vertex 自带。关闭后，它添加的内容随之移除，运行它的窗口会重新加载。",
+				"coreDescription": "Vertex 自带。关闭后，它添加的内容会在 Vertex 重启后移除。",
 				"none": "没有插件。",
 				"version": "版本 {version}",
 				"needs": "依赖 {names}",
@@ -510,6 +510,8 @@
 				},
 				"untrusted": "此工作区开启了你在设置中关闭的插件。信任此工作区后它们才会运行。",
 				"waitsForTrust": "等待信任",
+				"waitsForRestart": "已关闭，但在 Vertex 重启前仍在运行：{names}。",
+				"restartNow": "立即重启",
 				"settingsWaitForTrust": "此工作区在这里的部分更改需要信任此工作区后才会生效。",
 				"settings": "设置",
 				"noSettings": "此插件没有设置。",

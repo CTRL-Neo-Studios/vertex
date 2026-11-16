@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugins-waiting-restart"
+description = "Enables the plugins_waiting_restart command without any pre-configured scope."
+commands.allow = ["plugins_waiting_restart"]
+
+[[permission]]
+identifier = "deny-plugins-waiting-restart"
+description = "Denies the plugins_waiting_restart command without any pre-configured scope."
+commands.deny = ["plugins_waiting_restart"]

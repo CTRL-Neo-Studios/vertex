@@ -140,6 +140,32 @@ Denies the http_fetch command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-plugins-waiting-restart`
+
+</td>
+<td>
+
+Enables the plugins_waiting_restart command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-plugins-waiting-restart`
+
+</td>
+<td>
+
+Denies the plugins_waiting_restart command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-quit-app`
 
 </td>
@@ -185,6 +211,32 @@ Enables the read_text_files_batch command without any pre-configured scope.
 <td>
 
 Denies the read_text_files_batch command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:allow-restart-app`
+
+</td>
+<td>
+
+Enables the restart_app command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-restart-app`
+
+</td>
+<td>
+
+Denies the restart_app command without any pre-configured scope.
 
 </td>
 </tr>

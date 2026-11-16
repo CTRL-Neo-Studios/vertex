@@ -153,7 +153,7 @@ As built:
   (Settings, About), 2 and 4 (quit with a workspace and a single file open; both reopened, recovery `both`). 40 Rust
   tests.
 
-### W3: Plugins' permissions
+### W3: Plugins' permissions (done)
 - The permission table (from W2), in the kernel crate, with a test (an unknown name). The manifest's `permissions`
   take its names; validation knows them (the SDK's type in C1).
 - A window's grant adds those of the plugins on for it; a core crate's commands only where its plugin is on.
@@ -164,6 +164,47 @@ As built:
 - Turning a plugin off, globally or in a workspace, asks to restart the app (Restart now / Later); until then it stays
   on. Settings → Plugins says a change waits for a restart. K1's `onBeforePluginReload` flush becomes the restart's.
 - Acceptance (also): turning a plugin off and restarting leaves its commands in no window.
+
+As built:
+- **The table** is `shared/plugin/permissions.json` (name → Tauri permissions: `network` is `http_fetch`, `secrets`
+  the three secret commands, `files-outside-workspace` nothing until W4), one file for both sides: `manifest.ts` takes
+  `PLUGIN_PERMISSIONS` and the `PluginPermission` type from its keys, the kernel reads it at build (`include_str!`). A
+  name outside it is an error when the grant is made (tested).
+- **Which plugins Rust knows:** the core plugins' `plugin.json`s, embedded by the app crate's `build.rs`
+  (`layers/*/plugin.json`; `layers/.gitkeep` keeps the folder, as Cargo reruns a build script on every build while a
+  watched path is missing) and handed over with `api::set_core_plugins`. What it reads of one: `id`, `windows`,
+  `permissions`, `enabledByDefault`. The built-ins have no manifest Rust can read, so a core crate's plugin without a
+  manifest counts as always on, until its X phase gives it one.
+- **On for a window** (`plugin_on`, `plugins_on`; tested): made for its kind; the global `plugins.enabled`, and in a
+  workspace's window its `.vertex/settings.json` (off from any workspace, on only from a trusted one: `folder_trusted`,
+  the frontend's `folderTrustedBy`, tested), else the manifest's default. Rust follows the user's choice, not
+  `requires`: a plugin on whose requirement is off is granted though it doesn't run.
+- **Grants:** a window's base, then one capability per plugin on with anything to grant
+  (`window-<label>-plugin-<id>`): its permissions' Tauri permissions and its crate's commands for the kind (crates
+  register with `api::grant(app, PLUGIN, GRANTS)`; `ai`, `chat`, `git`). `grant_window` adds only what a label lacks.
+  `http_fetch` and the secret commands left the base grants; `http_fetch` stays in the session base for the chat
+  built-in's web fetch, which X8 moves to chat's manifest. Settings got `restart_app` and `plugins_waiting_restart`.
+- **Turned on:** a save of the global settings, a workspace's settings (update or reload) or trust now emits its event
+  only after its lock is released and `regrant` has granted every open window what's newly on for it, so a window
+  hears of a plugin only once it may call its commands.
+- **Turned off:** the host leaves a running plugin running (no window reload: `reload`, `isPluginReload`,
+  `onBeforePluginReload` and the persistence's `flush` export are gone). `plugins_waiting_restart` lists the plugins
+  a label was granted but which are off for it now. Settings → Plugins shows them in an alert with Restart now, rather
+  than a Restart now / Later dialog: the alert stays until the restart, so Later is leaving it.
+- **Restart:** `restart_app` flushes the session windows as `quit_app` does (`flush_windows`, shared), leaves a
+  `restarting` file in the app data and asks Tauri to restart. At launch `api::open_launch_windows` (was `open_main`)
+  opens the start window, and when that file is there, every session window that was open (`reopen`), whatever the
+  recovery setting, as the reload did.
+- **Tests:** the app crate's ACL tests now cover a core crate's commands with its plugin off and on (git), a plugin's
+  `network` and `secrets` in the window kind it runs in, and the base without them; the kernel's cover `plugin_on`, the
+  table, and a capability per plugin. 47 Rust tests; 319 frontend tests (the host's reload test became "keeps a
+  running plugin that is turned off running"); typecheck unchanged.
+- **Checked in a debug build** (the frontend embedded, as a restart under `tauri dev` loads a dev server the CLI stops;
+  two trial layers for the start window, `zz-plain` without permissions and `zz-net` with `network`, off by default;
+  all deleted after): `zz-plain`'s `ctx.http.fetch` refused; `zz-net` turned on: started at once and fetched (200), and
+  the window could call `http_fetch`; turned off: still running, still allowed, Settings → Plugins listed it with
+  Restart now; Restart now: the app came back with the workspace window it had (recovery off), `zz-net` off and
+  `http_fetch` refused again. With git still a built-in, "git off" is the Rust test's, not the app's.
 
 ### W4: Workspace file scope
 - Every access outside the workspace, listed and decided: importing dropped or pasted files, attachments in chat,
@@ -179,4 +220,4 @@ As built:
 
 ## Status
 
-W0, W1 and W2 done. W3 next.
+W0 to W3 done. W4 next.

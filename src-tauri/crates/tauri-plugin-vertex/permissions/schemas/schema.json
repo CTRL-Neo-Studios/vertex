@@ -355,6 +355,18 @@
           "markdownDescription": "Denies the http_fetch command without any pre-configured scope."
         },
         {
+          "description": "Enables the plugins_waiting_restart command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugins-waiting-restart",
+          "markdownDescription": "Enables the plugins_waiting_restart command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugins_waiting_restart command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugins-waiting-restart",
+          "markdownDescription": "Denies the plugins_waiting_restart command without any pre-configured scope."
+        },
+        {
           "description": "Enables the quit_app command without any pre-configured scope.",
           "type": "string",
           "const": "allow-quit-app",
@@ -377,6 +389,18 @@
           "type": "string",
           "const": "deny-read-text-files-batch",
           "markdownDescription": "Denies the read_text_files_batch command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the restart_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-restart-app",
+          "markdownDescription": "Enables the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the restart_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-restart-app",
+          "markdownDescription": "Denies the restart_app command without any pre-configured scope."
         },
         {
           "description": "Enables the scan_directory_recursive command without any pre-configured scope.",
