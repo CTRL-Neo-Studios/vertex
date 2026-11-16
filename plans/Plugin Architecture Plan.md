@@ -46,7 +46,7 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
 |---|---|
 | Tiers | Kernel (always on), core plugins (compiled in, can be turned off, can't be uninstalled), community plugins (loaded at runtime). One contract for both kinds of plugin. |
 | Kernel | Windows, sessions, settings and scopes, trust, updater, theme, i18n host, native menu; the workspace index, link graph, watcher, file operations and their undo history; tabs and the tab switcher; the panel layout; the command registry; the markdown editor host and the plain code viewer; text diff; the plugin host. |
-| Core plugins | `files`, `palette`, `outline`, `backlinks`, `outgoing-links`, `writers-tools`, `mermaid`, `image`, `yaml-form`, `latex`, `canvas`, `bases`, `workflows`, `ai`, `git`, `chat`, `ai-assistant`. |
+| Core plugins | `files`, `palette`, `outline`, `backlinks`, `outgoing-links`, `writers-tools`, `mermaid`, `image`, `yaml-form`, `latex`, `canvas`, `bases`, `bases-map`, `workflows`, `ai`, `git`, `chat`, `ai-assistant`. |
 | Frontend of a plugin | A Nuxt layer, `layers/<id>/`, in this repository. |
 | A plugin's npm dependencies | In its own `layers/<id>/package.json`; the root `package.json` lists `layers/*` as workspaces, so there's one install and one lockfile, and a dependency leaves with its plugin. The root keeps what the kernel uses, all of it declared. Bun's hoisted linker is pinned in `bunfig.toml`: with workspaces Bun otherwise switches to isolated installs. A community plugin bundles its dependencies into `main.js`, except the shared modules (C1). |
 | Rust of a plugin | A Cargo workspace under `src-tauri/`: a kernel crate and one crate per plugin that needs Rust, each a Tauri plugin. The app crate only composes them. |
@@ -515,11 +515,21 @@ What canvas reaches in the kernel and other features today, and what replaces it
 
 Blocked by X2.
 
-- 45 files: viewer, file type, the `![[x.base]]` embed and the ` ```base ` code block, palette commands (`registerBaseCommands` becomes registered commands with `enabled`), `useNoteProperties` over the kernel's frontmatter writer.
+- `bases`, 45 files less the map's: viewer, file type, the `![[x.base]]` embed and the ` ```base ` code block, palette commands (`registerBaseCommands` becomes registered commands with `enabled`), `useNoteProperties` over the kernel's frontmatter writer.
 - `usePropertyTypes` and `usePropertiesOptions` stay kernel: the editor's properties panel uses them without Bases.
+- `bases-map`, a second layer (`requires: ["bases"]`, on by default, so vaults with map views open as they do now): the map layout. In Obsidian the map is a plugin of its own (Maps), which registers a Bases view; here it's the same, and the first plugin built on another plugin's API beyond one component (mermaid's `Diagram`).
+  - It takes `Map.vue`, `basesMap.ts` and its test, the map's strings (the layout's name, its options, its right-click menu) and `maplibre-gl` with its `optimizeDeps` entry.
+  - It declares `network`: the map loads tiles from OpenFreeMap, or from the URLs a view names. This is disclosure only: the webview fetches tiles itself (the app has no CSP), not through `http_fetch`.
+- **Bases' API** (`layers/bases/app/api.ts`, provided with `ctx.provide`): `registerView({type, label, icon, component | mount, options?, embedHeight?(view)})`, removed like any registration.
+  - Bases' own layouts (table, cards, list, kanban) register through it too. The three hand-kept lists (`LAYOUTS` in `Base.vue`, `LAYOUT_ICONS` in the views menu, `LAYOUT_FIELDS` in `ViewOptions.vue`), `Base.vue`'s chain of layout components and its per-layout embed heights become one registry.
+  - A view is drawn through `PluginMount` with what the map reads from `BaseContext` today: the base, the view and its options, the query result, `property(id)`, `commit`, the New item preset and opening New, `thisPath`, `embed`, and the `SessionContext`. The API also gives `Value` (a cell's value drawn as Bases draws it), which the map's popup shows. The types are over the parser's own (`@type32/obsidian-bases-parser`), which a view imports itself.
+  - `options` are the Configure view fields, with the kinds `ViewOptions.vue` has (`slider`, `select`, `switch`, `text`, `property`, `formula`; the map's `tiles` becomes a general list-of-lines kind). Their labels are the registering plugin's keys.
+  - A view whose type nothing registered shows "unknown view type", as now. That is what a map view shows with `bases-map` off, as in Obsidian without Maps; the file is left as it is.
 
 ### Acceptance
-- [ ] The shared acceptance; embeds in notes, callouts and canvas cards still work; the Bases tests pass in the layer.
+- [ ] The shared acceptance, for both; embeds in notes, callouts and canvas cards still work; the Bases tests pass in their layers.
+- [ ] With `bases-map` off, a map view says its type is unknown, the other views work, and `maplibre-gl` isn't fetched. With `bases` off, `bases-map` is off and Settings → Plugins says why.
+- [ ] `bases-map` imports nothing of Bases but its `app/api.ts`.
 
 ## X4: Files and the palette
 
@@ -594,7 +604,7 @@ Blocked by X8.
 - **Package:** a folder with `plugin.json`, `main.js` (one ES module, no relative imports), optional `styles.css` and assets.
 - **Shared modules:** the host puts `vue`, the `@codemirror/*` and `@lezer/*` packages it uses, the editor's root, `/kit` and `/ext` (the facets plugins register through, `nestedExtensions`, `slashItems`, `toolbarItems`, only work as the host's copy), the published UI components and the plugin API on one registry. The preset (K0's spike shows its shape) takes each one's export names from the version the SDK pins, which is the host's for that `apiVersion`; a plugin built against a newer one than the host's would read `undefined`, so a shared module's major version is part of `apiVersion`.
 - **Editor surface:** the editor's plugin surface is unstable until its 1.0, which waits for this plan's use of it. C1 settles the order: editor 1.0 before the SDK is published, so `apiVersion` 1 pins a frozen editor surface.
-- **SDK** (`@type32/vertex-plugin`, built from `shared/plugin/`): the types, `definePlugin`, and a Vite preset that points those imports at the registry and builds `main.js`.
+- **SDK** (`@type32/vertex-plugin`, built from `shared/plugin/`): the types, `definePlugin`, and a Vite preset that points those imports at the registry and builds `main.js`. It also ships the types of the core plugins' APIs (each `layers/<id>/app/api.ts`, which so imports only the contract and packages), so `ctx.use('bases')` is typed for a community plugin as for a core one: a Bases view from a community plugin is what Obsidian's Maps is.
 - **Styles:** the host's CSS holds only the classes the host uses, so a plugin's own Tailwind classes wouldn't exist. The SDK's preset compiles a plugin's utilities into its `styles.css` against the host's theme variables, without the base styles. Plain CSS on the `--ui-*` variables works without it.
 - **One file:** a blob module can't import a sibling file, so `main.js` isn't split; a plugin loads a heavy part later by asking for an asset by path.
 - **Versioning:** `apiVersion` rises only for a breaking change; a plugin whose `apiVersion` or `minAppVersion` the app doesn't meet stays off and says why.
@@ -641,7 +651,7 @@ Blocked by C2.
 Blocked by C3.
 
 ### Change
-- Five sample plugins, each built with the SDK only, in `examples/plugins/`:
+- Six sample plugins, each built with the SDK only, in `examples/plugins/`:
   - a relation graph like Obsidian's, the first one built (`d3-force`, `d3-zoom` and `d3-drag`, bundled into its `main.js`; drawn on a canvas):
     - notes are nodes and links are edges, from `index.links()`; tags, attachments, unresolved links and orphans can be shown or hidden;
     - a global view and a local one that follows the active tab to a set depth, both `tab: true`, opened by commands;
@@ -651,7 +661,8 @@ Blocked by C3.
   - a file browser that can replace Files (a navigator: the kernel's file menu, New items and icons, drags to the editor, chat and Finder, file operations with undo, thumbnails, per-folder data in `ctx.data.workspace`);
   - a code block widget with a slash item and a piece of Markdown syntax drawn in notes, callouts and table cells (a stat block);
   - a new file format (viewer, file type, link extractor);
-  - one with schema settings, a custom settings widget, a workspace-overridable key and a secret.
+  - one with schema settings, a custom settings widget, a workspace-overridable key and a secret;
+  - a Bases view registered through Bases' API (a month calendar by a date property; `requires: ["bases"]`): a community plugin on a core plugin's API.
 - Author docs: the manifest, the contract, each contribution point with an example, the two UI tiers and what each promises, config scopes, data and secrets, what trust means, versioning.
 
 ### Acceptance
