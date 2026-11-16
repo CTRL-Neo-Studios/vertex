@@ -1,7 +1,16 @@
 # Window Permissions Plan
 
-Draft, nothing built. A sub-plan of the Plugin Architecture Plan (K5's capabilities line): what each window may do,
-decided when the window opens from the kernel's rules and the plugins that are on, instead of four hand-kept files.
+A sub-plan of the Plugin Architecture Plan (K5's capabilities line): what each window may do, decided when the window
+opens from the kernel's rules and the plugins that are on, instead of four hand-kept files. Runs after K5 and before X1;
+W0 to W4 are all in scope.
+
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| Scope | W0 to W4: window kinds made real, plugins' permissions true, and each session window held to its workspace's files. |
+| Order | Before the X phases: each X phase writes its plugin's manifest once, with its permissions in this plan's vocabulary. |
+| Turning a plugin off | Tauri can't take a grant back, so turning a plugin off asks to restart the app (replacing K1's window reload). Its grants are gone after the restart. |
 
 ## What was measured (Tauri 2.12.5, the tree after K5)
 
@@ -15,8 +24,14 @@ decided when the window opens from the kernel's rules and the plugins that are o
 - **Tauri can grant at runtime.** `app.add_capability(CapabilityBuilder::new(id).window(label).permission(…)
   .permission_scoped(permission, allow, deny))` (the `dynamic-acl` feature, on by default). The authority is read on every
   call, so a grant added later applies to open windows at once. It only adds: there is no removal.
-- **`fs:scope` is global**, shared by every window. A scope for one window has to be on that window's command
-  permissions (`permission_scoped`).
+- **`fs:scope` is global**, shared by every window: Tauri merges every capability's global scope by plugin, not by
+  window (`ScopeManager::get_global_scope_typed`). A scope for one window has to be on that window's command
+  permissions (`permission_scoped`), and no capability may grant a global `fs:scope` at all.
+- **Dialogs and the fs plugin's own scope are app-wide.** A path is allowed if the fs plugin's runtime scope allows it
+  (its config, plus whatever Rust adds through `fs_scope()`) or the calling window's scopes do. A file or folder picked
+  in a dialog is added to that runtime scope and to the asset protocol's (`tauri-plugin-dialog`'s `open`/`save`), so a
+  pick in one window can be read from every window.
+- **The asset protocol's scope is app-wide** too (`Scopes::asset_protocol`): it can't differ by window.
 - **Static files can't serve community plugins.** Capability files are compiled in. A plugin installed later can only
   use what the shipped files already grant its window, so trimming the static files and loading community plugins pull
   in opposite directions.
@@ -42,32 +57,52 @@ decided when the window opens from the kernel's rules and the plugins that are o
   the kind's base, plus the grants of the plugins on for it. Which plugins are on is read from what Rust owns (the
   settings, the workspace's overrides, trust; manifests compiled in for core plugins, read from disk for community
   ones), never from what a webview says. JavaScript loses the permission to create windows.
-- **A plugin turned on while a window is open:** its grants are added to that window at once. **Turned off:** the
-  window reloads (K1) but Tauri can't take a grant back, so the window keeps it until the app restarts. Stated in
-  Settings → Plugins only if it turns out to matter.
+- **A plugin turned on while a window is open:** its grants are added to that window at once. **Turned off:** the app
+  asks to restart (Decisions); until it does, the plugin stays on in its windows, so nothing runs with grants it
+  shouldn't have and no window is half-updated.
 - **Session windows get their workspace:** file permissions scoped to the window's root (a single-file window: its
   file and that file's folder), plus the app's own folders it needs. Every way a file outside the workspace is reached
   today gets its own answer (below), since each is a place the scope would break.
 
 ## Phases
 
-### W0: Spike
-Throwaway, as K0 was. A window opened from Rust with a runtime capability and no matching static file:
-- reads and writes inside its scoped folder, is refused outside it, and the watcher (`fs:watch`) works under the scope;
-- a file picked in a dialog: whether the dialog plugin widens the scope for it, and for which window;
-- images through the asset protocol with a per-window scope, or what replaces `**` there;
-- a grant added while the window is open applies without a reload;
-- the start window, which `tauri.conf.json` creates before any Rust setup: whether it can stay the one static file.
-- Output: results in this file; the phases below change to fit.
+### W0: Spike (done)
+Throwaway (a module in the app crate, a harness, and the four capability files without their global `fs:scope` for
+the second run; all removed). The start window opened `spike-a` from Rust through an app command after
+`app.add_capability`, with `core:default` and six fs commands each scoped to `/tmp/w0/a`.
+- **Run 1, the static files as they are:** reads and writes in `/tmp/w0/b` and `exists('/etc/hosts')` were allowed:
+  the other windows' global `fs:scope` (`**/*`) reached `spike-a`. This is the leak the measurements predicted.
+- **Run 2, no global `fs:scope` anywhere:** in its folder `spike-a` read, wrote, and watched (one event came). Outside,
+  reads, writes, `exists` and `watch` were refused (`forbidden path`).
+- **A grant added while it was open** (`/tmp/w0/b`, a second capability for the same label) applied at the next call, without a reload.
+- **A custom protocol** (`register_uri_scheme_protocol`) saw the calling window's label (`UriSchemeContext::webview_label`),
+  so files can be served per window by a protocol that checks the window's root.
+- **Refusals:** `spike-a` was refused a kernel command it wasn't granted, and creating a window from JavaScript
+  (`core:default` doesn't include `allow-create-webview-window`).
+- **From the source, not run:** a dialog's pick widens app-wide scopes (above); the start window is created from
+  `tauri.conf.json` before setup, and creating it in setup instead (as `spike-a` was) gives every window the same path.
+
+What it changes:
+- **W1:** the start window is made in Rust's setup too (`create: false` in `tauri.conf.json`), so no window is
+  configured statically and the capability files can all go in W2.
+- **W2:** no capability grants a global `fs:scope`; every fs permission is scoped per command.
+- **W4:** dialogs go through kernel commands that show them in Rust (`tauri_plugin_dialog`'s Rust API, which doesn't
+  touch any scope) and add the pick to the asking window's grant only. Workspace files reach the webview through a
+  kernel protocol that checks the asking window's root, replacing the asset protocol's `**` (whose scope is then
+  empty).
+- A label keeps its grants after its window closes (they can't be removed). A session window's label comes from its
+  session's uuid, which never changes root, so a reopened window gets the same grant again.
 
 ### W1: Rust opens windows
 - A kernel command per window kind replaces `new WebviewWindow` (`useAppWebviewWindows.ts`); labels are made in Rust.
+- The start window too: created in setup, not by `tauri.conf.json`.
 - No capability grants window creation to JavaScript.
 - No behaviour change. Closes the label hole by itself.
 
 ### W2: Grants assembled at runtime
 - The base grant per kind and the permission table, in the kernel crate, with tests (a kind's grant; an unknown name).
-- The four capability files go, except what the start window needs before Rust runs (W0 decides).
+- The four capability files go; every grant is added at runtime, before its window is built.
+- No global `fs:scope`: today's file scopes move onto each fs command's permission.
 - Each window's capability is added when it opens: its base only, in this phase, with today's scopes.
 - Acceptance: K5's check again (a command outside a kind's grant is refused) and the SMOKE rows for windows.
 
@@ -78,21 +113,22 @@ Throwaway, as K0 was. A window opened from Rust with a runtime capability and no
   same table.
 - Acceptance: with git off, no window can call `vertex-git`; a trial plugin without `network` is refused `http_fetch`,
   and with it, isn't.
+- Turning a plugin off, globally or in a workspace, asks to restart the app (Restart now / Later); until then it stays
+  on. Settings → Plugins says a change waits for a restart. K1's `onBeforePluginReload` flush becomes the restart's.
+- Acceptance (also): turning a plugin off and restarting leaves its commands in no window.
 
 ### W4: Workspace file scope
 - Every access outside the workspace, listed and decided: importing dropped or pasted files, attachments in chat,
   single-file windows, Open and Save dialogs, cloning into a new folder, reveal in Finder and open with the default app,
   the app's own data. Each becomes a kernel command that checks what it's given, a dialog, or `files-outside-workspace`.
-- Session windows' file permissions scoped to their root; the asset protocol's scope follows W0's finding.
-- Best after X4, where file operations become the kernel's (`SessionContext.files`) and have one owner.
+- Session windows' file permissions scoped to their root (`permission_scoped` per fs command). Dialogs shown from Rust,
+  the pick added to the asking window only. Images and other workspace files the webview loads: a kernel protocol
+  checking the window's root instead of the asset protocol (scope emptied).
+- Ahead of X4, so the outside-the-workspace flows become kernel commands here, in the composables that do them today;
+  X4 moves those composables into the kernel's `SessionContext.files` without changing what they may reach.
 - Acceptance: a session window can't read or write a path outside its workspace except through those flows; the
   File Explorer plan's SMOKE rows pass.
 
-## Open decisions
+## Status
 
-1. **How far:** W1 to W3 make the window kinds real and plugins' permissions true. W4 is the part with the most
-   security value and the most ways to break file handling. In scope, or a later plan?
-2. **When:** W0 to W2 before X1 (the X phases then declare permissions once, in W3's vocabulary), or after the X phases
-   (less to redo if the contract moves, but every manifest is revisited).
-3. **A grant that can't be taken back** until restart, for a plugin turned off: acceptable, or should turning one off
-   ask to restart?
+W0 done (results above). W1 next.

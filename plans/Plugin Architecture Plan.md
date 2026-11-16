@@ -440,7 +440,7 @@ Every extraction is accepted when:
 
 ## X1: Small plugins
 
-Blocked by K4.
+Blocked by K4 and the Window Permissions Plan (W0–W4), so each extraction declares its plugin's permissions once.
 
 - `mermaid` (code block, preview modal), `image` (viewer, embed), `yaml-form` (viewer), `latex` (viewer; `latex2vue.client.ts` becomes part of its activation), `outline` (the TOC view and the line TOC), `backlinks`, `outgoing-links`, `writers-tools` (its view and the word counter).
 - They prove panel views, viewers, code blocks, embeds and status items, with almost no logic to move.
