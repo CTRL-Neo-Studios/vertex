@@ -13,6 +13,10 @@ export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = [
     // X4: the file tree became the files plugin.
     ...['showFoldArrows', 'showFileExtInName', 'showFileExtAsTag', 'showDefaultFileIcons', 'showDefaultFolderIcons', 'allowCustomFileIcons', 'allowCustomFolderIcons']
         .map(key => [`viewConfig.fileTree.${key}`, `plugins.config.files.${key}`] as const),
+    // X5: workflows became a plugin; what file trust remembers is the kernel's trust setting.
+    ...['maxLoopIterations', 'maxStackDepth', 'wallClockTimeoutMs', 'confirmTrash']
+        .map(key => [`workflowConfig.${key}`, `plugins.config.workflows.${key}`] as const),
+    ['workflowConfig.fileTrust', 'trustConfig.fileTrust'],
 ]
 
 /** `raw` with each old path's value at its new one (unless the new one is set), and the old one gone. */

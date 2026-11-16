@@ -18,10 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'workflows': [
-        'app/components/Workflow/', 'app/components/ViewerEditor/WorkflowViewer', 'app/components/Modals/Workflow',
-        'app/components/Settings/Workflows/', 'app/composables/workflows/', 'shared/workflows/',
-    ],
     'ai': [
         'app/composables/ai/useAiConfig', 'app/composables/ai/useAiModels', 'app/utils/aiClient', 'app/utils/aiFetch',
         'app/components/Settings/Ai/', 'shared/utils/ai/', 'shared/utils/aiParams', 'shared/constants/ai', 'shared/types/app/ai',

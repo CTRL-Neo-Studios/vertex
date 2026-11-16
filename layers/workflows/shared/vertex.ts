@@ -1,6 +1,6 @@
-import {defineLanguage, t, tvar, type Language} from '@type32/workflows/core'
+import {defineLanguage, t, tvar, type Language, type LanguageBuilder} from '@type32/workflows/core'
 import {std} from '@type32/workflows/core/std'
-import {toYamlValue} from '#shared/utils/vault'
+import {toYamlValue} from '#shared/plugin/vault'
 
 /** What List folder keeps. */
 export interface ListOptions {
@@ -94,7 +94,7 @@ export interface VertexEffects {
 }
 
 /** A vault entry's value is its vault-relative path. */
-interface VertexValues {
+export interface VertexValues {
     'vertex.Entry': string
     'vertex.File': string
     'vertex.Note': string
@@ -118,7 +118,31 @@ const cancelled = (answer: unknown) => {
     if (answer === undefined) throw new Error('Cancelled')
 }
 
-export const vertexLanguage: Language<VertexEffects> = defineLanguage<VertexEffects, VertexValues>({
+/** Vertex's language before it's built, for what plugins add (`registerNodes`). */
+export type VertexBuilder = LanguageBuilder<VertexEffects, VertexValues>
+/** What a plugin adds to Vertex's language: nodes, categories or types, on its builder. */
+export type VertexExtension = (language: VertexBuilder) => VertexBuilder
+
+/**
+ * Vertex's language with `extensions` added, in order. One that makes the build throw (a duplicate node type, a type
+ * it names that doesn't exist) is left out, so the others still build; `failed` holds those, with the error.
+ */
+export function buildLanguage(extensions: readonly VertexExtension[] = []): { language: Language<VertexEffects>, failed: { extension: VertexExtension, error: unknown }[] } {
+    const failed: { extension: VertexExtension, error: unknown }[] = []
+    let kept: VertexExtension[] = []
+    for (const extension of extensions) {
+        try {
+            [...kept, extension].reduce((b, add) => add(b), vertexBuilder()).build()
+            kept = [...kept, extension]
+        } catch (error) {
+            failed.push({extension, error})
+        }
+    }
+    return {language: kept.reduce((b, add) => add(b), vertexBuilder()).build(), failed}
+}
+
+/** Vertex's own nodes over `std`, a fresh builder each time. */
+export const vertexBuilder = (): VertexBuilder => defineLanguage<VertexEffects, VertexValues>({
     id: 'vertex',
     version: 1,
     include: [std],
@@ -712,4 +736,3 @@ export const vertexLanguage: Language<VertexEffects> = defineLanguage<VertexEffe
             return 'then'
         },
     })
-    .build()

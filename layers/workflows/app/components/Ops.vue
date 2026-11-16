@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type {Op} from "#shared/workflows/effects"
-import {baseNameOf, parentOf} from "#shared/utils/vault"
+import type {Op} from "../../shared/effects"
+import {baseNameOf, parentOf} from "#shared/plugin/vault"
 
 /** A run's changes (or a dry run's planned ones) as a short diff: moves by name, writes by changed lines. */
 const props = defineProps<{ ops: Op[] }>()
@@ -21,15 +21,15 @@ function changedLines(before: string, after: string, max = 4) {
 }
 
 const rows = computed(() => props.ops.map(op => {
-    if (op.kind === 'write') return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.path, detail: '', lines: changedLines(op.before, op.after)}
-    if (op.kind === 'create') return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.path, detail: '', lines: op.text ? changedLines('', op.text) : []}
+    if (op.kind === 'write') return {icon: ICONS[op.why], label: t(`plugins.workflows.workflow.ops.${op.why}`), path: op.path, detail: '', lines: changedLines(op.before, op.after)}
+    if (op.kind === 'create') return {icon: ICONS[op.why], label: t(`plugins.workflows.workflow.ops.${op.why}`), path: op.path, detail: '', lines: op.text ? changedLines('', op.text) : []}
     const detail = op.why === 'rename' ? `→ ${baseNameOf(op.to)}` : op.why === 'move' ? `→ ${parentOf(op.to) || '/'}` : ''
-    return {icon: ICONS[op.why], label: t(`app.editor.ui.workflow.ops.${op.why}`), path: op.from, detail, lines: []}
+    return {icon: ICONS[op.why], label: t(`plugins.workflows.workflow.ops.${op.why}`), path: op.from, detail, lines: []}
 }))
 </script>
 
 <template>
-    <p v-if="!rows.length" class="text-sm text-muted">{{ t('app.editor.ui.workflow.noChanges') }}</p>
+    <p v-if="!rows.length" class="text-sm text-muted">{{ t('plugins.workflows.workflow.noChanges') }}</p>
     <ul v-else class="divide-y divide-default rounded-md border border-default text-xs">
         <li v-for="(row, i) in rows" :key="i" class="flex flex-col gap-1 p-2">
             <div class="flex items-center gap-1.5 min-w-0">

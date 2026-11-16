@@ -7,15 +7,15 @@ const {t} = useI18n()
 
 <template>
     <UModal
-        :title="t('app.editor.ui.workflowTrash.title')"
-        :description="t('app.editor.ui.workflowTrash.description', {name: props.name})"
+        :title="t('plugins.workflows.trash.title')"
+        :description="t('plugins.workflows.trash.description', {name: props.name})"
         :close="{ onClick: () => emit('close', false) }"
         size="sm"
     >
         <template #footer>
             <div class="w-full inline-flex items-center justify-end gap-2">
-                <UButton size="sm" color="neutral" variant="ghost" :label="t('app.editor.ui.workflowTrash.cancel')" @click="emit('close', false)"/>
-                <UButton size="sm" color="error" icon="i-lucide-trash-2" :label="t('app.editor.ui.workflowTrash.confirm')" autofocus @click="emit('close', true)"/>
+                <UButton size="sm" color="neutral" variant="ghost" :label="t('plugins.workflows.trash.cancel')" @click="emit('close', false)"/>
+                <UButton size="sm" color="error" icon="i-lucide-trash-2" :label="t('plugins.workflows.trash.confirm')" autofocus @click="emit('close', true)"/>
             </div>
         </template>
     </UModal>

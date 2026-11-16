@@ -1,0 +1,48 @@
+{
+  "id": "workflows",
+  "name": "Workflows",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": [
+    "session",
+    "settings"
+  ],
+  "config": {
+    "schema": [
+      {
+        "key": "maxLoopIterations",
+        "type": "number",
+        "default": 100000,
+        "min": 1,
+        "step": 1,
+        "label": "plugins.workflows.settings.maxLoopIterations",
+        "description": "plugins.workflows.settings.maxLoopIterationsDescription"
+      },
+      {
+        "key": "maxStackDepth",
+        "type": "number",
+        "default": 64,
+        "min": 1,
+        "step": 1,
+        "label": "plugins.workflows.settings.maxStackDepth",
+        "description": "plugins.workflows.settings.maxStackDepthDescription"
+      },
+      {
+        "key": "wallClockTimeoutMs",
+        "type": "number",
+        "default": 30000,
+        "min": 0,
+        "step": 1,
+        "label": "plugins.workflows.settings.wallClockTimeoutMs",
+        "description": "plugins.workflows.settings.wallClockTimeoutMsDescription"
+      },
+      {
+        "key": "confirmTrash",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.workflows.settings.confirmTrash",
+        "description": "plugins.workflows.settings.confirmTrashDescription"
+      }
+    ]
+  }
+}

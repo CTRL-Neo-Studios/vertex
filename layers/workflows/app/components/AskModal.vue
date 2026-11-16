@@ -57,12 +57,12 @@ function submit() {
         </template>
         <template #footer>
             <div class="w-full inline-flex items-center justify-end gap-2">
-                <UButton size="sm" color="neutral" variant="ghost" :label="t('app.editor.ui.workflowAsk.cancel')" @click="emit('close')"/>
+                <UButton size="sm" color="neutral" variant="ghost" :label="t('plugins.workflows.ask.cancel')" @click="emit('close')"/>
                 <template v-if="props.kind === 'yesNo'">
-                    <UButton size="sm" color="neutral" variant="outline" :label="t('app.editor.ui.workflowAsk.no')" @click="emit('close', false)"/>
-                    <UButton size="sm" :label="t('app.editor.ui.workflowAsk.yes')" autofocus @click="emit('close', true)"/>
+                    <UButton size="sm" color="neutral" variant="outline" :label="t('plugins.workflows.ask.no')" @click="emit('close', false)"/>
+                    <UButton size="sm" :label="t('plugins.workflows.ask.yes')" autofocus @click="emit('close', true)"/>
                 </template>
-                <UButton v-else size="sm" type="submit" form="workflow-ask" :label="t('app.editor.ui.workflowAsk.ok')" :disabled="props.kind === 'choice' && choice === undefined"/>
+                <UButton v-else size="sm" type="submit" form="workflow-ask" :label="t('plugins.workflows.ask.ok')" :disabled="props.kind === 'choice' && choice === undefined"/>
             </div>
         </template>
     </UModal>

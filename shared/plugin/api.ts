@@ -7,6 +7,7 @@ import type {EditorView} from '@codemirror/view'
 import type {Ref} from 'vue'
 import type {ActiveSession} from '#shared/types/active/sessions'
 import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexListener} from '#shared/types/active/workspace'
+import type {Vault} from '#shared/utils/vault'
 import type {PanelViewId} from '#shared/types/app/settings'
 import type {
     CodeBlockDef, EditorActionDef, EditorHost, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
@@ -119,6 +120,11 @@ export interface SessionContext {
         importAttachments(files: File[]): Promise<string[]>
         /** The vault picker: workspace-relative paths, `undefined` when it closes without a choice. */
         pick(options: VaultPickOptions): Promise<string[] | undefined>
+        /**
+         * The workspace as a `Vault` (`shared/plugin/vault.ts`), over workspace-relative paths: what it writes goes
+         * through the index as the app's own edits do. Throws in a single-file window.
+         */
+        vault(): Vault
         /** The icon of a file named `name`: its file type's (`ctx.files.type`), or the folder properties file's; `undefined` for others. */
         iconFor(name: string): string | undefined
         /** The folders a file browser shows open, by uuid: saved with the session, restored with it. */
@@ -240,6 +246,32 @@ export interface HostServices {
         open(options?: DialogOptions & { directory?: boolean }): Promise<string | null>
         save(options?: DialogOptions): Promise<string | null>
     }
+    /**
+     * Trust for programs from a vault (the trusted folders and files, Settings → Trust), so every plugin that runs one
+     * asks the same way. Paths are absolute; `hash` names a program's content (the format's `hash`).
+     */
+    trust: {
+        /**
+         * Whether it may run without asking: its file is trusted, or a covering folder (in content mode, with this
+         * program). A record of another program was changed outside Vertex, and is dropped.
+         */
+        allows(path: string, hash: string): Promise<boolean>
+        trustFile(path: string, hash: string): Promise<void>
+        /** With `nested`, its subfolders too; `pin`: the program running now, which may be ahead of the disk. */
+        trustFolder(path: string, nested: boolean, pin?: { file: string, hash: string }): Promise<void>
+        /** An edit made in Vertex keeps the file's trust with its new program; a new file (`before` undefined) in a trusted folder gets it pinned. */
+        followEdit(path: string, before: string | undefined, after: string): Promise<void>
+        /** Files whose programs a folder's trust pins (in content mode, each as it is when the folder is trusted). */
+        format(def: TrustedFormatDef): () => void
+    }
+}
+
+/** A kind of file holding a program trust pins (`.workflow`). */
+export interface TrustedFormatDef {
+    /** Lowercase, without the dot. */
+    extensions: string[]
+    /** The program's hash; `undefined` for a file that doesn't load, which isn't pinned and asks when it runs. */
+    hash(text: string): Promise<string | undefined>
 }
 
 export interface PluginContext<Config = Record<string, unknown>> extends HostServices {

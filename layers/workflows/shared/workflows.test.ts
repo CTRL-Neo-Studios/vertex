@@ -3,14 +3,17 @@ import {existsSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {dirname, join} from 'node:path'
 import {afterEach, beforeEach, describe, expect, it} from 'vitest'
+import {t} from '@type32/workflows/core'
 import {buildDocument, run} from '@type32/workflows/core/testing'
 import {frontmatterRange, parseFrontmatter} from '@type32/codemirror-rich-obsidian-editor'
-import {getInternalLinks} from '../utils/index/rewriteLinks'
-import {LinkGraph} from '../utils/index/linkGraph'
+import {getInternalLinks} from '#shared/plugin/links'
+import {LinkGraph} from '#shared/utils/index/linkGraph'
 import {overlayVault} from './dryRun'
 import {createVertexEffects, undoOps, type Op} from './effects'
-import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from '#shared/utils/vault'
-import {vertexLanguage, type VertexEffects} from './vertex'
+import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from '#shared/plugin/vault'
+import {buildLanguage, vertexBuilder, type VertexEffects, type VertexExtension} from './vertex'
+
+const vertexLanguage = vertexBuilder().build()
 
 const yaml = obsidianYaml(frontmatterRange)
 
@@ -192,6 +195,32 @@ describe('§10 against a vault on disk', () => {
         const after = await snapshot(root)
         expect(after['Notes/a_archive.md']).toBe('edited by hand')
         expect(after['Notes/b.md']).toBe(files['Notes/b.md'])
+    })
+})
+
+describe('registerNodes', () => {
+    it("runs a plugin's node with Vertex's types and effects, and leaves out one that doesn't build", async () => {
+        const shout: VertexExtension = language => language.node({
+            type: 'trial.shout', version: 1, mode: 'exec', label: 'Tag {note} shout', exec: {out: ['then']},
+            inputs: {note: {type: t('vertex.Note'), required: true}},
+            requires: ['fs'],
+            async run(ctx) {
+                const {note} = await ctx.inputs()
+                await ctx.effects.fs.tag(note, 'shout', true)
+                return 'then'
+            },
+        })
+        const clash: VertexExtension = language => language.node({type: 'vertex.onManual', version: 1, mode: 'event', label: 'Again', exec: {out: ['then']}})
+        const {language, failed} = buildLanguage([clash, shout])
+        expect(failed.map(f => f.extension)).toEqual([clash])
+        const doc = buildDocument(language, {
+            nodes: {go: 'vertex.onManual', q: {type: 'vertex.queryByTag', literals: {tag: 'draft'}}, each: 'std.forEach', act: 'trial.shout'},
+            edges: ['go.then > each.exec', 'q.files > each.list', 'each.body > act.exec', 'each.item > act.note'],
+        })
+        const {effects} = createVertexEffects(vault, {yaml, runId: 'run1', ui: stubUi()})
+        const {result} = await run(language, doc, {event: 'vertex.onManual', effects})
+        expect(result.status).toBe('ok')
+        expect(await readFile(join(root, 'Notes/a.md'), 'utf8')).toContain('shout')
     })
 })
 

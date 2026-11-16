@@ -1,0 +1,9 @@
+{
+  "name": "@vertex-plugins/workflows",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@type32/workflows": "^0.1.3",
+    "@vue-flow/core": "^1.48.2"
+  }
+}

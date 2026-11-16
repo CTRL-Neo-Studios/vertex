@@ -1,4 +1,4 @@
-import {renameTargets, rewriteLinks} from '../utils/index/rewriteLinks'
+import {renameTargets, rewriteLinks} from '#shared/plugin/links'
 import type {VertexEffects} from './vertex'
 import {
     baseNameOf,
@@ -14,7 +14,7 @@ import {
     vaultPath,
     type Vault,
     type YamlTools,
-} from '#shared/utils/vault'
+} from '#shared/plugin/vault'
 
 /** One change a run made (or, in a dry run, would make), in order. Undo applies their inverses backwards. */
 export type Op =

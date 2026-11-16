@@ -20,6 +20,7 @@ const links = computed(() => [
     {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
     {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
     {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
+    {label: t('app.settings.nav.trust'), icon: 'i-lucide-shield-check', to: `${Routes.settings}/trust`},
     // Registered pages, in registration order; one with children is a group, open on its routes.
     ...[...settingsPages.items.values()].map(page => {
         const to = `${Routes.settings}/${page.id}`

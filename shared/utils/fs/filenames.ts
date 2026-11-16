@@ -107,10 +107,6 @@ export function isYamlFile(extension: PossiblyRef<string>) {
     return ['yml', 'yaml'].includes(unref(extension))
 }
 
-export function isWorkflowFile(extension: PossiblyRef<string>) {
-    return ['workflow'].includes(unref(extension))
-}
-
 export function isPdf(extension: PossiblyRef<string>) {
     return ['pdf'].includes(unref(extension))
 }

@@ -658,9 +658,37 @@ Blocked by X4.
 - `ctx.trust`: what the plugin needs from the kernel's `useTrust` (K4) becomes the contract: the records, file and folder trust, and `registerTrustedFormat` (the programs a folder's trust pins, which the workflows builtin registers from K4), so any plugin that runs a vault's code asks the same way.
 - API (`app/api.ts`): `run(path, options)`, `dryRun`, and `registerNodes` for other plugins' nodes.
 
+### Decisions
+
+- **Trust gets its own kernel page** (the user's choice): Settings → Trust (`pages/settings/trust.vue`), always there. It holds the trusted folders and files list (Add folder, Add file, Revoke, Revoke all) and "What file trust remembers", which moves from `workflowConfig.fileTrust` to the kernel's `trustConfig.fileTrust`. Folder trust is more than workflows now (a workspace's CSS, plugins it turns on, AI and git overrides). The Workflows plugin keeps only its limits and "Ask before trashing", drawn from its manifest's schema, global only as before.
+- **`ctx.trust`** is what a plugin running a vault's code needs, with the rules in the kernel (`useTrust`):
+  - `allows(path, hash)`: the file or a covering folder trusts this program (in content mode, with this hash); a record holding another program is dropped first (changed outside Vertex);
+  - `trustFile(path, hash)` and `trustFolder(path, nested, pin?)` (`pin`: the program running now, which may be ahead of the disk);
+  - `followEdit(path, before, after)`: an edit made in Vertex carries the trust from the old program to the new one, and a new file's first program in a trusted folder is pinned;
+  - `format({extensions, hash(text)})`: the programs a folder's trust pins (was `registerTrustedFormat`, which only matched by a function). Settings → Trust's Add file offers the registered extensions and hashes with the format; without one (Workflows off) it's not offered.
+- **The vault:** `session.files.vault()` is the workspace as a `Vault` (`useWorkspaceVault`, kernel, as bases and chat use it); `shared/plugin/vault.ts` re-exports `shared/utils/vault.ts` (types and helpers), and `shared/plugin/links.ts` adds `renameTargets`.
+- **`registerNodes(add)`** takes a function that adds to Vertex's `LanguageBuilder` (`.node()`, `.category()`, `.type()`), typed with Vertex's effects and value types. A plugin's own `Language` can't merge in: one that names `vertex.Note` must include Vertex's, and merging that again duplicates its types (tried against `@type32/workflows`). The workflows plugin builds the language from its own definitions plus each registered function; one that makes the build throw is left out and logged. Documents stay `vertex` v1; a node whose plugin is off is an unknown node, as an invalid document is now.
+- **API** (`app/api.ts`): `run(path, {note?})` (asks for trust, reports in a toast with Undo; `undefined` when declined), `dryRun(path, {note?})`, both on the window's session, throwing a plain `Error` with the first diagnostic for an invalid or uncompilable workflow; and `registerNodes`. Chat's `runWorkflow` tool goes through it (`chatUses('workflows')`; chat's manifest gains `workflows?`), so chat imports nothing of workflows; with Workflows off the tool says it can't run.
+- **Published UI:** `VaultPicker` (the Entry, File, Note and Folder inputs' picker).
+- **The canvas's classes:** `@type32/workflows` is scanned by `main.css`'s `@source`, as now: Nuxt UI generates the `@source` list from the layers' `app/` folders only, with no hook for a package. The path stays right while bun hoists the layer's dependency.
+- **Moves:** the `.workflow` file type, viewer, `Workflow/*`, the three modals, runner, manifest and `shared/workflows/*` (as `layers/workflows/shared/`, with its test) go to `layers/workflows/`; `isWorkflowFile` goes (chat and the viewers test check the extension). Strings to `plugins.workflows.*`; Settings → Trust's to `app.settings.trust.*`.
+
 ### Acceptance
-- [ ] The shared acceptance; SMOKE rows 25–36 pass.
-- [ ] A trial plugin adds a node through `registerNodes` and it runs.
+- [ ] The shared acceptance; SMOKE rows 25–36 pass. (In `tauri dev`, separate app identifier, a temporary harness and a fixture vault, deleted after. On: the `.workflow` icon; Run and Dry run in a workflow's row menu, Run workflow on this note in a note's; the palette's Run workflow group; a `.workflow` tab draws the canvas, styled; a real run asks for trust, and the trusted file is listed on Settings → Trust. Settings written before the move: `workflowConfig.fileTrust: path` shows as Paths only on Settings → Trust, `workflowConfig.maxStackDepth: 10` on the Workflows plugin's page. Off: a `.workflow` opens as JSON in the code editor, no file type, no plugin code fetched. Not run by hand: rows 25–36 themselves (building workflows on the canvas, undo, trash, ⌘ shortcuts, groups and blocks, pause and step, Ask, `trust.json` recovery, chat's `runWorkflow` with a model).)
+- [x] A trial plugin adds a node through `registerNodes` and it runs. (A temporary `layers/zz-trial/` requiring `workflows`: its node, using `vertex.Note` and the `fs` effects, dry-runs (one tag write, nothing on disk), runs for real after the trust prompt and tags the note; with Workflows off the trial plugin is off too (`requirementOff`). Also a unit test: `buildLanguage` with a plugin's node that runs, and one that doesn't build left out.)
+
+### As built
+
+- **Layer** (`layers/workflows/`): `plugin.json` (four schema fields, global only; windows `session` and `settings`, so the trust format is registered where Settings → Trust adds files); `package.json` (`@type32/workflows`, `@vue-flow/core`, its peer; both left the root); `nuxt.config.ts` (prefix `Workflow`, the canvas's stylesheet and `build.transpile`, from the root config); `app/plugin.ts` (file type, viewer, `ctx.trust.format`, the file menu and palette group in `onSession`, `ctx.provide`); `app/api.ts`; `app/lib/` (`useWorkflowRunner` over `SessionContext` and `ctx.trust`, with `runPath` for the API and `runFile` for menus; `language.ts`, the registry; `useWorkflowManifest`; `notify.ts`); `app/components/` (`Viewer`, the three modals, `Ops`, `PathWidget`, `DataWidget`); `shared/` (`vertex.ts` with `vertexBuilder()` and `buildLanguage`, `effects`, `dryRun`, `localize`, the test).
+- **Kernel:**
+  - `useTrust` holds the rules the runner had (`allows`, `followEdit`, `trustFolder` with `pin`) and the registered formats (`TrustedFormatDef`, by extension); `hostServices` builds `ctx.trust` from the window's `useTrust`.
+  - `pages/settings/trust.vue` (was the trust half of `WorkflowsSettings.vue`); `trust` joins the kernel's page ids and the nav.
+  - `session.files.vault()`; `shared/plugin/vault.ts` replaces `shared/plugin/frontmatter.ts` (bases imports it); `renameTargets` public; `VaultPicker` published.
+  - The note editor's Cut/Copy/Paste/Select all borrowed the workflow canvas's strings; they're `app.editor.ui.noteMenu.*` now.
+  - Chat's `runWorkflow` goes through `chatUses('workflows')`; chat no longer imports `@type32/workflows`.
+- **Settings:** five `LEGACY_PATHS` rows (four to `plugins.config.workflows`, `fileTrust` to `trustConfig`); `AppSettings.workflowConfig` is gone, `trustConfig` is new; the defaults and scopes tests follow.
+- **Boundaries:** `RESIDENTS` loses `workflows`; `EXCEPTIONS` stays empty.
+- **Numbers:** 379 tests (43 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X6: AI
 

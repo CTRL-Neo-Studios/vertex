@@ -4,6 +4,7 @@ import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useFileActions} from "~/composables/active/useFileActions";
+import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault";
 import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
 import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -44,6 +45,7 @@ const $tabs = useActiveTabs(activeSesh)
 const $tools = useActiveWorkspaceTools(activeSesh)
 const propertyTypes = usePropertyTypes(activeSesh)
 const $files = activeSesh ? useFileActions(activeSesh) : undefined
+const vault = isWorkspace && activeSesh?.rootPath ? useWorkspaceVault(activeSesh) : undefined
 const openFolders = useState<string[]>(StateKey.expandedFolders($sessionId.value), () => [])
 const vaultPicker = useOverlay().create(VaultPickModal)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
@@ -101,6 +103,10 @@ function sessionContext(session: ActiveSession): SessionContext {
             redo: () => $tools.redo(),
             importAttachments: async files => (isWorkspace ? $tools.importAttachments(files.map(fromFile)) : []),
             pick: async options => (isWorkspace ? vaultPicker.open({...options, sessionId: session.uuid}).result : undefined),
+            vault() {
+                if (!vault) throw new Error('A single-file window has no workspace')
+                return vault
+            },
             iconFor: name => $files!.iconFor(name),
             openFolders,
             menuFor: (uuids, options) => $files!.menuFor(uuids, options),

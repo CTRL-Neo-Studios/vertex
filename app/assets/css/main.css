@@ -2,7 +2,8 @@
 /*@import url('https://fonts.cdnfonts.com/css/sf-pro-display');*/
 @import 'tailwindcss';
 @import '@nuxt/ui';
-/* The workflow canvas (@type32/workflows/vue) is built from Nuxt UI classes. */
+/* The workflows plugin's canvas (@type32/workflows/vue) is built from Nuxt UI classes. Nuxt UI scans the layers' own
+   `app/` folders but no package, so it's named here; bun hoists the layer's dependency to the root `node_modules`. */
 @source '../../../node_modules/@type32/workflows/dist';
 
 

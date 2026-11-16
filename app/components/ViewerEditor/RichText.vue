@@ -131,16 +131,16 @@ async function paste(view: EditorView) {
 
 const menuItems = computed<ContextMenuItem[][]>(() => {
     const none = !selected.value
-    const canvas = 'app.editor.ui.workflowCanvas'
+    const menu = 'app.editor.ui.noteMenu'
     return [
         [
-            {label: t(`${canvas}.cut`), icon: 'i-lucide-scissors', kbds: ['meta', 'x'], disabled: none || readOnly.value, onSelect: act(async view => {
+            {label: t(`${menu}.cut`), icon: 'i-lucide-scissors', kbds: ['meta', 'x'], disabled: none || readOnly.value, onSelect: act(async view => {
                 await writeText(selected.value)
                 view.dispatch({...view.state.replaceSelection(''), userEvent: 'delete.cut'})
             })},
-            {label: t(`${canvas}.copy`), icon: 'i-lucide-copy', kbds: ['meta', 'c'], disabled: none, onSelect: act(() => writeText(selected.value))},
-            {label: t(`${canvas}.paste`), icon: 'i-lucide-clipboard-paste', kbds: ['meta', 'v'], disabled: readOnly.value, onSelect: act(paste)},
-            {label: t(`${canvas}.selectAll`), icon: 'i-lucide-text-select', kbds: ['meta', 'a'], onSelect: act(view => selectAll(view))},
+            {label: t(`${menu}.copy`), icon: 'i-lucide-copy', kbds: ['meta', 'c'], disabled: none, onSelect: act(() => writeText(selected.value))},
+            {label: t(`${menu}.paste`), icon: 'i-lucide-clipboard-paste', kbds: ['meta', 'v'], disabled: readOnly.value, onSelect: act(paste)},
+            {label: t(`${menu}.selectAll`), icon: 'i-lucide-text-select', kbds: ['meta', 'a'], onSelect: act(view => selectAll(view))},
         ],
         ...[...noteMenuItems.items.values()]
             .map(def => def.items({host, selection: selected.value}).map(runAfterClose))

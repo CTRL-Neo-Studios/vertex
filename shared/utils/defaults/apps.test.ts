@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppAiConfig, defaultAppGitConfig, defaultAppPluginsConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppWorkflowConfig } from './apps'
+import { defaultAppAiConfig, defaultAppGitConfig, defaultAppPluginsConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppTrustConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -84,17 +84,10 @@ describe('defaultAppSession', () => {
     })
 })
 
-describe('defaultAppWorkflowConfig', () => {
-    it('replaces invalid limits and keeps a zero timeout (no limit)', () => {
-        const c = defaultAppWorkflowConfig({maxLoopIterations: -1, maxStackDepth: 2.5, wallClockTimeoutMs: 0})
-        expect(c).toMatchObject({maxLoopIterations: 100_000, maxStackDepth: 64, wallClockTimeoutMs: 0, confirmTrash: true})
-    })
-
-    it('drops the old trust records, which moved to trust.json, and defaults file trust to path and content', () => {
-        const c = defaultAppWorkflowConfig({trustedWorkspaces: {'/v': {trustedAt: 'x'}}, fileTrust: 'bogus'} as never)
-        expect(c).not.toHaveProperty('trustedWorkspaces')
-        expect(c.fileTrust).toBe('content')
-        expect(defaultAppWorkflowConfig({fileTrust: 'path'}).fileTrust).toBe('path')
+describe('defaultAppTrustConfig', () => {
+    it('defaults file trust to path and content', () => {
+        expect(defaultAppTrustConfig({fileTrust: 'bogus'} as never).fileTrust).toBe('content')
+        expect(defaultAppTrustConfig({fileTrust: 'path'}).fileTrust).toBe('path')
     })
 })
 

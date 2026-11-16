@@ -1,4 +1,4 @@
-import type {AppFileConfig, AppGitConfig, AppPluginsConfig, AppSettings, AppViewConfig, AppWorkflowConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppFileConfig, AppGitConfig, AppPluginsConfig, AppSettings, AppTrustConfig, AppViewConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AiModelInfo, AiModelProfile, AiProviderProfile, AppAiConfig} from "#shared/types/app/ai";
 import type {ChatMode} from "#shared/types/app/chats";
 import type {AppSession, AppSessionContext, SavedTab} from "#shared/types/app/sessions";
@@ -29,7 +29,7 @@ export function defaultAppSettings(raw?: LegacySettings): AppSettings {
         themeConfig: defaultAppThemeConfig(data?.themeConfig),
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
-        workflowConfig: defaultAppWorkflowConfig(data?.workflowConfig),
+        trustConfig: defaultAppTrustConfig(data?.trustConfig),
         aiConfig: defaultAppAiConfig(data?.aiConfig),
         gitConfig: defaultAppGitConfig(data?.gitConfig),
         fileConfig: defaultAppFileConfig(data?.fileConfig),
@@ -63,9 +63,6 @@ export function defaultAppPluginsConfig(data?: DeepPartial<AppPluginsConfig>): A
         sources: Object.fromEntries(entries(data?.sources).filter((e): e is [string, string] => typeof e[1] === 'string')),
     }
 }
-
-const positiveInt = (value: unknown, fallback: number) =>
-    typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback
 
 type Loose = Record<string, unknown>
 const isLoose = (v: unknown): v is Loose => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -155,14 +152,8 @@ export function defaultAppAiConfig(data?: unknown): AppAiConfig {
     }
 }
 
-export function defaultAppWorkflowConfig(data?: DeepPartial<AppWorkflowConfig>): AppWorkflowConfig {
-    return {
-        maxLoopIterations: positiveInt(data?.maxLoopIterations, 100_000),
-        maxStackDepth: positiveInt(data?.maxStackDepth, 64),
-        wallClockTimeoutMs: data?.wallClockTimeoutMs === 0 ? 0 : positiveInt(data?.wallClockTimeoutMs, 30_000),
-        confirmTrash: data?.confirmTrash ?? true,
-        fileTrust: data?.fileTrust === 'path' ? 'path' : 'content',
-    } satisfies AppWorkflowConfig
+export function defaultAppTrustConfig(data?: DeepPartial<AppTrustConfig>): AppTrustConfig {
+    return {fileTrust: data?.fileTrust === 'path' ? 'path' : 'content'}
 }
 
 export function defaultAppGitConfig(data?: DeepPartial<AppGitConfig>): AppGitConfig {

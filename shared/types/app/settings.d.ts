@@ -12,7 +12,8 @@ export interface AppSettings {
     themeConfig: AppThemeConfig,
     advancedThemeConfig: AppAdvancedThemeConfig,
     viewConfig: AppViewConfig,
-    workflowConfig: AppWorkflowConfig,
+    /** Global only: what trust remembers (the trusted folders and files themselves are in `trust.json`). */
+    trustConfig: AppTrustConfig,
     /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
     aiConfig: AppAiConfig,
     /** Global only: a workspace mustn't choose which program runs as git. */
@@ -74,16 +75,8 @@ export interface AppGitConfig {
 }
 
 /** Trusted folders and files aren't settings: they live in `trust.json` (`shared/utils/trust.ts`). */
-export interface AppWorkflowConfig {
-    /** Step limit per run (`limits.steps`): every node activation counts, so loops can't run forever. */
-    maxLoopIterations: number,
-    /** Call depth limit (`limits.depth`). */
-    maxStackDepth: number,
-    /** Wall-clock limit per run; 0 = none. */
-    wallClockTimeoutMs: number,
-    /** Ask before a run's first move to the vault trash. */
-    confirmTrash: boolean,
-    /** What a trusted file remembers: its path, or its path and program (an edit asks again). */
+export interface AppTrustConfig {
+    /** What a trusted file remembers: its path, or its path and program (an edit outside Vertex asks again). */
     fileTrust: FileTrustMode,
 }
 

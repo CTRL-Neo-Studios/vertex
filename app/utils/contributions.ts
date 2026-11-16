@@ -31,7 +31,7 @@ export const linkExtractors = createRegistry<LinkExtractorDef>('link extractor',
 
 const settingsPageRegistry = createRegistry<SettingsPageDef>('settings page', d => d.id)
 /** The kernel's own settings pages (file routes, which win over a registered page's): their ids are refused. */
-const KERNEL_SETTINGS_PAGES = ['general', 'theme', 'view', 'plugins']
+const KERNEL_SETTINGS_PAGES = ['general', 'theme', 'view', 'trust', 'plugins']
 export const settingsPages = {
     ...settingsPageRegistry,
     register(def: SettingsPageDef) {

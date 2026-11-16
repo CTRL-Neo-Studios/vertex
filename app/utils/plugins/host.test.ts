@@ -14,7 +14,7 @@ const SESSION = {
     commands: {list: () => [], paletteGroups: () => []},
     files: {
         assetUrl: () => '', write: async () => {}, create: async () => undefined, edit: async () => {}, move: async () => {},
-        undo: async () => {}, redo: async () => {}, importAttachments: async () => [], pick: async () => undefined,
+        undo: async () => {}, redo: async () => {}, importAttachments: async () => [], pick: async () => undefined, vault: () => { throw new Error('none') },
         iconFor: () => undefined, openFolders: ref<string[]>([]), menuFor: () => [], newItems: () => [],
         copy: async () => {}, paste: async () => [], remove: async () => {}, importDrop: async () => [],
         drag: {start: () => {}, rows: () => undefined},

@@ -1,9 +1,10 @@
 /**
  * The UI community plugins may import: the Settings building blocks, `ViewerLayout` (a file viewer's header, rename and
  * status bar, with the registered status items), `NoteEditor` (a markdown editor inside something else: a canvas
- * card), `PluginMount` (draws another plugin's contribution, an embed from `session.editor.embedFor`), `openExternal`
- * (a web or mail link in the default app; anything else refused), `useScrollFade` (a scroll area's fading edges, as
- * the panels have), and the Nuxt UI components the app itself uses most,
+ * card), `PluginMount` (draws another plugin's contribution, an embed from `session.editor.embedFor`), `VaultPicker`
+ * (files or folders of the workspace, inline; `session.files.pick` is its dialog), `openExternal` (a web or mail link
+ * in the default app; anything else refused), `useScrollFade` (a scroll area's fading edges, as the panels have), and
+ * the Nuxt UI components the app itself uses most,
  * under the names its templates use. These are Vue components, so a plugin using them follows Vue and Nuxt UI: Nuxt
  * UI's next major can break them. A plugin that needs to outlast that draws its own DOM through `mount`, the stable tier.
  */
@@ -13,6 +14,7 @@ export {default as SettingsScrollLayout} from '~/components/Settings/ScrollLayou
 export {default as ViewerLayout} from '~/components/ViewerEditor/LayoutWrapper.vue'
 export {default as NoteEditor} from '~/components/NoteEditor.vue'
 export {default as PluginMount} from '~/components/PluginMount.vue'
+export {default as VaultPicker} from '~/components/VaultPicker.vue'
 export {openUrlInBrowser as openExternal} from '~/composables/app/useAppOpener'
 export {useScrollFade} from '~/composables/utility/useScrollFade'
 

@@ -1,4 +1,4 @@
-import {parentOf, type LinkRef, type Vault, type VaultEntry, type YamlTools} from '#shared/utils/vault'
+import {parentOf, type LinkRef, type Vault, type VaultEntry, type YamlTools} from '#shared/plugin/vault'
 
 const under = (path: string, root: string) => path === root || path.startsWith(`${root}/`)
 const rebase = (path: string, from: string, to: string) => to + path.slice(from.length)

@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import {CompileError, type TypeTerm} from "@type32/workflows/core"
+import type {TypeTerm} from "@type32/workflows/core"
 import {defaultMessages, useWorkflowEditor, WorkflowWidget, WorkflowWorkbench, type WorkflowMessages} from "@type32/workflows/vue"
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager"
-import type {UndoResult} from "#shared/workflows/effects"
-import {useActiveSessions} from "~/composables/active/useActiveSessions"
-import useQuickToasts from "~/composables/utility/useQuickToasts"
-import {useWorkflowManifest} from "~/composables/workflows/useWorkflowManifest"
-import {newWorkflow, parseWorkflow, useWorkflowRunner, type RunOutcome} from "~/composables/workflows/useWorkflowRunner"
+import type {SessionContext} from "#shared/plugin/api"
+import {ViewerLayout} from "~/plugin/ui"
+import type {UndoResult} from "../../shared/effects"
+import {useNotify} from "../lib/notify"
+import {useWorkflowManifest} from "../lib/useWorkflowManifest"
+import {failureOf, newWorkflow, parseWorkflow, useWorkflowRunner, type RunOutcome} from "../lib/useWorkflowRunner"
 
 /**
  * The `.workflow` editor (workspace mode only). The file is untrusted JSON: it's loaded through `migrate`, and
@@ -19,20 +20,20 @@ const props = withDefaults(defineProps<{
     renaming: boolean,
     filePath?: string,
     sessionId: string,
+    session: SessionContext,
     disabled?: boolean,
 }>(), {filePath: '', disabled: false})
 const emit = defineEmits<{ rename: [oldValue: string, newValue: string] }>()
 
 const {t} = useI18n()
-const $qt = useQuickToasts()
-const session = useActiveSessions().getSession(props.sessionId)!
-const runner = useWorkflowRunner(session)
+const notify = useNotify()
+const runner = useWorkflowRunner(props.session)
 
 const initial = parseWorkflow(content.value)
 const loadProblems = ref(initial.problems)
 
 // The canvas's own strings, translated; a getter, so a locale switch reaches them.
-const wf = (key: string, params: Record<string, unknown> = {}) => t(`app.editor.ui.workflowCanvas.${key}`, params)
+const wf = (key: string, params: Record<string, unknown> = {}) => t(`plugins.workflows.canvas.${key}`, params)
 const messages = (): WorkflowMessages => ({
     ...Object.fromEntries(Object.keys(defaultMessages).map(key => [key, wf(key)])) as unknown as WorkflowMessages,
     cantConnect: reason => wf('cantConnect', {reason}),
@@ -100,12 +101,12 @@ async function act(kind: 'dry' | 'run') {
     try {
         const doc = editor.snapshot()
         const name = fileName.value || 'Workflow'
-        if (kind === 'run' && !await runner.trust(doc, name, props.filePath)) return $qt.info(t('app.editor.ui.workflow.declined'))
+        if (kind === 'run' && !await runner.askTrust(doc, name, props.filePath)) return notify.info(t('plugins.workflows.workflow.declined'))
         const out = await editor.run(live => kind === 'dry' ? runner.dryRun(doc, name, {}, live) : runner.run(doc, name, props.filePath, {}, live))
-        if (!out) return $qt.info(t('app.editor.ui.workflow.declined'))
+        if (!out) return notify.info(t('plugins.workflows.workflow.declined'))
         outcome.value = out
     } catch (error) {
-        $qt.error(t('app.editor.ui.workflow.failed'), error instanceof CompileError ? error.diagnostics[0]?.message : String(error))
+        notify.error(t('plugins.workflows.workflow.failed'), failureOf(error))
     }
 }
 defineShortcuts({meta_enter: () => act('run'), meta_shift_enter: () => act('dry')})
@@ -116,7 +117,7 @@ async function undo() {
         undone.value = await runner.undo()
         editor.trace.value = []
     } catch (error) {
-        $qt.error(t('app.editor.ui.workflow.failed'), String(error))
+        notify.error(t('plugins.workflows.workflow.failed'), String(error))
     } finally {
         busy.value = false
     }
@@ -125,19 +126,19 @@ async function undo() {
 const status = computed(() => {
     const r = outcome.value?.result
     if (!r) return undefined
-    const dry = outcome.value!.dry ? `${t('app.editor.ui.workflow.dryRun')} · ` : ''
-    if (r.status === 'ok') return {color: 'success' as const, icon: 'i-lucide-circle-check', title: dry + t('app.editor.ui.workflow.ok', {steps: r.steps})}
+    const dry = outcome.value!.dry ? `${t('plugins.workflows.workflow.dryRun')} · ` : ''
+    if (r.status === 'ok') return {color: 'success' as const, icon: 'i-lucide-circle-check', title: dry + t('plugins.workflows.workflow.ok', {steps: r.steps})}
     return {
         color: 'error' as const,
         icon: 'i-lucide-octagon-alert',
-        title: dry + (r.status === 'aborted' ? t('app.editor.ui.workflow.aborted') : t('app.editor.ui.workflow.fault', {code: r.fault?.code ?? ''})),
+        title: dry + (r.status === 'aborted' ? t('plugins.workflows.workflow.aborted') : t('plugins.workflows.workflow.fault', {code: r.fault?.code ?? ''})),
         description: r.fault?.message ?? '',
     }
 })
 </script>
 
 <template>
-    <ViewerEditorLayoutWrapper
+    <ViewerLayout
         scrollMode="none"
         v-model:fileName="fileName"
         @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
@@ -154,8 +155,8 @@ const status = computed(() => {
                 color="error"
                 variant="subtle"
                 icon="i-lucide-file-x"
-                :title="t('app.editor.ui.workflow.invalid')"
-                :description="t('app.editor.ui.workflow.invalidDescription')"
+                :title="t('plugins.workflows.workflow.invalid')"
+                :description="t('plugins.workflows.workflow.invalidDescription')"
             />
             <ul class="mt-3 space-y-1 font-mono text-xs text-muted">
                 <li v-for="(d, i) in loadProblems" :key="i"><span class="text-error">{{ d.code }}</span> {{ d.message }}</li>
@@ -187,12 +188,12 @@ const status = computed(() => {
                     <WorkflowWidget v-else v-bind="w"/>
                 </template>
                 <template #toolbar>
-                    <UTooltip :text="errors.length ? t('app.editor.ui.workflow.runDisabled') : undefined" :disabled="!errors.length">
+                    <UTooltip :text="errors.length ? t('plugins.workflows.workflow.runDisabled') : undefined" :disabled="!errors.length">
                         <UButton
                             size="sm"
                             icon="i-lucide-play"
                             class="shadow-sm"
-                            :label="t('app.editor.ui.workflow.run')"
+                            :label="t('plugins.workflows.workflow.run')"
                             :loading="editor.running.value"
                             :disabled="busy || editor.running.value || errors.length > 0"
                             @click="act('run')"
@@ -204,7 +205,7 @@ const status = computed(() => {
                         variant="outline"
                         icon="i-lucide-flask-conical"
                         class="bg-default shadow-sm"
-                        :label="t('app.editor.ui.workflow.dryRun')"
+                        :label="t('plugins.workflows.workflow.dryRun')"
                         :disabled="busy || editor.running.value || errors.length > 0"
                         @click="act('dry')"
                     />
@@ -214,18 +215,18 @@ const status = computed(() => {
                         variant="outline"
                         icon="i-lucide-undo-2"
                         class="bg-default shadow-sm"
-                        :aria-label="t('app.editor.ui.workflow.undo')"
+                        :aria-label="t('plugins.workflows.workflow.undo')"
                         :disabled="busy || editor.running.value || !runner.canUndo.value"
                         @click="undo"
                     />
                 </template>
                 <template #inspector>
                     <section class="border-t border-default p-3">
-                        <h3 class="mb-2 text-xs font-medium text-dimmed">{{ t('app.editor.ui.workflow.lastRun') }}</h3>
-                        <p v-if="!status" class="text-sm text-muted">{{ t('app.editor.ui.workflow.noRun') }}</p>
+                        <h3 class="mb-2 text-xs font-medium text-dimmed">{{ t('plugins.workflows.workflow.lastRun') }}</h3>
+                        <p v-if="!status" class="text-sm text-muted">{{ t('plugins.workflows.workflow.noRun') }}</p>
                         <div v-else class="space-y-2">
                             <UAlert :color="status.color" variant="subtle" :icon="status.icon" :title="status.title" :description="status.description"/>
-                            <h4 class="text-xs text-dimmed">{{ outcome!.dry ? t('app.editor.ui.workflow.wouldChange') : t('app.editor.ui.workflow.changed') }}</h4>
+                            <h4 class="text-xs text-dimmed">{{ outcome!.dry ? t('plugins.workflows.workflow.wouldChange') : t('plugins.workflows.workflow.changed') }}</h4>
                             <WorkflowOps :ops="outcome!.ops"/>
                         </div>
                         <UAlert
@@ -234,12 +235,12 @@ const status = computed(() => {
                             :color="undone.skipped.length ? 'warning' : 'success'"
                             variant="subtle"
                             icon="i-lucide-undo-2"
-                            :title="t('app.editor.ui.workflow.undone', {count: undone.undone})"
-                            :description="undone.skipped.length ? t('app.editor.ui.workflow.undoSkipped', {count: undone.skipped.length, reasons: [...new Set(undone.skipped.map(s => s.reason))].join('; ')}) : ''"
+                            :title="t('plugins.workflows.workflow.undone', {count: undone.undone})"
+                            :description="undone.skipped.length ? t('plugins.workflows.workflow.undoSkipped', {count: undone.skipped.length, reasons: [...new Set(undone.skipped.map(s => s.reason))].join('; ')}) : ''"
                         />
                     </section>
                 </template>
             </WorkflowWorkbench>
         </div>
-    </ViewerEditorLayoutWrapper>
+    </ViewerLayout>
 </template>

@@ -38,7 +38,7 @@ function set(v: unknown) {
         size="xs"
         class="min-w-32 max-w-64"
         :model-value="Array.isArray(props.value) ? props.value as string[] : []"
-        :placeholder="Array.isArray(props.fallback) && props.fallback.length ? props.fallback.join(', ') : t('app.editor.ui.workflowData.addItem')"
+        :placeholder="Array.isArray(props.fallback) && props.fallback.length ? props.fallback.join(', ') : t('plugins.workflows.data.addItem')"
         @update:model-value="set"
     />
     <UPopover v-else>
@@ -47,7 +47,7 @@ function set(v: unknown) {
             color="neutral"
             variant="outline"
             :icon="list ? 'i-lucide-list' : 'i-lucide-braces'"
-            :label="t(list ? 'app.editor.ui.workflowData.list' : 'app.editor.ui.workflowData.dictionary', {count})"
+            :label="t(list ? 'plugins.workflows.data.list' : 'plugins.workflows.data.dictionary', {count})"
             :class="props.value === undefined && 'text-dimmed'"
         />
         <template #content>

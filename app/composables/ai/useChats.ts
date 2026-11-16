@@ -1,14 +1,13 @@
 import {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls} from "ai";
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
-import {CompileError} from "@type32/workflows/core";
 import {vertexInvoke} from "~/utils/vertexInvoke";
 import {readFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {pluginStateKey, sessionScope} from "#shared/constants/app";
-import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile, isWorkflowFile} from "#shared/utils/fs/filenames";
+import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, dataUrl, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
@@ -17,9 +16,8 @@ import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
 import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "~/utils/chatBash";
 import {TRASH_DIR} from "#shared/utils/vault";
-import type {Op} from "#shared/workflows/effects";
 import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault";
-import {parseWorkflow, useWorkflowRunner, type WorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
+import {chatUses} from "~/builtins/chat";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -58,14 +56,13 @@ const loading = new Map<string, Promise<LiveChat>>()
 const live = shallowReactive(new Map<string, LiveChat>())
 /** The last failed save per loaded chat (same keys), cleared by the next successful one. Shown in ChatView. */
 const saveErrors = shallowReactive(new Map<string, string>())
-/** A session's workflow runner, for `runWorkflow` (its modals and toasts are app-wide), made on first use. */
-const runners = new Map<string, WorkflowRunner>()
 
 const parentsOf = (path: string) => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
 const inFolder = (folder: string, path: string) => folder === path || folder.startsWith(`${path}/`)
 
-/** A workflow run's change, in a few words for the model. */
-const opText = (op: Op) => op.kind === 'move' ? `${op.why}: "${op.from}" → "${op.to}"` : `${op.kind === 'create' ? `new ${op.why}` : op.why}: "${op.path}"`
+/** A workflow run's change (the workflows plugin's `Op`), in a few words for the model. */
+const opText = (op: { kind: string, why: string, path?: string, from?: string, to?: string }) =>
+    op.kind === 'move' ? `${op.why}: "${op.from}" → "${op.to}"` : `${op.kind === 'create' ? `new ${op.why}` : op.why}: "${op.path}"`
 
 /** A chat's entry in the session's index, without the rest of `useChats` (which needs a component): its tab's name. */
 export const chatSummaryOf = (session: ActiveSession, id: string): ChatSummary | undefined =>
@@ -334,27 +331,23 @@ export function useChats(session?: ActiveSession) {
         .sort((a, b) => a.path.localeCompare(b.path))
 
     /**
-     * `runWorkflow`: the workflow at `path` (or by name) on `note` (else the open note), through the session's runner:
+     * `runWorkflow`: the workflow at `path` (or by name) on `note` (else the open note), through the workflows plugin:
      * a real run asks for trust when it isn't trusted, and ends in its toast with Undo. Worded for the model.
      */
     async function runWorkflow(path: string, note: string | undefined, dry: boolean): Promise<object> {
+        const workflows = chatUses('workflows')
+        if (!workflows) return {error: 'Workflows are turned off in Settings → Plugins, so they can\'t run.'}
         const name = path.toLowerCase().replace(/\.workflow$/, '')
-        const file = $index.getFilteredFiles(f => !f.isFolder && isWorkflowFile(f.fileExt)).find(f => slashed(f.relativePath) === path
+        const file = $index.getFilteredFiles(f => !f.isFolder && f.fileExt === 'workflow').find(f => slashed(f.relativePath) === path
             || slashed(f.relativePath).toLowerCase().replace(/\.workflow$/, '') === name || fileNameFromPath(f.fileName, true).toLowerCase() === name)
         if (!file) return {error: `There's no workflow at "${path}". List them with findFiles, extension "workflow".`}
         const at = slashed(file.relativePath)
         const open = editTarget()
         const on = note ? findNote(note)?.relativePath ?? note : open && $index.getFileByUuid(open)?.relativePath
-        const label = fileNameFromPath(file.fileName, true)
-        let runner = runners.get(session!.uuid)
-        if (!runner) runners.set(session!.uuid, runner = await nuxtApp.runWithContext(() => useWorkflowRunner(session!)))
         try {
-            const {doc, problems} = parseWorkflow(await (await vaultOf()).read(at))
-            if (!doc) return {error: `"${at}" isn't a valid workflow: ${problems[0]?.message ?? 'unreadable'}`}
-            const context = {note: on && slashed(on)}
-            const outcome = dry ? await runner.dryRun(doc, label, context) : await runner.run(doc, label, at, context)
+            const options = {note: on && slashed(on)}
+            const outcome = dry ? await workflows.dryRun(at, options) : await workflows.run(at, options)
             if (!outcome) return {declined: true, reason: 'The user didn\'t trust the workflow.'}
-            if (!dry) runner.report(label, outcome)
             const {status, steps, fault} = outcome.result
             return {
                 status,
@@ -364,7 +357,7 @@ export function useChats(session?: ActiveSession) {
                 ...(outcome.ops.length > 50 && {more: outcome.ops.length - 50}),
             }
         } catch (e) {
-            return {error: e instanceof CompileError ? e.diagnostics[0]?.message ?? e.message : e instanceof Error ? e.message : String(e)}
+            return {error: `"${at}" can't run: ${e instanceof Error ? e.message : String(e)}`}
         }
     }
 

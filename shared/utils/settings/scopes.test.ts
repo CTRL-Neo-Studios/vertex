@@ -14,12 +14,12 @@ describe('effectiveSettings', () => {
             viewConfig: {editorPanel: {slashMenu: false}},
             language: 'zh-CN',
             updateChannel: 'evil',
-            workflowConfig: {confirmTrash: false},
+            trustConfig: {fileTrust: 'path' as const},
         }
         const s = effectiveSettings(global, local, false, kernel)
         expect(s.themeConfig).toEqual({...global.themeConfig, primaryColor: 'rose'})
         expect(s.viewConfig.editorPanel).toEqual({...global.viewConfig.editorPanel, slashMenu: false})
-        expect([s.language, s.updateChannel, s.workflowConfig.confirmTrash, s.deviceId]).toEqual(['system', 'stable', true, 'd'])
+        expect([s.language, s.updateChannel, s.trustConfig.fileTrust, s.deviceId]).toEqual(['system', 'stable', 'content', 'd'])
     })
 
     it('applies custom CSS only in a trusted workspace', () => {
@@ -67,7 +67,7 @@ describe('overrides', () => {
         expect(['themeConfig', 'themeConfig.primaryColor', 'viewConfig.editorPanel.slashMenu'].map(p => overridableAs(p, kernel)))
             .toEqual(['workspace', 'workspace', 'workspace'])
         expect(overridableAs('advancedThemeConfig.customCss', kernel)).toBe('trustedWorkspace')
-        expect(['advancedThemeConfig', 'language', 'workflowConfig.fileTrust', 'themeConfigX', 'plugins.config.graph.depth'].map(p => overridableAs(p, kernel)))
+        expect(['advancedThemeConfig', 'language', 'trustConfig.fileTrust', 'themeConfigX', 'plugins.config.graph.depth'].map(p => overridableAs(p, kernel)))
             .toEqual([undefined, undefined, undefined, undefined, undefined])
     })
 

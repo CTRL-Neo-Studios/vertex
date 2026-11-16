@@ -27,10 +27,7 @@ export default defineNuxtConfig({
 		]
 	},
 
-    css: ["~/assets/css/main.css", "@type32/workflows/vue/style.css"],
-
-    // The workflow canvas ships compiled SFCs that import Nuxt UI components by path; let Vite process them.
-    build: {transpile: ["@type32/workflows"]},
+    css: ["~/assets/css/main.css"],
 
     compatibilityDate: "2026-10-14",
 
@@ -126,8 +123,6 @@ export default defineNuxtConfig({
                 "linkedom",
                 "defuddle/node",
             ],
-            // Pre-bundling would hide its `@nuxt/ui/components/*.vue` imports from the Vue plugin.
-            // exclude: ["@type32/workflows"]
         },
     },
 });

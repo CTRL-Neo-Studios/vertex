@@ -1,6 +1,6 @@
 import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {SessionContext} from "#shared/plugin/api";
-import {obsidianYaml, setFrontmatterProperty} from "#shared/plugin/frontmatter";
+import {obsidianYaml, setFrontmatterProperty} from "#shared/plugin/vault";
 
 /** One property change: the note (workspace-relative path), the frontmatter key, the new value (null empties it). */
 export interface PropertyEdit {

@@ -3,6 +3,7 @@ import type {HostServices, Store} from '#shared/plugin/api'
 import {httpFetch} from '~/utils/httpFetch'
 import {pickToOpen, pickToSave} from '~/utils/dialogs'
 import {vertexInvoke} from '~/utils/vertexInvoke'
+import {registerTrustedFormat, type WindowTrust} from '~/composables/app/useTrust'
 
 /** Sent by Rust `data_set` to every window; `root` is `null` for a plugin's global document. */
 export const PLUGIN_DATA_CHANGED = 'vertex://plugin-data-changed'
@@ -41,8 +42,11 @@ export function dataStore<T>(plugin: string, root: string | null, own: (dispose:
     }
 }
 
-/** What `plugin` gets from the kernel; `root` is the window's workspace (`null` without one). */
-export function hostServices(plugin: string, root: string | null, own: (dispose: () => void) => void): HostServices {
+/**
+ * What `plugin` gets from the kernel; `root` is the window's workspace (`null` without one), `trust` the window's
+ * (`useTrust`, made where the Nuxt app's context is).
+ */
+export function hostServices(plugin: string, root: string | null, own: (dispose: () => void) => void, trust: WindowTrust): HostServices {
     return {
         http: {fetch: httpFetch},
         secrets: {
@@ -55,5 +59,16 @@ export function hostServices(plugin: string, root: string | null, own: (dispose:
             workspace: root ? dataStore(plugin, root, own) : undefined,
         },
         dialogs: {open: pickToOpen, save: pickToSave},
+        trust: {
+            allows: trust.allows,
+            trustFile: async (path, hash) => { await trust.trustFile(path, hash) },
+            trustFolder: (path, nested, pin) => trust.trustFolder(path, nested, {pin}),
+            followEdit: trust.followEdit,
+            format(def) {
+                const remove = registerTrustedFormat(def)
+                own(remove)
+                return remove
+            },
+        },
     }
 }
