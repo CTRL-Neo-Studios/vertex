@@ -39,6 +39,23 @@ export interface PluginCommand {
     palette?: boolean
 }
 
+/** What the vault picker shows: files or folders of the workspace, one or several, of some extensions. */
+export interface VaultPickOptions {
+    title: string
+    kind: 'file' | 'folder'
+    multiple: boolean
+    /** Comma-separated extensions without the dot (`png,jpg`); empty for any. */
+    extensions?: string
+}
+
+/** An Open or Save dialog's options. */
+export interface DialogOptions {
+    title?: string
+    /** A folder to start in, a path whose name is suggested, or a bare name. */
+    defaultPath?: string
+    filters?: { name: string, extensions: string[] }[]
+}
+
 /** What `onSession` callbacks get: the window's session once its index is built. */
 export interface SessionContext {
     session: ActiveSession
@@ -65,6 +82,24 @@ export interface SessionContext {
         /** Files created, removed, renamed, modified (removed with the session). */
         on(listener: WorkspaceIndexListener): () => void
     }
+    /** The kernel's file operations (X4 adds the rest). */
+    files: {
+        /** A URL the webview can load an absolute path from (images, media). */
+        assetUrl(path: string): string
+        /** Writes a workspace file's text, by uuid, and updates the index. */
+        write(uuid: string, text: string): Promise<void>
+        /**
+         * Files from outside (a drop) as workspace uuids: ones the workspace has as they are, the rest copied into the
+         * attachments folder (`fileConfig.attachmentsFolder`). Empty outside a workspace.
+         */
+        importAttachments(files: File[]): Promise<string[]>
+        /** The vault picker: workspace-relative paths, `undefined` when it closes without a choice. */
+        pick(options: VaultPickOptions): Promise<string[] | undefined>
+        drag: {
+            /** The workspace-relative paths of rows dragged from Files (a folder's ends with `/`); `undefined` for any other drag. */
+            rows(transfer: DataTransfer | null): string[] | undefined
+        }
+    }
     tabs: {
         /** Opens and shows a tab: a file's (by uuid), or another kind's (`kind`, `id`). */
         open(id: string, kind?: string): Promise<unknown>
@@ -76,6 +111,8 @@ export interface SessionContext {
     editor: {
         /** The note editor of a tab while it's mounted (its tab is shown). */
         viewOf(tabId: string): EditorView | undefined
+        /** The embed a plugin registered for files of `extension` (lowercase, no dot): how `![[file]]` draws one. */
+        embedFor(extension: string): EmbedDef | undefined
     }
     /**
      * Raw watcher events under a workspace-relative folder the index ignores (a dot folder: `.vertex/chats/`), each
@@ -139,6 +176,11 @@ export interface HostServices {
         global: Store<unknown>
         /** The plugin's document in the window's workspace (`.vertex/plugins-data/`); `undefined` outside a workspace window. */
         workspace: Store<unknown> | undefined
+    }
+    /** The Open and Save dialogs; what's picked is this window's to read (open) or write (save). `null` when cancelled. */
+    dialogs: {
+        open(options?: DialogOptions & { directory?: boolean }): Promise<string | null>
+        save(options?: DialogOptions): Promise<string | null>
     }
 }
 

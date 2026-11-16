@@ -12,8 +12,8 @@ describe('settings that moved', () => {
         expect(withMovedPaths(old, table)).toEqual({plugins: {config: {canvas: {snapToGrid: false}}}})
         const both = {...old, plugins: {config: {canvas: {snapToGrid: true}}}}
         expect(withMovedPaths(both, table)).toEqual({plugins: {config: {canvas: {snapToGrid: true}}}})
-        // What `defaultAppSettings` keeps of it: the new path, so the next save writes it there.
-        expect(defaultAppSettings(withMovedPaths(old, table)).plugins.config).toEqual({canvas: {snapToGrid: false}})
+        // A file written before X2, read with the real table: the new path, so the next save writes it there.
+        expect(defaultAppSettings(JSON.parse('{"viewConfig": {"canvas": {"snapToGrid": false}}}')).plugins.config).toEqual({canvas: {snapToGrid: false}})
     })
 
     it('tells a workspace\'s write which old paths to move', () => {

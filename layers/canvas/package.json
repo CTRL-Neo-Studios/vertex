@@ -1,0 +1,8 @@
+{
+  "name": "@vertex-plugins/canvas",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@type32/jsoncanvas-editor": "^0.1.2"
+  }
+}

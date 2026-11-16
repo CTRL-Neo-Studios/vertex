@@ -9,6 +9,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifest} from "~/utils/plugins/catalog";
+import {platform} from "@tauri-apps/plugin-os";
 
 definePageMeta({
     layout: 'settings'
@@ -16,9 +17,12 @@ definePageMeta({
 
 /**
  * A plugin's settings, drawn from its manifest's `config.schema` without running it. Each row follows the scope being
- * edited like any setting: in a workspace, the keys the manifest doesn't let it override are "Global only".
+ * edited like any setting: in a workspace, the keys the manifest doesn't let it override are "Global only". The
+ * plugin's strings get `{mod}`, the shortcut modifier (⌘ or Ctrl).
  */
 const {t} = useI18n()
+const mod = platform() === 'macos' ? '⌘' : 'Ctrl'
+const tField = (key: string) => t(key, {mod})
 const $qt = useQuickToasts()
 const route = useRoute()
 const {config, load} = useAppSettings()
@@ -93,8 +97,8 @@ async function pick(field: Extract<ConfigField, {type: 'path'}>) {
                     v-for="field in fields"
                     :key="field.key"
                     :setting="at(field)"
-                    :label="t(field.label)"
-                    :description="field.description ? t(field.description) : undefined"
+                    :label="tField(field.label)"
+                    :description="field.description ? tField(field.description) : undefined"
                     :data-plugin-field="field.key"
                 >
                     <USwitch v-if="field.type === 'switch'" :model-value="valueOf(field)" @update:model-value="set(field, $event)"/>
@@ -117,7 +121,7 @@ async function pick(field: Extract<ConfigField, {type: 'path'}>) {
                     <USelect
                         v-else-if="field.type === 'select'"
                         class="w-48"
-                        :items="field.options.map(o => ({label: t(o.label), value: o.value}))"
+                        :items="field.options.map(o => ({label: tField(o.label), value: o.value}))"
                         :model-value="valueOf(field)"
                         @update:model-value="set(field, $event)"
                     />

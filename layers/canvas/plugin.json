@@ -1,0 +1,59 @@
+{
+  "id": "canvas",
+  "name": "Canvas",
+  "version": "0",
+  "apiVersion": 1,
+  "config": {
+    "overridable": {
+      "wheelBehavior": "workspace",
+      "modDragBehavior": "workspace",
+      "cardLabels": "workspace",
+      "snapToGrid": "workspace",
+      "snapToObjects": "workspace",
+      "zoomBreakpoint": "workspace"
+    },
+    "schema": [
+      {
+        "key": "wheelBehavior", "type": "select", "default": "pan",
+        "label": "plugins.canvas.settings.wheelBehavior", "description": "plugins.canvas.settings.wheelBehaviorDescription",
+        "options": [
+          {"value": "pan", "label": "plugins.canvas.settings.wheelPan"},
+          {"value": "zoom", "label": "plugins.canvas.settings.wheelZoom"}
+        ]
+      },
+      {
+        "key": "modDragBehavior", "type": "select", "default": "menu",
+        "label": "plugins.canvas.settings.modDragBehavior", "description": "plugins.canvas.settings.modDragBehaviorDescription",
+        "options": [
+          {"value": "menu", "label": "plugins.canvas.settings.modDrag.menu"},
+          {"value": "card", "label": "plugins.canvas.settings.modDrag.card"},
+          {"value": "file", "label": "plugins.canvas.settings.modDrag.file"},
+          {"value": "media", "label": "plugins.canvas.settings.modDrag.media"},
+          {"value": "webpage", "label": "plugins.canvas.settings.modDrag.webpage"},
+          {"value": "group", "label": "plugins.canvas.settings.modDrag.group"}
+        ]
+      },
+      {
+        "key": "cardLabels", "type": "select", "default": "always",
+        "label": "plugins.canvas.settings.cardLabels", "description": "plugins.canvas.settings.cardLabelsDescription",
+        "options": [
+          {"value": "always", "label": "plugins.canvas.settings.cardLabel.always"},
+          {"value": "hover", "label": "plugins.canvas.settings.cardLabel.hover"},
+          {"value": "never", "label": "plugins.canvas.settings.cardLabel.never"}
+        ]
+      },
+      {
+        "key": "snapToGrid", "type": "switch", "default": true,
+        "label": "plugins.canvas.settings.snapToGrid", "description": "plugins.canvas.settings.snapToGridDescription"
+      },
+      {
+        "key": "snapToObjects", "type": "switch", "default": true,
+        "label": "plugins.canvas.settings.snapToObjects", "description": "plugins.canvas.settings.snapToObjectsDescription"
+      },
+      {
+        "key": "zoomBreakpoint", "type": "number", "default": 0, "min": -2, "max": 2, "step": 0.25,
+        "label": "plugins.canvas.settings.zoomBreakpoint", "description": "plugins.canvas.settings.zoomBreakpointDescription"
+      }
+    ]
+  }
+}

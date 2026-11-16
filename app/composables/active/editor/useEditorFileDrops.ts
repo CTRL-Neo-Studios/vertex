@@ -6,9 +6,8 @@ import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {fileNameFromPath, isImage} from "#shared/utils/fs/filenames";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {FILES_DRAG, draggedRows, outsideItems, outsideItemsAt, pastedImage, type OutsideItem} from "~/utils/outsideItems";
+import {FILES_DRAG, draggedRows, outsideItems, outsideItemsAt, pastedImage} from "~/utils/outsideItems";
 
 /**
  * Files into a note, as Obsidian does: links where they're dropped or pasted, `![[…]]` for an image (an embed),
@@ -25,9 +24,8 @@ import {FILES_DRAG, draggedRows, outsideItems, outsideItemsAt, pastedImage, type
 export function useEditorFileDrops(session: ActiveSession | undefined): Extension {
     const {t} = useI18n()
     const $qt = useQuickToasts()
-    const {effective} = useSettingsScope()
     const {getFileByUuid, getFileByPath, resolveLink} = useActiveWorkspaceIndex(session)
-    const {importItems, indexedMatch, ensureFolder} = useActiveWorkspaceTools(session)
+    const {importAttachments: bringIn} = useActiveWorkspaceTools(session)
     const workspace = !!session?.workspaceSession && !!session.rootPath
 
     /**
@@ -58,19 +56,6 @@ export function useEditorFileDrops(session: ActiveSession | undefined): Extensio
             userEvent: 'input.paste',
         })
         view.focus()
-    }
-
-    /** Outside items as workspace uuids: the workspace's own as they are, the rest copied into the attachments folder. */
-    async function bringIn(items: OutsideItem[]) {
-        const own: string[] = [], outside: OutsideItem[] = []
-        for (const item of items) {
-            const uuid = indexedMatch(item)
-            if (uuid) own.push(uuid)
-            else outside.push(item)
-        }
-        if (!outside.length) return own
-        const folder = await ensureFolder(effective.value?.fileConfig.attachmentsFolder ?? 'Attachments')
-        return [...own, ...await importItems(outside, folder, {copy: true}) || []]
     }
 
     async function fromPaste(images: File[]) {

@@ -487,8 +487,29 @@ Blocked by X1.
 - Viewer, file type, link extractor with rewrite, `useCanvasHost`, `CanvasCardEditor`; `viewConfig.canvas` → `plugins.config.canvas`.
 - A canvas card showing a `.base` file goes through the embed registry, so Canvas doesn't know Bases.
 
+### Decisions
+
+What canvas reaches in the kernel and other features today, and what replaces it (the user chose to build the file operations now rather than keep exceptions until X4, and the schema page for settings):
+- **Viewers get `session`** (`ViewerProps.session`); `SessionTab` draws a viewer once the session is handed to plugins (a file tab needs the built index anyway).
+- **`SessionContext.files`, the part canvas needs**, under the names X4 plans: `assetUrl(path)`, `write(uuid, text)` (`saveContent`), `importAttachments(files)` (the workspace's own as they are, the rest copied into the attachments folder, as a note's file drops do: one kernel function for both), `pick(options)` (the vault picker), `drag.rows(transfer)` (rows dragged from Files). X4 adds the rest.
+- **`ctx.dialogs.{open, save}`**: the kernel's Open and Save dialogs (Rust grants the pick to the window), for Export as image.
+- **The vault picker** (`WorkflowPickModal`, `WorkflowVaultPicker`, workflows' today) becomes the kernel's `VaultPickModal` and `VaultPicker`; workflows and `session.files.pick` use them.
+- **`NoteEditor`** (today `CanvasCardEditor`): the kernel's inline note editor, published in `app/plugin/ui`; canvas's cards and Bases' New item use it. The boundary test reads a tag a file imports by name as that import, not as the kernel component of the same name.
+- **`.base` cards**: canvas asks `session.editor.embedFor(ext)` for a card whose file kind it doesn't draw itself (`fileKind` `other`) and draws that embed with `EmbedProps` plus `card: true`; Bases' embed reads `filePath`/`subpath` for it instead of the canvas `node`.
+- **Wiki links**: `getInternalLinks` and `rewriteLinks` are public (`shared/plugin/links.ts`), for the link extractor's rewrite and the host's link list.
+- **Settings**: `viewConfig.canvas.*` → `plugins.config.canvas.*` (six `LEGACY_PATHS` rows), declared as the manifest's schema (each key `workspace`-overridable, as `viewConfig` is) and drawn by the generic plugin page, listed as Canvas in the nav; the zoom threshold is a number field. The page passes `{mod}` (⌘ or Ctrl) to its strings. The canvas's snap switches write through `ctx.config.set(…, 'workspace')`. `AppCanvasConfig`, `defaultAppCanvasConfig` and Settings → View → Canvas go.
+- **Small helpers** inlined: `ext === 'canvas'`, the file name for the export, toasts through `useToast`, links through the opener with the `http(s)`/`mailto` filter.
+
 ### Acceptance
-- [ ] The shared acceptance; a canvas is still a backlink of the notes it shows, and a rename rewrites it.
+- [ ] The shared acceptance; a canvas is still a backlink of the notes it shows, and a rename rewrites it. (In `tauri dev`: the backlink, a rename rewriting the file card and the text card's link, the text, note and `.base` cards, imports into Attachments, a pre-X2 settings file migrated and shown on the Canvas page; with canvas off, no canvas code fetched, `.canvas` in the code editor, no file type, link extractor or settings page. SMOKE 108–110 by hand (editing cards, export, the web page card, Mod+drag) not run.)
+
+### As built
+
+- **Layer** `layers/canvas/`: `plugin.json` (the manifest with its `config`: six schema fields, each `workspace`-overridable), `nuxt.config.ts` (installs `@type32/jsoncanvas-editor`'s Nuxt module, out of the root config), `app/plugin.ts` (file type, viewer, link extractor; `CanvasConfig`; `canvasContext()` for its components), `app/components/Viewer.vue`, `app/lib/host.ts` (`useCanvasHost` over `SessionContext`), `shared/canvasLinks.ts` and its test (with the kernel's index), strings under `plugins.canvas.*`.
+- **Contract:** `ViewerProps.session`; `SessionContext.files` (`assetUrl`, `write`, `importAttachments`, `pick`, `drag.rows`) and `editor.embedFor`; `ctx.dialogs` (`DialogOptions` moved into the contract); `EmbedProps.card` and `filePath` documented as workspace-relative; `VaultPickOptions`; `shared/plugin/links.ts`; `NoteEditor` in `app/plugin/ui`.
+- **Kernel:** `importAttachments` in `useActiveWorkspaceTools` (the note editor's drops use it); `VaultPicker` and `VaultPickModal` (moved from workflows; its Cancel is `app.generic.cancel`); `NoteEditor` (was `CanvasCardEditor`; Bases' New item uses it); Bases' embed reads `filePath`/`subpath`/`card` instead of the canvas `node` (two cards of one base and view share the shown view, as two links do); the schema page passes `{mod}`; the boundary test reads a tag named after a by-name import as that import (with a case). Gone: `AppCanvasConfig`, `defaultAppCanvasConfig`, Settings → View → Canvas, `isCanvasFile`, the canvas builtin and its `RESIDENTS` entry.
+- **Settings:** `LEGACY_PATHS` holds the six canvas rows. A pre-X2 file loaded at startup is written back at `plugins.config.canvas` (checked on disk). Found on the way, not changed: `useAppSettings.set` merges one level deep, so `save({gitConfig: {path}})` (`GitChangesView`) drops git's other settings back to their defaults.
+- **Numbers:** 354 tests (43 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X3: Bases
 

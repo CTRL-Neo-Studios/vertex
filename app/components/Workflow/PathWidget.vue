@@ -42,7 +42,7 @@ const picked = computed({
         />
         <template #content>
             <div class="w-72 p-2">
-                <WorkflowVaultPicker v-model="picked" :session-id="props.sessionId" :kind="props.kind" :extensions="props.extensions"/>
+                <VaultPicker v-model="picked" :session-id="props.sessionId" :kind="props.kind" :extensions="props.extensions"/>
             </div>
         </template>
     </UPopover>

@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import {parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
+import {fileKind, parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
 import {MESSAGES, type CanvasError, type CanvasMessages, type FileRendererProps, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
 import type {InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
-import type {EditorHost} from "#shared/plugin/api"
-import {defaultAppCanvasConfig} from "#shared/utils/defaults/apps"
-import {useActiveSessions} from "~/composables/active/useActiveSessions"
-import {useActiveTabs} from "~/composables/active/useActiveTabs"
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
-import {useAppNavigator} from "~/composables/app/useAppNavigator"
-import {useSettingsScope} from "~/composables/app/useSettingsScope"
-import {useCanvasHost} from "~/composables/canvas/useCanvasHost"
-import useQuickToasts from "~/composables/utility/useQuickToasts"
-import {pluginSession} from "~/utils/plugins/runtime"
-import {ViewerEditorBasesEmbed} from "#components"
+import type {Component} from "vue"
+import type {EditorHost, EmbedDef, EmbedProps, SessionContext} from "#shared/plugin/api"
+import {NoteEditor, PluginMount, ViewerLayout} from "~/plugin/ui"
+import {useCanvasHost} from "../lib/host"
+import {canvasContext} from "../plugin"
 
 /**
  * A `.canvas` file (JSON Canvas, as Obsidian writes it), edited with `@type32/jsoncanvas-editor` (workspace mode
@@ -25,27 +19,38 @@ defineModel<boolean>('contentSaved', {default: false})
 const props = withDefaults(defineProps<{
     renaming: boolean,
     filePath?: string,
-    sessionId: string,
+    session: SessionContext,
     disabled?: boolean,
 }>(), {filePath: '', disabled: false})
 const emit = defineEmits<{ rename: [oldValue: string, newValue: string] }>()
 
 const {t} = useI18n()
-const $qt = useQuickToasts()
-const session = useActiveSessions().getSession(props.sessionId)!
-const $index = useActiveWorkspaceIndex(session)
-const {openTab} = useActiveTabs(session)
-const $navi = useAppNavigator()
-const scope = useSettingsScope()
-const host = useCanvasHost(session, () => props.filePath && `${session.rootPath}/${props.filePath}`)
-// `.base` cards show the base (its `#View`) with the canvas as `this`, as embedded bases do (text cards embed through
-// their editor, `CanvasCardEditor`). The canvas's own `host` prop isn't the base's; drawn once the session is handed
-// to plugins, as embeds are.
-const baseHost: EditorHost = {get session() { return pluginSession()! }, get notePath() { return props.filePath }}
-const fileRenderers: FileRenderers = {
-    base: ({node}: FileRendererProps) => (pluginSession() ? h(ViewerEditorBasesEmbed, {node, host: baseHost}) : null),
-}
+const toast = useToast()
+const {session, index, tabs, editor: editors} = props.session
+const config = canvasContext().config
+const host = useCanvasHost(props.session, () => props.filePath && `${session.rootPath}/${props.filePath}`)
 const editor = useTemplateRef<{ refreshFiles: (paths?: string[]) => void }>('editor')
+
+// A card whose file the canvas doesn't draw itself (a `.base`) shows the embed a plugin registered for its type, with
+// the canvas as `this`, as a note embeds it. One component per embed, so a card keeps its content while the canvas
+// redraws.
+const embedHost: EditorHost = {session: props.session, get notePath() { return props.filePath }}
+const cards = new WeakMap<EmbedDef, Component<FileRendererProps>>()
+function cardFor(def: EmbedDef) {
+    let card = cards.get(def)
+    if (!card) cards.set(def, card = ({node, file}: FileRendererProps) => h(PluginMount, {
+        ui: def,
+        props: {filePath: node.file, subpath: node.subpath?.replace(/^#/, ''), assetUrl: file.url ?? '', host: embedHost, card: true} satisfies EmbedProps,
+    }))
+    return card
+}
+const fileRenderers: FileRenderers = new Proxy({}, {
+    get(_, ext) {
+        if (typeof ext !== 'string' || fileKind(`file.${ext}`) !== 'other') return undefined
+        const def = editors.embedFor(ext)
+        return def && cardFor(def)
+    },
+})
 
 function read(text: string): { canvas?: CanvasDocument, problem?: string } {
     try {
@@ -75,15 +80,14 @@ watch(content, (text) => {
     if (next.canvas) canvas.value = next.canvas
 })
 
-// Settings → View → Canvas; the canvas's own snap switches write there too (this workspace's, in a workspace window).
-const config = computed(() => scope.effective.value?.viewConfig.canvas ?? defaultAppCanvasConfig())
+// The plugin's settings; the canvas's own snap switches write there too, as this workspace's.
 const snapToGrid = computed({
     get: () => config.value.snapToGrid,
-    set: v => void scope.set({'viewConfig.canvas.snapToGrid': v}),
+    set: v => void config.set({snapToGrid: v}, 'workspace'),
 })
 const snapToObjects = computed({
     get: () => config.value.snapToObjects,
-    set: v => void scope.set({'viewConfig.canvas.snapToObjects': v}),
+    set: v => void config.set({snapToObjects: v}, 'workspace'),
 })
 const readonly = ref(false)
 
@@ -91,19 +95,24 @@ const readonly = ref(false)
 // handed through as they are.
 const messages = computed((): CanvasMessages => Object.fromEntries(Object.entries(MESSAGES).map(([key, english]) => {
     const params = Object.fromEntries([...english.matchAll(/\{(\w+)\}/g)].map(([all, name]) => [name, all]))
-    return [key, t(`app.editor.ui.jsonCanvas.${key}`, params)]
+    return [key, t(`plugins.canvas.jsonCanvas.${key}`, params)]
 })) as CanvasMessages)
 
 function onError({action, error}: CanvasError) {
-    $qt.error(t('app.editor.ui.canvas.hostFailed', {action}), error instanceof Error ? error.message : String(error))
+    toast.add({
+        title: t('plugins.canvas.hostFailed', {action}),
+        description: error instanceof Error ? error.message : String(error),
+        color: 'error',
+        icon: 'lucide:circle-alert',
+    })
 }
 
-async function openLink({referenceId}: InternalLinkClickDetail) {
-    if (referenceId) await $navi.toWorkspaceTab(session.uuid, openTab(referenceId))
+function openLink({referenceId}: InternalLinkClickDetail) {
+    if (referenceId) void tabs.open(referenceId)
 }
 
 // Cards show files from the workspace: when one changes, appears or goes, they load again.
-const unsubscribe = $index.on((event) => {
+const unsubscribe = index.on((event) => {
     const paths = event.type === 'rename' ? [event.oldPath, event.newPath]
         : event.type === 'remove' ? [event.path, ...event.removedNodes.map(n => n.fullPath)]
             : event.type === 'create' || event.type === 'modify' ? [event.path] : []
@@ -113,7 +122,7 @@ onBeforeUnmount(unsubscribe)
 </script>
 
 <template>
-    <ViewerEditorLayoutWrapper
+    <ViewerLayout
         scrollMode="none"
         v-model:fileName="fileName"
         @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
@@ -129,8 +138,8 @@ onBeforeUnmount(unsubscribe)
                 color="error"
                 variant="subtle"
                 icon="i-lucide-file-x"
-                :title="t('app.editor.ui.canvas.invalid')"
-                :description="t('app.editor.ui.canvas.invalidDescription')"
+                :title="t('plugins.canvas.invalid')"
+                :description="t('plugins.canvas.invalidDescription')"
             />
             <p class="mt-3 font-mono text-xs text-muted">{{ problem }}</p>
         </div>
@@ -144,22 +153,22 @@ onBeforeUnmount(unsubscribe)
                 v-model:readonly="readonly"
                 :host="host"
                 :messages="messages"
-                :wheel-behavior="config.wheelBehavior"
-                :mod-drag-behavior="config.modDragBehavior"
-                :card-labels="config.cardLabels"
-                :zoom-breakpoint="config.zoomBreakpoint"
+                :wheel-behavior="config.value.wheelBehavior"
+                :mod-drag-behavior="config.value.modDragBehavior"
+                :card-labels="config.value.cardLabels"
+                :zoom-breakpoint="config.value.zoomBreakpoint"
                 :file-renderers="fileRenderers"
                 @error="onError"
             >
                 <template #text-editor="{text, update, done}">
-                    <ViewerEditorComponentCanvasCardEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
+                    <NoteEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
                 </template>
                 <template #note-editor="{text, update, done}">
-                    <ViewerEditorComponentCanvasCardEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
+                    <NoteEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
                 </template>
             </JsonCanvas>
         </div>
-    </ViewerEditorLayoutWrapper>
+    </ViewerLayout>
 </template>
 
 <style scoped>

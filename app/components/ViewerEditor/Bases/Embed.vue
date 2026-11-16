@@ -10,7 +10,7 @@ import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTo
  * A base embedded where Obsidian embeds one, each host passing its own props:
  * - `![[x.base]]` / `![[x.base#View]]` in a note (`linkData`, `subpath`): the file, its edits written to it;
  * - a ` ```base ` block (`codeContent`): the block's YAML, its edits written into the block;
- * - a canvas file card (`node`, its `subpath` `#View`): the file, filling the card.
+ * - a canvas file card (the embed props with `card`: `filePath`, `subpath` `View`): the file, filling the card.
  * `this` is the file it's in (`host.notePath`: the note or the canvas); outside a workspace nothing shows.
  *
  * The editor unmounts embeds scrolled out of view and remounts them on the way back (and a block after each edit it
@@ -21,9 +21,11 @@ defineOptions({inheritAttrs: false})
 const props = defineProps<{
     host: EditorHost,
     linkData?: InternalLink,
+    /** Workspace-relative; how a canvas card names its file (an editor embed has `linkData`). */
+    filePath?: string,
     subpath?: string,
     codeContent?: string,
-    node?: { id: string, file: string, subpath?: string },
+    card?: boolean,
 }>()
 
 const {t} = useI18n()
@@ -36,7 +38,7 @@ const inBlock = props.codeContent !== undefined
 const file = computed(() => {
     if (!$index || !session) return undefined
     if (props.linkData) return $index.getFileByUuid(props.linkData.referenceId)
-    return props.node ? $index.getFileByPath(`${session.rootPath}/${props.node.file}`) : undefined
+    return props.filePath ? $index.getFileByPath(`${session.rootPath}/${props.filePath}`) : undefined
 })
 
 const texts = useState<Record<string, string>>('bases-embed-texts', () => ({}))
@@ -55,16 +57,16 @@ if (!inBlock) {
     onBeforeUnmount(() => unsubscribe?.())
 }
 
-// The shown view, by embed: a link by its target and subpath, a card by its id, a block by its text (moved to the new
-// text when the block is written).
-// ponytail: identical blocks (or links) in one note share their view; key by position if that ever matters.
+// The shown view, by embed: a link or a card by its file and subpath, a block by its text (moved to the new text when
+// the block is written).
+// ponytail: identical blocks (or links, or cards) in one note share their view; key by position if that ever matters.
 const views = useState<Record<string, string>>('bases-embed-views', () => ({}))
 const viewKey = computed(() => {
     const here = props.host.notePath
     if (inBlock) return `${here}\n${text.value}`
-    return props.node ? `${here}#${props.node.id}` : `${here}#${props.linkData?.referenceId}#${props.subpath ?? ''}`
+    return `${here}#${props.linkData?.referenceId ?? props.filePath}#${props.subpath ?? ''}`
 })
-const view = ref(views.value[viewKey.value] ?? props.subpath ?? props.node?.subpath?.replace(/^#/, '') ?? '')
+const view = ref(views.value[viewKey.value] ?? props.subpath ?? '')
 watch(view, name => views.value[viewKey.value] = name)
 
 /** The block's editor and the position of its opening fence. */
@@ -120,14 +122,14 @@ async function save(next: string) {
         v-if="session && text !== null"
         ref="root"
         class="flex flex-col text-sm [contain:inline-size]"
-        :class="node ? 'h-full' : 'my-2 rounded-lg border border-default overflow-hidden bg-default'"
+        :class="card ? 'h-full' : 'my-2 rounded-lg border border-default overflow-hidden bg-default'"
     >
         <ViewerEditorBasesBase
             :model-value="text"
             v-model:view="view"
             :session="session"
             :this-path="host.notePath"
-            :embed="node ? 'card' : 'note'"
+            :embed="card ? 'card' : 'note'"
             :readonly="readonly"
             @update:model-value="save"
         />

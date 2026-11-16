@@ -6,7 +6,11 @@ import {getAt, withAt, withoutAt} from './paths'
  * paths with the next save; a workspace's drops the old ones the next time it's changed (`movedPathsIn`). Entries stay
  * for good: a vault may come back after years.
  */
-export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = []
+export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = [
+    // X2: canvas became a plugin.
+    ...['wheelBehavior', 'modDragBehavior', 'cardLabels', 'snapToGrid', 'snapToObjects', 'zoomBreakpoint']
+        .map(key => [`viewConfig.canvas.${key}`, `plugins.config.canvas.${key}`] as const),
+]
 
 /** `raw` with each old path's value at its new one (unless the new one is set), and the old one gone. */
 export function withMovedPaths<T>(raw: T, table: readonly (readonly [string, string])[] = LEGACY_PATHS): T {

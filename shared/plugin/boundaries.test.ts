@@ -18,7 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'canvas': ['app/components/ViewerEditor/CanvasViewer', 'app/components/ViewerEditor/Component/CanvasCardEditor', 'app/composables/canvas/', 'shared/utils/index/canvasLinks'],
     'bases': ['app/components/ViewerEditor/Bases/', 'app/components/ViewerEditor/BasesViewer', 'app/composables/bases/', 'app/utils/bases', 'shared/utils/index/baseFile'],
     'files': ['app/components/FileTreeComponent', 'app/components/LayoutComponents/PanelFilesView'],
     'palette': ['app/components/WorkspaceCommandPalette', 'app/components/CommandPaletteButton'],
@@ -96,15 +95,24 @@ function specifiers(source: string): string[] {
         .map(m => (m[1] ?? m[2] ?? m[3])!)
 }
 
-/** Names imported from `#components`, and the component tags a `.vue` template uses, without `Lazy`. */
+/**
+ * Names imported from `#components`, and the component tags a `.vue` template uses, without `Lazy`. A tag named after
+ * something the file imports from elsewhere (`import {NoteEditor} from '~/plugin/ui'`) is that import, whose module the
+ * import rules check, not the auto-imported component of the same name.
+ */
 function componentsUsed(path: string, source: string): string[] {
-    const named = [...withoutComments(source).matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]#components['"]/g)]
+    const code = withoutComments(source)
+    const named = [...code.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]#components['"]/g)]
         .flatMap(m => m[1]!.split(',').map(s => s.trim().split(/\s+as\s+/)[0]!.trim()).filter(Boolean))
+    const imported = new Set([...code.matchAll(/import\s+(?:type\s+)?([\w$]+)?\s*,?\s*(?:\{([^}]*)\})?\s*from\s*['"]([^'"]+)['"]/g)]
+        .filter(m => m[3] !== '#components')
+        .flatMap(m => [m[1], ...(m[2]?.split(',').map(s => s.trim().split(/\s+as\s+/).pop()!.trim()) ?? [])])
+        .filter(Boolean))
     const template = path.endsWith('.vue') ? /<template[\s\S]*<\/template>/.exec(source)?.[0] ?? '' : ''
     const tags = [
         ...[...template.matchAll(/<([A-Z][A-Za-z0-9]*)/g)].map(m => m[1]!),
         ...[...template.matchAll(/<([a-z][a-z0-9]*(?:-[a-z0-9]+)+)/g)].map(m => pascal(m[1]!)),
-    ]
+    ].filter(tag => !imported.has(tag))
     return [...named, ...tags].map(n => n.replace(/^Lazy(?=[A-Z])/, ''))
 }
 
@@ -327,6 +335,8 @@ describe('checkBoundaries', () => {
         const files = {
             'layers/ai/app/lib/a.ts': `import {stateClient} from '~/utils/stateClient'`,
             'layers/ai/app/components/S.vue': '<template><SettingsRow/></template>',
+            // The published component, imported by name: not the kernel's auto-imported one.
+            'layers/ai/app/components/P.vue': `<script setup>import {SettingsRow} from '~/plugin/ui'</script><template><SettingsRow/></template>`,
         }
         expect(rules(files)).toEqual([
             'layer-reaches-kernel layers/ai/app/lib/a.ts: imports app/utils/stateClient',

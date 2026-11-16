@@ -1,14 +1,13 @@
 import {describe, expect, it} from 'vitest'
 import {parseFrontmatter, parseYaml} from '@type32/codemirror-rich-obsidian-editor'
 import type {LinkExtractorDef} from '#shared/plugin/contributions'
-import {isCanvasFile} from '#shared/utils/fs/filenames'
+import {LinkGraph} from '#shared/utils/index/linkGraph'
+import {parseLinkTargets} from '#shared/utils/index/parse'
+import {getInternalLinks, renameTargets} from '#shared/utils/index/rewriteLinks'
 import {canvasLinkTargets, rewriteCanvasLinks} from './canvasLinks'
-import {LinkGraph} from './linkGraph'
-import {parseLinkTargets} from './parse'
-import {getInternalLinks, renameTargets} from './rewriteLinks'
 
-// What the canvas plugin registers (`app/builtins/canvas.ts`).
-const canvas: LinkExtractorDef = {id: 'canvas', match: isCanvasFile, targets: canvasLinkTargets, rewrite: rewriteCanvasLinks}
+// What the canvas plugin registers (`layers/canvas/app/plugin.ts`), with the kernel's index.
+const canvas: LinkExtractorDef = {id: 'canvas', match: ext => ext === 'canvas', targets: canvasLinkTargets, rewrite: rewriteCanvasLinks}
 const parsers = {parseYaml, parseFrontmatter, getInternalLinks, linkExtractorFor: (ext: string) => (canvas.match(ext) ? canvas : undefined)}
 
 // As Obsidian writes it: tabs, one node per line, no trailing newline.

@@ -1,5 +1,5 @@
 import {isSupportedNode, parseCanvas, stringifyCanvas, type JSONCanvas} from "@type32/jsoncanvas-editor/core";
-import {rewriteLinks} from "#shared/utils/index/rewriteLinks";
+import {rewriteLinks} from "#shared/plugin/links";
 
 /** The canvas in `text`, or `undefined` when it isn't one (a broken file has no links and is never rewritten). */
 function readCanvas(text: string): JSONCanvas | undefined {

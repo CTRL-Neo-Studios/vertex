@@ -114,6 +114,8 @@ export interface TabKindDef extends UiSlot<TabProps> {
  */
 export interface ViewerProps {
     sessionId: string
+    /** The window's session, as `onSession` gets it: the viewer draws once it's handed to plugins. */
+    session: SessionContext
     /** The file's id in the workspace index (also its tab's id). */
     fileId: string
     /** The display path: relative to the workspace, or absolute in a singlespace window. */
@@ -269,9 +271,12 @@ export interface CodeBlockDef extends UiSlot<{ codeContent: string, host: Editor
     language: string
 }
 
-/** What an embed is drawn with: the editor's props for `![[file#subpath|display]]`, `host`, and `assetUrl`. */
+/**
+ * What an embed is drawn with: the editor's props for `![[file#subpath|display]]`, `host`, and `assetUrl`; or what a
+ * canvas card gives it (`card`).
+ */
 export interface EmbedProps {
-    /** The embedded file's path. */
+    /** The embedded file's path, workspace-relative. */
     filePath: string
     /** After `#` (`View` in `![[x.base#View]]`). */
     subpath?: string
@@ -280,6 +285,8 @@ export interface EmbedProps {
     /** A URL the webview can load the file from, as `ViewerProps.assetUrl`. */
     assetUrl: string
     host: EditorHost
+    /** It fills a box (a canvas card) instead of sitting in a note's flow. */
+    card?: boolean
     [prop: string]: unknown
 }
 

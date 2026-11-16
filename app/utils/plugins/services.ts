@@ -1,6 +1,7 @@
 import {listen} from '@tauri-apps/api/event'
 import type {HostServices, Store} from '#shared/plugin/api'
 import {httpFetch} from '~/utils/httpFetch'
+import {pickToOpen, pickToSave} from '~/utils/dialogs'
 import {vertexInvoke} from '~/utils/vertexInvoke'
 
 /** Sent by Rust `data_set` to every window; `root` is `null` for a plugin's global document. */
@@ -53,5 +54,6 @@ export function hostServices(plugin: string, root: string | null, own: (dispose:
             global: dataStore(plugin, null, own),
             workspace: root ? dataStore(plugin, root, own) : undefined,
         },
+        dialogs: {open: pickToOpen, save: pickToSave},
     }
 }

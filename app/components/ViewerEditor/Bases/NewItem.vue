@@ -80,7 +80,7 @@ onBeforeUnmount(flush)
                 <template v-if="note">
                     <div class="px-4 pt-3 font-semibold truncate">{{ note.title }}</div>
                     <div class="grow min-h-0">
-                        <ViewerEditorComponentCanvasCardEditor
+                        <NoteEditor
                             :text="note.text"
                             :note-path="note.path"
                             @update="update"

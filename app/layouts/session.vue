@@ -2,6 +2,7 @@
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -16,10 +17,14 @@ import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterP
 import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
 import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import TabSwitcher from "~/components/TabSwitcher.vue";
+import VaultPickModal from "~/components/Modals/VaultPickModal.vue";
 import {Routes} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {SessionContext} from "#shared/plugin/api";
 import {pluginSessions} from "~/utils/plugins/runtime";
+import {embeds} from "~/utils/contributions";
+import {fileUrl} from "~/utils/fileUrl";
+import {draggedRows, fromFile} from "~/utils/outsideItems";
 
 /**
  * Frame for a session window (workspace or singlespace): builds the index, restores tabs, starts persistence,
@@ -35,6 +40,8 @@ const isWorkspace = !!activeSesh?.workspaceSession
 const $asesh = useAppSessions()
 const index = useActiveWorkspaceIndex(activeSesh)
 const $tabs = useActiveTabs(activeSesh)
+const $tools = useActiveWorkspaceTools(activeSesh)
+const vaultPicker = useOverlay().create(VaultPickModal)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
 const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
@@ -71,13 +78,23 @@ function sessionContext(session: ActiveSession): SessionContext {
             unresolved: index.unresolved,
             on: listener => withScope(index.on(listener)),
         } : NO_INDEX,
+        files: {
+            assetUrl: fileUrl,
+            write: $tools.saveContent,
+            importAttachments: async files => (isWorkspace ? $tools.importAttachments(files.map(fromFile)) : []),
+            pick: async options => (isWorkspace ? vaultPicker.open({...options, sessionId: session.uuid}).result : undefined),
+            drag: {rows: draggedRows},
+        },
         tabs: {
             open: (id, kind) => useAppNavigator().toWorkspaceTab(session.uuid, $tabs.openTab(id, kind)),
             close: $tabs.closeTabElsewhere,
             active: () => $tabs.activeTabUuid.value,
             list: () => $tabs.tabs.value.map(t => ({kind: t.kind, id: t.fileUuid})),
         },
-        editor: {viewOf: tabId => editorViewOf(session, tabId)},
+        editor: {
+            viewOf: tabId => editorViewOf(session, tabId),
+            embedFor: ext => [...embeds.items.values()].find(def => def.match(ext)),
+        },
         watch: (prefix, fn) => (isWorkspace ? withScope(index.watchUnder(prefix, fn)) : () => {}),
     }
 }

@@ -57,6 +57,8 @@ const setText = (value: string) => { content.value = value }
 const viewerProps = computed((): ViewerProps | ViewerMountProps => {
     const props: ViewerProps = {
         sessionId: sessionId.value,
+        // Drawn only once it's set (the template waits).
+        session: pluginSession()!,
         fileId: tabId.value,
         filePath: displayPath.value,
         fileName: fileName.value,
@@ -147,7 +149,7 @@ async function onRename(oldValue: string) {
 
 <template>
     <div class="w-full h-full relative">
-        <div v-if="!isContentLoaded" class="h-full max-h-svh w-full flex items-center justify-center">
+        <div v-if="!isContentLoaded || !pluginSession()" class="h-full max-h-svh w-full flex items-center justify-center">
             <UIcon name="i-lucide-loader-circle" class="text-muted animate-spin size-6"/>
         </div>
         <PluginMount v-else-if="viewer" :ui="viewer" :props="viewerProps"/>

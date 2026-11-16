@@ -580,5 +580,22 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         return path
     }
 
-    return {createFile, renameFile, moveFiles, importItems, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
+    /**
+     * Outside items as workspace uuids, as a note's file drops and a canvas's take them: ones the workspace already has
+     * (`indexedMatch`) as they are, the rest copied into the attachments folder (`fileConfig.attachmentsFolder`, created
+     * when first needed).
+     */
+    async function importAttachments(items: OutsideItem[]) {
+        const own: string[] = [], outside: OutsideItem[] = []
+        for (const item of items) {
+            const uuid = indexedMatch(item)
+            if (uuid) own.push(uuid)
+            else outside.push(item)
+        }
+        if (!outside.length) return own
+        const folder = await ensureFolder(scope.effective.value?.fileConfig.attachmentsFolder ?? 'Attachments')
+        return [...own, ...await importItems(outside, folder, {copy: true}) || []]
+    }
+
+    return {createFile, renameFile, moveFiles, importItems, importAttachments, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
 }

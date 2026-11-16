@@ -7,7 +7,7 @@ import {coveringFolder, normalizeTrustPath, trustedBy} from "#shared/utils/trust
 import {baseNameOf, obsidianYaml, type Vault} from "#shared/utils/vault"
 import {vertexLanguage, type PickOptions, type VertexEffects} from "#shared/workflows/vertex"
 import WorkflowAskModal, {type Ask} from "~/components/Modals/WorkflowAskModal.vue"
-import WorkflowPickModal from "~/components/Modals/WorkflowPickModal.vue"
+import VaultPickModal from "~/components/Modals/VaultPickModal.vue"
 import WorkflowTrashModal from "~/components/Modals/WorkflowTrashModal.vue"
 import WorkflowTrustModal from "~/components/Modals/WorkflowTrustModal.vue"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"
@@ -81,7 +81,7 @@ export function useWorkflowRunner(session: ActiveSession) {
     const trustModal = overlay.create(WorkflowTrustModal)
     const trashModal = overlay.create(WorkflowTrashModal)
     const askModal = overlay.create(WorkflowAskModal)
-    const pickModal = overlay.create(WorkflowPickModal)
+    const pickModal = overlay.create(VaultPickModal)
     // Frontmatter as Obsidian writes it (the editor package's `frontmatterRange` is auto-imported).
     const yaml = obsidianYaml(frontmatterRange)
     const undoable = shallowRef<Op[]>([])
