@@ -1,0 +1,23 @@
+{
+	"plugins": {
+		"bases-map": {
+			"layout": "Map",
+			"newNote": "New note",
+			"copyCoordinates": "Copy coordinates",
+			"setDefaultCenter": "Set default center point",
+			"setDefaultZoom": "Set default zoom ({zoom})",
+			"options": {
+				"mapHeight": "Embedded height",
+				"center": "Center coordinates",
+				"defaultZoom": "Default zoom",
+				"minZoom": "Minimum zoom",
+				"maxZoom": "Maximum zoom",
+				"coordinates": "Marker coordinates",
+				"markerIcon": "Marker icon",
+				"markerColor": "Marker color",
+				"mapTiles": "Map tiles",
+				"mapTilesDark": "Map tiles in dark mode"
+			}
+		}
+	}
+}

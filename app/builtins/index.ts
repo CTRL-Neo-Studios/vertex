@@ -6,7 +6,6 @@ import manifests from './plugins.json'
 const LOAD: Record<string, PluginEntry['load']> = {
     'files': () => import('./files'),
     'palette': () => import('./palette'),
-    'bases': () => import('./bases'),
     'workflows': () => import('./workflows'),
     'git': () => import('./git'),
     'ai': () => import('./ai'),

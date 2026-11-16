@@ -1,0 +1,23 @@
+{
+	"plugins": {
+		"bases-map": {
+			"layout": "地图",
+			"newNote": "新建笔记",
+			"copyCoordinates": "复制坐标",
+			"setDefaultCenter": "设为默认中心点",
+			"setDefaultZoom": "设为默认缩放（{zoom}）",
+			"options": {
+				"mapHeight": "嵌入高度",
+				"center": "中心坐标",
+				"defaultZoom": "默认缩放",
+				"minZoom": "最小缩放",
+				"maxZoom": "最大缩放",
+				"coordinates": "标记坐标",
+				"markerIcon": "标记图标",
+				"markerColor": "标记颜色",
+				"mapTiles": "地图瓦片",
+				"mapTilesDark": "深色模式地图瓦片"
+			}
+		}
+	}
+}

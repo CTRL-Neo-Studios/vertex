@@ -12,7 +12,6 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import {useNoteEditor} from "~/composables/active/editor/useNoteEditor";
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -70,22 +69,6 @@ async function openLink({referenceId}: InternalLinkClickDetail) {
 // The editor follows no link itself: a web or mail link opens in the default app.
 const {openUrlInBrowser} = useAppOpener()
 const openExternalLink = ({url}: ExternalLinkClickDetail) => openUrlInBrowser(url)
-
-// Insert new base arrives through the session's editor dispatcher.
-const {dispatcher} = useActiveEditorDispatcher(session)
-
-/** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
-function insertBlock({text}: { text: string }) {
-    const view = editorView.value
-    if (!view) return
-    const {from, to} = view.state.selection.main
-    const line = view.state.doc.lineAt(from)
-    const insert = `${from > line.from ? '\n' : ''}${text}\n`
-    view.dispatch({changes: {from, to, insert}, selection: {anchor: from + insert.length - 1}, scrollIntoView: true})
-    view.focus()
-}
-dispatcher.on('editor.insertBlock', insertBlock)
-onBeforeUnmount(dispatcher.unmount)
 
 // The editor's right-click menu (replaces the webview's, so spelling suggestions and Look Up are gone). Tables keep
 // their own: their menu takes the event first. Plugins' items (Ask in chat) follow the kernel's, a group per

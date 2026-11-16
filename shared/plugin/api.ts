@@ -13,7 +13,7 @@ import type {
 } from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
 
-export type {ActiveSession}
+export type {ActiveSession, ActiveWorkspaceFileIndex}
 export type {PluginManifest, WindowKind}
 export type * from './contributions'
 
@@ -89,6 +89,18 @@ export interface SessionContext {
         /** Writes a workspace file's text, by uuid, and updates the index. */
         write(uuid: string, text: string): Promise<void>
         /**
+         * Creates an empty file named `name` in `folder` (workspace-relative, `''` for the top level; created when
+         * missing) and indexes it. Throws when the path exists.
+         */
+        create(folder: string, name: string): Promise<ActiveWorkspaceFileIndex | undefined>
+        /** New text for notes, by uuid, as one step of Files' undo history named `label`; open tabs of them reload. */
+        edit(edits: { uuid: string, text: string }[], label: string): Promise<void>
+        /** Moves files into `folder` (workspace-relative, `''` for the top level), with Files' clash prompts and undo. */
+        move(uuids: string[], folder: string): Promise<unknown>
+        /** Files' undo history: the last file operation undone, or the last undone one done again. */
+        undo(): Promise<unknown>
+        redo(): Promise<unknown>
+        /**
          * Files from outside (a drop) as workspace uuids: ones the workspace has as they are, the rest copied into the
          * attachments folder (`fileConfig.attachmentsFolder`). Empty outside a workspace.
          */
@@ -99,6 +111,12 @@ export interface SessionContext {
             /** The workspace-relative paths of rows dragged from Files (a folder's ends with `/`); `undefined` for any other drag. */
             rows(transfer: DataTransfer | null): string[] | undefined
         }
+    }
+    /** The vault's property types (Obsidian's `types.json`: key → `text`, `multitext`, `number`…). Reactive. */
+    properties: {
+        types(): Readonly<Record<string, string>>
+        /** `null`: Automatic (the type comes from the values). Saved to `.vertex/types.json`. */
+        setType(key: string, type: string | null): Promise<void>
     }
     tabs: {
         /** Opens and shows a tab: a file's (by uuid), or another kind's (`kind`, `id`). */

@@ -203,7 +203,8 @@ mod tests {
 
     #[test]
     fn a_built_in_turned_off_takes_its_crates_commands_with_it() {
-        let mut off = Granted::new(&app_plugins(), json!({"plugins": {"enabled": {"git": false, "chat": false}}}));
+        // `bases-map` also asks for `network`: off too, so what's left is only chat's to take.
+        let mut off = Granted::new(&app_plugins(), json!({"plugins": {"enabled": {"git": false, "chat": false, "bases-map": false}}}));
         for (command, label) in [("vertex-git|git_status", "session-a"), ("vertex-git|git_clone", "main"), ("vertex-git|git_tokens", "settings"), ("vertex-chats|chat_read", "session-a")] {
             assert!(!off.allows(&format!("plugin:{command}"), label), "{command} in {label}");
         }

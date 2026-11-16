@@ -3,8 +3,8 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
 import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
+import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
@@ -41,10 +41,10 @@ const $asesh = useAppSessions()
 const index = useActiveWorkspaceIndex(activeSesh)
 const $tabs = useActiveTabs(activeSesh)
 const $tools = useActiveWorkspaceTools(activeSesh)
+const propertyTypes = usePropertyTypes(activeSesh)
 const vaultPicker = useOverlay().create(VaultPickModal)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
-const $editorDispatcher = useActiveEditorDispatcher(activeSesh)
 useSessionCommands(activeSesh)
 const panels = usePanels(activeSesh)
 // One drag state for the window's panel buttons, so a view can go from one side's list to the other's.
@@ -81,9 +81,21 @@ function sessionContext(session: ActiveSession): SessionContext {
         files: {
             assetUrl: fileUrl,
             write: $tools.saveContent,
+            async create(folder, name) {
+                const dir = await $tools.ensureFolder(folder)
+                return (await $tools.createFile(index.getFileByPath(dir)?.uuid, name)) ?? undefined
+            },
+            edit: $tools.editNotes,
+            move: (uuids, folder) => $tools.moveFiles(uuids, folder ? `${session.rootPath}/${folder}` : session.rootPath!),
+            undo: () => $tools.undo(),
+            redo: () => $tools.redo(),
             importAttachments: async files => (isWorkspace ? $tools.importAttachments(files.map(fromFile)) : []),
             pick: async options => (isWorkspace ? vaultPicker.open({...options, sessionId: session.uuid}).result : undefined),
             drag: {rows: draggedRows},
+        },
+        properties: {
+            types: () => propertyTypes?.types.value ?? {},
+            setType: async (key, type) => { await propertyTypes?.set(key, type) },
         },
         tabs: {
             open: (id, kind) => useAppNavigator().toWorkspaceTab(session.uuid, $tabs.openTab(id, kind)),
@@ -125,7 +137,6 @@ onBeforeUnmount(async () => {
     $tabs.clearTabs()
     await index.stopWatcher()
     index.clearIndex()
-    $editorDispatcher.dispatcher.unmount()
     $sesh.removeSession($sessionId)
 })
 </script>

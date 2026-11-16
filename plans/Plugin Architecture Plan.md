@@ -520,16 +520,41 @@ Blocked by X2.
 - `bases-map`, a second layer (`requires: ["bases"]`, on by default, so vaults with map views open as they do now): the map layout. In Obsidian the map is a plugin of its own (Maps), which registers a Bases view; here it's the same, and the first plugin built on another plugin's API beyond one component (mermaid's `Diagram`).
   - It takes `Map.vue`, `basesMap.ts` and its test, the map's strings (the layout's name, its options, its right-click menu) and `maplibre-gl` with its `optimizeDeps` entry.
   - It declares `network`: the map loads tiles from OpenFreeMap, or from the URLs a view names. This is disclosure only: the webview fetches tiles itself (the app has no CSP), not through `http_fetch`.
-- **Bases' API** (`layers/bases/app/api.ts`, provided with `ctx.provide`): `registerView({type, label, icon, component | mount, options?, embedHeight?(view)})`, removed like any registration.
+- **Bases' API** (`layers/bases/app/api.ts`, provided with `ctx.provide`): `registerView({type, label, icon, component | mount, options?, embedStyle?(view)})`, removed like any registration.
   - Bases' own layouts (table, cards, list, kanban) register through it too. The three hand-kept lists (`LAYOUTS` in `Base.vue`, `LAYOUT_ICONS` in the views menu, `LAYOUT_FIELDS` in `ViewOptions.vue`), `Base.vue`'s chain of layout components and its per-layout embed heights become one registry.
   - A view is drawn through `PluginMount` with what the map reads from `BaseContext` today: the base, the view and its options, the query result, `property(id)`, `commit`, the New item preset and opening New, `thisPath`, `embed`, and the `SessionContext`. The API also gives `Value` (a cell's value drawn as Bases draws it), which the map's popup shows. The types are over the parser's own (`@type32/obsidian-bases-parser`), which a view imports itself.
   - `options` are the Configure view fields, with the kinds `ViewOptions.vue` has (`slider`, `select`, `switch`, `text`, `property`, `formula`; the map's `tiles` becomes a general list-of-lines kind). Their labels are the registering plugin's keys.
   - A view whose type nothing registered shows "unknown view type", as now. That is what a map view shows with `bases-map` off, as in Obsidian without Maps; the file is left as it is.
 
+### Decisions
+
+What Bases reaches in the kernel today, and what replaces it:
+- **`SessionContext.files` grows** by what Bases writes with, under X4's names: `create(folder, name)` (folder workspace-relative, created when missing), `edit(edits, label)` (new text for notes, one undo step), `move(uuids, folder)`, `undo()`, `redo()`. X4 adds the rest.
+- **`SessionContext.properties`**: `types()` and `setType(key, type)`, the vault's `types.json` (`usePropertyTypes` stays the kernel's, as the editor's panel uses it).
+- **The frontmatter writer** is public: `shared/plugin/frontmatter.ts` (`obsidianYaml`, `setFrontmatterProperty`). `ActiveWorkspaceFileIndex` (what `index` returns) is exported from the contract.
+- **`openExternal(url)`** (a web or mail link in the default app, anything else refused) is published in `app/plugin/ui`, hoisted out of `useAppOpener`; mermaid's diagram and canvas's host, which inlined it, use it too.
+- **A base's context holds the `SessionContext`**, not the `ActiveSession`: cards, cells and the map open notes with `tabs.open` and load images with `files.assetUrl`.
+- **Insert new base** inserts into the note's editor through `session.editor.viewOf`. The editor dispatcher had only that event left: `useActiveEditorDispatcher`, `EditorDispatcherEvents`, RichText's handler and the `@type32/dispatcher` module go.
+- **Commands stay a palette group** (`ctx.commands.paletteGroup`, already the contract); the plan's "registered commands with `enabled`" predates palette groups.
+- **Move with Bases:** `afterOverlaysClose` (only Bases uses it; views get it as `context.newItem`), `baseKind`, `baseFile` and its test, `isBasesFile`, the `bases*` utilities and their tests (`app/lib/`). Strings: `plugins.bases.*`, with copies of the kernel strings it showed (save and create failures, the property type names); the map's under `plugins.bases-map.*`.
+- **Dependencies:** `xss` and `@codemirror/autocomplete` (and their `optimizeDeps` entries) go to `bases`, `maplibre-gl` to `bases-map`; the parser stays in the root too (the index and the frontmatter writer use it).
+- **Every view is keyed by its name** (only the map was), so switching views draws a fresh layout.
+
 ### Acceptance
-- [ ] The shared acceptance, for both; embeds in notes, callouts and canvas cards still work; the Bases tests pass in their layers.
-- [ ] With `bases-map` off, a map view says its type is unknown, the other views work, and `maplibre-gl` isn't fetched. With `bases` off, `bases-map` is off and Settings → Plugins says why.
-- [ ] `bases-map` imports nothing of Bases but its `app/api.ts`.
+- [ ] The shared acceptance, for both; embeds in notes, callouts and canvas cards still work; the Bases tests pass in their layers. (In `tauri dev`: a base's tab; all five layouts embedded in a note by view (`![[all.base#K]]`…), a ` ```base ` block, a canvas `.base` card; the map 400 px high in a note, with markers; Insert new base from the palette; the new `files` and `properties` operations. Off: see below. Not run: SMOKE 111–122 by hand (cell editing, kanban drags, the views menu and Configure view, filters, the map's popup and right click), callouts.)
+- [x] With `bases-map` off, a map view says its type is unknown, the other views work, and `maplibre-gl` isn't fetched. With `bases` off, `bases-map` is off (`requirementOff`), a `.base` opens as YAML, and no Bases code is fetched. (Settings → Plugins' reason text not looked at; it's the K2 row that names a requirement that's off.)
+- [x] `bases-map` imports nothing of Bases but its `app/api.ts` (the boundary test passes with `EXCEPTIONS` empty).
+
+### As built
+
+- **Layers:**
+  - `layers/bases/`: `plugin.json`; `package.json` (`xss`, `@codemirror/autocomplete`, the parser); `nuxt.config.ts` (prefix `Bases`, their `optimizeDeps`); `app/plugin.ts` (file type, viewer, code block, embed, palette group, the four layouts, `ctx.provide`; `basesContext()`); `app/api.ts`; 31 components; `app/lib/` (`useBaseContext`, `useBaseHost`, `useNoteProperties`, `useBaseCommands`, `useGroupFolds`, `useListDrag`, `views.ts` (the registry), `overlays.ts`, `baseFile.ts`, the `bases*` utilities, and their six tests).
+  - `layers/bases-map/`: `plugin.json` (`requires: ["bases"]`, `network`); `package.json` (`maplibre-gl`, the parser); `app/plugin.ts` (registers `map` with its ten options and `embedStyle`; `basesApi()`); `app/components/View.vue` (props, not the injected context; `Value` from the API); `app/lib/basesMap.ts` and its test.
+- **Contract:** `SessionContext.files.{create, edit, move, undo, redo}`, `SessionContext.properties`, `ActiveWorkspaceFileIndex` exported, `shared/plugin/frontmatter.ts`, `openExternal` in `app/plugin/ui` (mermaid and canvas moved onto it).
+- **Kernel:** the editor dispatcher is gone (`useActiveEditorDispatcher`, `events.d.ts`, RichText's handler, the `@type32/dispatcher` module and dependency); `baseKind` and `isBasesFile` are gone; `xss`, `@codemirror/autocomplete` and `maplibre-gl` left the root `package.json` and `optimizeDeps`. The boundary test's auto-import check counts a destructured binding as the file's own (`bindsLocally`, with a case): `baseFile.ts`'s `const {embeds} = node.meta` read as the kernel's `embeds`.
+- **Rust:** the test that turns chat off and expects `http_fetch` gone also turns `bases-map` off, which now asks for `network` too.
+- **On the way:** the image property's label on Configure view was the missing key `options.image` (shown raw); its field is labelled `options.imageProperty` now.
+- **Numbers:** 364 tests (43 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X4: Files and the palette
 

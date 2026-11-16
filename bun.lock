@@ -9,7 +9,6 @@
         "@ai-sdk/tool-web-fetch": "^1.0.20",
         "@ai-sdk/vue": "^4.0.170",
         "@catppuccin/codemirror": "^1.0.3",
-        "@codemirror/autocomplete": "^6.20.4",
         "@codemirror/commands": "^6.11.1",
         "@codemirror/state": "^6.7.6",
         "@codemirror/view": "^6.43.15",
@@ -33,7 +32,6 @@
         "@tiptap/extension-collaboration": "^3.33.1",
         "@tiptap/extension-node-range": "^3.33.1",
         "@type32/codemirror-rich-obsidian-editor": "^0.5.0",
-        "@type32/dispatcher": "^0.1.2",
         "@type32/nuxt-predicates": "^1.1.0",
         "@type32/obsidian-bases-parser": "^0.5.1",
         "@type32/workflows": "^0.1.3",
@@ -47,14 +45,12 @@
         "diff": "^9.0.0",
         "just-bash": "^3.6.0",
         "katex": "^0.19.1",
-        "maplibre-gl": "^6.18.0",
         "nuxt": "^4.6.4",
         "rangi": "^2.2.0",
         "reka-ui": "^2.11.0",
         "tailwindcss": "^4.3.5",
         "vue": "^3.5.45",
         "vue-codemirror6": "^1.7.0",
-        "xss": "^1.0.17",
         "yjs": "^13.6.33",
         "zod": "^4.6.7",
       },
@@ -71,6 +67,21 @@
     },
     "layers/backlinks": {
       "name": "@vertex-plugins/backlinks",
+    },
+    "layers/bases": {
+      "name": "@vertex-plugins/bases",
+      "dependencies": {
+        "@codemirror/autocomplete": "^6.20.4",
+        "@type32/obsidian-bases-parser": "^0.5.1",
+        "xss": "^1.0.17",
+      },
+    },
+    "layers/bases-map": {
+      "name": "@vertex-plugins/bases-map",
+      "dependencies": {
+        "@type32/obsidian-bases-parser": "^0.5.1",
+        "maplibre-gl": "^6.18.0",
+      },
     },
     "layers/canvas": {
       "name": "@vertex-plugins/canvas",
@@ -991,8 +1002,6 @@
 
     "@type32/codemirror-rich-obsidian-editor": ["@type32/codemirror-rich-obsidian-editor@0.5.0", "", { "dependencies": { "@catppuccin/codemirror": "^1.0.3", "@nuxt/kit": "^4.0.0", "alfaaz": "^1.1.0", "diff": "^9.0.0", "lezer-markdown-obsidian": "^0.0.3", "yaml": "^2.9.1" }, "peerDependencies": { "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/vue": "^4.0.0", "@codemirror/autocomplete": "^6.20.0", "@codemirror/commands": "^6.11.1", "@codemirror/lang-markdown": "^6.5.0", "@codemirror/language": "^6.12.2", "@codemirror/language-data": "^6.5.2", "@codemirror/lint": "^6.9.7", "@codemirror/search": "^6.7.2", "@codemirror/state": "^6.5.4", "@codemirror/view": "^6.0.0", "@lezer/common": "^1.0.0", "@lezer/highlight": "^1.2.5", "@lezer/markdown": "^1.6.3", "@nuxt/ui": "^4.12.0", "ai": "^7.0.0", "codemirror": "^6.0.2", "comark": "^0.9.0", "katex": ">=0.16.33 <1", "tailwindcss": "^4.2.1", "vue": "^3.5.0", "vue-codemirror6": "^1.4.2" }, "optionalPeers": ["@ai-sdk/openai-compatible", "@ai-sdk/vue", "@nuxt/ui", "ai", "comark", "tailwindcss", "vue"] }, "sha512-6oDXYK5HGoaHZB7hvd86+Aw11TlKET+a6hUa3spEMhG5J+B+xp+hSYxwHE31ELrVnPBG24HfErGAPZWrDwGPTg=="],
 
-    "@type32/dispatcher": ["@type32/dispatcher@0.1.2", "", { "dependencies": { "@nuxt/kit": "^4.2.2", "mitt": "^3.0.1" } }, "sha512-jN/r9L7CkwLi/HkK5fJ7ant8WmC3HbZq2K95/SB7FN97yU/wC7wOakLpmLzP/aKVORHbweTGw/UDjhvEbjcipA=="],
-
     "@type32/jsoncanvas-editor": ["@type32/jsoncanvas-editor@0.1.2", "", { "dependencies": { "@comark/vue": "^0.9.1", "@nuxt/kit": "^4.6.4", "@vueuse/core": "^15.0.0", "comark": "^0.9.1" }, "peerDependencies": { "@nuxt/ui": "^4.12.0", "vue": "^3.5.0" } }, "sha512-bkY1LPOgBJ3OGj8fKaLc3vkjuund6FPW0kwYYEA3kDJOC0vJI7Hxqtg8X0oCcIZ+xAlJOGYpqzc5NtuMnss+QQ=="],
 
     "@type32/latex2vue": ["@type32/latex2vue@3.1.18", "", { "dependencies": { "@latex2js/macros": "3.0.10", "@latex2js/pstricks": "3.1.4", "@latex2js/utils": "3.0.12", "latex2js": "^3.1.4", "mathjaxjs": "3.0.10", "vue": "3.5.27" } }, "sha512-jPL1U416HGOWZzVmAlWMkMcs+dUTl+KvVom9T/vTbRTAJQFeN14bmRGHlumGiQep8CexioshsDK6yrEumDZwZw=="],
@@ -1094,6 +1103,10 @@
     "@vercel/oidc": ["@vercel/oidc@3.2.0", "", {}, "sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug=="],
 
     "@vertex-plugins/backlinks": ["@vertex-plugins/backlinks@workspace:layers/backlinks"],
+
+    "@vertex-plugins/bases": ["@vertex-plugins/bases@workspace:layers/bases"],
+
+    "@vertex-plugins/bases-map": ["@vertex-plugins/bases-map@workspace:layers/bases-map"],
 
     "@vertex-plugins/canvas": ["@vertex-plugins/canvas@workspace:layers/canvas"],
 
@@ -1900,8 +1913,6 @@
     "minipass": ["minipass@7.1.3", "", {}, "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="],
 
     "minizlib": ["minizlib@3.1.0", "", { "dependencies": { "minipass": "^7.1.2" } }, "sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw=="],
-
-    "mitt": ["mitt@3.0.1", "", {}, "sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw=="],
 
     "mkdirp-classic": ["mkdirp-classic@0.5.3", "", {}, "sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A=="],
 

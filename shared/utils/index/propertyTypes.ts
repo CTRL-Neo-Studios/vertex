@@ -1,5 +1,4 @@
 import type {PropertyType} from "@type32/codemirror-rich-obsidian-editor";
-import type {PropertyKind} from "@type32/obsidian-bases-parser";
 
 /**
  * Property types as Obsidian's `types.json` has them (checked against Obsidian 1.15.1): `{"types": {key: type}}`,
@@ -36,9 +35,3 @@ const EDITOR_TYPES: Record<string, PropertyType> = {
 /** A stored type as the editor's properties panel names it; Obsidian-only ones (`file`, `folder`…) are left to inference. */
 export const editorType = (stored: string): PropertyType | undefined => EDITOR_TYPES[stored]
 export const storedType = (type: PropertyType): string => (type === 'list' ? 'multitext' : type)
-
-const KINDS: Record<string, PropertyKind> = {
-    text: 'text', multitext: 'list', tags: 'list', aliases: 'list', number: 'number', checkbox: 'checkbox', date: 'date', datetime: 'date',
-}
-/** A stored type as Bases treats it (menus, cell editors); `undefined` leaves it to the values. */
-export const baseKind = (stored: string | undefined): PropertyKind | undefined => (stored ? KINDS[stored] : undefined)

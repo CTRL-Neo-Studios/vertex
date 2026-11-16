@@ -18,7 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'bases': ['app/components/ViewerEditor/Bases/', 'app/components/ViewerEditor/BasesViewer', 'app/composables/bases/', 'app/utils/bases', 'shared/utils/index/baseFile'],
     'files': ['app/components/FileTreeComponent', 'app/components/LayoutComponents/PanelFilesView'],
     'palette': ['app/components/WorkspaceCommandPalette', 'app/components/CommandPaletteButton'],
     'workflows': [
@@ -142,6 +141,13 @@ function kernelAutoImports(files: Files): Map<string, string> {
     return names
 }
 
+/** Whether `code` names `name` itself: imports it, declares it, or destructures it (`const {embeds} = node.meta`). */
+function bindsLocally(code: string, name: string) {
+    return new RegExp(`import[^;]*\\b${name}\\b[^;]*from`).test(code)
+        || new RegExp(`\\b(?:const|let|var|function|class|type|interface|enum)\\s+${name}\\b`).test(code)
+        || new RegExp(`\\b(?:const|let|var)\\s*[{[][^=;]*\\b${name}\\b[^=;]*[}\\]]\\s*=`).test(code)
+}
+
 /** The plugin a resident module (path without extension) belongs to: a listed module, or a file under a listed folder or name prefix. */
 const residentOf = (residents: Record<string, string[]>, module: string) =>
     Object.entries(residents).find(([, prefixes]) => prefixes.some(p => module === p || module.startsWith(p)))?.[0]
@@ -204,9 +210,7 @@ function checkBoundaries(
             const code = withoutStrings(withoutComments(source))
             for (const [name, module] of autoImports) {
                 if (!residentOf(residents, module) || !new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}(?![\\w$])`).test(code)) continue
-                const imported = new RegExp(`import[^;]*\\b${name}\\b[^;]*from`).test(code)
-                const declared = new RegExp(`\\b(?:const|let|var|function|class|type|interface|enum)\\s+${name}\\b`).test(code)
-                if (!imported && !declared) reachesFeature(path, module, `uses ${name}, auto-imported from ${module}`)
+                if (!bindsLocally(code, name)) reachesFeature(path, module, `uses ${name}, auto-imported from ${module}`)
             }
             continue
         }
@@ -231,9 +235,7 @@ function checkBoundaries(
         const code = withoutStrings(withoutComments(source))
         for (const [name, module] of autoImports) {
             if (!new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}(?![\\w$])`).test(code)) continue
-            const imported = new RegExp(`import[^;]*\\b${name}\\b[^;]*from`).test(code)
-            const declared = new RegExp(`\\b(?:const|let|var|function|class|type|interface|enum)\\s+${name}\\b`).test(code)
-            if (!imported && !declared) add('layer-reaches-kernel', path, `uses ${name}, auto-imported from ${module}; import it`)
+            if (!bindsLocally(code, name)) add('layer-reaches-kernel', path, `uses ${name}, auto-imported from ${module}; import it`)
         }
     }
 
@@ -349,6 +351,8 @@ describe('checkBoundaries', () => {
     it('4: an auto-imported folder in a layer, a kernel auto-import used without importing it, a layer without a manifest', () => {
         expect(rules({
             'layers/ai/app/composables/useAi.ts': 'export const useAi = () => stateClient',
+            // Its own binding of the same name, destructured: not the auto-import.
+            'layers/ai/app/lib/meta.ts': 'export const meta = (node: {m: {stateClient: number}}) => { const {stateClient} = node.m; return stateClient }',
             'layers/stray/app/plugin.ts': '',
         })).toEqual([
             'layer-layout layers/stray: no plugin.json',

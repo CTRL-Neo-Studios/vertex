@@ -1,6 +1,6 @@
 import {dirname, join} from "@tauri-apps/api/path";
 import {readTextFile, writeFile} from "@tauri-apps/plugin-fs";
-import {openUrl} from "@tauri-apps/plugin-opener";
+import {openExternal} from "~/plugin/ui";
 import {fileKind, type FileKind} from "@type32/jsoncanvas-editor/core";
 import type {CanvasHost} from "@type32/jsoncanvas-editor/vue";
 import type {SessionContext} from "#shared/plugin/api";
@@ -60,10 +60,7 @@ export function useCanvasHost(session: SessionContext, canvasPath: () => string 
             const file = index.resolveLink(target.split('#')[0]!.trim())
             if (file) void tabs.open(file.uuid)
         },
-        // Web and mail links only: anything else (a `file:` or an app's scheme) would launch what the system maps it to.
-        openUrl: (url) => {
-            if (/^(https?|mailto):/i.test(url.trim())) void openUrl(url)
-        },
+        openUrl: url => void openExternal(url),
         async saveImage(png) {
             const canvas = canvasPath()
             const base = canvas?.slice(canvas.lastIndexOf('/') + 1).replace(/\.canvas$/, '') || 'Canvas'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {mount, type Mounted, type MountOptions} from "pele";
-import {openUrl} from "@tauri-apps/plugin-opener";
+import {openExternal} from "~/plugin/ui";
 
 const props = defineProps<{ source: string, options?: MountOptions }>()
 const el = useTemplateRef<HTMLDivElement>('el')
@@ -10,15 +10,14 @@ onMounted(() => diagram = mount(el.value!, props.source, props.options))
 watch(() => props.source, source => diagram?.update(source))
 onBeforeUnmount(() => diagram?.destroy())
 
-// An <a> in the SVG would navigate the Tauri window away from the app; send web and mail links to the default app
-// instead (anything else, a `file:` or an app's scheme, is refused: it'd launch whatever the system maps it to).
+// An <a> in the SVG would navigate the Tauri window away from the app; send its links to the default app instead.
 // ponytail: internal (note-name) links are swallowed, wire them to workspace navigation when wanted.
 function onClick(event: MouseEvent) {
     const link = (event.target as Element).closest('a')
     if (!link) return
     event.preventDefault()
-    const href = link.getAttribute('href')?.trim()
-    if (href && !link.classList.contains('internal-link') && /^(https?|mailto):/i.test(href)) void openUrl(href)
+    const href = link.getAttribute('href')
+    if (href && !link.classList.contains('internal-link')) void openExternal(href)
 }
 </script>
 

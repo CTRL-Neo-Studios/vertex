@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {isBasesFile, isPlainTextFile, isWorkflowFile} from '#shared/utils/fs/filenames'
+import {isPlainTextFile, isWorkflowFile} from '#shared/utils/fs/filenames'
 import {fileViewers} from './contributions'
 import {viewerFor} from './viewers'
 
@@ -9,7 +9,7 @@ fileViewers.register({id: 'image', loadsText: false, match: ext => ['png', 'jpg'
 fileViewers.register({id: 'yaml', loadsText: true, match: ext => ext === 'yml' || ext === 'yaml', component})
 fileViewers.register({id: 'latex', loadsText: true, match: ext => ext === 'tex', component})
 fileViewers.register({id: 'canvas', loadsText: true, modes: ['workspace'], match: ext => ext === 'canvas', component})
-fileViewers.register({id: 'bases', loadsText: true, modes: ['workspace'], match: isBasesFile, component})
+fileViewers.register({id: 'bases', loadsText: true, modes: ['workspace'], match: ext => ext === 'base', component})
 fileViewers.register({id: 'workflow', loadsText: true, modes: ['workspace'], match: isWorkflowFile, component})
 
 describe('viewerFor', () => {

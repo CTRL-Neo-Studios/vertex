@@ -12,9 +12,11 @@ const SESSION = {
         backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {},
     },
     files: {
-        assetUrl: () => '', write: async () => {}, importAttachments: async () => [], pick: async () => undefined,
+        assetUrl: () => '', write: async () => {}, create: async () => undefined, edit: async () => {}, move: async () => {},
+        undo: async () => {}, redo: async () => {}, importAttachments: async () => [], pick: async () => undefined,
         drag: {rows: () => undefined},
     },
+    properties: {types: () => ({}), setType: async () => {}},
     tabs: {open: async () => {}, close: async () => {}, active: () => null, list: () => []},
     editor: {viewOf: () => undefined, embedFor: () => undefined},
     watch: () => () => {},
