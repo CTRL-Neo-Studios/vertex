@@ -1,0 +1,7 @@
+{
+  "id": "outgoing-links",
+  "name": "Outgoing links",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": ["session", "settings"]
+}

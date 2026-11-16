@@ -1,9 +1,9 @@
-import type {EditorState, Extension} from "@codemirror/state";
+import type {Extension} from "@codemirror/state";
 import {ViewPlugin, type EditorView} from "@codemirror/view";
-import {editorLabels, headingAt, headingsField, type Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
+import {editorLabels} from "@type32/codemirror-rich-obsidian-editor/kit";
 import {blockDragHandle, selectionToolbar, slashMenu} from "@type32/codemirror-rich-obsidian-editor/ext";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import {sessionScope, StateKey} from "#shared/constants/app";
+import {sessionScope} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useEditorFileDrops} from "~/composables/active/editor/useEditorFileDrops";
 
@@ -29,11 +29,6 @@ const LABEL_KEYS = [
     'ui.properties.type.object', 'ui.properties.type.unknown',
 ] as const
 
-function outlineKeys(session: ActiveSession | undefined, tabId: string) {
-    const scope = sessionScope(session, 'useActiveEditorExtensions')
-    return {outline: StateKey.tabOutline(scope, tabId), activeHeading: StateKey.tabActiveHeading(scope, tabId)}
-}
-
 /**
  * Mounted markdown editors by `${scope}:${tabId}`; a view isn't serializable, so it lives here and not in `useState`.
  * Shallow-reactive, so code can wait for a note's editor to mount.
@@ -58,22 +53,8 @@ export function editorViewsOf(session: ActiveSession | undefined) {
     return [...views].flatMap(([key, view]) => key.startsWith(prefix) ? [view] : [])
 }
 
-/** Read-only outline of a tab's markdown editor and the `from` of the heading containing the cursor; follows `tabId`. */
-export function useTabOutline(session: ActiveSession | undefined, tabId: MaybeRefOrGetter<string>) {
-    const nuxtApp = useNuxtApp()
-    const keys = computed(() => outlineKeys(session, toValue(tabId)))
-    return {
-        // `runWithContext` is typed as possibly async; `useState` is sync.
-        outline: computed(() => (nuxtApp.runWithContext(() => useState<Heading[]>(keys.value.outline, () => [])) as Ref<Heading[]>).value),
-        activeHeading: computed(() => (nuxtApp.runWithContext(() => useState<number | null>(keys.value.activeHeading, () => null)) as Ref<number | null>).value),
-    }
-}
-
-/** The kernel's CodeMirror extensions for a tab's markdown editor (`useNoteEditor` adds the plugins'): labels, outline tracking, file drops and the optional ready-made UI extensions. */
+/** The kernel's CodeMirror extensions for a tab's markdown editor (`useNoteEditor` adds the plugins'): labels, the tracker behind `editorViewOf`, file drops and the optional ready-made UI extensions. */
 export function useActiveEditorExtensions(session: ActiveSession | undefined, tabId: MaybeRefOrGetter<string>) {
-    const keys = outlineKeys(session, toValue(tabId))
-    const outline = useState<Heading[]>(keys.outline, () => [])
-    const activeHeading = useState<number | null>(keys.activeHeading, () => null)
     const {effective} = useSettingsScope()
     const {t, locale} = useI18n()
     const fileDrops = useEditorFileDrops(session)
@@ -83,32 +64,17 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
         return editorLabels.of(Object.fromEntries(LABEL_KEYS.map(k => [k, t(`app.editor.labels.${k}`, {n: '{n}', total: '{total}'})])))
     })
 
-    // The heading list is a new array on every edit: stored raw (no deep proxy of every heading) and at most every
-    // 100 ms while typing, with the active heading in the same write so the two always match.
-    let lastHeadings: Heading[] | undefined
-    const sync = useThrottleFn((state: EditorState) => {
-        const list = state.field(headingsField)
-        if (list !== lastHeadings) outline.value = lastHeadings = markRaw(list)
-        const from = headingAt(state, state.selection.main.head)?.from ?? null
-        if (from !== activeHeading.value) activeHeading.value = from
-    }, 100, true, true)
-    // A view plugin rather than an update listener so the outline is also written when the view is created.
     const scope = sessionScope(session, 'useActiveEditorExtensions')
     const viewKey = `${scope}:${toValue(tabId)}`
     const tracker = ViewPlugin.define(view => {
         views.set(viewKey, view)
         lastShown.set(scope, toValue(tabId))
-        sync(view.state)
-        return {
-            update: u => sync(u.state),
-            destroy: () => { if (views.get(viewKey) === view) views.delete(viewKey) },
-        }
+        return {destroy: () => { if (views.get(viewKey) === view) views.delete(viewKey) }}
     })
     return computed<Extension[]>(() => {
         const panel = effective.value?.viewConfig.editorPanel
         return [
             labels.value,
-            headingsField,
             tracker,
             fileDrops,
             panel?.selectionToolbar ?? true ? toolbarExt : [],

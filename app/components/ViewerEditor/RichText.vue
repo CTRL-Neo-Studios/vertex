@@ -6,7 +6,6 @@ import {selectAll} from "@codemirror/commands";
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {ContextMenuItem} from "@nuxt/ui";
 import type {PluginMenuItem} from "#shared/plugin/api";
-import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -72,15 +71,8 @@ async function openLink({referenceId}: InternalLinkClickDetail) {
 const {openUrlInBrowser} = useAppOpener()
 const openExternalLink = ({url}: ExternalLinkClickDetail) => openUrlInBrowser(url)
 
-// The outline's jumps and Insert new base arrive through the session's editor dispatcher.
+// Insert new base arrives through the session's editor dispatcher.
 const {dispatcher} = useActiveEditorDispatcher(session)
-function toTocEntry({from, verticalScrollStrategy, verticalMargin}: ToTocEntryProps) {
-    const view = editorView.value
-    if (!view) return
-    view.dispatch({selection: {anchor: from}, effects: EditorView.scrollIntoView(from, {y: verticalScrollStrategy ?? 'start', yMargin: verticalMargin ?? 70})})
-    view.focus()
-}
-dispatcher.on('editor.tableOfContents.toEntry', toTocEntry)
 
 /** As Obsidian's "Insert new base": a line break first if the cursor's line has text before it, one after. */
 function insertBlock({text}: { text: string }) {

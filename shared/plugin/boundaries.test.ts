@@ -18,14 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'mermaid': ['app/components/EditorProse/CodeBlock/MermaidGraph', 'app/components/Modals/PreviewMermaidGraphModal', 'app/components/Utility/MermaidDiagram'],
-    'image': ['app/components/ViewerEditor/ImageViewer', 'app/components/EditorProse/Embed/ImageDisplay'],
-    'yaml-form': ['app/components/ViewerEditor/YamlDataForm', 'app/components/ViewerEditor/Component/DataEditorForm'],
-    'latex': ['app/components/ViewerEditor/LatexDoc', 'app/plugins/latex2vue.client'],
-    'outline': ['app/components/TableOfContentsPanelComponent', 'app/components/MinimalLineToc'],
-    'backlinks': ['app/components/ReferenceBacklinksListComponent'],
-    'outgoing-links': ['app/components/ReferenceForelinksListComponent'],
-    'writers-tools': ['app/components/WritersInfoPanelComponent', 'app/components/ViewerEditor/Component/WordCounter'],
     'canvas': ['app/components/ViewerEditor/CanvasViewer', 'app/components/ViewerEditor/Component/CanvasCardEditor', 'app/composables/canvas/', 'shared/utils/index/canvasLinks'],
     'bases': ['app/components/ViewerEditor/Bases/', 'app/components/ViewerEditor/BasesViewer', 'app/composables/bases/', 'app/utils/bases', 'shared/utils/index/baseFile'],
     'files': ['app/components/FileTreeComponent', 'app/components/LayoutComponents/PanelFilesView'],

@@ -572,13 +572,6 @@
 				"duplicate": "Duplicate",
 				"rename": "Rename",
 				"delete": "Delete",
-				"forelinks": "Forelinks",
-				"backlinks": "Backlinks",
-				"noForelinks": "No forelinks.",
-				"noBacklinks": "No backlinks.",
-				"analyzeText": "Analyze Text",
-				"previewMermaid": "Preview Mermaid Graph",
-				"copiedMermaid": "Copied Mermaid diagram code.",
 				"palette": {
 					"quickActions": "Quick Actions",
 					"commands": "Commands",
@@ -989,11 +982,6 @@
 				"copyRelativePath": "Copy relative path",
 				"revealInFileExplorer": "Reveal in File Explorer",
 				"moveFileTo": "Move file to…",
-				"jumpToHeading": "Jump to Level {level} Content in Editor",
-				"functions": {
-					"writersTools": "Writer's Tools",
-					"tableOfContents": "Table of Contents"
-				},
 				"updateLinks": {
 					"title": "Update links to “{name}”?",
 					"description": "{links} link(s) in {files} note(s) point to the old name or place.",
@@ -1923,9 +1911,6 @@
 				}
 			}
 		},
-		"frontmatter": {
-			"color": "Color"
-		},
 		"generic": {
 			"name": "Name",
 			"type": "Type",
@@ -1942,10 +1927,7 @@
 			},
 			"fileName": "File Name",
 			"black": "Black",
-			"properties": "Properties",
-			"words": "Words",
-			"lines": "Lines",
-			"paragraphs": "Paragraphs"
+			"properties": "Properties"
 		},
 		"chat": {
 			"files": "Files",

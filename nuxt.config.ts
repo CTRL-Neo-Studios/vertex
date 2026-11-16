@@ -108,7 +108,6 @@ export default defineNuxtConfig({
                 // Imported by pages/settings/index.vue; found at runtime otherwise, which reloads the page mid-load ("head.hooks").
                 "@tauri-apps/api/app",
                 "tailwindcss/colors",
-                "pele",
                 "ai",
                 "@ai-sdk/openai-compatible",
                 "@ai-sdk/vue",
@@ -124,10 +123,8 @@ export default defineNuxtConfig({
                 // which reloads the window.
                 "xss",
                 "@codemirror/autocomplete",
-                "@type32/latex2vue",
                 "zod",
                 "@vue-flow/core",
-                "alfaaz",
                 // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
                 // The chat's `bash` tool (app/utils/chatBash.ts), imported on its first command; same reason.

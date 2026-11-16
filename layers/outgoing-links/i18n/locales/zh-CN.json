@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"outgoing-links": {
+			"title": "出链",
+			"empty": "没有出链。"
+		}
+	}
+}

@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"mermaid": {
+			"copied": "Copied Mermaid diagram code.",
+			"preview": "Preview Mermaid Graph"
+		}
+	}
+}

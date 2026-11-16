@@ -1,0 +1,11 @@
+{
+	"plugins": {
+		"writers-tools": {
+			"title": "写作工具",
+			"analyzeText": "分析文本",
+			"words": "词",
+			"lines": "行",
+			"paragraphs": "段"
+		}
+	}
+}

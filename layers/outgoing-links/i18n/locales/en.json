@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"outgoing-links": {
+			"title": "Forelinks",
+			"empty": "No forelinks."
+		}
+	}
+}

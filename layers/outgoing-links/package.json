@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/outgoing-links",
+  "private": true,
+  "type": "module"
+}

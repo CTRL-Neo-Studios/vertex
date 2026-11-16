@@ -1,0 +1,8 @@
+{
+  "name": "@vertex-plugins/latex",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@type32/latex2vue": "^3.1.18"
+  }
+}

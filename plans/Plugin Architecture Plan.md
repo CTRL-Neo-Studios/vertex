@@ -443,12 +443,42 @@ Every extraction is accepted when:
 Blocked by K4 and the Window Permissions Plan (W0–W4, both done), so each extraction declares its plugin's permissions
 once. A built-in moving to its layer keeps its manifest from `app/builtins/plugins.json`, permissions included.
 
-- `mermaid` (code block, preview modal), `image` (viewer, embed), `yaml-form` (viewer), `latex` (viewer; `latex2vue.client.ts` becomes part of its activation), `outline` (the TOC view and the line TOC), `backlinks`, `outgoing-links`, `writers-tools` (its view and the word counter).
+- `mermaid` (code block, preview modal), `image` (viewer, embed), `yaml-form` (viewer), `latex` (viewer), `outline` (the TOC view and the line TOC), `backlinks`, `outgoing-links`, `writers-tools` (its view and the word counter).
 - They prove panel views, viewers, code blocks, embeds and status items, with almost no logic to move.
 
+### Decisions
+
+What the eight reach in the kernel today, and what replaces it:
+- **Viewer chrome** (image, yaml-form, latex): `LayoutWrapper` is published as `ViewerLayout` in `app/plugin/ui`. It draws the header, rename and status bar, with the registered status items, so writers-tools' counters keep showing in YAML and LaTeX files.
+- **Status items** get `fileId` (the tab's id) and `session` besides `text` and `filePath` (`StatusItemProps`): the line outline finds its note's editor through `session.editor.viewOf(fileId)`.
+- **Outline**: the plugin tracks headings itself, with its own editor extension (a view plugin keeping each view's headings and active heading, throttled as before) and jumps through `viewOf`. The kernel's outline state goes: `useTabOutline`, the outline `useState`, `StateKey.tabOutline`/`tabActiveHeading`, the dispatcher's `emitToTocEntry` and RichText's handler for it.
+- **Panels** (outline, backlinks, outgoing links, writer's tools) use `PanelViewProps.session` (`tabs.active()`, `tabs.open`, `index.byUuid`/`backlinks`/`forelinks`) in place of the route and the kernel's composables.
+- **Embeds** get `assetUrl` from the kernel, as viewers do; `EmbedDef.props`, which only image used, goes.
+- **Small helpers** are inlined: extension checks (`png`… / `yml`, `yaml` / `tex`), toasts through Nuxt UI's `useToast`, mermaid's links through the opener plugin with the kernel's `http(s)`/`mailto` filter (the window's opener scope allows only those anyway).
+- **Chat's mermaid replies**: mermaid provides `{Diagram}` (`layers/mermaid/app/api.ts`); chat, still a built-in, draws ```` ```mermaid ```` with `ctx.use('mermaid')` and falls back to plain code when it's off.
+- **LaTeX**: `latex2vue.client.ts` is deleted, not moved. It registered a global `<Latex>` nobody used (the viewer imports it), and a Nuxt plugin in a layer would load in every window.
+- **Strings** move to `plugins.<id>.*`; panel ids (`toc`, `backlinks`, `forelinks`, `writersTools`) and viewer ids stay, so saved layouts and settings still apply. None of the eight has settings.
+
 ### Acceptance
-- [ ] The shared acceptance, for each of the eight.
-- [ ] None needs a kernel-internal import.
+- [ ] The shared acceptance, for each of the eight. (On: SMOKE 38 with one flowchart (the link, syntax errors and Appearance not run), 39's TOC and line TOC (cursor tracking and jumps; the editor toggles not run), 98's image and LaTeX, 122's mermaid and image in a callout; chat's ```` ```mermaid ```` drawn through mermaid's API, without a model (44 not run). Off: views, viewers, code block, embed and status items gone, no layer code fetched. No settings moved; the panel ids are unchanged. Concepts updated.)
+- [x] None needs a kernel-internal import (`EXCEPTIONS` is empty).
+
+### As built
+
+- **Layers** (`layers/<id>/`, each with `plugin.json` (the manifest it had in `app/builtins/plugins.json`), `package.json`, `nuxt.config.ts` with its component prefix, `app/plugin.ts`, `app/components/`, and its strings in `i18n/locales/` unless it has none):
+  - `mermaid`: `Graph` (the code block), `PreviewModal`, `Diagram` (pele, with its theme variables, out of `main.css`); `app/api.ts` provides `{Diagram}`; `pele` and its `optimizeDeps` entry.
+  - `image`: `Viewer`, `Embed` (`assetUrl`; captioned with the link's name).
+  - `yaml-form`: `Viewer`, `Fields` (the form with the color type; `useFrontmatterTypes` folded in).
+  - `latex`: `Viewer` (no `@reference` to the kernel's CSS: the two `@apply`s are plain CSS); `@type32/latex2vue` and its `optimizeDeps` entry.
+  - `outline`: `app/lib/outline.ts` (the `tracker` extension with `headingsField`, `outlineOf(view)`, `jumpTo`), `Panel`, `Lines`.
+  - `backlinks`, `outgoing-links`: `Panel` each, through `session.index` and `session.tabs`.
+  - `writers-tools`: `Panel`, `Counter`; the `alfaaz` `optimizeDeps` entry.
+- **Contract:** `ViewerLayout` in `app/plugin/ui`; `StatusItemProps {text, filePath, fileId, session}` (status items draw once the session is handed to plugins, as panels do); `EmbedProps.assetUrl` (the link list adds it to every embed); `EmbedDef.props` removed.
+- **Kernel:** the outline's state, `useTabOutline`, `emitToTocEntry` and its event, RichText's handler and `StateKey.tabOutline`/`tabActiveHeading` are gone (the tracker behind `editorViewOf` stays); `isLatexFile` is gone; `viewers.test.ts` registers its own matchers. Chat, still a built-in, keeps `ctx.use` (`chatUses`) for `ChatCodeBlock`.
+- **Strings:** a layer's locale files load with the locale (`@nuxtjs/i18n` merges every layer's), whether the plugin is on or off; its code doesn't.
+- **Moved as they were:** the writer's tools view is one Analyze Text button with no handler; the image viewer's size reads "0 KB"; the LaTeX viewer's unscoped styles (`.cm-code-editor`, `.cm-scroller`, `svg`, `pre`…) reach the whole window once it has loaded.
+- **Checked in `tauri dev`** (separate identifier, a temporary harness and a fixture folder, deleted after): with all on, the diagram, the image embed, the line outline (3 lines, active heading, a click jumps), the word counter; the TOC lists headings and jumps; Backlinks and Outgoing links list the linked note and open it; the YAML form, the LaTeX viewer with the line counter, the image viewer with its size; mermaid and an image inside a callout; chat's code block draws the diagram. Then all eight off and the window reloaded: no layer code fetched, no code block, embed, panel views or status items; YAML and LaTeX open in the code editor, a PNG has no viewer; the note shows the mermaid source.
+- **Numbers:** 349 tests (43 files; the i18n test checks six more catalogs); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X2: Canvas
 

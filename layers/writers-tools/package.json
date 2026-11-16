@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/writers-tools",
+  "private": true,
+  "type": "module"
+}

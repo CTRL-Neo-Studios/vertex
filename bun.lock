@@ -35,7 +35,6 @@
         "@type32/codemirror-rich-obsidian-editor": "^0.5.0",
         "@type32/dispatcher": "^0.1.2",
         "@type32/jsoncanvas-editor": "^0.1.2",
-        "@type32/latex2vue": "^3.1.18",
         "@type32/nuxt-predicates": "^1.1.0",
         "@type32/obsidian-bases-parser": "^0.5.1",
         "@type32/workflows": "^0.1.3",
@@ -51,7 +50,6 @@
         "katex": "^0.19.1",
         "maplibre-gl": "^6.18.0",
         "nuxt": "^4.6.4",
-        "pele": "^1.13.0",
         "rangi": "^2.2.0",
         "reka-ui": "^2.11.0",
         "tailwindcss": "^4.3.5",
@@ -71,6 +69,36 @@
         "vitest": "^5.1.0",
         "vue-tsc": "^3.3.14",
       },
+    },
+    "layers/backlinks": {
+      "name": "@vertex-plugins/backlinks",
+    },
+    "layers/image": {
+      "name": "@vertex-plugins/image",
+    },
+    "layers/latex": {
+      "name": "@vertex-plugins/latex",
+      "dependencies": {
+        "@type32/latex2vue": "^3.1.18",
+      },
+    },
+    "layers/mermaid": {
+      "name": "@vertex-plugins/mermaid",
+      "dependencies": {
+        "pele": "^1.13.0",
+      },
+    },
+    "layers/outgoing-links": {
+      "name": "@vertex-plugins/outgoing-links",
+    },
+    "layers/outline": {
+      "name": "@vertex-plugins/outline",
+    },
+    "layers/writers-tools": {
+      "name": "@vertex-plugins/writers-tools",
+    },
+    "layers/yaml-form": {
+      "name": "@vertex-plugins/yaml-form",
     },
   },
   "trustedDependencies": [
@@ -1059,6 +1087,22 @@
     "@vercel/nft": ["@vercel/nft@1.11.1", "", { "dependencies": { "@mapbox/node-pre-gyp": "^2.0.0", "@rollup/pluginutils": "^5.1.3", "acorn": "^8.6.0", "acorn-import-attributes": "^1.9.5", "async-sema": "^3.1.1", "bindings": "^1.4.0", "estree-walker": "2.0.2", "glob": "^13.0.0", "graceful-fs": "^4.2.9", "node-gyp-build": "^4.2.2", "picomatch": "^4.0.4", "resolve-from": "^5.0.0" }, "bin": { "nft": "out/cli.js" } }, "sha512-RXQA08MdBy9WdKKXf1JCAM6HlZUOUDPDBjwHSz0ZaPcQDVisPR5hPJs2iLHVdfjHq36YIlS9AkzDceegukpqGA=="],
 
     "@vercel/oidc": ["@vercel/oidc@3.2.0", "", {}, "sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug=="],
+
+    "@vertex-plugins/backlinks": ["@vertex-plugins/backlinks@workspace:layers/backlinks"],
+
+    "@vertex-plugins/image": ["@vertex-plugins/image@workspace:layers/image"],
+
+    "@vertex-plugins/latex": ["@vertex-plugins/latex@workspace:layers/latex"],
+
+    "@vertex-plugins/mermaid": ["@vertex-plugins/mermaid@workspace:layers/mermaid"],
+
+    "@vertex-plugins/outgoing-links": ["@vertex-plugins/outgoing-links@workspace:layers/outgoing-links"],
+
+    "@vertex-plugins/outline": ["@vertex-plugins/outline@workspace:layers/outline"],
+
+    "@vertex-plugins/writers-tools": ["@vertex-plugins/writers-tools@workspace:layers/writers-tools"],
+
+    "@vertex-plugins/yaml-form": ["@vertex-plugins/yaml-form@workspace:layers/yaml-form"],
 
     "@vitejs/plugin-vue": ["@vitejs/plugin-vue@6.0.11", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0", "vue": "^3.2.25 || ^3.6.0-rc.15" } }, "sha512-m48lskIUJGlB6qUiYhDMI8nd2ngeidz2U4nKTjqI13cFMu5rH8JeEILPkDtK9Fk/TjBA2pkj8AlbenqDaKu+ww=="],
 

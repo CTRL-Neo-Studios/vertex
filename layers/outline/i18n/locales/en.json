@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"outline": {
+			"title": "Table of Contents",
+			"jumpToHeading": "Jump to Level {level} Content in Editor"
+		}
+	}
+}

@@ -572,13 +572,6 @@
 				"duplicate": "创建副本",
 				"rename": "重命名",
 				"delete": "删除",
-				"forelinks": "出链",
-				"backlinks": "反向链接",
-				"noForelinks": "没有出链。",
-				"noBacklinks": "没有反向链接。",
-				"analyzeText": "分析文本",
-				"previewMermaid": "预览 Mermaid 图表",
-				"copiedMermaid": "已复制 Mermaid 图表代码。",
 				"palette": {
 					"quickActions": "快捷操作",
 					"commands": "命令",
@@ -989,11 +982,6 @@
 				"copyRelativePath": "复制相对路径",
 				"revealInFileExplorer": "在文件管理器中显示",
 				"moveFileTo": "移动文件到…",
-				"jumpToHeading": "跳转到编辑器中的 {level} 级标题",
-				"functions": {
-					"writersTools": "写作工具",
-					"tableOfContents": "目录"
-				},
 				"updateLinks": {
 					"title": "更新指向“{name}”的链接？",
 					"description": "{files} 篇笔记中有 {links} 个链接指向旧的名称或位置。",
@@ -1923,9 +1911,6 @@
 				}
 			}
 		},
-		"frontmatter": {
-			"color": "颜色"
-		},
 		"generic": {
 			"name": "名称",
 			"type": "类型",
@@ -1942,10 +1927,7 @@
 			},
 			"fileName": "文件名",
 			"black": "黑色",
-			"properties": "属性",
-			"words": "词",
-			"lines": "行",
-			"paragraphs": "段"
+			"properties": "属性"
 		},
 		"chat": {
 			"files": "文件",

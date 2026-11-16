@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"backlinks": {
+			"title": "Backlinks",
+			"empty": "No backlinks."
+		}
+	}
+}

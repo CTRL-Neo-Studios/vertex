@@ -1,13 +1,13 @@
 import {describe, expect, it} from 'vitest'
-import {isBasesFile, isCanvasFile, isImage, isLatexFile, isPlainTextFile, isWorkflowFile, isYamlFile} from '#shared/utils/fs/filenames'
+import {isBasesFile, isCanvasFile, isPlainTextFile, isWorkflowFile} from '#shared/utils/fs/filenames'
 import {fileViewers} from './contributions'
 import {viewerFor} from './viewers'
 
-// The builtins' viewers as they register them (`app/builtins/`); the kernel's (markdown, code) come with `viewers.ts`.
+// The plugins' viewers as they register them (`layers/`, `app/builtins/`); the kernel's (markdown, code) come with `viewers.ts`.
 const component = async () => ({})
-fileViewers.register({id: 'image', loadsText: false, match: isImage, component})
-fileViewers.register({id: 'yaml', loadsText: true, match: isYamlFile, component})
-fileViewers.register({id: 'latex', loadsText: true, match: isLatexFile, component})
+fileViewers.register({id: 'image', loadsText: false, match: ext => ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext), component})
+fileViewers.register({id: 'yaml', loadsText: true, match: ext => ext === 'yml' || ext === 'yaml', component})
+fileViewers.register({id: 'latex', loadsText: true, match: ext => ext === 'tex', component})
 fileViewers.register({id: 'canvas', loadsText: true, modes: ['workspace'], match: isCanvasFile, component})
 fileViewers.register({id: 'bases', loadsText: true, modes: ['workspace'], match: isBasesFile, component})
 fileViewers.register({id: 'workflow', loadsText: true, modes: ['workspace'], match: isWorkflowFile, component})

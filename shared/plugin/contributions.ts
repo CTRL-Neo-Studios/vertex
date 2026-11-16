@@ -150,8 +150,18 @@ export interface ViewerDef extends UiSlot<ViewerProps> {
     priority?: number
 }
 
+/** What a status item is drawn with: the shown file's text (empty for a viewer that doesn't load it) and where it is. */
+export interface StatusItemProps {
+    text: string
+    /** As `ViewerProps.filePath`. */
+    filePath: string
+    /** The file's id in the workspace index, also its tab's id (`session.editor.viewOf(fileId)`). */
+    fileId: string
+    session: SessionContext
+}
+
 /** Something a viewer shows besides its content: in its status bar (the word counter), or at its side (the line outline). */
-export interface StatusItemDef extends UiSlot<{ text: string, filePath: string }> {
+export interface StatusItemDef extends UiSlot<StatusItemProps> {
     id: string
     /** The viewers it shows for; default every one that loads text. */
     viewers?: string[]
@@ -259,7 +269,7 @@ export interface CodeBlockDef extends UiSlot<{ codeContent: string, host: Editor
     language: string
 }
 
-/** What an embed is drawn with: the editor's props for `![[file#subpath|display]]`, `host`, and what `props(file)` adds. */
+/** What an embed is drawn with: the editor's props for `![[file#subpath|display]]`, `host`, and `assetUrl`. */
 export interface EmbedProps {
     /** The embedded file's path. */
     filePath: string
@@ -267,6 +277,8 @@ export interface EmbedProps {
     subpath?: string
     /** After `|` (`300` in `![[x.png|300]]`). */
     display?: string
+    /** A URL the webview can load the file from, as `ViewerProps.assetUrl`. */
+    assetUrl: string
     host: EditorHost
     [prop: string]: unknown
 }
@@ -278,8 +290,6 @@ export interface EmbedDef extends UiSlot<EmbedProps> {
     match(extension: string): boolean
     /** How `![[…]]` names the file: `fileName` (default) with its extension (`photo.png`), `name` without (`Board`). */
     linkName?: 'name' | 'fileName'
-    /** More props for one file (an image's asset URL). */
-    props?(file: ActiveWorkspaceFileIndex): Record<string, unknown>
 }
 
 /**

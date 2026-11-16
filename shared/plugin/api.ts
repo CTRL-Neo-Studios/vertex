@@ -17,7 +17,7 @@ export type {ActiveSession}
 export type {PluginManifest, WindowKind}
 export type * from './contributions'
 
-/** `builtin`: a feature not extracted into its layer yet (Plugin Architecture Plan, X phases): always on, not in Settings. */
+/** `builtin`: a feature not extracted into its layer yet (Plugin Architecture Plan, X phases), registered from `app/builtins/`. */
 export type PluginSource = 'core' | 'global' | 'workspace' | 'builtin'
 
 export type MenuSection = 'app' | 'file' | 'edit' | 'view' | 'help'

@@ -1,0 +1,115 @@
+<script setup lang="ts">
+import {Latex} from "@type32/latex2vue";
+import {ViewerLayout} from "~/plugin/ui";
+
+const fileName = defineModel<string>('fileName')
+const content = defineModel<string>({ default: '' })
+const contentSaved = defineModel<boolean>('contentSaved', {default: false})
+const $cm = useColorMode()
+
+const props = withDefaults(defineProps<{
+    renaming: boolean,
+    filePath?: string,
+    disabled?: boolean
+}>(), {
+    renaming: false,
+    filePath: '',
+    disabled: false,
+})
+
+const emit = defineEmits<{
+    (e: 'rename', oldValue: string, newValue: string): void
+}>()
+</script>
+
+<template>
+    <ViewerLayout
+        scrollMode="none"
+        v-model:fileName="fileName"
+        @onRename="(oldValue: string, newValue: string) => emit('rename', oldValue, newValue)"
+        :filePath="props.filePath"
+        :renaming="renaming"
+        :bottomSpacing="false"
+    >
+        <template #default>
+            <div class="w-full flex flex-col flex-1 h-full pb-10">
+                <div class="flex-1 grid grid-cols-2 grid-rows-1 w-full min-h-0 pb-6">
+                    <UScrollArea orientation="vertical" class="no-scrollbar border-r border-r-default overflow-auto">
+                        <CodeEditor
+                            :disabled="disabled || renaming"
+                            :colorMode="$cm.value"
+                            v-model="content"
+                            class="w-full pb-6"
+                            language="tex"
+                            @update:model-value="() => contentSaved = false"
+                        />
+                    </UScrollArea>
+                    <div class="overflow-auto">
+                        <UScrollArea orientation="vertical" class="w-full h-full no-scrollbar">
+                            <ClientOnly class="math-document" id="latex-macros">
+                                <Latex class="w-full h-full items-center justify-center p-3 px-6 relative font-math" :content="content"/>
+                            </ClientOnly>
+                        </UScrollArea>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </ViewerLayout>
+</template>
+
+<style>
+.cm-code-editor {
+    height: 100%;
+}
+
+.cm-scroller {
+    scrollbar-width: none;
+}
+
+.cm-scroller::-webkit-scrollbar {
+    display: none;
+}
+
+svg {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+.pspicture {
+    position: relative;
+    margin: auto;
+}
+
+.enumerate {
+    list-style: circle;
+    padding: 12px;
+}
+
+span.tt {
+    font-family: courier;
+}
+
+p.quotation {
+    padding: 0 0 0 15px;
+    margin: 0 0 20px;
+    font-size: 10pt;
+}
+
+.nicebox {
+    margin-top: 20px;
+    min-height: 20px;
+    padding: 19px;
+    margin-bottom: 20px;
+    background-color: #f5f5f5;
+    border: 1px solid #e3e3e3;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+pre {
+    overflow: auto;
+}
+</style>

@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"backlinks": {
+			"title": "反向链接",
+			"empty": "没有反向链接。"
+		}
+	}
+}

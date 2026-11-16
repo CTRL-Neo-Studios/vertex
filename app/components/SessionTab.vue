@@ -13,6 +13,7 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {SHOWN_VIEWER, viewerFor} from "~/utils/viewers";
+import {pluginSession} from "~/utils/plugins/runtime";
 
 /**
  * The editor for one open file, in either session mode. The viewer is the registered one for its extension
@@ -46,7 +47,11 @@ const fileName = ref(fileNameFromPath(fullFilePath.value ?? '', true))
 const INVALID_CHARS = /[\\/:*?"<>|]/
 
 watch(isContentSaved, v => setTabSavedState(tabId, v))
-provide(SHOWN_VIEWER, {viewer, status: computed(() => ({text: content.value, filePath: displayPath.value}))})
+// Status items draw once the session is handed to plugins (`pluginSession()`), so they always get it.
+provide(SHOWN_VIEWER, {viewer, status: computed(() => {
+    const session = pluginSession()
+    return session && {text: content.value, filePath: displayPath.value, fileId: tabId.value, session}
+})})
 
 const setText = (value: string) => { content.value = value }
 const viewerProps = computed((): ViewerProps | ViewerMountProps => {

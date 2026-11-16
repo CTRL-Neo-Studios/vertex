@@ -3,12 +3,13 @@ import type {EmbedDef} from "#shared/plugin/api";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {fileNameFromPath, getFileExtensionFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {embeds} from "~/utils/contributions";
+import {fileUrl} from "~/utils/fileUrl";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 
 /**
  * What the markdown editor's links and embeds can point to (`<Editor :internal-link-map>`): the workspace's notes, and
  * the files a registered embed draws (`embeds`), each with the editor's mount for that embed (`mountOf`, one function per
- * registration). Empty in a singlespace window.
+ * registration) and its `assetUrl`. Empty in a singlespace window.
  */
 export function useInternalLinkList(session: ActiveSession | undefined, mountOf: (def: EmbedDef) => EmbedMount) {
     const $index = useActiveWorkspaceIndex(session)
@@ -26,7 +27,7 @@ export function useInternalLinkList(session: ActiveSession | undefined, mountOf:
             return [{
                 name: def.linkName === 'name' ? name : f.fileName, filePath: f.relativePath, referenceId: f.uuid,
                 embedMount: mountOf(def),
-                ...(def.props && {componentProps: def.props(f)}),
+                componentProps: {assetUrl: fileUrl(f.fullPath)},
             } satisfies InternalLink]
         })
     })

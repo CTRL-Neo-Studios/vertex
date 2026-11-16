@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"mermaid": {
+			"copied": "已复制 Mermaid 图表代码。",
+			"preview": "预览 Mermaid 图表"
+		}
+	}
+}

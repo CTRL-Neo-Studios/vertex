@@ -1,0 +1,8 @@
+{
+	"plugins": {
+		"outline": {
+			"title": "目录",
+			"jumpToHeading": "跳转到编辑器中的 {level} 级标题"
+		}
+	}
+}

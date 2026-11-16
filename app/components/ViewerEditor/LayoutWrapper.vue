@@ -25,11 +25,12 @@ const fileName = defineModel<string>('fileName')
 const {effective} = useSettingsScope()
 const statusBarDisplayMode = computed(() => effective.value?.viewConfig.editorPanel.showStatusBar)
 // The viewer's registered status items (default: viewers that load text): `bar` ones in the status bar after the
-// viewer's own, `side` ones (the line outline) over the content's right edge.
+// viewer's own, `side` ones (the line outline) over the content's right edge. None until their props are ready.
 const shown = inject(SHOWN_VIEWER, null)
+const status = computed(() => shown?.status.value)
 const items = computed(() => {
     const viewer = shown?.viewer.value
-    if (!viewer) return []
+    if (!viewer || !status.value) return []
     return [...statusItems.items.values()].filter(item => item.viewers?.includes(viewer.id) ?? viewer.loadsText)
 })
 const barItems = computed(() => items.value.filter(item => (item.placement ?? 'bar') === 'bar'))
@@ -190,13 +191,13 @@ const viewportClasses = computed(() => {
         <div v-if="showStatusBar" class="bg-default absolute z-10 left-0 right-0 bottom-0 h-fit">
             <div class="bg-submuted inline-flex justify-center items-center w-full border-t border-default p-1 px-3 pb-1.5">
                 <slot name="status-bar"/>
-                <PluginMount v-for="item in barItems" :key="item.id" :ui="item" :props="shown!.status.value"/>
+                <PluginMount v-for="item in barItems" :key="item.id" :ui="item" :props="status!"/>
             </div>
         </div>
 
         <!-- Side items -->
         <div v-if="sideItems.length" class="absolute right-8 top-1/2 -translate-y-1/2 z-10">
-            <PluginMount v-for="item in sideItems" :key="item.id" :ui="item" :props="shown!.status.value"/>
+            <PluginMount v-for="item in sideItems" :key="item.id" :ui="item" :props="status!"/>
         </div>
     </div>
 
@@ -241,13 +242,13 @@ const viewportClasses = computed(() => {
 				]"
 			>
 				<slot name="status-bar" />
-				<PluginMount v-for="item in barItems" :key="item.id" :ui="item" :props="shown!.status.value"/>
+				<PluginMount v-for="item in barItems" :key="item.id" :ui="item" :props="status!"/>
 			</div>
 		</div>
 
         <!-- Side items -->
         <div v-if="sideItems.length" class="absolute right-8 top-1/2 -translate-y-1/2 z-10">
-            <PluginMount v-for="item in sideItems" :key="item.id" :ui="item" :props="shown!.status.value"/>
+            <PluginMount v-for="item in sideItems" :key="item.id" :ui="item" :props="status!"/>
         </div>
 
         <!-- Scrollbar (vertical) -->

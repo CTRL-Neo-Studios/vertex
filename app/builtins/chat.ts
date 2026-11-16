@@ -1,5 +1,5 @@
 import {h} from 'vue'
-import type {PanelViewContext, TabProps} from '#shared/plugin/api'
+import type {PanelViewContext, PluginApis, PluginContext, TabProps} from '#shared/plugin/api'
 import {definePlugin} from '#shared/plugin/api'
 import {pluginStateKey, sessionScope} from '#shared/constants/app'
 import {aiFeatureOn} from '~/composables/ai/useAiConfig'
@@ -11,8 +11,13 @@ import {pluginSession} from '~/utils/plugins/runtime'
 
 const chatOn = (c: PanelViewContext) => c.isWorkspace && aiFeatureOn(c.settings?.aiConfig, 'chat')
 
+let use: PluginContext['use'] | undefined
+/** Another plugin's API while that plugin is on, for chat's components (replies draw ```mermaid with mermaid's). */
+export const chatUses = <K extends keyof PluginApis>(id: K) => use?.(id)
+
 export default definePlugin({
     setup(ctx) {
+        use = ctx.use
         ctx.views.panel({
             id: 'chats', label: 'app.chat.chats', icon: 'i-lucide-messages-square', defaultArea: 'left',
             when: chatOn,

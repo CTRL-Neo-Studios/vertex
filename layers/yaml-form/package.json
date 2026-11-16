@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/yaml-form",
+  "private": true,
+  "type": "module"
+}

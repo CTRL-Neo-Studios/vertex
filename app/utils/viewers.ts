@@ -1,6 +1,6 @@
 import type {InjectionKey, Ref} from "vue";
 import type {SessionMode} from "#shared/constants/app";
-import type {ViewerDef} from "#shared/plugin/api";
+import type {StatusItemProps, ViewerDef} from "#shared/plugin/api";
 import {isPlainTextFile, isUnreadableAsText} from "#shared/utils/fs/filenames";
 import {fileViewers} from "~/utils/contributions";
 
@@ -18,12 +18,12 @@ export function viewerFor(ext: string, mode: SessionMode): ViewerDef | undefined
 }
 
 /**
- * The viewer a file tab shows and what its status items are drawn with. `SessionTab` provides it; the viewer's
- * `LayoutWrapper` draws the status bar's items for it.
+ * The viewer a file tab shows and what its status items are drawn with (`undefined` until the session is handed to
+ * plugins). `SessionTab` provides it; the viewer's `LayoutWrapper` draws the status bar's items for it.
  */
 export const SHOWN_VIEWER: InjectionKey<{
     viewer: Readonly<Ref<ViewerDef | undefined>>
-    status: Readonly<Ref<{ text: string, filePath: string }>>
+    status: Readonly<Ref<StatusItemProps | undefined>>
 }> = Symbol('shown-viewer')
 
 // The kernel's own: notes, and the code editor for any other file readable as text (when nothing else matches).

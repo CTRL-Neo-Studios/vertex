@@ -1,0 +1,8 @@
+{
+  "name": "@vertex-plugins/mermaid",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pele": "^1.13.0"
+  }
+}

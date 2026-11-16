@@ -1,0 +1,7 @@
+{
+	"plugins": {
+		"yaml-form": {
+			"color": "颜色"
+		}
+	}
+}

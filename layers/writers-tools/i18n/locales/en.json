@@ -1,0 +1,11 @@
+{
+	"plugins": {
+		"writers-tools": {
+			"title": "Writer's Tools",
+			"analyzeText": "Analyze Text",
+			"words": "Words",
+			"lines": "Lines",
+			"paragraphs": "Paragraphs"
+		}
+	}
+}

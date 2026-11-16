@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/image",
+  "private": true,
+  "type": "module"
+}
