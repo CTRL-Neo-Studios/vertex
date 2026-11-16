@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {Op} from "#shared/workflows/effects"
-import {baseNameOf, parentOf} from "#shared/workflows/vault"
+import {baseNameOf, parentOf} from "#shared/utils/vault"
 
 /** A run's changes (or a dry run's planned ones) as a short diff: moves by name, writes by changed lines. */
 const props = defineProps<{ ops: Op[] }>()

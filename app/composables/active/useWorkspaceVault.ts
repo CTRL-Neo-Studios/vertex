@@ -1,7 +1,7 @@
 import {exists, mkdir, readDir, readTextFile, rename, writeTextFile} from "@tauri-apps/plugin-fs"
 import type {ActiveSession} from "#shared/types/active/sessions"
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace"
-import {parentOf, type Vault, type VaultEntry} from "#shared/workflows/vault"
+import {parentOf, type Vault, type VaultEntry} from "#shared/utils/vault"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
 

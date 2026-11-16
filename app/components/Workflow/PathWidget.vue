@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {Json} from "@type32/workflows/core"
-import {baseNameOf} from "#shared/workflows/vault"
+import {baseNameOf} from "#shared/utils/vault"
 
 /**
  * The literal editor for Entry, File, Note and Folder inputs (Appendix A #68): the picked path, opening a

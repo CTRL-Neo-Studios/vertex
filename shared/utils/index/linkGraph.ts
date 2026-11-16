@@ -124,6 +124,16 @@ export class LinkGraph {
         return (this.rawLinks.get(fromId) ?? []).filter(t => this.resolveTarget(t) === toId)
     }
 
+    /** Every resolved link as a pair of ids. */
+    links(): { from: string, to: string }[] {
+        return [...this.forward].flatMap(([from, tos]) => [...tos].map(to => ({from, to})))
+    }
+
+    /** Raw targets in `id` that find no file. */
+    unresolved(id: string): string[] {
+        return (this.rawLinks.get(id) ?? []).filter(t => !this.resolveTarget(t))
+    }
+
     private resolve(id: string) {
         const next = new Set<string>()
         for (const target of this.rawLinks.get(id) ?? []) {

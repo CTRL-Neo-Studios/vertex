@@ -1,3 +1,4 @@
+import {watch as watchVue, type WatchStopHandle} from "vue";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
 import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
@@ -6,12 +7,13 @@ import {invoke} from "@tauri-apps/api/core"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import {getFileExtensionFromPath, isCanvasFile, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
+import {getFileExtensionFromPath, isPlainTextFile, isUnreadableAsText, isYamlFile} from "#shared/utils/fs/filenames";
 import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, parseNoteMeta, parseProperties} from "#shared/utils/index/parse";
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
 import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
 import {stateClient} from "~/utils/stateClient";
+import {linkExtractors} from "~/utils/contributions";
 
 /**
  * Per-session runtime objects that must not be deep-reactive (watcher handle, listeners, link graph).
@@ -20,11 +22,15 @@ import {stateClient} from "~/utils/stateClient";
 interface SessionRuntime {
     unwatch?: UnwatchFn
     listeners: Set<WorkspaceIndexListener>
+    /** `watchUnder`'s listeners, each with its workspace-relative folder. */
+    folderWatchers: Set<{ prefix: string, fn: (paths: string[]) => void }>
     graph: LinkGraph
     selfWrites: RecentWrites
     root: string
     /** True after `buildIndex` scanned the whole folder; a singlespace session only tracks its one file. */
     wholeFolder: boolean
+    /** Stops `followExtractors`. */
+    stopExtractors?: WatchStopHandle
 }
 const runtimes = new Map<string, SessionRuntime>()
 
@@ -39,12 +45,15 @@ interface DirectoryEntry {
     children: string[]
 }
 
-const parsers: ContentParsers = {parseYaml, parseFrontmatter, getInternalLinks}
+/** The link extractor a plugin registered for files of this extension (a canvas's), if any. */
+export const linkExtractorFor = (extension: string) => [...linkExtractors.items.values()].find(d => d.match(extension))
+
+const parsers: ContentParsers = {parseYaml, parseFrontmatter, getInternalLinks, linkExtractorFor}
 
 /** Only formats that carry properties or links are read during indexing. */
 const isIndexedText = (path: string) => {
     const ext = getFileExtensionFromPath(path)
-    return isPlainTextFile(ext) || isYamlFile(ext) || isCanvasFile(ext)
+    return isPlainTextFile(ext) || isYamlFile(ext) || !!linkExtractorFor(ext)
 }
 
 function fileExtOf(fileName: string) {
@@ -66,7 +75,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function runtime(): SessionRuntime {
         let rt = runtimes.get(scope)
         if (!rt) {
-            rt = {listeners: new Set(), graph: new LinkGraph(), selfWrites: new RecentWrites(), root: session?.rootPath ?? '', wholeFolder: false}
+            rt = {listeners: new Set(), folderWatchers: new Set(), graph: new LinkGraph(), selfWrites: new RecentWrites(), root: session?.rootPath ?? '', wholeFolder: false}
             runtimes.set(scope, rt)
         }
         return rt
@@ -173,8 +182,31 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             rt.graph.setLinks(next[r.path]!.uuid, parseLinkTargets(r.path, r.content, parsers))
         }
         syncLinks(uuidMap.keys())
+        followExtractors()
         console.log(`[index] ${entries.length} entries, ${textPaths.length} parsed in ${Date.now() - started}ms`)
         return next
+    }
+
+    /**
+     * A link extractor registered after the scan (a plugin turned on mid-session) reads the indexed files it now
+     * handles. Removal needs nothing: turning a plugin off reloads the window.
+     */
+    function followExtractors() {
+        const rt = runtime()
+        rt.stopExtractors?.()
+        let known = new Set(linkExtractors.items.values())
+        rt.stopExtractors = watchVue(() => [...linkExtractors.items.values()], (extractors) => {
+            const added = extractors.filter(d => !known.has(d))
+            known = new Set(extractors)
+            if (!added.length) return
+            for (const node of Object.values(unref(fileIndex))) {
+                const extractor = node.isFolder ? undefined : linkExtractorFor(getFileExtensionFromPath(node.fullPath))
+                if (!extractor || !added.includes(extractor)) continue
+                readTextFile(node.fullPath)
+                    .then(content => relink(node.fullPath, content))
+                    .catch(error => console.error(`[index] could not read ${node.fullPath}`, error))
+            }
+        })
     }
 
     /** Singlespace: index only `path`, rooted at its folder. */
@@ -185,6 +217,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     function clearIndex() {
         fileIndex.value = {}
         unref(uuidToFilePathIndex).clear()
+        runtimes.get(scope)?.stopExtractors?.()
         runtimes.delete(scope)
     }
 
@@ -303,6 +336,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (!node || node.isFolder) return
         node.modifiedTime = new Date()
         applyProperties(path, content)
+        relink(path, content)
+    }
+
+    /** Re-reads a file's links into the graph, and re-syncs every file they touch (before and after). */
+    function relink(path: string, content: string) {
+        const node = unref(fileIndex)[path]
+        if (!node || node.isFolder) return
         const g = runtime().graph
         const before = g.forelinks(node.uuid)
         g.setLinks(node.uuid, parseLinkTargets(path, content, parsers))
@@ -345,8 +385,10 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (rt.wholeFolder && event.paths.includes(`${rt.root}/.vertex/settings.json`)) {
             void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
         }
-        const chatPath = rt.wholeFolder && event.paths.find(p => relativeOf(p).startsWith('.vertex/chats/'))
-        if (chatPath) broadcast({type: 'chats', path: chatPath})
+        if (rt.wholeFolder) for (const {prefix, fn} of rt.folderWatchers) {
+            const under = event.paths.filter(p => relativeOf(p).startsWith(prefix))
+            if (under.length) fn(under)
+        }
         // Same rule as the initial scan (`scan_directory_recursive`): nothing under a dot-name is indexed, so
         // `.vertex/` (settings temp files, trash), `.git/` and `.DS_Store` never reach the index.
         const paths = event.paths.filter(p => !relativeOf(p).split('/').some(part => part.startsWith('.')))
@@ -480,6 +522,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         return () => listeners.delete(listener)
     }
 
+    /**
+     * Raw watcher paths under a workspace-relative folder (`.vertex/chats/`), for what lives where the index doesn't
+     * look (dot folders). Whole-folder watches only.
+     */
+    function watchUnder(prefix: string, fn: (paths: string[]) => void): () => void {
+        const watchers = runtime().folderWatchers
+        const watcher = {prefix, fn}
+        watchers.add(watcher)
+        return () => watchers.delete(watcher)
+    }
+
     return {
         buildIndex,
         openFile,
@@ -493,6 +546,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         stopWatcher,
         clearIndex,
         on,
+        watchUnder,
         /** For writes the app makes to a file on behalf of another feature (the watcher ignores self-writes), so open tabs reload. */
         notifyModified: (path: string) => broadcast({type: 'modify', path}),
         updateIndex,
@@ -502,6 +556,9 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         getFilesByPaths,
         getFilteredFiles,
         resolveLink,
+        /** Every resolved link as a pair of uuids, and a file's targets that find no file: read off the link graph. */
+        links: () => runtime().graph.links(),
+        unresolved: (uuid: string) => runtime().graph.unresolved(uuid),
         getPropertiesFile,
     }
 }

@@ -5,16 +5,16 @@ import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {AppWorkflowConfig} from "#shared/types/app/settings";
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
-import {coveringFolder} from "#shared/workflows/trust";
+import {coveringFolder} from "#shared/utils/trust";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {parseWorkflow} from "~/composables/workflows/useWorkflowRunner";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 
 const {t} = useI18n()
 const $qt = useQuickToasts()
 const {config, load, save} = useAppSettings()
-const trust = useWorkflowTrust()
+const trust = useTrust()
 onMounted(() => Promise.all([load(), trust.load()]))
 
 const defaults = defaultAppWorkflowConfig()

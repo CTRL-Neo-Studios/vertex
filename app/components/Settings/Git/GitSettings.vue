@@ -4,7 +4,7 @@ import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 import {gitClient} from "~/utils/gitClient";
 
 /**
@@ -15,7 +15,7 @@ const {t} = useI18n()
 const $qt = useQuickToasts()
 const {load} = useAppSettings()
 const scope = useSettingsScope()
-const trust = useWorkflowTrust()
+const trust = useTrust()
 
 const tokens = ref<GitToken[]>([])
 async function attempt(action: () => Promise<unknown>) {

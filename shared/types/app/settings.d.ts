@@ -1,4 +1,4 @@
-import type {FileTrustMode} from "#shared/workflows/trust"
+import type {FileTrustMode} from "#shared/utils/trust"
 import type {AppAiConfig} from "#shared/types/app/ai"
 import type {PluginConfigs} from "#shared/plugin/api"
 
@@ -73,7 +73,7 @@ export interface AppGitConfig {
     },
 }
 
-/** Trusted folders and files aren't settings: they live in `trust.json` (`shared/workflows/trust.ts`). */
+/** Trusted folders and files aren't settings: they live in `trust.json` (`shared/utils/trust.ts`). */
 export interface AppWorkflowConfig {
     /** Step limit per run (`limits.steps`): every node activation counts, so loops can't run forever. */
     maxLoopIterations: number,

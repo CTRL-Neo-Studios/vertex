@@ -1,6 +1,6 @@
 import {defineLanguage, t, tvar, type Language} from '@type32/workflows/core'
 import {std} from '@type32/workflows/core/std'
-import {toYamlValue} from './vault'
+import {toYamlValue} from '#shared/utils/vault'
 
 /** What List folder keeps. */
 export interface ListOptions {

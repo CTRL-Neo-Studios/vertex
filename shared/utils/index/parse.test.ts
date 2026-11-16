@@ -34,6 +34,14 @@ describe('parseLinkTargets', () => {
     it('yaml files carry no links', () => {
         expect(parseLinkTargets('/v/x.yml', 'a: "[[B]]"', parsers)).toEqual([])
     })
+
+    it('other formats\' links come from their link extractor', () => {
+        const extractor = {id: 'x', match: (ext: string) => ext === 'x', targets: (text: string) => text.split(',')}
+        const withExtractor = {...parsers, linkExtractorFor: (ext: string) => (extractor.match(ext) ? extractor : undefined)}
+        expect(parseLinkTargets('/v/a.x', 'B,C', withExtractor)).toEqual(['B', 'C'])
+        expect(parseLinkTargets('/v/a.x', 'B,C', parsers)).toEqual([])
+        expect(parseLinkTargets('/v/a.md', '[[B]]', withExtractor)).toEqual(['B'])
+    })
 })
 
 describe('path helpers', () => {

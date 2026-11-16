@@ -1,14 +1,13 @@
 import {copyFile, exists, mkdir, readDir, readTextFile, rename, stat, writeFile, writeTextFile} from "@tauri-apps/plugin-fs"
 import {invoke} from "@tauri-apps/api/core"
 import {dirname, join} from "@tauri-apps/api/path"
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
+import {linkExtractorFor, useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
 import {parentPathOf} from "#shared/utils/index/parse";
-import {fileNameFromPath, freeName, getFileExtensionFromPath, isCanvasFile} from "#shared/utils/fs/filenames";
-import {rewriteCanvasLinks} from "#shared/utils/index/canvasLinks";
+import {fileNameFromPath, freeName, getFileExtensionFromPath, isPlainTextFile} from "#shared/utils/fs/filenames";
 import UpdateLinksModal from "~/components/Modals/UpdateLinksModal.vue";
 import FileConflictModal, {type ConflictAction} from "~/components/Modals/FileConflictModal.vue";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -485,9 +484,13 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         for (const [id, targets] of changes) {
             const ref = getFileByUuid(id)
             if (!ref) continue
+            const ext = getFileExtensionFromPath(ref.fileName)
+            // Notes' links, or what the format's link extractor rewrites; a format whose extractor can't is left as is.
+            const rewrite = isPlainTextFile(ext) ? rewriteLinks : linkExtractorFor(ext)?.rewrite
+            if (!rewrite) continue
             try {
                 const before = await readTextFile(ref.fullPath)
-                const result = (isCanvasFile(getFileExtensionFromPath(ref.fileName)) ? rewriteCanvasLinks : rewriteLinks)(before, targets)
+                const result = rewrite(before, targets)
                 if (result.count === 0) continue
                 markSelfWrite(ref.fullPath)
                 await writeTextFile(ref.fullPath, result.text)

@@ -7,7 +7,7 @@ import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifest} from "~/utils/plugins/catalog";
 
 definePageMeta({
@@ -23,7 +23,7 @@ const $qt = useQuickToasts()
 const route = useRoute()
 const {config, load} = useAppSettings()
 const scope = useSettingsScope()
-const trust = useWorkflowTrust()
+const trust = useTrust()
 onMounted(load)
 
 const id = computed(() => String(route.params.id))

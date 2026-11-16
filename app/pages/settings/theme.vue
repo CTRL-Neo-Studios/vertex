@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {useAppTheme} from "~/composables/app/useAppTheme";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 import type {AppThemeConfig} from "#shared/types/app/settings";
 
 definePageMeta({
@@ -11,7 +11,7 @@ definePageMeta({
 const {t} = useI18n()
 const {theme, defaults, update, isDirty, reset} = useAppTheme()
 const scope = useSettingsScope()
-const trust = useWorkflowTrust()
+const trust = useTrust()
 
 const COLOR_KEYS: (keyof AppThemeConfig)[] = ['primaryColor', 'neutralColor', 'blackAsPrimary', 'colorMode']
 const SHAPE_KEYS: (keyof AppThemeConfig)[] = ['roundedRadius']

@@ -4,12 +4,12 @@ import {Routes} from "#shared/constants/app";
 import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 
 const {t} = useI18n()
 const {load, config} = useAppSettings()
 const scope = useSettingsScope()
-const trust = useWorkflowTrust()
+const trust = useTrust()
 onMounted(load)
 
 const ENABLED = 'aiConfig.enabled' as const

@@ -9,7 +9,7 @@ import {getInternalLinks} from '../utils/index/rewriteLinks'
 import {LinkGraph} from '../utils/index/linkGraph'
 import {overlayVault} from './dryRun'
 import {createVertexEffects, undoOps, type Op} from './effects'
-import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from './vault'
+import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from '#shared/utils/vault'
 import {vertexLanguage, type VertexEffects} from './vertex'
 
 const yaml = obsidianYaml(frontmatterRange)

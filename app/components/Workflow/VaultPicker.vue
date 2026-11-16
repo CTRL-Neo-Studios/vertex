@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {TreeItem} from "@nuxt/ui"
 import type {UITreeNode} from "#shared/types/active/workspace"
-import {extensionOf} from "#shared/workflows/vault"
+import {extensionOf} from "#shared/utils/vault"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
 

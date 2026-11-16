@@ -58,9 +58,6 @@ export function useBaseContext(): BaseContext {
     return context
 }
 
-/** What a tab gives the bases embedded in it (`![[x.base]]`, ` ```base `, canvas cards): its session and file (`this`). */
-export const BASE_EMBED: InjectionKey<{ session: ActiveSession, thisPath: () => string }> = Symbol('bases-embed')
-
 /** In the order Obsidian's property pickers list them. */
 export const FILE_PROPERTIES = ['name', 'basename', 'fullname', 'path', 'folder', 'ext', 'ctime', 'mtime', 'size', 'links', 'embeds', 'tags', 'backlinks'] as const
 

@@ -8,7 +8,10 @@ import {pluginEnabled} from '#shared/plugin/resolve'
 import {getAt, withAt, withoutAt} from '#shared/utils/settings/paths'
 import type {AppSettingPath} from '#shared/utils/settings/scopes'
 import {registerCommand} from '~/utils/commands'
-import {fileMenuItems, fileTypes, fileViewers, homeActions, paletteGroups, settingsPages, statusItems, tabKinds} from '~/utils/contributions'
+import {
+    codeBlocks, editorExtensions, embeds, fileMenuItems, fileTypes, fileViewers, homeActions, linkExtractors, markdownSyntax,
+    noteMenuItems, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
+} from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
 import {isBuiltin, pluginEntries} from '~/utils/plugins/catalog'
 import {useAppSettings} from '~/composables/app/useAppSettings'
@@ -42,6 +45,14 @@ const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]
     fileMenuItem: fileMenuItems.register,
     settingsPage: settingsPages.register,
     homeAction: homeActions.register,
+    codeBlock: codeBlocks.register,
+    embed: embeds.register,
+    editorExtension: editorExtensions.register,
+    markdownSyntax: markdownSyntax.register,
+    slashItem: slashItems.register,
+    toolbarItem: toolbarItems.register,
+    noteMenuItem: noteMenuItems.register,
+    linkExtractor: linkExtractors.register,
 }
 /** Set across the reload a plugin's switch-off causes, so the reloaded window doesn't take focus. */
 const QUIET_RELOAD = 'vertex-plugin-reload'

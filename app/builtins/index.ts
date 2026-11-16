@@ -19,6 +19,7 @@ export const builtinPlugins: readonly PluginEntry[] = [
     builtin({id: 'outgoing-links', name: 'Outgoing links', windows: ['session', 'settings']}, () => import('./outgoing-links')),
     builtin({id: 'writers-tools', name: 'Writer\'s tools', windows: ['session', 'settings']}, () => import('./writers-tools')),
     builtin({id: 'image', name: 'Image'}, () => import('./image')),
+    builtin({id: 'mermaid', name: 'Mermaid'}, () => import('./mermaid')),
     builtin({id: 'yaml-form', name: 'YAML form'}, () => import('./yaml-form')),
     builtin({id: 'latex', name: 'LaTeX'}, () => import('./latex')),
     builtin({id: 'canvas', name: 'Canvas'}, () => import('./canvas')),
@@ -26,5 +27,6 @@ export const builtinPlugins: readonly PluginEntry[] = [
     builtin({id: 'workflows', name: 'Workflows', windows: ['session', 'settings']}, () => import('./workflows')),
     builtin({id: 'git', name: 'Git', windows: ['main', 'session', 'settings']}, () => import('./git')),
     builtin({id: 'ai', name: 'AI', windows: ['session', 'settings']}, () => import('./ai')),
+    builtin({id: 'ai-assistant', name: 'AI assistant'}, () => import('./ai-assistant')),
     builtin({id: 'chat', name: 'Chat', windows: ['session', 'settings']}, () => import('./chat')),
 ]

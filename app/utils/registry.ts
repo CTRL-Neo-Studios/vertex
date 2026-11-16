@@ -21,3 +21,15 @@ export function createRegistry<T>(what: string, idOf: (def: T) => string) {
 }
 
 export type Registry<T> = ReturnType<typeof createRegistry<T>>
+
+/** A reactive list of contributions without ids (editor extensions, Markdown syntax), in registration order. */
+export function createList<T>() {
+    const items = shallowReactive(new Set<T>())
+    return {
+        items: items as ReadonlySet<T>,
+        register(def: T): () => void {
+            items.add(def)
+            return () => void items.delete(def)
+        },
+    }
+}

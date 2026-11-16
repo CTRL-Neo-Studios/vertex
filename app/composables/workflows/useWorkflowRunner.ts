@@ -3,8 +3,8 @@ import type {ActiveSession} from "#shared/types/active/sessions"
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps"
 import {overlayVault} from "#shared/workflows/dryRun"
 import {createVertexEffects, undoOps, type Op, type UndoResult} from "#shared/workflows/effects"
-import {coveringFolder, normalizeTrustPath, trustedBy} from "#shared/workflows/trust"
-import {baseNameOf, obsidianYaml, type Vault} from "#shared/workflows/vault"
+import {coveringFolder, normalizeTrustPath, trustedBy} from "#shared/utils/trust"
+import {baseNameOf, obsidianYaml, type Vault} from "#shared/utils/vault"
 import {vertexLanguage, type PickOptions, type VertexEffects} from "#shared/workflows/vertex"
 import WorkflowAskModal, {type Ask} from "~/components/Modals/WorkflowAskModal.vue"
 import WorkflowPickModal from "~/components/Modals/WorkflowPickModal.vue"
@@ -16,8 +16,8 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator"
 import {useAppSettings} from "~/composables/app/useAppSettings"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
 import {useWorkflowManifest} from "~/composables/workflows/useWorkflowManifest"
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust"
-import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault"
+import {useTrust} from "~/composables/app/useTrust"
+import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault"
 import {stateClient} from "~/utils/stateClient"
 
 export const RUN_EVENT = 'vertex.onManual'
@@ -68,7 +68,7 @@ export type LiveOptions = Pick<RunOptions<unknown>, 'onTrace' | 'signal' | 'befo
 export function useWorkflowRunner(session: ActiveSession) {
     const vault = useWorkspaceVault(session)
     const {config} = useAppSettings()
-    const trusted = useWorkflowTrust()
+    const trusted = useTrust()
     // Not `useI18n`: chats run workflows outside a component's setup.
     const {t} = useNuxtApp().$i18n
     const $qt = useQuickToasts()

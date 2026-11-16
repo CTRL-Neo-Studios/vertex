@@ -1,7 +1,7 @@
 import type {YamlFormData} from "@type32/yaml-editor-form";
 import type {FileLink} from "@type32/obsidian-bases-parser";
-import {getFileExtensionFromPath, isCanvasFile, isPlainTextFile, isYamlFile} from "#shared/utils/fs/filenames";
-import {canvasLinkTargets} from "#shared/utils/index/canvasLinks";
+import {getFileExtensionFromPath, isPlainTextFile, isYamlFile} from "#shared/utils/fs/filenames";
+import type {LinkExtractorDef} from "#shared/plugin/contributions";
 import {scanLinks} from "#shared/utils/index/rewriteLinks";
 
 /** Parsers injected by the caller (the editor package's auto-imported utils in the app; stubs in tests). */
@@ -9,6 +9,8 @@ export interface ContentParsers {
     parseYaml: (text: string) => { data?: unknown, error?: unknown }
     parseFrontmatter: (text: string) => { data?: unknown, error?: unknown }
     getInternalLinks: (text: string) => { path: string }[]
+    /** The link extractor reading files of this extension (`linkExtractors`); without one, only notes have links. */
+    linkExtractorFor?: (extension: string) => LinkExtractorDef | undefined
 }
 
 export const PROPERTIES_FILE_NAMES = ['properties.yml', 'properties.yaml'] as const
@@ -39,12 +41,11 @@ export function parseProperties(path: string, content: string, parsers: ContentP
     }
 }
 
-/** Raw link targets in a document: `[[target]]`s in md/txt, file cards and text cards' links in a canvas. */
+/** Raw link targets in a document: `[[target]]`s in md/txt, what its link extractor finds in another format. */
 export function parseLinkTargets(path: string, content: string, parsers: ContentParsers): string[] {
     const ext = getFileExtensionFromPath(path)
-    if (isCanvasFile(ext)) return canvasLinkTargets(content, parsers.getInternalLinks)
-    if (!isPlainTextFile(ext)) return []
-    return parsers.getInternalLinks(content).map(l => l.path)
+    if (isPlainTextFile(ext)) return parsers.getInternalLinks(content).map(l => l.path)
+    return parsers.linkExtractorFor?.(ext)?.targets(content, parsers.getInternalLinks) ?? []
 }
 
 /** What Bases reads from a note besides its properties (`file.tags`, `file.links`, `file.embeds`). */

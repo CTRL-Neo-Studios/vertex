@@ -1,8 +1,10 @@
+import {hashProgram} from '@type32/workflows/core'
 import {definePlugin} from '#shared/plugin/api'
 import {fileNameFromPath, getFileExtensionFromPath, isWorkflowFile} from '#shared/utils/fs/filenames'
 import {useActiveTabs} from '~/composables/active/useActiveTabs'
 import {useActiveWorkspaceIndex} from '~/composables/active/useActiveWorkspaceIndex'
-import {useWorkflowRunner} from '~/composables/workflows/useWorkflowRunner'
+import {registerTrustedFormat} from '~/composables/app/useTrust'
+import {parseWorkflow, useWorkflowRunner} from '~/composables/workflows/useWorkflowRunner'
 
 export default definePlugin({
     setup(ctx) {
@@ -16,6 +18,14 @@ export default definePlugin({
         // Workflows run on the workspace; in a singlespace a `.workflow` opens as JSON.
         ctx.views.fileViewer({id: 'workflow', loadsText: true, modes: ['workspace'], match: isWorkflowFile, component: () => import('~/components/ViewerEditor/WorkflowViewer.vue')})
         ctx.settings.page({id: 'workflows', label: 'app.settings.nav.workflows', icon: 'i-lucide-workflow', component: () => import('~/components/Settings/Workflows/WorkflowsSettings.vue')})
+        // Trusting a folder in content mode pins its workflows' programs, as they are now.
+        onScopeDispose(registerTrustedFormat({
+            match: isWorkflowFile,
+            async hash(text) {
+                const doc = parseWorkflow(text).doc
+                return doc && await hashProgram(doc)
+            },
+        }))
         // Run workflow from Files' row menu and the palette. Workflows run on a workspace folder.
         ctx.onSession(({session}) => {
             if (!session.rootPath) return

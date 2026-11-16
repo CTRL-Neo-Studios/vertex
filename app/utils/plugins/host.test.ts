@@ -4,7 +4,17 @@ import type {PluginContext, PluginDefinition, PluginEntry} from '#shared/plugin/
 import type {PluginManifest} from '#shared/plugin/manifest'
 import {createPluginHost} from './host'
 
-const SESSION = {session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'}, views: {show: () => {}, openInTab: () => {}}}
+const SESSION = {
+    session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'},
+    views: {show: () => {}, openInTab: () => {}},
+    index: {
+        files: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
+        backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {},
+    },
+    tabs: {open: async () => {}, close: async () => {}, active: () => null, list: () => []},
+    editor: {viewOf: () => undefined},
+    watch: () => () => {},
+}
 
 function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, setup?: (ctx: PluginContext) => void, loadError?: Error }>) {
     const log: string[] = []

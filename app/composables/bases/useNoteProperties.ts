@@ -1,6 +1,6 @@
 import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
-import {obsidianYaml, setFrontmatterProperty} from "#shared/workflows/vault";
+import {obsidianYaml, setFrontmatterProperty} from "#shared/utils/vault";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
 

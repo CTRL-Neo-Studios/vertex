@@ -2,7 +2,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {emit, listen, type UnlistenFn} from "@tauri-apps/api/event";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {AppSettings} from "#shared/types/app/settings";
-import type {TrustRecords} from "#shared/workflows/trust";
+import type {TrustRecords} from "#shared/utils/trust";
 import type {DeepPartial} from "#shared/types/types";
 
 /**

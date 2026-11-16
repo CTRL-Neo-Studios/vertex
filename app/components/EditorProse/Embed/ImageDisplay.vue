@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {InternalLink} from "@type32/codemirror-rich-obsidian-editor"
+// The editor's embed props it doesn't use (`filePath`, `host`…) aren't attributes.
+defineOptions({inheritAttrs: false})
 defineProps<{
     srcPath: string;
     display: string;

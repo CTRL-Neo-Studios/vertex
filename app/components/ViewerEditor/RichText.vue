@@ -5,7 +5,7 @@ import {EditorView} from "@codemirror/view";
 import {selectAll} from "@codemirror/commands";
 import {readText, writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {ContextMenuItem} from "@nuxt/ui";
-import type {Heading} from "@type32/codemirror-rich-obsidian-editor/kit";
+import type {PluginMenuItem} from "#shared/plugin/api";
 import type {ToTocEntryProps} from "#shared/types/active/events";
 import type {HeaderToolsPosition} from "#shared/types/app/settings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
@@ -13,19 +13,15 @@ import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveEditorCodeblockMappings} from "~/composables/active/editor/useActiveEditorCodeblockMappings";
 import {useActiveEditorDispatcher} from "~/composables/active/editor/useActiveEditorDispatcher";
-import {useActiveEditorExtensions} from "~/composables/active/editor/useActiveEditorExtensions";
-import {useInternalLinkList} from "~/composables/active/editor/useInternalLinkList";
+import {useNoteEditor} from "~/composables/active/editor/useNoteEditor";
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions";
-import {BASE_EMBED} from "~/composables/bases/useBaseContext";
-import {useChats} from "~/composables/ai/useChats";
-import {aiFeatureOn} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {noteMenuItems} from "~/utils/contributions";
 
 /**
- * The kernel's markdown viewer (`.md`, `.txt`): the rich editor, with the outline's line beside it. Two roots (the
- * layout and the outline), so the `ViewerProps` it doesn't declare are dropped rather than given to one of them.
+ * The kernel's markdown viewer (`.md`, `.txt`): the rich editor, with what plugins add to note editors
+ * (`useNoteEditor`) and to its right-click menu (`noteMenuItems`). The `ViewerProps` it doesn't declare are dropped.
  */
 defineOptions({inheritAttrs: false})
 
@@ -50,11 +46,8 @@ const emit = defineEmits<{
 }>()
 
 const session = useActiveSessions().getSession(props.sessionId)
-const internalLinkList = useInternalLinkList(session)
-const codeblockMappings = useActiveEditorCodeblockMappings()
-const extensions = useActiveEditorExtensions(session, () => props.fileId)
-// Bases embedded in this note (`![[x.base]]`, ` ```base `) query this workspace, with this note as `this`.
-if (session?.workspaceSession) provide(BASE_EMBED, {session, thisPath: () => props.filePath})
+// Drawn once the session is handed to plugins (`ready`), so what they add always gets it.
+const {host, ready, codeBlocks: codeBlockMap, links, markdown, extensions} = useNoteEditor(session, () => props.filePath, () => props.fileId)
 
 // Header tools: the editor's latest state drives their enabled/active looks; each group sits where settings say.
 const {effective} = useSettingsScope()
@@ -103,10 +96,10 @@ dispatcher.on('editor.insertBlock', insertBlock)
 onBeforeUnmount(dispatcher.unmount)
 
 // The editor's right-click menu (replaces the webview's, so spelling suggestions and Look Up are gone). Tables keep
-// their own: their menu takes the event first. Ask in chat needs a workspace (chats belong to one) and Chat on.
+// their own: their menu takes the event first. Plugins' items (Ask in chat) follow the kernel's, a group per
+// registration.
 const {t} = useI18n()
 const $qt = useQuickToasts()
-const {root: chatsRoot, askInChat} = useChats(session)
 // The properties panel's suggestions: the workspace's property names and values.
 const properties = usePropertiesOptions(session)
 const selected = ref('')
@@ -117,7 +110,10 @@ function onMenuOpen(open: boolean) {
     if (open && state) selected.value = state.sliceDoc(state.selection.main.from, state.selection.main.to)
 }
 
-/** Runs a menu action on the editor, then gives it focus back; failures (clipboard, chats) show as a toast. */
+/** A failed menu action (clipboard, a plugin's item) shows as a toast. */
+const failed = (e: unknown) => $qt.error(t('app.editor.ui.editFailed'), e instanceof Error ? e.message : String(e))
+
+/** Runs a menu action on the editor, then gives it focus back. */
 function act(action: (view: EditorView) => unknown) {
     return async () => {
         const view = editorView.value
@@ -125,21 +121,29 @@ function act(action: (view: EditorView) => unknown) {
         try {
             await action(view)
         } catch (e) {
-            $qt.error(t('app.editor.ui.editFailed'), e instanceof Error ? e.message : String(e))
+            failed(e)
         }
         view.focus()
     }
 }
 
-// Ask in chat runs once the menu has closed: closing puts focus back in the editor, which would take it from the
-// chat's prompt.
-let askAfterClose: string | null = null
-function onCloseAutoFocus(event: Event) {
-    if (askAfterClose === null) return
+// A plugin's item runs once the menu has closed: closing puts focus back in the editor, which would take it from what
+// the item opens (the chat's prompt).
+let afterClose: (() => unknown) | null = null
+const runAfterClose = (item: PluginMenuItem): ContextMenuItem => {
+    const run = item.onSelect
+    return {...item, onSelect: run && (() => { afterClose = run }), children: item.children?.map(runAfterClose)}
+}
+async function onCloseAutoFocus(event: Event) {
+    if (!afterClose) return
     event.preventDefault()
-    const quote = askAfterClose
-    askAfterClose = null
-    askInChat(quote, props.filePath).catch(e => $qt.error(t('app.editor.ui.editFailed'), e instanceof Error ? e.message : String(e)))
+    const run = afterClose
+    afterClose = null
+    try {
+        await run()
+    } catch (e) {
+        failed(e)
+    }
 }
 
 // Paste goes through a paste event, so CodeMirror's and the editor's paste handling (links, tables) still apply.
@@ -163,9 +167,9 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
             {label: t(`${canvas}.paste`), icon: 'i-lucide-clipboard-paste', kbds: ['meta', 'v'], disabled: readOnly.value, onSelect: act(paste)},
             {label: t(`${canvas}.selectAll`), icon: 'i-lucide-text-select', kbds: ['meta', 'a'], onSelect: act(view => selectAll(view))},
         ],
-        ...(chatsRoot.value && aiFeatureOn(effective.value?.aiConfig, 'chat') ? [[
-            {label: t('app.editor.ui.askInChat'), icon: 'i-lucide-message-square-quote', disabled: none, onSelect: () => { askAfterClose = selected.value }},
-        ]] : []),
+        ...[...noteMenuItems.items.values()]
+            .map(def => def.items({host, selection: selected.value}).map(runAfterClose))
+            .filter(group => group.length),
     ]
 })
 </script>
@@ -182,13 +186,15 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
             <UContextMenu :items="menuItems" :content="{ onCloseAutoFocus }" @update:open="onMenuOpen">
                 <!-- Frontmatter shows as the editor's own properties panel, offering the workspace's names and values. -->
                 <Editor
+                    v-if="ready"
                     :disabled="readOnly"
                     :extensions="editorExtensions"
                     ref="editorInstance"
                     v-model="content"
                     class="max-w-2xl w-full"
-                    :special-code-block-map="codeblockMappings"
-                    :internal-link-map="internalLinkList"
+                    :special-code-block-map="codeBlockMap"
+                    :internal-link-map="links"
+                    :markdown="markdown"
                     :properties="properties"
                     context-menu-size="sm"
                     @update:model-value="() => contentSaved = false"
@@ -204,10 +210,6 @@ const menuItems = computed<ContextMenuItem[][]>(() => {
             <ViewerEditorComponentHeaderTools v-for="tools in toolsAt('right')" :key="tools" :tools="tools" :view="editorView" :state="editorState" :disabled="readOnly"/>
         </template>
     </ViewerEditorLayoutWrapper>
-    <MinimalLineToc
-        class="absolute right-8 top-1/2 -translate-y-1/2 z-10"
-        @to-toc="(heading: Heading) => toTocEntry({from: heading.from})"
-    />
 </template>
 
 <style scoped>

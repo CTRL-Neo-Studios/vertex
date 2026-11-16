@@ -2,9 +2,15 @@
  * The plugin contract: what a plugin's entry exports and what its `setup` is given. It holds only what the host
  * implements; each phase of the Plugin Architecture Plan adds its contribution points here.
  */
+import type {Extension} from '@codemirror/state'
+import type {EditorView} from '@codemirror/view'
 import type {ActiveSession} from '#shared/types/active/sessions'
+import type {ActiveWorkspaceFileIndex, WorkspaceIndexListener} from '#shared/types/active/workspace'
 import type {PanelViewId} from '#shared/types/app/settings'
-import type {FileMenuItemDef, FileTypeDef, HomeActionDef, PaletteGroupDef, PanelViewDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef} from './contributions'
+import type {
+    CodeBlockDef, EditorActionDef, EditorHost, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
+    MarkdownSyntaxDef, NoteMenuItemDef, PaletteGroupDef, PanelViewDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
+} from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
 
 export type {ActiveSession}
@@ -42,6 +48,40 @@ export interface SessionContext {
         /** Opens a `tab: true` view in a tab. */
         openInTab(id: PanelViewId): unknown
     }
+    /** The workspace's files and links (empty in a single-file window). Files by absolute path or uuid. */
+    index: {
+        files(): ActiveWorkspaceFileIndex[]
+        byPath(path: string): ActiveWorkspaceFileIndex | undefined
+        byUuid(uuid: string): ActiveWorkspaceFileIndex | undefined
+        /** The file a link target (`[[target]]`) finds, as the editor resolves it. */
+        resolveLink(target: string): ActiveWorkspaceFileIndex | undefined
+        /** Uuids of the files linking to it / it links to. */
+        backlinks(uuid: string): string[]
+        forelinks(uuid: string): string[]
+        /** Every resolved link as a pair of uuids. */
+        links(): { from: string, to: string }[]
+        /** A file's link targets that find no file. */
+        unresolved(uuid: string): string[]
+        /** Files created, removed, renamed, modified (removed with the session). */
+        on(listener: WorkspaceIndexListener): () => void
+    }
+    tabs: {
+        /** Opens and shows a tab: a file's (by uuid), or another kind's (`kind`, `id`). */
+        open(id: string, kind?: string): Promise<unknown>
+        close(id: string): Promise<unknown>
+        /** The shown tab's id (a file's uuid, or another kind's id). */
+        active(): string | null
+        list(): { kind?: string, id: string }[]
+    }
+    editor: {
+        /** The note editor of a tab while it's mounted (its tab is shown). */
+        viewOf(tabId: string): EditorView | undefined
+    }
+    /**
+     * Raw watcher events under a workspace-relative folder the index ignores (a dot folder: `.vertex/chats/`), each
+     * batch's absolute paths. Removed with the session.
+     */
+    watch(prefix: string, fn: (paths: string[]) => void): () => void
 }
 
 /**
@@ -96,6 +136,21 @@ export interface PluginContext<Config = Record<string, unknown>> {
     }
     home: {
         action(def: HomeActionDef): () => void
+    }
+    editor: {
+        /** Also in callouts, table cells and canvas cards with `{nested: true}`. */
+        extension(extension: Extension | ((host: EditorHost) => Extension), options?: { nested?: boolean }): () => void
+        codeBlock(def: CodeBlockDef): () => void
+        embed(def: EmbedDef): () => void
+        /** Markdown syntax the editor parses, in notes and everything nested in them. */
+        markdown(syntax: MarkdownSyntaxDef): () => void
+        slashItem(def: EditorActionDef): () => void
+        toolbarItem(def: EditorActionDef): () => void
+        /** Items in the note's right-click menu. */
+        noteMenuItem(def: NoteMenuItemDef): () => void
+    }
+    index: {
+        linkExtractor(def: LinkExtractorDef): () => void
     }
     /** Runs for the window's session once its index is built (now, if it already is); what it starts stops with the session. */
     onSession(fn: (session: SessionContext) => unknown): void

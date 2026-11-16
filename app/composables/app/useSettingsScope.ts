@@ -4,9 +4,9 @@ import {defaultAppSettings} from "#shared/utils/defaults/apps";
 import {movedPathsIn, withMovedPaths} from "#shared/utils/settings/legacy";
 import {getAt, withAt, withoutAt} from "#shared/utils/settings/paths";
 import {effectiveSettings, isOverridden, overridableAs, settingsAllowlist, type AppSettingPath, type SettingAt} from "#shared/utils/settings/scopes";
-import {folderTrustedBy} from "#shared/workflows/trust";
+import {folderTrustedBy} from "#shared/utils/trust";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {useWorkflowTrust} from "~/composables/workflows/useWorkflowTrust";
+import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifests} from "~/utils/plugins/catalog";
 import {stateClient} from "~/utils/stateClient";
 
@@ -20,7 +20,7 @@ const allowlist = settingsAllowlist(pluginManifests())
  */
 export function useSettingsScope() {
     const {config, save} = useAppSettings()
-    const trust = useWorkflowTrust()
+    const trust = useTrust()
     const root = useState<string | null>('settingsScopeRoot', () => null)
     /** The workspace's overrides, moved settings read at their new paths (`LEGACY_PATHS`). */
     const local = useState<DeepPartial<AppSettings>>('settingsScopeLocal', () => ({}))

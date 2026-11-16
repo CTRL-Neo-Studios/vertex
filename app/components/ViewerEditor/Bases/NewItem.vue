@@ -21,7 +21,7 @@ const open = computed({
     get: () => ctx.open.value === 'new',
     set: value => ctx.open.value = value ? 'new' : null,
 })
-const note = ref<{ uuid: string, title: string, text: string }>()
+const note = ref<{ uuid: string, path: string, title: string, text: string }>()
 
 async function create() {
     if (!ctx.session.rootPath) return
@@ -42,7 +42,7 @@ async function create() {
         const entry = await tools.createFile(getFileByPath(dir)?.uuid, `${title}.md`, false, 'below')
         if (!entry) return
         if (text) await tools.saveContent(entry.uuid, text)
-        note.value = {uuid: entry.uuid, title, text}
+        note.value = {uuid: entry.uuid, path: entry.relativePath, title, text}
     } catch (error) {
         open.value = false
         $qt.error(t('app.home.createFailed'), String(error))
@@ -82,7 +82,7 @@ onBeforeUnmount(flush)
                     <div class="grow min-h-0">
                         <ViewerEditorComponentCanvasCardEditor
                             :text="note.text"
-                            :internal-link-list="[]"
+                            :note-path="note.path"
                             @update="update"
                             @done="open = false"
                         />

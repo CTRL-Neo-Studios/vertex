@@ -1,5 +1,5 @@
 import type {ChatChange, VertexChatMessage} from "#shared/types/app/chats";
-import {vaultPath} from "#shared/workflows/vault";
+import {vaultPath} from "#shared/utils/vault";
 import {fromBase64Url, toBase64Url} from "#shared/utils/base64url";
 
 /** Which staged change a diff tab shows: `path` in the changes of `messageId` in `chatId`. */

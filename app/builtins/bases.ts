@@ -13,6 +13,9 @@ export default definePlugin({
         })
         // A base queries the workspace's index; in a singlespace it opens as YAML.
         ctx.views.fileViewer({id: 'bases', loadsText: true, modes: ['workspace'], match: isBasesFile, component: () => import('~/components/ViewerEditor/BasesViewer.vue')})
+        // A base embedded in a note (` ```base `, `![[x.base]]`), with the note as `this`.
+        ctx.editor.codeBlock({language: 'base', component: () => import('~/components/ViewerEditor/Bases/Embed.vue')})
+        ctx.editor.embed({id: 'base', match: isBasesFile, component: () => import('~/components/ViewerEditor/Bases/Embed.vue')})
         // The palette's Bases commands: the open base's, and Insert new base in a note.
         ctx.onSession(({session}) => {
             const items = useBaseCommandItems(session)

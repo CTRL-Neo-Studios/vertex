@@ -1,35 +1,53 @@
 import {invoke} from "@tauri-apps/api/core"
-import {hashProgram} from "@type32/workflows/core"
-import {getFileExtensionFromPath, isWorkflowFile} from "#shared/utils/fs/filenames"
-import {defaultTrustRecords, normalizeTrustPath, type TrustRecords} from "#shared/workflows/trust"
-import {parseWorkflow} from "~/composables/workflows/useWorkflowRunner"
+import {getFileExtensionFromPath} from "#shared/utils/fs/filenames"
+import {defaultTrustRecords, normalizeTrustPath, type TrustRecords} from "#shared/utils/trust"
 import {stateClient} from "~/utils/stateClient"
 
 /**
- * The program of each workflow a folder covers right now (its own files, or with `nested` everything under it):
- * what trusting the folder means in content mode. Hidden entries (`.vertex/`) are skipped by the scan; files that
- * don't load as workflows aren't pinned, so they ask when they run.
+ * A kind of file whose content trust pins (a workflow's program): trusting a folder in content mode trusts each such
+ * file as it is now. `hash` is `undefined` for a file that doesn't load, which isn't pinned and asks when it runs.
+ */
+export interface TrustedFormat {
+    match(extension: string): boolean
+    hash(text: string): Promise<string | undefined>
+}
+
+const trustedFormats = new Set<TrustedFormat>()
+
+/** Adds a format a folder's trust pins (the workflows builtin's programs); returns its removal. */
+export function registerTrustedFormat(format: TrustedFormat): () => void {
+    trustedFormats.add(format)
+    return () => void trustedFormats.delete(format)
+}
+
+/**
+ * What trusting a folder means in content mode: the hash of each file of a trusted format it covers right now (its own
+ * files, or with `nested` everything under it). Hidden entries (`.vertex/`) are skipped by the scan.
  */
 async function pinsUnder(folder: string, nested: boolean): Promise<Record<string, string>> {
+    const formatOf = (name: string) => {
+        const ext = getFileExtensionFromPath(name)
+        return [...trustedFormats].find(f => f.match(ext))
+    }
     const entries = await invoke<{path: string, name: string, is_directory: boolean}[]>('scan_directory_recursive', {rootPath: folder})
     const paths = entries
-        .filter(e => !e.is_directory && isWorkflowFile(getFileExtensionFromPath(e.name)))
+        .filter(e => !e.is_directory && formatOf(e.name))
         .map(e => normalizeTrustPath(e.path))
         .filter(path => nested || path.slice(0, path.lastIndexOf('/')) === folder)
     const read = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths})
     const pins: Record<string, string> = {}
     for (const {path, content} of read) {
-        const doc = content === undefined ? undefined : parseWorkflow(content).doc
-        if (doc) pins[normalizeTrustPath(path)] = await hashProgram(doc)
+        const hash = content === undefined ? undefined : await formatOf(path)?.hash(content)
+        if (hash) pins[normalizeTrustPath(path)] = hash
     }
     return pins
 }
 
 /**
- * Per-window mirror of the trusted workflow folders and files. Rust (`state.rs`) owns `trust.json`, changes one
+ * Per-window mirror of the trusted folders and files. Rust (`state.rs`) owns `trust.json`, changes one
  * entry per call and broadcasts the result, so a revoke in one window reaches every other before its next run.
  */
-export function useWorkflowTrust() {
+export function useTrust() {
     const records = useState<TrustRecords>('workflowTrust', () => defaultTrustRecords())
     const loading = useState<Promise<void> | null>('workflowTrustLoading', () => null)
 

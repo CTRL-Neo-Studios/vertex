@@ -5,7 +5,6 @@ import {blockDragHandle, selectionToolbar, slashMenu} from "@type32/codemirror-r
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {useAiEditorExtension} from "~/composables/ai/useAiEditorExtension";
 import {useEditorFileDrops} from "~/composables/active/editor/useEditorFileDrops";
 
 // Plugins must be stable objects (package README), so they are built once and only picked per settings.
@@ -70,14 +69,13 @@ export function useTabOutline(session: ActiveSession | undefined, tabId: MaybeRe
     }
 }
 
-/** CodeMirror extensions for a tab's markdown editor: outline tracking plus the optional ready-made UI extensions. */
+/** The kernel's CodeMirror extensions for a tab's markdown editor (`useNoteEditor` adds the plugins'): labels, outline tracking, file drops and the optional ready-made UI extensions. */
 export function useActiveEditorExtensions(session: ActiveSession | undefined, tabId: MaybeRefOrGetter<string>) {
     const keys = outlineKeys(session, toValue(tabId))
     const outline = useState<Heading[]>(keys.outline, () => [])
     const activeHeading = useState<number | null>(keys.activeHeading, () => null)
     const {effective} = useSettingsScope()
     const {t, locale} = useI18n()
-    const ai = useAiEditorExtension()
     const fileDrops = useEditorFileDrops(session)
     // `{n}`/`{total}` are the package's own placeholders: pass them through vue-i18n untouched.
     const labels = computed(() => {
@@ -116,7 +114,6 @@ export function useActiveEditorExtensions(session: ActiveSession | undefined, ta
             panel?.selectionToolbar ?? true ? toolbarExt : [],
             panel?.slashMenu ?? true ? slashExt : [],
             panel?.blockHandle ?? true ? blockHandleExt : [],
-            ai.value,
         ]
     })
 }

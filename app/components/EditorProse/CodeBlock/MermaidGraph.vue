@@ -3,6 +3,8 @@ import useQuickToasts from "~/composables/utility/useQuickToasts";
 import PreviewMermaidGraphModal from "~/components/Modals/PreviewMermaidGraphModal.vue";
 import MermaidDiagram from "~/components/Utility/MermaidDiagram.vue";
 
+// The editor's block props come with `host` (`CodeBlockDef`), which this doesn't need: not an attribute.
+defineOptions({inheritAttrs: false})
 const props = defineProps<{ codeContent?: string }>()
 const {t} = useI18n()
 const $qt = useQuickToasts()

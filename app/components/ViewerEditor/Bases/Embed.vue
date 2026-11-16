@@ -2,16 +2,16 @@
 import {EditorView} from "@codemirror/view";
 import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {InternalLink} from "@type32/codemirror-rich-obsidian-editor";
+import type {EditorHost} from "#shared/plugin/api";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
-import {BASE_EMBED} from "~/composables/bases/useBaseContext";
 
 /**
  * A base embedded where Obsidian embeds one, each host passing its own props:
  * - `![[x.base]]` / `![[x.base#View]]` in a note (`linkData`, `subpath`): the file, its edits written to it;
  * - a ` ```base ` block (`codeContent`): the block's YAML, its edits written into the block;
  * - a canvas file card (`node`, its `subpath` `#View`): the file, filling the card.
- * `this` is the tab's file (the note or the canvas), from `BASE_EMBED`; without it (no workspace) nothing shows.
+ * `this` is the file it's in (`host.notePath`: the note or the canvas); outside a workspace nothing shows.
  *
  * The editor unmounts embeds scrolled out of view and remounts them on the way back (and a block after each edit it
  * writes), so what must survive lives in `useState`: the shown view per embed, and each file's last text, which lets a
@@ -19,6 +19,7 @@ import {BASE_EMBED} from "~/composables/bases/useBaseContext";
  */
 defineOptions({inheritAttrs: false})
 const props = defineProps<{
+    host: EditorHost,
     linkData?: InternalLink,
     subpath?: string,
     codeContent?: string,
@@ -26,16 +27,16 @@ const props = defineProps<{
 }>()
 
 const {t} = useI18n()
-const embed = inject(BASE_EMBED, null)
-const $index = embed ? useActiveWorkspaceIndex(embed.session) : null
-const tools = embed ? useActiveWorkspaceTools(embed.session) : null
+const session = props.host.session.session.workspaceSession ? props.host.session.session : null
+const $index = session ? useActiveWorkspaceIndex(session) : null
+const tools = session ? useActiveWorkspaceTools(session) : null
 const root = useTemplateRef<HTMLElement>('root')
 
 const inBlock = props.codeContent !== undefined
 const file = computed(() => {
-    if (!$index || !embed) return undefined
+    if (!$index || !session) return undefined
     if (props.linkData) return $index.getFileByUuid(props.linkData.referenceId)
-    return props.node ? $index.getFileByPath(`${embed.session.rootPath}/${props.node.file}`) : undefined
+    return props.node ? $index.getFileByPath(`${session.rootPath}/${props.node.file}`) : undefined
 })
 
 const texts = useState<Record<string, string>>('bases-embed-texts', () => ({}))
@@ -59,7 +60,7 @@ if (!inBlock) {
 // ponytail: identical blocks (or links) in one note share their view; key by position if that ever matters.
 const views = useState<Record<string, string>>('bases-embed-views', () => ({}))
 const viewKey = computed(() => {
-    const here = embed?.thisPath() ?? ''
+    const here = props.host.notePath
     if (inBlock) return `${here}\n${text.value}`
     return props.node ? `${here}#${props.node.id}` : `${here}#${props.linkData?.referenceId}#${props.subpath ?? ''}`
 })
@@ -116,7 +117,7 @@ async function save(next: string) {
 <template>
     <!-- `contain: inline-size`: wide layouts (a kanban's columns) scroll inside rather than widening the note. -->
     <div
-        v-if="embed && text !== null"
+        v-if="session && text !== null"
         ref="root"
         class="flex flex-col text-sm [contain:inline-size]"
         :class="node ? 'h-full' : 'my-2 rounded-lg border border-default overflow-hidden bg-default'"
@@ -124,8 +125,8 @@ async function save(next: string) {
         <ViewerEditorBasesBase
             :model-value="text"
             v-model:view="view"
-            :session="embed.session"
-            :this-path="embed.thisPath()"
+            :session="session"
+            :this-path="host.notePath"
             :embed="node ? 'card' : 'note'"
             :readonly="readonly"
             @update:model-value="save"

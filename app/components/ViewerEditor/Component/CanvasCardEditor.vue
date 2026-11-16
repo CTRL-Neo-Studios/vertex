@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import type {EditorView} from "@codemirror/view"
-import type {ExternalLinkClickDetail, InternalLink, InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
+import type {ExternalLinkClickDetail, InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
+import {useNoteEditor} from "~/composables/active/editor/useNoteEditor"
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useAppOpener} from "~/composables/app/useAppOpener"
 
 /**
  * The markdown editor inside a canvas card being edited (a text card, or a note card): the note editor's own
- * rendering and `[[links]]`, without the tab's extensions (the outline, toolbars, AI), which belong to a note's tab.
- * Esc ends editing, as the canvas's own textarea does.
+ * rendering, `[[links]]`, code blocks, embeds and syntax (`useNoteEditor`), and of the extensions only the `nested`
+ * ones, as the tab's (the outline, toolbars, AI) belong to a note's tab. `notePath` is the file it's in (the canvas),
+ * `this` for an embedded base. Esc ends editing, as the canvas's own textarea does.
  */
-const props = defineProps<{ text: string, internalLinkList: InternalLink[] }>()
+const props = defineProps<{ text: string, notePath: string }>()
 const emit = defineEmits<{ update: [text: string], done: [], openLink: [detail: InternalLinkClickDetail] }>()
 const editor = useTemplateRef<{ view: EditorView | undefined }>('editor')
 const $route = useRoute()
-const properties = usePropertiesOptions(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
+const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
+const properties = usePropertiesOptions(session)
+const {ready, codeBlocks: codeBlockMap, links, markdown, extensions} = useNoteEditor(session, () => props.notePath)
 // The editor follows no link itself: a web or mail link opens in the default app.
 const {openUrlInBrowser} = useAppOpener()
 
@@ -30,10 +34,14 @@ watch(() => editor.value?.view, (view) => {
 <template>
     <div class="canvas-card-editor size-full overflow-auto" @keydown.esc.stop.prevent="emit('done')">
         <Editor
+            v-if="ready"
             ref="editor"
             class="w-full"
             :model-value="props.text"
-            :internal-link-map="props.internalLinkList"
+            :extensions="extensions"
+            :special-code-block-map="codeBlockMap"
+            :internal-link-map="links"
+            :markdown="markdown"
             :properties="properties"
             context-menu-size="sm"
             @update:model-value="(text?: string) => emit('update', text ?? '')"

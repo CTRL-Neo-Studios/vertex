@@ -127,6 +127,16 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
             },
             settings: {page: def => add('settingsPage', def)},
             home: {action: def => add('homeAction', def)},
+            editor: {
+                extension: (extension, options) => add('editorExtension', {extension, nested: options?.nested}),
+                codeBlock: def => add('codeBlock', def),
+                embed: def => add('embed', def),
+                markdown: syntax => add('markdownSyntax', syntax),
+                slashItem: def => add('slashItem', def),
+                toolbarItem: def => add('toolbarItem', def),
+                noteMenuItem: def => add('noteMenuItem', def),
+            },
+            index: {linkExtractor: def => add('linkExtractor', def)},
             onSession(fn) {
                 r.hooks.push(fn)
                 // During `setup` the host runs it once `setup` is done; later, now.

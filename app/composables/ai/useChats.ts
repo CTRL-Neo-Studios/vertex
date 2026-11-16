@@ -16,9 +16,9 @@ import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToo
 import {branchAt, fork, pruneForks, switchBranch} from "~/utils/chatForks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
 import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "~/utils/chatBash";
-import {TRASH_DIR} from "#shared/workflows/vault";
+import {TRASH_DIR} from "#shared/utils/vault";
 import type {Op} from "#shared/workflows/effects";
-import {useWorkspaceVault} from "~/composables/workflows/useWorkspaceVault";
+import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault";
 import {parseWorkflow, useWorkflowRunner, type WorkflowRunner} from "~/composables/workflows/useWorkflowRunner";
 import {resolveAiFeature} from "~/composables/ai/useAiConfig";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";

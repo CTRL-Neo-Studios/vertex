@@ -115,7 +115,8 @@ interface PluginContext<Config = unknown> {
     views: { panel(def), tabKind(def), fileViewer(def), statusItem(def) }
     /** Register, and read what's registered: another file browser draws the same icons, New items and menus. */
     files: { type(def), types: Readonly<Ref<FileType[]>>, menuItem(def), menuFor(target): MenuItem[][] }
-    editor: { extension(ext), codeBlock(def), embed(def), slashItem(def), toolbarItem(def), contextMenuItem(def) }
+    /** `extension(ext, {nested})`: `nested` also installs it in callouts, table cells and canvas cards. */
+    editor: { extension(ext, options?), codeBlock(def), embed(def), markdown(config), slashItem(def), toolbarItem(def), noteMenuItem(def) }
     index: { linkExtractor(def) }
     settings: { page(def) }
     home: { action(def) }
@@ -143,7 +144,7 @@ interface SessionContext {
     }
     tabs: { open, close, active, list }
     views: { show(id), openInTab(id) }
-    editor: { viewOf(tabId), dispatcher }
+    editor: { viewOf(tabId) }
     /** Raw watcher events under a path the index ignores (a dot-folder). */
     watch(prefix: string, fn: (paths: string[]) => void): void
 }
@@ -344,23 +345,43 @@ Blocked by K2. Each registry replaces a closed list; what's built in today regis
 
 ## K4: Editor and index contribution points; shared services
 
-Blocked by K3.
+Blocked by K3. Built on editor 0.5 (`@type32/codemirror-rich-obsidian-editor`), whose `mount` functions, `nestedExtensions` and `markdown` option these points hand plugins directly.
 
 ### Change
-- **Code blocks:** `{language, component | mount}`, replacing `useActiveEditorCodeblockMappings`' list. The props are the editor library's (`SpecialCodeBlockMapping`).
-- **Embeds:** `{match(extension), linkName: 'name' | 'fileName', component | mount, props?(file)}`, replacing the image and base branches of `SessionTab`'s link list.
+- **Code blocks:** `{language, component | mount}`, replacing `useActiveEditorCodeblockMappings`' list; passed through as the editor's `SpecialCodeBlockMapping` (`mount` is its `EmbedMount`, `(el, props) => teardown`).
+- **Embeds:** `{match(extension), linkName: 'name' | 'fileName', component | mount, props?(file)}`, replacing the image and base branches of the link list; passed through as `InternalLink.embedComponent` / `embedMount`. The editor remounts an embed when its function or component is a different one, so each registration resolves to one function, never a closure per rebuild of the link list.
 - **Extensions and menus:** CodeMirror extensions per editor (`(editorContext) => Extension`), slash items, toolbar items (the library's `slashItems`, `toolbarItems`), and items for the note's right-click menu (Ask in chat). Editor labels a plugin adds go through the same i18n mapping as `LABEL_KEYS`.
-- **Nested editors** (callouts, table cells, canvas cards) get the same registrations as a tab's editor.
+- **Markdown syntax:** `ctx.editor.markdown(config)`, a Lezer `MarkdownConfig` added to the editor's parser (`<Editor :markdown>`, one stable `MarkdownOptions` object rebuilt only when the registrations change). Drawing what it parses is an extension's job.
+- **Nested editors:** callouts and table cells inherit the note's code blocks, embeds, labels and syntax from the editor itself. An extension reaches them, and canvas cards, only when registered with `{nested: true}` (through the editor's `nestedExtensions`); menus, toolbars and the AI assistant stay in the note's own editor.
+- **The kernel's boundary:** feature code that still lives in `app/` and `shared/` (until its X phase moves it) is listed in the boundary test by its future plugin; rule 1 then also forbids the rest of the kernel to import it, outside `app/builtins/` (the bridge) and listed exceptions, each with the X phase that ends it.
 - **Index:** link extractors `{match(extension), targets(text), rewrite?(text, changes)}`, replacing the canvas branches in `parse.ts` and `useActiveWorkspaceTools`; `SessionContext.watch` replaces the `.vertex/chats/` case in the watcher.
   - `index.links()` and `index.unresolved(uuid)` read the `LinkGraph` directly (it keeps each file's raw targets), so a view of the whole vault doesn't walk every file's reactive lists.
 - **Kernel services that lived in a feature:** `shared/workflows/trust.ts` → `shared/utils/trust.ts` and `useWorkflowTrust` → `useTrust`; `shared/workflows/vault.ts`'s frontmatter writer and path helpers, and `useWorkspaceVault`, → the kernel's file services. `TextDiff.vue` and `shared/utils/textDiff.ts` are confirmed kernel.
 - **Published UI components:** the list community plugins may import (the Settings rows and sections, and the Nuxt UI components the app uses most), exported from one module.
 
 ### Acceptance
-- [ ] No behaviour change: the SMOKE rows for the editor, embeds, Mermaid, canvas links and link rewriting pass.
-- [ ] The boundary test's rule 1 passes for the whole kernel: `app/` and `shared/` import no feature.
-- [ ] A registered extension, code block and embed work in a tab, a callout and a canvas card.
-- [ ] Concepts doc.
+- [x] No behaviour change: the SMOKE rows for the editor, embeds, Mermaid, canvas links and link rewriting pass (in `tauri dev`, below; rename rewriting through its unit tests, the app's rename not run; three small differences listed there).
+- [x] The boundary test's rule 1 passes for the whole kernel: `app/` and `shared/` import no feature, beyond four exceptions each ended by a later phase.
+- [x] A registered extension (with `nested`), code block, embed and Markdown syntax work in a tab, a callout, a table cell and a canvas card.
+- [x] Concepts doc.
+
+### As built
+
+- **Editor 0.5 first** (`0fd26c9` bumped it; the migration landed with K4): the Nuxt module at `…/nuxt`, types and frontmatter helpers from the package root (the `#codemirror-rich-obsidian-editor` alias is gone), `.cm-embed-widget`, and Vertex's `alfaaz` hook removed (0.5's module no longer transpiles it). External links in notes and canvas cards open in the browser now that the editor emits `external-link-click` (it never fired in 0.4); `openUrlInBrowser` opens only `http(s):` and `mailto:` links, which Mermaid diagrams and bases' URL values used to pass unchecked.
+- **The kernel's boundary** (`boundaries.test.ts`): `RESIDENTS` lists the feature code still in `app/` and `shared/` by its future plugin (16 plugins); rule 1 holds the kernel to it by import, component tag and auto-import, except `app/builtins/` and `KERNEL_EXCEPTIONS`: the session layout drawing the palette (X4), `AppSettings.aiConfig`'s type and the AI and chat settings defaults (X6, X8). The test never checked `shared/`: Vite keys its globbed files relative to the test, and `load` stripped them to `utils/…`; it now resolves them and asserts it found them. `withoutExt` strips `.d.ts`.
+- **Editor host** (`useNoteEditor`): one per note editor (a tab's `RichText`, a canvas card's `CanvasCardEditor`), drawn once the session is handed to plugins. Code blocks and embeds draw through `PluginMount`, one `mount` per registration per editor (a `WeakMap`), with the host component's app context and provides (Bases' tooltips need `<UApp>`'s), and `host: EditorHost` added to the editor's props; `BASE_EMBED` is gone. `useActiveEditorCodeblockMappings` is deleted; `useActiveEditorExtensions` keeps the kernel's own.
+- **Builtins:** `mermaid` and `ai-assistant` are new; bases registers its code block and embed, image its embed, chat Ask in chat (a note menu item), outline the line outline as a `side` status item (`StatusItemDef.placement`, drawn by `LayoutWrapper`). Plugin note menu items run after the menu closes, as Ask in chat did.
+- **Contract** (`contributions.ts`): `EditorHost {session, notePath}`, `CodeBlockDef`, `EmbedDef`/`EmbedProps`, `EditorExtensionDef {extension, nested}`, `MarkdownSyntaxDef`, `EditorActionDef`, `NoteMenuItemDef`, `LinkExtractorDef {id, match, targets(text, getInternalLinks), rewrite?}`. The note menu target is `{host, selection}` (the planned `contextMenuItem` is `noteMenuItem`). `SessionContext.editor` is `viewOf(tabId)` only: the planned `dispatcher` isn't needed (the outline uses the kernel's, Bases inserts through the view).
+- **Index:** `parseLinkTargets` asks `ContentParsers.linkExtractorFor(ext)` for anything but markdown; `isIndexedText` counts a format an extractor matches; rename rewrites call its `rewrite` (none: skipped). An extractor registered after the index is built relinks the files it matches (`relink`, without touching their modified time). `watch(prefix, fn)` replaces the index's `chats` event (deleted), and passes every changed path, not the first.
+- **Kernel services:** `shared/utils/trust.ts`, `useTrust` (state keys unchanged), `shared/utils/vault.ts` (all of it: chats, bases and workflows use it), `active/useWorkspaceVault`. Trusting a folder pinned workflow programs inside `useTrust`; that's now `registerTrustedFormat` (the workflows builtin registers its programs), and X5 makes it `ctx.trust`.
+- **Published UI** (`app/plugin/ui.ts`, on the boundary test's public list): Settings rows, sections and scroll layout, `PluginMount`, and the 21 Nuxt UI components used in at least 5 files, imported by path.
+- **Checked in `tauri dev`** (separate identifier; a temporary core plugin in `layers/` registering `{{name}}` syntax, a `nested` extension marking it, a ` ```trial ` code block and a `.trial` embed, and a harness; all deleted after):
+  - the syntax and extension in the note, a callout's title and body, and a table cell; the code block in the note and a callout; the embed in the note, a callout and a table cell; all three in an edited canvas card; blocks and embeds got their `host.notePath`;
+  - Mermaid, a base code block and embed, an image, the line outline, and the note menu's Ask in chat, with no draw errors or console errors;
+  - the index through `SessionContext`: a canvas card's link counted in a note's backlinks (the canvas extractor), `links()` and `unresolved()`.
+  - Not run in the app: rename rewriting (unit tests) and chats synced from another device (`watch`).
+  - Differences: canvas text cards now draw code blocks (they had no code-block map); the Bases New popover's editor gets the workspace's links (it had none); an embed or diagram may draw a tick later (its component loads through `PluginMount`).
+- **Numbers:** 317 tests (42 files); typecheck unchanged (the 7 errors in `@type32/latex2vue`); startup closure 690,469 bytes (243,839 gzipped), with the editor 0.5 migration in the same measurement (K3: 1,214,592 on 0.4.4).
 
 ## K5: Rust kernel
 
@@ -448,6 +469,7 @@ Blocked by X3.
 Blocked by X4.
 
 - Viewer, file type, runner, manifest, trust prompts, the tree's Run items and the palette's Run commands; `workflowConfig` → `plugins.config.workflows`. The trust store stays kernel.
+- `ctx.trust`: what the plugin needs from the kernel's `useTrust` (K4) becomes the contract: the records, file and folder trust, and `registerTrustedFormat` (the programs a folder's trust pins, which the workflows builtin registers from K4), so any plugin that runs a vault's code asks the same way.
 - API (`app/api.ts`): `run(path, options)`, `dryRun`, and `registerNodes` for other plugins' nodes.
 
 ### Acceptance
@@ -485,6 +507,7 @@ Blocked by X7.
 - `chat` (requires `ai`): the Chats and Chat views, the `chat` and `chat-change` tab kinds, tools, transport, staging and changes, attachments, the note menu's Ask in chat; `aiConfig.chatStorage`, `chatMode`, `chatTitles` → `plugins.config.chat`.
 - `crates/tauri-plugin-vertex-chats` from `chats.rs`. `fetchUrl` and `searchNotes` use the kernel's `http_fetch` and `search_notes`.
 - Chat's tools are registered through `ai.registerTool`; `runWorkflow` only when `workflows` is on.
+- Check whether the editor's `/comark` plugin (`ofm()`, 0.5) can replace `app/utils/comarkPlugins.ts`'s wikilinks, so replies render callouts, tags and highlights as notes do; adopt it if the chat's streaming and quoted frontmatter still work.
 - `ai-assistant` (requires `ai`): `useAiEditorExtension` as an editor extension; `aiConfig.editorAssistant` → `plugins.config.ai-assistant`.
 
 ### Acceptance
@@ -498,7 +521,8 @@ Blocked by X8.
 
 ### Change
 - **Package:** a folder with `plugin.json`, `main.js` (one ES module, no relative imports), optional `styles.css` and assets.
-- **Shared modules:** the host puts `vue`, the `@codemirror/*` and `@lezer/*` packages it uses, the editor's kit, the published UI components and the plugin API on one registry. The preset (K0's spike shows its shape) takes each one's export names from the version the SDK pins, which is the host's for that `apiVersion`; a plugin built against a newer one than the host's would read `undefined`, so a shared module's major version is part of `apiVersion`.
+- **Shared modules:** the host puts `vue`, the `@codemirror/*` and `@lezer/*` packages it uses, the editor's root, `/kit` and `/ext` (the facets plugins register through, `nestedExtensions`, `slashItems`, `toolbarItems`, only work as the host's copy), the published UI components and the plugin API on one registry. The preset (K0's spike shows its shape) takes each one's export names from the version the SDK pins, which is the host's for that `apiVersion`; a plugin built against a newer one than the host's would read `undefined`, so a shared module's major version is part of `apiVersion`.
+- **Editor surface:** the editor's plugin surface is unstable until its 1.0, which waits for this plan's use of it. C1 settles the order: editor 1.0 before the SDK is published, so `apiVersion` 1 pins a frozen editor surface.
 - **SDK** (`@type32/vertex-plugin`, built from `shared/plugin/`): the types, `definePlugin`, and a Vite preset that points those imports at the registry and builds `main.js`.
 - **Styles:** the host's CSS holds only the classes the host uses, so a plugin's own Tailwind classes wouldn't exist. The SDK's preset compiles a plugin's utilities into its `styles.css` against the host's theme variables, without the base styles. Plain CSS on the `--ui-*` variables works without it.
 - **One file:** a blob module can't import a sibling file, so `main.js` isn't split; a plugin loads a heavy part later by asking for an asset by path.
@@ -554,7 +578,7 @@ Blocked by C3.
     - it follows the index (`index.on`) and the theme (`ui.theme`);
     - filters, color groups and forces are its config: global, with per-workspace overrides;
   - a file browser that can replace Files (a navigator: the kernel's file menu, New items and icons, drags to the editor, chat and Finder, file operations with undo, thumbnails, per-folder data in `ctx.data.workspace`);
-  - a code block widget with a slash item (a stat block);
+  - a code block widget with a slash item and a piece of Markdown syntax drawn in notes, callouts and table cells (a stat block);
   - a new file format (viewer, file type, link extractor);
   - one with schema settings, a custom settings widget, a workspace-overridable key and a secret.
 - Author docs: the manifest, the contract, each contribution point with an example, the two UI tiers and what each promises, config scopes, data and secrets, what trust means, versioning.

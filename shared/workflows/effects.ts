@@ -14,7 +14,7 @@ import {
     vaultPath,
     type Vault,
     type YamlTools,
-} from './vault'
+} from '#shared/utils/vault'
 
 /** One change a run made (or, in a dry run, would make), in order. Undo applies their inverses backwards. */
 export type Op =

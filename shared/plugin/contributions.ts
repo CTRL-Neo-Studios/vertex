@@ -1,7 +1,11 @@
 /**
- * What a plugin adds to the workbench (Plugin Architecture Plan, K3): the definitions it registers through `ctx`. Ids
- * are global (panel views and tab kinds are saved in layouts and sessions), so a plugin starts its own with its id.
+ * What a plugin adds to the workbench and the editor (Plugin Architecture Plan, K3 and K4): the definitions it registers
+ * through `ctx`. Ids are global (panel views and tab kinds are saved in layouts and sessions), so a plugin starts its
+ * own with its id.
  */
+import type {Extension} from '@codemirror/state'
+import type {MarkdownOptions} from '@type32/codemirror-rich-obsidian-editor'
+import type {EditorAction} from '@type32/codemirror-rich-obsidian-editor/kit'
 import type {Component} from 'vue'
 import type {ActiveSession} from '#shared/types/active/sessions'
 import type {ActiveWorkspaceFileIndex} from '#shared/types/active/workspace'
@@ -146,11 +150,13 @@ export interface ViewerDef extends UiSlot<ViewerProps> {
     priority?: number
 }
 
-/** Something in a viewer's status bar (the word counter). */
+/** Something a viewer shows besides its content: in its status bar (the word counter), or at its side (the line outline). */
 export interface StatusItemDef extends UiSlot<{ text: string, filePath: string }> {
     id: string
     /** The viewers it shows for; default every one that loads text. */
     viewers?: string[]
+    /** `bar` (default): in the status bar, after the viewer's own items. `side`: over the content's right edge, centred. */
+    placement?: 'bar' | 'side'
 }
 
 // Files
@@ -238,6 +244,86 @@ export interface HomeActionDef {
     run(): unknown
 }
 
+// Editor
+
+/** The note an editor shows, as what a plugin adds to that editor sees it. */
+export interface EditorHost {
+    session: SessionContext
+    /** The note's path as its viewer has it (`ViewerProps.filePath`): `this` for a base embedded in it. */
+    notePath: string
+}
+
+/** A fenced code block a plugin draws (` ```mermaid `), in notes, callouts, table cells and canvas cards. */
+export interface CodeBlockDef extends UiSlot<{ codeContent: string, host: EditorHost }> {
+    /** The fence's info string. */
+    language: string
+}
+
+/** What an embed is drawn with: the editor's props for `![[file#subpath|display]]`, `host`, and what `props(file)` adds. */
+export interface EmbedProps {
+    /** The embedded file's path. */
+    filePath: string
+    /** After `#` (`View` in `![[x.base#View]]`). */
+    subpath?: string
+    /** After `|` (`300` in `![[x.png|300]]`). */
+    display?: string
+    host: EditorHost
+    [prop: string]: unknown
+}
+
+/** `![[file]]` drawn by a plugin, for the files it matches. */
+export interface EmbedDef extends UiSlot<EmbedProps> {
+    id: string
+    /** The embedded file's extension, lowercase, without the dot. */
+    match(extension: string): boolean
+    /** How `![[…]]` names the file: `fileName` (default) with its extension (`photo.png`), `name` without (`Board`). */
+    linkName?: 'name' | 'fileName'
+    /** More props for one file (an image's asset URL). */
+    props?(file: ActiveWorkspaceFileIndex): Record<string, unknown>
+}
+
+/**
+ * A CodeMirror extension for the note editor. A function gets each editor's host; whatever it returns must be the same
+ * objects on every call (module constants; options through a facet), or CodeMirror remounts them on every change.
+ */
+export interface EditorExtensionDef {
+    extension: Extension | ((host: EditorHost) => Extension)
+    /** Also in callouts, table cells and canvas cards (the editor's `nestedExtensions`). Default: the note's own editor only. */
+    nested?: boolean
+}
+
+/** Markdown syntax added to the editor's parser (a Lezer `MarkdownConfig`); drawing what it parses is an extension's job. */
+export type MarkdownSyntaxDef = NonNullable<MarkdownOptions['extensions']> extends readonly (infer C)[] ? C : never
+
+/** An item in the editor's slash menu or selection toolbar: the editor's `EditorAction`, with `label` an i18n key. */
+export type EditorActionDef = EditorAction
+
+/** What the note's right-click menu is for. */
+export interface NoteMenuTarget {
+    host: EditorHost
+    /** The selected text; empty when nothing is. */
+    selection: string
+}
+
+/** A group of items in the note's right-click menu (Ask in chat). An item's `onSelect` runs once the menu has closed. */
+export interface NoteMenuItemDef {
+    id: string
+    items(target: NoteMenuTarget): PluginMenuItem[]
+}
+
+// Index
+
+/** Links in a file format the index doesn't read as markdown (a canvas's cards), for backlinks and link updates. */
+export interface LinkExtractorDef {
+    id: string
+    /** The file's extension, lowercase, without the dot. */
+    match(extension: string): boolean
+    /** The link targets as written (`target` of `[[target]]`); `getInternalLinks` reads markdown's, for text inside the file. */
+    targets(text: string, getInternalLinks: (text: string) => { path: string }[]): string[]
+    /** After renames (`rename`: old target → new), the text with its links updated and how many changed. Without it, links in these files aren't updated. */
+    rewrite?(text: string, rename: Map<string, string>): { text: string, count: number }
+}
+
 /** Every contribution point, by the name the host registers it under. */
 export interface ContributionPoints {
     command: PluginCommand & { plugin: string }
@@ -250,4 +336,12 @@ export interface ContributionPoints {
     fileMenuItem: FileMenuItemDef
     settingsPage: SettingsPageDef
     homeAction: HomeActionDef
+    codeBlock: CodeBlockDef
+    embed: EmbedDef
+    editorExtension: EditorExtensionDef
+    markdownSyntax: MarkdownSyntaxDef
+    slashItem: EditorActionDef
+    toolbarItem: EditorActionDef
+    noteMenuItem: NoteMenuItemDef
+    linkExtractor: LinkExtractorDef
 }

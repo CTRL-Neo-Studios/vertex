@@ -8,5 +8,10 @@ export default definePlugin({
             when: c => c.activeViewer !== 'bases', scroll: true,
             component: () => import('~/components/TableOfContentsPanelComponent.vue'),
         })
+        // The headings as lines beside the note.
+        ctx.views.statusItem({
+            id: 'line-outline', placement: 'side', viewers: ['markdown'],
+            component: () => import('~/components/MinimalLineToc.vue'),
+        })
     },
 })

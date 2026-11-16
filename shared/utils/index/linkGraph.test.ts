@@ -86,6 +86,18 @@ describe('LinkGraph', () => {
         expect(g.targetsPointingAt('c', 'b')).toEqual(['notes/B'])
     })
 
+    it('lists every resolved link, and a file\'s targets that find nothing', () => {
+        const g = graph({a: 'A.md', b: 'B.md', c: 'C.md'}, {a: ['B', 'C', 'Gone', 'A'], b: ['A', 'Later']})
+        expect(g.links().sort((x, y) => (x.from + x.to).localeCompare(y.from + y.to)))
+            .toEqual([{from: 'a', to: 'b'}, {from: 'a', to: 'c'}, {from: 'b', to: 'a'}])
+        expect(g.unresolved('a')).toEqual(['Gone'])
+        g.addFile({id: 'l', relativePath: 'Later.md'})
+        expect(g.unresolved('b')).toEqual([])
+        g.removeFile('c')
+        expect(g.links()).not.toContainEqual({from: 'a', to: 'c'})
+        expect(g.unresolved('a')).toEqual(['C', 'Gone'])
+    })
+
     it('incremental updates match an independent full rebuild after a random edit sequence', () => {
         let seed = 7
         const rand = (n: number) => (seed = (seed * 1103515245 + 12345) % 2 ** 31) % n

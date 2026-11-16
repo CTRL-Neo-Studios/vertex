@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import {parseCanvas, stringifyCanvas, type JSONCanvas as CanvasDocument} from "@type32/jsoncanvas-editor/core"
-import {MESSAGES, type CanvasError, type CanvasMessages, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
+import {MESSAGES, type CanvasError, type CanvasMessages, type FileRendererProps, type FileRenderers} from "@type32/jsoncanvas-editor/vue"
 import type {InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
+import type {EditorHost} from "#shared/plugin/api"
 import {defaultAppCanvasConfig} from "#shared/utils/defaults/apps"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useActiveTabs} from "~/composables/active/useActiveTabs"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
-import {useInternalLinkList} from "~/composables/active/editor/useInternalLinkList"
 import {useAppNavigator} from "~/composables/app/useAppNavigator"
 import {useSettingsScope} from "~/composables/app/useSettingsScope"
-import {BASE_EMBED} from "~/composables/bases/useBaseContext"
 import {useCanvasHost} from "~/composables/canvas/useCanvasHost"
 import useQuickToasts from "~/composables/utility/useQuickToasts"
+import {pluginSession} from "~/utils/plugins/runtime"
 import {ViewerEditorBasesEmbed} from "#components"
 
 /**
@@ -38,12 +38,13 @@ const {openTab} = useActiveTabs(session)
 const $navi = useAppNavigator()
 const scope = useSettingsScope()
 const host = useCanvasHost(session, () => props.filePath && `${session.rootPath}/${props.filePath}`)
-// Text cards link and embed like notes; embedded bases (cards included) have the canvas as `this`.
-const internalLinkList = useInternalLinkList(session)
-provide(BASE_EMBED, {session, thisPath: () => props.filePath})
-// `.base` cards show the base (its `#View`), with the canvas as `this`.
-// It takes `node` and leaves `file` and `host` as attributes.
-const fileRenderers: FileRenderers = {base: ViewerEditorBasesEmbed as FileRenderers[string]}
+// `.base` cards show the base (its `#View`) with the canvas as `this`, as embedded bases do (text cards embed through
+// their editor, `CanvasCardEditor`). The canvas's own `host` prop isn't the base's; drawn once the session is handed
+// to plugins, as embeds are.
+const baseHost: EditorHost = {get session() { return pluginSession()! }, get notePath() { return props.filePath }}
+const fileRenderers: FileRenderers = {
+    base: ({node}: FileRendererProps) => (pluginSession() ? h(ViewerEditorBasesEmbed, {node, host: baseHost}) : null),
+}
 const editor = useTemplateRef<{ refreshFiles: (paths?: string[]) => void }>('editor')
 
 function read(text: string): { canvas?: CanvasDocument, problem?: string } {
@@ -151,10 +152,10 @@ onBeforeUnmount(unsubscribe)
                 @error="onError"
             >
                 <template #text-editor="{text, update, done}">
-                    <ViewerEditorComponentCanvasCardEditor :text="text" :internal-link-list="internalLinkList" @update="update" @done="done" @open-link="openLink"/>
+                    <ViewerEditorComponentCanvasCardEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
                 </template>
                 <template #note-editor="{text, update, done}">
-                    <ViewerEditorComponentCanvasCardEditor :text="text" :internal-link-list="internalLinkList" @update="update" @done="done" @open-link="openLink"/>
+                    <ViewerEditorComponentCanvasCardEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
                 </template>
             </JsonCanvas>
         </div>
