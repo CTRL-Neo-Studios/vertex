@@ -790,6 +790,32 @@ Denies the update_token_set command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-window-open`
+
+</td>
+<td>
+
+Enables the window_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-window-open`
+
+</td>
+<td>
+
+Denies the window_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-workspace-settings-get`
 
 </td>

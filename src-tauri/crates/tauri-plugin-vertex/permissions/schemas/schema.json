@@ -655,6 +655,18 @@
           "markdownDescription": "Denies the update_token_set command without any pre-configured scope."
         },
         {
+          "description": "Enables the window_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-window-open",
+          "markdownDescription": "Enables the window_open command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the window_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-window-open",
+          "markdownDescription": "Denies the window_open command without any pre-configured scope."
+        },
+        {
           "description": "Enables the workspace_settings_get command without any pre-configured scope.",
           "type": "string",
           "const": "allow-workspace-settings-get",

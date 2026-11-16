@@ -1,6 +1,6 @@
-//! Vertex's kernel as a Tauri plugin (`vertex`): the state every window shares (sessions, settings, trust, workspace
-//! settings), files, the Trash, the clipboard's files, fonts, update channels, and the host services every plugin
-//! builds on (`http_fetch`, `search_notes`, secrets, plugin data). Plugin crates use its Rust API, [`api`].
+//! Vertex's kernel as a Tauri plugin (`vertex`): the app's windows, the state every window shares (sessions, settings,
+//! trust, workspace settings), files, the Trash, the clipboard's files, fonts, update channels, and the host services
+//! every plugin builds on (`http_fetch`, `search_notes`, secrets, plugin data). Plugin crates use its Rust API, [`api`].
 
 pub mod api;
 mod fonts;
@@ -10,6 +10,7 @@ mod state;
 mod trash;
 mod updater;
 mod web;
+mod windows;
 
 use api::SESSION_WINDOW_PREFIX;
 use rayon::prelude::*;
@@ -17,7 +18,7 @@ use state::AppState;
 use std::fs;
 use std::path::Path;
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Manager, RunEvent, Runtime, WindowEvent};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct FileReadResult {
@@ -234,10 +235,16 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             host::secret_delete,
             host::data_get,
             host::data_set,
+            windows::window_open,
         ])
         .setup(|app, _api| {
             app.manage(AppState::default());
             Ok(())
+        })
+        .on_event(|app, event| {
+            if let RunEvent::WindowEvent { label, event: WindowEvent::Destroyed, .. } = event {
+                windows::destroyed(app, label);
+            }
         })
         .build()
 }

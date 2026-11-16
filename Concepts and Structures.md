@@ -98,7 +98,7 @@ they never read or write those files themselves. This removes the cross-window l
 
 The Rust is a Cargo workspace (`src-tauri/crates/`) of Tauri plugins: `tauri-plugin-vertex` (the kernel, plugin `vertex`)
 and the features' `tauri-plugin-vertex-ai`, `-chats` and `-git`. The app crate (`src-tauri/src/lib.rs`) only builds them
-with the third-party plugins and handles windows and file opening; it defines no command. A plugin's commands are
+with the third-party plugins, opens the start window and handles file opening; it defines no command. A plugin's commands are
 `plugin:<plugin>|<command>` (the frontend's `vertexInvoke`, `pluginInvoke('vertex-git')`), so every window is checked
 against its capability (`src-tauri/capabilities/`: `main.json`, `session.json`, `settings.json`, `about.json`, each
 naming the commands that window kind calls): a command outside it is refused ("not allowed by ACL").
@@ -338,9 +338,16 @@ A note's frontmatter shows as the editor's properties panel (`@type32/codemirror
 
 | Window | Label | Notes |
 |---|---|---|
-| Main | `main` | Anchor. Never destroyed at runtime. Hidden while any session window exists, shown when the last one closes — enforced by Rust (`sync_main_visibility`) on real window create/destroy events. Recovers saved sessions and serves the OS open queue. Always opens centred. |
+| Main | `main` | Anchor. Never destroyed at runtime. Hidden while any session window exists, shown when the last one closes — enforced by the kernel (`sync_main_visibility`) on real window create/destroy events. Recovers saved sessions and serves the OS open queue. Always opens centred. Described in `tauri.conf.json` (`create: false`) and built by the kernel at startup. |
 | Session | `session-{uuid}` | One per workspace/singlespace. `uuid` is the AppSession uuid. Starts at `/loading` and initializes itself. Its creation and destruction set the session's `open` (`AppState::session_window`). Reopens at its last size and place (`tauri-plugin-window-state`, by label; pulled back on screen when that monitor is gone). |
 | Settings | `settings` | Singleton utility window. Not persisted; keeps its size and place like a session window. |
+| About | `about` | Singleton, 420×480, not resizable. |
+
+Only the kernel creates windows (`src-tauri/crates/tauri-plugin-vertex/src/windows.rs`, Window Permissions Plan W1).
+A webview asks with `window_open` (`useAppWebviewWindows().openAppWindow`) for a session that's in `sessions.json`,
+Settings on a page under `/settings` (and a scope), or About; Rust makes the label, the route, the size and the
+overlay title bar, and brings an open one forward instead. No capability lets JavaScript create a window, so a label,
+and the capability that goes with it, is never a webview's to choose.
 
 Labels, routes and `useState` keys come from `shared/constants/app.ts`; never hand-build them.
 
@@ -366,8 +373,8 @@ sequenceDiagram
     Rust-->>Main: vertex://open-requested
     Main->>Rust: take_open_requests
     Main->>Rust: sessions_upsert(new AppSession)
-    Main->>Win: create window at /loading
-    Rust->>Rust: webview-created → hide main
+    Main->>Rust: window_open(session)
+    Rust->>Win: create window at /loading, hide main
     Win->>Win: useAppSessionRecovery: open root, restore tabs
 ```
 

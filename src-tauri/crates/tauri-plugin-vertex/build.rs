@@ -33,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "secret_delete",
     "data_get",
     "data_set",
+    "window_open",
 ];
 
 fn main() {

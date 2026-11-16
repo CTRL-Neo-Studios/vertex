@@ -1,36 +1,10 @@
-//! The app: builds the plugins (the kernel `tauri-plugin-vertex`, the feature plugins, third-party ones), keeps the
-//! windows' lifecycle and hands files the OS asks it to open to the kernel. Every command lives in a plugin.
+//! The app: builds the plugins (the kernel `tauri-plugin-vertex`, the feature plugins, third-party ones), opens the
+//! start window, and hands files the OS asks it to open to the kernel. Every command lives in a plugin, and the kernel
+//! makes every window (`windows.rs` there).
 
-use tauri::{Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
-use tauri_plugin_vertex::api::{self, SESSION_WINDOW_PREFIX};
+use tauri_plugin_vertex::api;
 use url::Url;
-
-const MAIN_WINDOW: &str = "main";
-
-fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(main) = app.get_webview_window(MAIN_WINDOW) {
-        let _ = main.unminimize();
-        let _ = main.show();
-        let _ = main.set_focus();
-    }
-}
-
-/// Hides `main` once a session window exists and shows it again when the last one is gone,
-/// so the app never ends up with zero visible windows. Driven by real window events, not timers.
-fn sync_main_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>, closing: Option<&str>) {
-    let has_sessions = app
-        .webview_windows()
-        .keys()
-        .any(|l| l.starts_with(SESSION_WINDOW_PREFIX) && Some(l.as_str()) != closing);
-    if has_sessions {
-        if let Some(main) = app.get_webview_window(MAIN_WINDOW) {
-            let _ = main.hide();
-        }
-    } else {
-        show_main_window(app);
-    }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -49,12 +23,12 @@ pub fn run() {
             // Second launch (Windows/Linux file association, or user re-opening the app).
             match parse_file_path_from_args(&args) {
                 Some(path) => api::push_open_request(app, path),
-                None => show_main_window(app),
+                None => api::show_main(app),
             }
         }));
         // Each session window (`session-{uuid}`, stable per session) and Settings reopen at their last size and
         // place, pulled back on screen when that monitor is gone. `main`, the start window, stays centred.
-        builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[MAIN_WINDOW]).build());
+        builder = builder.plugin(tauri_plugin_window_state::Builder::new().with_denylist(&[api::MAIN_WINDOW]).build());
         builder = builder.plugin(tauri_plugin_drag::init());
     }
 
@@ -67,8 +41,12 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
         .setup(|app| {
-            let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
-            apply_decorum_style(&main_window);
+            // After every plugin is set up (window state, decorum), so the start window gets them as any other. Every
+            // window the kernel builds gets the overlay title bar.
+            api::set_window_style(app.handle(), |window| {
+                let _ = window.create_overlay_titlebar();
+            });
+            api::open_main(app.handle())?;
 
             // trust.json exists from launch (and old settings migrate then), not only once a window reads it.
             if let Err(e) = api::ensure_trust(app.handle()) {
@@ -84,18 +62,6 @@ pub fn run() {
                 }
             }
 
-            let app_handle = app.handle().clone();
-            app.listen_any("tauri://webview-created", move |event| {
-                let Some(label) = created_label(event.payload()) else { return };
-                if let Some(uuid) = label.strip_prefix(SESSION_WINDOW_PREFIX) {
-                    if let Some(win) = app_handle.get_webview_window(&label) {
-                        apply_decorum_style(&win);
-                    }
-                    sync_main_visibility(&app_handle, None);
-                    api::session_window(&app_handle, uuid, true);
-                }
-            });
-
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -104,14 +70,6 @@ pub fn run() {
                 )?;
             }
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                if let Some(uuid) = window.label().strip_prefix(SESSION_WINDOW_PREFIX) {
-                    sync_main_visibility(window.app_handle(), Some(window.label()));
-                    api::session_window(window.app_handle(), uuid, false);
-                }
-            }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -128,14 +86,6 @@ pub fn run() {
                 }
             }
         });
-}
-
-fn apply_decorum_style(window: &WebviewWindow) {
-    let _ = window.create_overlay_titlebar();
-    #[cfg(target_os = "macos")]
-    {
-        // let _ = window.set_traffic_lights_inset(14.0, 21.0);
-    }
 }
 
 fn parse_file_path_from_args(args: &[String]) -> Option<String> {
@@ -155,18 +105,4 @@ fn parse_file_path_from_args(args: &[String]) -> Option<String> {
         return Some(arg.clone());
     }
     None
-}
-
-/// The label in a `tauri://webview-created` payload (`{"label": "…"}`).
-fn created_label(payload: &str) -> Option<String> {
-    serde_json::from_str::<serde_json::Value>(payload).ok()?.get("label")?.as_str().map(str::to_owned)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn created_label_reads_the_event_payload() {
-        assert_eq!(super::created_label(r#"{"label":"session-a"}"#).as_deref(), Some("session-a"));
-        assert_eq!(super::created_label(r#""session-a""#), None);
-    }
 }

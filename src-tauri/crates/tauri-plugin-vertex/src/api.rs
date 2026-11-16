@@ -1,5 +1,5 @@
 //! The kernel's Rust API, for plugin crates (`tauri-plugin-vertex-*`) and the app crate's startup: files, the
-//! keychain, the global settings and what changes them, and the window bookkeeping the app reports to the kernel.
+//! keychain, the global settings and what changes them, the start window, and the events the app reports to the kernel.
 //! Everything that takes an `AppHandle` needs the kernel plugin ([`crate::init`]) registered first.
 
 use crate::state::AppState;
@@ -8,6 +8,12 @@ use tauri::{AppHandle, Manager, Runtime};
 
 pub use crate::notes::snippet;
 pub use crate::state::{workspace_root, write_atomic, write_bytes_atomic};
+pub use crate::windows::{open_main, show_main, MAIN_WINDOW};
+
+/// What the app does to each window the kernel builds (its title bar style): set once, before [`open_main`].
+pub fn set_window_style<R: Runtime>(app: &AppHandle<R>, style: impl Fn(&tauri::WebviewWindow<R>) + Send + Sync + 'static) {
+    app.manage(crate::windows::WindowStyle(Box::new(style)));
+}
 
 /// The service every keychain entry of the app is saved under; entries differ by account.
 pub const KEYRING_SERVICE: &str = "dev.ctrl-neo.vertex";
@@ -84,11 +90,6 @@ pub fn ensure_trust<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 /// Queues a path the OS asked the app to open and wakes the windows (`vertex://open-requested`).
 pub fn push_open_request<R: Runtime>(app: &AppHandle<R>, path: String) {
     app.state::<AppState>().push_open_request(app, path);
-}
-
-/// A session window (`session-{uuid}`) was created (`open`) or destroyed.
-pub fn session_window<R: Runtime>(app: &AppHandle<R>, uuid: &str, open: bool) {
-    app.state::<AppState>().session_window(app, uuid, open);
 }
 
 /// The app is quitting: session windows destroyed from now on keep their session `open`, for recovery.

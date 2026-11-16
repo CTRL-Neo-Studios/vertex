@@ -1,8 +1,8 @@
-import {emitTo, TauriEvent} from "@tauri-apps/api/event";
+import {emitTo} from "@tauri-apps/api/event";
 import {defaultAppSettings} from "#shared/utils/defaults/apps";
 import type {AppSettings} from "#shared/types/app/settings";
 import type {DeepPartial} from "#shared/types/types";
-import {Routes, StateKey, WindowLabel} from "#shared/constants/app";
+import {StateKey, WindowLabel} from "#shared/constants/app";
 import {useAppWebviewWindows} from "~/composables/app/useAppWebviewWindows";
 import {stateClient} from "~/utils/stateClient";
 
@@ -79,13 +79,7 @@ export function useAppSettings() {
             if (path) await emitTo(WindowLabel.settings, SETTINGS_ROUTE_EVENT, path)
             return
         }
-        const route = `${path ?? Routes.settings}${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`
-        const settingsWindow = $win.createAppWebviewWindow(route, WindowLabel.settings, 'Settings')
-        // Settings has nothing to flush; let close proceed immediately.
-        const unlisten = await settingsWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
-            unlisten()
-            await settingsWindow.destroy()
-        })
+        await $win.openAppWindow({kind: 'settings', path, scope})
     }
 
     async function createOrFocusAboutWindow() {
@@ -93,16 +87,7 @@ export function useAppSettings() {
             await $win.showWindowWithLabel(WindowLabel.about)
             return
         }
-        const aboutWindow = $win.createAppWebviewWindow(Routes.about, WindowLabel.about, undefined, {
-            width: 420,
-            height: 480,
-            resizable: false,
-            title: 'Vertex',
-        })
-        const unlisten = await aboutWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
-            unlisten()
-            await aboutWindow.destroy()
-        })
+        await $win.openAppWindow({kind: 'about'})
     }
 
     return {

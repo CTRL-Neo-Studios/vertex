@@ -1,4 +1,4 @@
-import {Routes, sessionWindowLabel, StateKey} from "#shared/constants/app";
+import {sessionWindowLabel, StateKey} from "#shared/constants/app";
 import type {PossiblyRef} from "#shared/types/types";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {SessionRecoveryMode} from "#shared/types/app/settings";
@@ -11,7 +11,7 @@ import {stateClient} from "~/utils/stateClient";
 /*
 Window model
 - `main` is the anchor: never destroyed during runtime, hidden while any `session-{uuid}` window exists
-  (Rust `sync_main_visibility` enforces this on window create/destroy).
+  (the kernel's `sync_main_visibility` enforces this on window create/destroy; only the kernel creates windows).
 - `session-{uuid}` windows edit one workspace/singlespace; the uuid in the label is the AppSession uuid.
 - `settings` is a singleton utility window, never persisted.
 
@@ -109,8 +109,7 @@ export function useAppSessions() {
 
     async function createWindowFromAppSession(session: AppSession) {
         if (!session?.rootFileOrFolderAbsolutePath) return
-        const title = fileNameFromPath(session.rootFileOrFolderAbsolutePath)
-        return $win.createAppWebviewWindow(Routes.loading, sessionWindowLabel(session.uuid), title)
+        await $win.openAppWindow({kind: 'session', uuid: session.uuid, title: fileNameFromPath(session.rootFileOrFolderAbsolutePath)})
     }
 
     function getWebviewWindowWithAppSession(session: PossiblyRef<AppSession>) {

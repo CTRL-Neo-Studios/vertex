@@ -93,11 +93,35 @@ What it changes:
 - A label keeps its grants after its window closes (they can't be removed). A session window's label comes from its
   session's uuid, which never changes root, so a reopened window gets the same grant again.
 
-### W1: Rust opens windows
+### W1: Rust opens windows (done)
 - A kernel command per window kind replaces `new WebviewWindow` (`useAppWebviewWindows.ts`); labels are made in Rust.
 - The start window too: created in setup, not by `tauri.conf.json`.
 - No capability grants window creation to JavaScript.
 - No behaviour change. Closes the label hole by itself.
+
+As built:
+- **`window_open`** (kernel crate, `src/windows.rs`): a request `{kind: 'session', uuid, title}`, `{kind: 'settings',
+  path?, scope?}` or `{kind: 'about'}`. A pure `plan` makes the label, route, title and size: a session must be in
+  `sessions.json`; Settings only opens on `/settings` or a page under it (no `?`, `#` or `..`), with `scope` as its
+  query. An open window is brought forward instead. The command is `async`: Tauri runs a synchronous command on the
+  main thread, and building a window there froze the app in the first run.
+- **The lifecycle moved into the kernel plugin:** the start window shown only while no session window is
+  (`sync_main_visibility`), each session's `open` mark, and window destruction (the plugin's `on_event`). Each window's
+  style is the app crate's (`api::set_window_style`): decorum's title bar only works with the concrete runtime, which
+  the generic kernel doesn't name.
+- **The start window:** `tauri.conf.json` keeps its description with `label: "main"` and `create: false`;
+  `api::open_main` builds it in the app crate's setup, after every plugin is set up.
+- **The app crate** keeps the plugins, the start window, file opening and `ExitRequested`; the `tauri://webview-created`
+  listener and its window bookkeeping are gone.
+- **Frontend:** `openAppWindow(request)` in `useAppWebviewWindows`; Settings and About no longer attach a close listener
+  that destroys them (closing works without it).
+- **Capabilities:** `core:window:allow-create`, `core:webview:allow-create-webview` and
+  `-create-webview-window` left all four files; each gained `vertex:allow-window-open` (the native menu's Settings… and
+  About run in whichever window is focused).
+- **Checked in `tauri dev`:** the start window at launch; JavaScript making `session-evil`, an unknown session and a
+  Settings path outside `/settings` refused; a workspace opened (the start window hid), opened again (the same window
+  came forward); Settings on `/settings/ai/providers?scope=…` and About (420×481, not resizable) opened and closed; the
+  session closed and the start window came back. 39 Rust tests (three for `plan`), 319 frontend tests, typecheck unchanged.
 
 ### W2: Grants assembled at runtime
 - The base grant per kind and the permission table, in the kernel crate, with tests (a kind's grant; an unknown name).
@@ -131,4 +155,4 @@ What it changes:
 
 ## Status
 
-W0 done (results above). W1 next.
+W0 and W1 done. W2 next.

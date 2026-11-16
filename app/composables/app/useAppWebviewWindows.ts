@@ -1,35 +1,27 @@
-import {getAllWebviewWindows, WebviewWindow, getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
-import {LogicalPosition} from "@tauri-apps/api/dpi";
+import {getAllWebviewWindows, getCurrentWebviewWindow, type WebviewWindow} from "@tauri-apps/api/webviewWindow";
 import {sessionUuidFromLabel, WindowLabel} from "#shared/constants/app";
+import {vertexInvoke} from "~/utils/vertexInvoke";
 
 /**
- * Finding and creating webview windows. No session logic here; main-window visibility is owned by Rust
- * (`sync_main_visibility` in src-tauri/src/lib.rs).
+ * A window a webview may ask the kernel for (`window_open`, `src-tauri/crates/tauri-plugin-vertex/src/windows.rs`):
+ * only Rust creates windows, so their labels, and the capabilities that go with them, are the kernel's to give.
+ */
+export type AppWindowRequest =
+    | { kind: 'session', uuid: string, title: string }
+    | { kind: 'settings', path?: string, scope?: string | null }
+    | { kind: 'about' }
+
+/**
+ * Finding and opening webview windows. No session logic here; the start window's visibility is the kernel's (it
+ * shows it while no session window is open).
  */
 export function useAppWebviewWindows() {
     function getCurrentAppWindow(): WebviewWindow {
         return getCurrentWebviewWindow()
     }
 
-    function createAppWebviewWindow(route: string, label: string, titleSuffix?: string, options?: {width?: number, height?: number, resizable?: boolean, title?: string}) {
-        const {width = 900, height = 600, resizable = true, title} = options ?? {}
-        return new WebviewWindow(label, {
-            url: route,
-            decorations: true,
-            center: true,
-            transparent: true,
-            width,
-            height,
-            resizable,
-            title: title ?? (titleSuffix ? `Vertex - ${titleSuffix}` : "Vertex"),
-            hiddenTitle: true,
-            titleBarStyle: 'overlay',
-            trafficLightPosition: new LogicalPosition(14, 21),
-            // As tauri.conf.json does for `main` (which only covers that window): Tauri's own file-drop handler
-            // would take every drop, so the page's HTML5 drag and drop (chat list, editor) would never get one.
-            dragDropEnabled: false,
-        })
-    }
+    /** Opens the window, or brings it forward when it's open already. */
+    const openAppWindow = (request: AppWindowRequest) => vertexInvoke('window_open', {request})
 
     async function getAppWindowWithLabel(label: string) {
         return (await getAllWebviewWindows()).find(w => w.label === label)
@@ -46,7 +38,7 @@ export function useAppWebviewWindows() {
 
     return {
         getCurrentAppWindow,
-        createAppWebviewWindow,
+        openAppWindow,
         getAppWindowWithLabel,
         showWindowWithLabel,
         isCurrentAppWindowMain: () => getCurrentAppWindow().label === WindowLabel.main,

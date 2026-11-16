@@ -1,8 +1,9 @@
 /**
  * Single source for window labels, routes and `useState` keys.
  * Tauri's own `tauri://*` events come from `TauriEvent` in `@tauri-apps/api/event`; Rust commands/events
- * are named in app/utils/stateClient.ts. Window labels are mirrored by MAIN_WINDOW / SESSION_WINDOW_PREFIX
- * in src-tauri/src/lib.rs; keep both in sync.
+ * are named in app/utils/stateClient.ts. Window labels are mirrored by `MAIN_WINDOW` / `SETTINGS_WINDOW` /
+ * `ABOUT_WINDOW` / `SESSION_WINDOW_PREFIX` in the kernel crate (`src-tauri/crates/tauri-plugin-vertex`), which alone
+ * creates windows; keep both in sync.
  */
 
 export const WindowLabel = {

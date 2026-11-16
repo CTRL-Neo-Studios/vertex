@@ -506,6 +506,12 @@ impl AppState {
         self.quitting.store(true, Ordering::SeqCst);
     }
 
+    /// Whether `uuid` is a session in `sessions.json` (a session window may only be opened for one).
+    pub fn has_session<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str) -> bool {
+        self.with_sessions(app, |list| Ok(list.iter().any(|s| s.get("uuid").and_then(Value::as_str) == Some(uuid))), false)
+            .unwrap_or(false)
+    }
+
     /// A `session-{uuid}` window was created (`open`) or destroyed; a destroy while quitting changes nothing,
     /// so the session stays `open` and the next launch reopens it.
     pub fn session_window<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str, open: bool) {
