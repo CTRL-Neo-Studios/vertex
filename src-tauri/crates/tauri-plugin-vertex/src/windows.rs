@@ -109,6 +109,7 @@ pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) 
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .traffic_light_position(tauri::LogicalPosition::new(14.0, 21.0));
     }
+    crate::grants::grant_window(&app, &plan.label)?;
     let window = builder.build().map_err(|e| e.to_string())?;
     opened(&app, &window);
     Ok(())
@@ -117,6 +118,7 @@ pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) 
 /// Builds the start window from its entry in `tauri.conf.json` (`create: false` there, so this is the only way).
 pub fn open_main<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let config = app.config().app.windows.iter().find(|w| w.label == MAIN_WINDOW).ok_or("no `main` window in tauri.conf.json")?;
+    crate::grants::grant_window(app, MAIN_WINDOW)?;
     let window = WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()).map_err(|e| e.to_string())?;
     opened(app, &window);
     Ok(())

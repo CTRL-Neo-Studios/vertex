@@ -8,7 +8,14 @@ use tauri::{AppHandle, Manager, Runtime};
 
 pub use crate::notes::snippet;
 pub use crate::state::{workspace_root, write_atomic, write_bytes_atomic};
+pub use crate::grants::{capability, Grants, WindowKind};
 pub use crate::windows::{open_main, show_main, MAIN_WINDOW};
+
+/// Lets every window of the kinds `grants` names call those commands, from the next window built (call it in the
+/// plugin's setup, before any window opens). How a core crate's commands reach the windows, with no capability file.
+pub fn grant<R: Runtime>(app: &AppHandle<R>, grants: Grants) {
+    crate::grants::register(app, grants);
+}
 
 /// What the app does to each window the kernel builds (its title bar style): set once, before [`open_main`].
 pub fn set_window_style<R: Runtime>(app: &AppHandle<R>, style: impl Fn(&tauri::WebviewWindow<R>) + Send + Sync + 'static) {

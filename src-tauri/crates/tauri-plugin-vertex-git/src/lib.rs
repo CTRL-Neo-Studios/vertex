@@ -1030,6 +1030,49 @@ async fn git_token_set(host: String, username: String, token: String) -> Result<
     .await
 }
 
+/// What each window kind may call here: the start window clones, Settings keeps tokens, workspaces do the rest.
+pub const GRANTS: api::Grants = &[
+    (
+        api::WindowKind::Main,
+        &["vertex-git:allow-git-clone", "vertex-git:allow-git-tokens", "vertex-git:allow-git-token-set"],
+    ),
+    (
+        api::WindowKind::Session,
+        &[
+            "vertex-git:allow-git-status",
+            "vertex-git:allow-git-log",
+            "vertex-git:allow-git-commit-files",
+            "vertex-git:allow-git-diff",
+            "vertex-git:allow-git-show-file",
+            "vertex-git:allow-git-stage",
+            "vertex-git:allow-git-unstage",
+            "vertex-git:allow-git-discard",
+            "vertex-git:allow-git-commit",
+            "vertex-git:allow-git-fetch",
+            "vertex-git:allow-git-pull",
+            "vertex-git:allow-git-push",
+            "vertex-git:allow-git-branches",
+            "vertex-git:allow-git-switch",
+            "vertex-git:allow-git-remotes",
+            "vertex-git:allow-git-remote-set",
+            "vertex-git:allow-git-merge-abort",
+            "vertex-git:allow-git-init",
+            "vertex-git:allow-git-identity",
+            "vertex-git:allow-git-identity-set",
+            "vertex-git:allow-git-install-tools",
+            "vertex-git:allow-git-resolve",
+            "vertex-git:allow-git-conflict-markers",
+            "vertex-git:allow-git-merge-continue",
+            "vertex-git:allow-git-tokens",
+            "vertex-git:allow-git-token-set",
+        ],
+    ),
+    (
+        api::WindowKind::Settings,
+        &["vertex-git:allow-git-tokens", "vertex-git:allow-git-token-set"],
+    ),
+];
+
 /// The git plugin (`vertex-git`); register it after the kernel's.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-git")
@@ -1065,6 +1108,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(Git::default());
+            api::grant(app, GRANTS);
             Ok(())
         })
         .build()

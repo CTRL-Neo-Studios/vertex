@@ -100,13 +100,18 @@ The Rust is a Cargo workspace (`src-tauri/crates/`) of Tauri plugins: `tauri-plu
 and the features' `tauri-plugin-vertex-ai`, `-chats` and `-git`. The app crate (`src-tauri/src/lib.rs`) only builds them
 with the third-party plugins, opens the start window and handles file opening; it defines no command. A plugin's commands are
 `plugin:<plugin>|<command>` (the frontend's `vertexInvoke`, `pluginInvoke('vertex-git')`), so every window is checked
-against its capability (`src-tauri/capabilities/`: `main.json`, `session.json`, `settings.json`, `about.json`, each
-naming the commands that window kind calls): a command outside it is refused ("not allowed by ACL").
+against its capability: a command outside it is refused ("not allowed by ACL"). There's no capability file: the kernel
+adds each window's capability just before it builds the window (`grants.rs`), made from its kind (`main`, `session`,
+`settings`, `about`): the permissions every window shares, the file permissions (each scoped on its command; no global
+`fs:scope`, which Tauri would share with every window), the kernel's commands that kind calls, and those each core
+crate registered for the kind (its `GRANTS`, through `api::grant`). Tauri can't take a grant back, so a label keeps its
+grant once given; the app crate's test resolves every kind against the real ACL.
 
 - **The kernel's Rust API** (`tauri_plugin_vertex::api`) for plugin crates: `workspace_root`, `write_atomic`, `blocking`,
   the keychain, `install_crypto`, `snippet`, `settings(app)`, `plugin_config(app, id)`, `on_settings_change(app, …)`
-  (run by `settings_set` after a save: the AI crate deletes removed providers' keys there). Plugins register in the app
-  crate after the kernel, which their setup relies on.
+  (run by `settings_set` after a save: the AI crate deletes removed providers' keys there), `grant(app, GRANTS)` (which
+  window kinds may call the crate's commands). Plugins register in the app crate after the kernel, which their setup
+  relies on.
 - **Host services** (kernel commands, `ctx` in the plugin contract): `http_fetch` (`ctx.http.fetch`: one GET from Rust,
   outside CORS, refusing local addresses), `search_notes`, `secret_get` / `secret_set` / `secret_delete` (`ctx.secrets`:
   the keychain, account `plugin:<id>:<name>`), and `data_get` / `data_set` (`ctx.data.global` / `.workspace`: one JSON
@@ -140,7 +145,7 @@ Rows select like a file manager's. The selection is the tree's own (uuids plus a
 
 Deleting (`deleteFiles`, `useActiveWorkspaceTools`) follows `fileConfig.deletedFiles`, workspace-overridable (Settings → View → Files):
 - **`'trash'`** (the default): the system Trash or Recycle Bin, through Rust `trash_item` (the kernel crate's `trash.rs`). On macOS it uses `NSFileManager trashItemAtURL:resultingItemURL:` (`objc2-foundation`), which says where the item went; elsewhere it uses the `trash` crate. `trash_restore` puts an item back: on macOS by moving it from where it went, elsewhere by finding it in the Trash's listing by original path and deletion time. It fails with `taken` or `missing`.
-- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index. Like `.vertex`, it's listed in the fs scopes (each window kind's capability in `src-tauri/capabilities/`), whose `**/*` doesn't match dot paths.
+- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index. Like `.vertex`, it's listed in the file permissions' scopes (the kernel's `grants.rs`), whose `**/*` doesn't match dot paths.
 - **`'permanent'`:** `DeleteFilesModal` asks first, then the items are removed for good, with no undo.
 - Either trash asks nothing, and the toast ("Moved N item(s) to the Trash.") has an **Undo** button. An item a clash's Replace displaces goes the same way.
 - **Tabs:** every removed item's tab closes through `closeTabElsewhere`, so a shown one hands the page to the next tab first. Undo doesn't reopen the tab.

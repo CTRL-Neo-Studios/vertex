@@ -4,6 +4,7 @@
 
 pub mod api;
 mod fonts;
+mod grants;
 mod host;
 mod notes;
 mod state;
@@ -239,6 +240,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(AppState::default());
+            app.manage(grants::WindowGrants::default());
             Ok(())
         })
         .on_event(|app, event| {

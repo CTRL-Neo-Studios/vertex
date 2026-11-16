@@ -123,15 +123,39 @@ As built:
   came forward); Settings on `/settings/ai/providers?scope=…` and About (420×481, not resizable) opened and closed; the
   session closed and the start window came back. 39 Rust tests (three for `plan`), 319 frontend tests, typecheck unchanged.
 
-### W2: Grants assembled at runtime
+### W2: Grants assembled at runtime (done)
 - The base grant per kind and the permission table, in the kernel crate, with tests (a kind's grant; an unknown name).
 - The four capability files go; every grant is added at runtime, before its window is built.
 - No global `fs:scope`: today's file scopes move onto each fs command's permission.
 - Each window's capability is added when it opens: its base only, in this phase, with today's scopes.
 - Acceptance: K5's check again (a command outside a kind's grant is refused) and the SMOKE rows for windows.
 
+As built:
+- **`grants.rs`** (kernel crate): `WindowKind` (from a label), and a window's capability (`capability(label, kind,
+  crates)`): `SHARED` (Tauri's and the third-party plugins' permissions, every kind alike, as the four files had them,
+  without the entries a set they named already holds: 160 to 77), `SCOPED` (the file permissions), and the commands of
+  the kernel (`KERNEL`) and of each core crate for that kind. `grant_window` adds it before `window_open` or
+  `open_main` builds the window, once per label (Tauri appends a capability added twice).
+- **The core crates name their own commands:** each has `pub const GRANTS` (per kind) and registers it in its setup
+  (`api::grant`), so the kernel names no feature's command.
+- **Files:** `fs:read-all`, `fs:write-all` and `fs:allow-exists` carry today's scopes (with the dot folders);
+  `fs:allow-rename`, `fs:allow-mkdir` (both in `write-all`, same scope) and `fs:allow-watch` (in `read-all`) went. No
+  `fs:scope`, and no `fs:default`: its allows are global scopes (the app's own folders, which the frontend never reads
+  through the fs plugin); only its two denies stay (the webview's data, Linux and Windows).
+- **The permission table moved to W3,** which is the first to use it (a manifest's names); W2 grants by kind only.
+- **Tauri panics on an unknown identifier** (`add_capability` unwraps), so the app crate's test adds every kind's
+  capability to the real context (`generate_context!`, now one `context()` used by `run` too: on macOS it embeds
+  `Info.plist` as a symbol, which can't be defined twice) and checks commands in and out of each kind's grant.
+- **Checked in `tauri dev`:** in each kind, a command of its grant goes through and one outside is refused (main:
+  `chat_read`, `trash_item`; a workspace: `ai_key_set`, `update_token_set`; Settings: `sessions_upsert`, `git_status`;
+  About: `trash_item`). A workspace window read, wrote, watched and found `.vertex`; a single-file window read its file;
+  nothing the app does while loading was refused. SMOKE 15 (closing a workspace, reopened: its label granted once), 7
+  (Settings, About), 2 and 4 (quit with a workspace and a single file open; both reopened, recovery `both`). 40 Rust
+  tests.
+
 ### W3: Plugins' permissions
-- The manifest's `permissions` take the table's names; validation knows them (the SDK's type in C1).
+- The permission table (from W2), in the kernel crate, with a test (an unknown name). The manifest's `permissions`
+  take its names; validation knows them (the SDK's type in C1).
 - A window's grant adds those of the plugins on for it; a core crate's commands only where its plugin is on.
 - Each X phase declares its plugin's permissions as it writes the manifest; C2's install prompt lists them from the
   same table.
@@ -155,4 +179,4 @@ As built:
 
 ## Status
 
-W0 and W1 done. W2 next.
+W0, W1 and W2 done. W3 next.

@@ -509,6 +509,26 @@ async fn chat_search<R: Runtime>(app: AppHandle<R>, root: String, storage: Stora
     with_store(app, root, storage, move |s| s.search(&query)).await
 }
 
+/// What each window kind may call here: the chats live in workspace windows only.
+pub const GRANTS: api::Grants = &[(
+    api::WindowKind::Session,
+    &[
+        "vertex-chats:allow-chat-vault-state",
+        "vertex-chats:allow-chat-vault-create",
+        "vertex-chats:allow-chat-vault-unlock",
+        "vertex-chats:allow-chat-vault-lock",
+        "vertex-chats:allow-chat-vault-change",
+        "vertex-chats:allow-chat-index",
+        "vertex-chats:allow-chat-read",
+        "vertex-chats:allow-chat-write",
+        "vertex-chats:allow-chat-delete",
+        "vertex-chats:allow-chat-folders-set",
+        "vertex-chats:allow-chat-folder-rename",
+        "vertex-chats:allow-chat-folder-delete",
+        "vertex-chats:allow-chat-search",
+    ],
+)];
+
 /// The chats plugin (`vertex-chats`); register it after the kernel's.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-chats")
@@ -529,6 +549,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(ChatVaults::default());
+            api::grant(app, GRANTS);
             Ok(())
         })
         .build()

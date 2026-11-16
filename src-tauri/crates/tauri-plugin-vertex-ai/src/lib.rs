@@ -276,6 +276,21 @@ async fn ai_model_catalog<R: Runtime>(app: AppHandle<R>) -> Result<Value, String
     }
 }
 
+/// What each window kind may call here: workspaces send requests; Settings also keeps keys and lists models.
+pub const GRANTS: api::Grants = &[
+    (api::WindowKind::Session, &["vertex-ai:allow-ai-request", "vertex-ai:allow-ai-request-cancel"]),
+    (
+        api::WindowKind::Settings,
+        &[
+            "vertex-ai:allow-ai-key-set",
+            "vertex-ai:allow-ai-key-has",
+            "vertex-ai:allow-ai-request",
+            "vertex-ai:allow-ai-request-cancel",
+            "vertex-ai:allow-ai-model-catalog",
+        ],
+    ),
+];
+
 /// The AI plugin (`vertex-ai`); register it after the kernel's. A saved key goes when its provider is removed or
 /// moved to another baseURL, checked after every settings save.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -289,6 +304,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .setup(|app, _api| {
             app.manage(AiRequests::default());
+            api::grant(app, GRANTS);
             api::on_settings_change(app, |old, new| {
                 for id in stale_ai_providers(old, new) {
                     if let Err(e) = delete_key(&id) {

@@ -71,7 +71,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context())
         .expect("error while building tauri application")
         .run(|_app_handle, _event| {
             // Quitting by any route (menu, Dock, ⌘Q, shutdown): windows destroyed from now on stay `open`, for recovery.
@@ -86,6 +86,12 @@ pub fn run() {
                 }
             }
         });
+}
+
+/// The app's config, assets and ACL. One call site: on macOS it embeds `Info.plist` as a symbol, which can't be
+/// defined twice (the test reads the ACL from here too).
+fn context() -> tauri::Context<tauri::Wry> {
+    tauri::generate_context!()
 }
 
 fn parse_file_path_from_args(args: &[String]) -> Option<String> {
@@ -105,4 +111,42 @@ fn parse_file_path_from_args(args: &[String]) -> Option<String> {
         return Some(arg.clone());
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use tauri::ipc::Origin;
+    use tauri_plugin_vertex::api::{self, WindowKind};
+
+    /// Every kind's grant names only permissions the app's plugins have (Tauri would panic opening the window), and
+    /// holds the window to it.
+    #[test]
+    fn each_window_kind_gets_its_grant_and_no_more() {
+        let crates = [tauri_plugin_vertex_ai::GRANTS, tauri_plugin_vertex_chats::GRANTS, tauri_plugin_vertex_git::GRANTS];
+        let mut context = super::context();
+        let authority = context.runtime_authority_mut();
+        for (label, kind) in [
+            ("main", WindowKind::Main),
+            ("session-a", WindowKind::Session),
+            ("settings", WindowKind::Settings),
+            ("about", WindowKind::About),
+        ] {
+            authority.add_capability(api::capability(label, kind, &crates)).unwrap();
+        }
+        let allowed = |command: &str, label: &str| authority.resolve_access(command, label, label, &Origin::Local).is_some();
+
+        assert!(allowed("plugin:vertex-git|git_status", "session-a"));
+        assert!(!allowed("plugin:vertex-git|git_status", "settings"));
+        assert!(allowed("plugin:vertex-git|git_clone", "main"));
+        assert!(allowed("plugin:vertex-ai|ai_key_set", "settings"));
+        assert!(!allowed("plugin:vertex-ai|ai_key_set", "session-a"));
+        assert!(allowed("plugin:vertex|sessions_upsert", "main"));
+        assert!(!allowed("plugin:vertex|sessions_upsert", "settings"));
+        assert!(!allowed("plugin:vertex|trash_item", "about"));
+        assert!(!allowed("plugin:vertex-chats|chat_read", "main"));
+        assert!(allowed("plugin:fs|watch", "session-a"));
+        // A label the kernel never makes gets nothing.
+        assert!(!allowed("plugin:fs|read_text_file", "session"));
+        assert!(!allowed("plugin:vertex|window_open", "evil"));
+    }
 }
