@@ -18,8 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'files': ['app/components/FileTreeComponent', 'app/components/LayoutComponents/PanelFilesView'],
-    'palette': ['app/components/WorkspaceCommandPalette', 'app/components/CommandPaletteButton'],
     'workflows': [
         'app/components/Workflow/', 'app/components/ViewerEditor/WorkflowViewer', 'app/components/Modals/Workflow',
         'app/components/Settings/Workflows/', 'app/composables/workflows/', 'shared/workflows/',
@@ -38,9 +36,6 @@ const RESIDENTS: Record<string, string[]> = {
 
 /** Kernel module → feature module it still reaches → why, and the phase that ends it. An unused entry fails. */
 const KERNEL_EXCEPTIONS: Record<string, Record<string, string>> = {
-    'app/layouts/session': {
-        'app/components/WorkspaceCommandPalette': 'the session layout draws the palette: X4 makes it the palette plugin',
-    },
     'shared/types/app/settings': {
         'shared/types/app/ai': '`AppSettings.aiConfig`: X6 moves it to `plugins.config.ai`',
     },

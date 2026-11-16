@@ -2,7 +2,6 @@
 import type {BreadcrumbItem, DropdownMenuItem} from '@nuxt/ui'
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 const modelValue = defineModel<string>()
 const props = defineProps<{relativeFilePath: string, renaming?: boolean}>()
@@ -13,7 +12,6 @@ const emit = defineEmits<{
 const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {getFileByPath} = useActiveWorkspaceIndex(session)
-const {effective} = useSettingsScope()
 
 /** More crumbs than this (folders + the file) collapse to: first folder / … / file. */
 const MAX_CRUMBS = 3
@@ -28,9 +26,9 @@ const folders = computed(() => {
     })
 })
 
-/** A folder's custom icon (its properties' `icon`), as in the file tree, when custom folder icons are allowed. */
+/** A folder's custom icon (its properties' `icon`), as Files shows it. */
 function folderIcon(path: string) {
-    const icon = effective.value?.viewConfig.fileTree.allowCustomFolderIcons ? getFileByPath(path)?.properties.icon : undefined
+    const icon = getFileByPath(path)?.properties.icon
     return typeof icon === 'string' && icon ? icon : 'i-lucide-folder'
 }
 

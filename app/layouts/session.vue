@@ -3,6 +3,7 @@ import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import {useActiveWorkspaceTools} from "~/composables/active/useActiveWorkspaceTools";
+import {useFileActions} from "~/composables/active/useFileActions";
 import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
 import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
@@ -15,14 +16,14 @@ import {PANEL_DRAG, usePanelDrag} from "~/composables/utility/usePanelDrag";
 import DashboardSidePanel from "~/components/LayoutComponents/DashboardSidePanel.vue";
 import DashboardCenterPanel from "~/components/LayoutComponents/DashboardCenterPanel.vue";
 import PanelStrip from "~/components/LayoutComponents/PanelStrip.vue";
-import WorkspaceCommandPalette from "~/components/WorkspaceCommandPalette.vue";
 import TabSwitcher from "~/components/TabSwitcher.vue";
 import VaultPickModal from "~/components/Modals/VaultPickModal.vue";
-import {Routes} from "#shared/constants/app";
+import {Routes, StateKey} from "#shared/constants/app";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {SessionContext} from "#shared/plugin/api";
-import {pluginSessions} from "~/utils/plugins/runtime";
-import {embeds} from "~/utils/contributions";
+import {pluginSession, pluginSessions} from "~/utils/plugins/runtime";
+import {registeredCommands} from "~/utils/commands";
+import {embeds, overlays, paletteGroups} from "~/utils/contributions";
 import {fileUrl} from "~/utils/fileUrl";
 import {draggedRows, fromFile} from "~/utils/outsideItems";
 
@@ -42,6 +43,8 @@ const index = useActiveWorkspaceIndex(activeSesh)
 const $tabs = useActiveTabs(activeSesh)
 const $tools = useActiveWorkspaceTools(activeSesh)
 const propertyTypes = usePropertyTypes(activeSesh)
+const $files = activeSesh ? useFileActions(activeSesh) : undefined
+const openFolders = useState<string[]>(StateKey.expandedFolders($sessionId.value), () => [])
 const vaultPicker = useOverlay().create(VaultPickModal)
 const {recoverWorkspaceTabs} = useAppSessionRecovery()
 const $persistence = activeSesh ? useAppSessionPersistence(activeSesh) : undefined
@@ -49,6 +52,8 @@ useSessionCommands(activeSesh)
 const panels = usePanels(activeSesh)
 // One drag state for the window's panel buttons, so a view can go from one side's list to the other's.
 provide(PANEL_DRAG, usePanelDrag(panels.move))
+// Plugins' overlays (the command palette), drawn once the session is handed to plugins.
+const shownOverlays = computed(() => [...overlays.items.values()].filter(def => !def.when || def.when(panels.context.value)))
 
 /** Removed with the plugin's session scope when called from an `onSession` callback; the caller may remove it sooner. */
 function withScope<T extends () => unknown>(off: T) {
@@ -58,7 +63,7 @@ function withScope<T extends () => unknown>(off: T) {
 
 /** A single-file window has no workspace to share: its index is empty to plugins and nothing is watched. */
 const NO_INDEX: SessionContext['index'] = {
-    files: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
+    files: () => [], tree: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
     backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {},
 }
 
@@ -69,6 +74,7 @@ function sessionContext(session: ActiveSession): SessionContext {
         views: {show: panels.showView, openInTab: panels.openInTab},
         index: isWorkspace ? {
             files: () => Object.values(index.fileIndex.value),
+            tree: () => index.fileTree.value,
             byPath: index.getFileByPath,
             byUuid: uuid => index.getFileByUuid(uuid) ?? undefined,
             resolveLink: index.resolveLink,
@@ -78,6 +84,10 @@ function sessionContext(session: ActiveSession): SessionContext {
             unresolved: index.unresolved,
             on: listener => withScope(index.on(listener)),
         } : NO_INDEX,
+        commands: {
+            list: () => [...registeredCommands.values()],
+            paletteGroups: () => [...paletteGroups.items.values()],
+        },
         files: {
             assetUrl: fileUrl,
             write: $tools.saveContent,
@@ -91,7 +101,15 @@ function sessionContext(session: ActiveSession): SessionContext {
             redo: () => $tools.redo(),
             importAttachments: async files => (isWorkspace ? $tools.importAttachments(files.map(fromFile)) : []),
             pick: async options => (isWorkspace ? vaultPicker.open({...options, sessionId: session.uuid}).result : undefined),
-            drag: {rows: draggedRows},
+            iconFor: name => $files!.iconFor(name),
+            openFolders,
+            menuFor: (uuids, options) => $files!.menuFor(uuids, options),
+            newItems: folder => $files!.newItems(folder),
+            copy: uuids => $files!.copy(uuids),
+            paste: folder => $files!.paste(folder),
+            remove: uuids => $files!.remove(uuids),
+            importDrop: (transfer, folder, options) => $files!.importDrop(transfer, folder, options),
+            drag: {start: (...args) => $files!.dragStart(...args), rows: draggedRows},
         },
         properties: {
             types: () => propertyTypes?.types.value ?? {},
@@ -145,8 +163,9 @@ onBeforeUnmount(async () => {
     <UDashboardGroup class="w-full h-full transition-colors duration-200" unit="rem">
         <PanelStrip v-if="panels.style.value === 'strip'" side="left"/>
         <DashboardSidePanel side="left"/>
-        <WorkspaceCommandPalette v-if="isWorkspace"/>
-        <UDashboardSearch v-else shortcut="meta_p"/>
+        <template v-if="pluginSession()">
+            <PluginMount v-for="def in shownOverlays" :key="def.id" :ui="def" :props="{session: pluginSession()}"/>
+        </template>
         <TabSwitcher v-if="isWorkspace && activeSesh" :session="activeSesh"/>
         <DashboardCenterPanel>
             <slot/>

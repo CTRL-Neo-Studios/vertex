@@ -121,6 +121,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
                 tabKind: def => add('tabKind', def),
                 fileViewer: def => add('viewer', def),
                 statusItem: def => add('statusItem', def),
+                overlay: def => add('overlay', def),
             },
             files: {
                 type: def => add('fileType', def),

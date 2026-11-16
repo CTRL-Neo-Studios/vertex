@@ -44,6 +44,8 @@ export interface PanelActionContext extends PanelViewContext {
     area: PanelArea
     /** The view shown in the pane holding the button, `undefined` when the area is collapsed. */
     shown: PanelViewId | undefined
+    /** The shown view's own search (`PanelViewDef.search`), when it has one. */
+    shownSearch: (() => void) | undefined
 }
 
 /** A button a view puts in its panel's header (refresh, new, collapse all…). */
@@ -84,6 +86,18 @@ export interface PanelViewDef extends UiSlot<PanelViewProps> {
     kbds?: (ctx: PanelActionContext) => string[] | undefined
     /** What the Search button does while this view is shown (the Chats view searches chats); absent = the palette. */
     search?: (ctx: PanelActionContext) => void
+}
+
+/** What an overlay is drawn with. */
+export interface OverlayProps {
+    session: SessionContext
+}
+
+/** UI drawn once in each session window, over its layout (the command palette). */
+export interface OverlayDef extends UiSlot<OverlayProps> {
+    id: string
+    /** Whether it's drawn in this window; absent = always. */
+    when?: (ctx: PanelViewContext) => boolean
 }
 
 // Tabs
@@ -193,17 +207,20 @@ export interface PluginMenuItem {
     icon?: string
     description?: string
     disabled?: boolean
+    /** Keys shown beside it (`['meta', 'z']`); a hint only. */
+    kbds?: string[]
+    color?: 'error'
     onSelect?: () => unknown
     children?: PluginMenuItem[]
 }
 
-/** What Files' row menu is for: the rows right-clicked (several when a selection is). */
+/** What the file menu is for: the rows right-clicked (several when a selection is). */
 export interface FileMenuTarget {
     session: ActiveSession
     files: ActiveWorkspaceFileIndex[]
 }
 
-/** A group of items in Files' row menu (Run workflow). */
+/** A group of items in the file menu of a row or a selection (Run workflow). */
 export interface FileMenuItemDef {
     id: string
     items(target: FileMenuTarget): PluginMenuItem[]
@@ -346,6 +363,7 @@ export interface ContributionPoints {
     command: PluginCommand & { plugin: string }
     paletteGroup: PaletteGroupDef
     panel: PanelViewDef
+    overlay: OverlayDef
     tabKind: TabKindDef
     viewer: ViewerDef
     statusItem: StatusItemDef

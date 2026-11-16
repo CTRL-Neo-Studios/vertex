@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {SelectItem} from '@nuxt/ui'
-import type {AppViewConfig, PanelLayout} from "#shared/types/app/settings";
+import type {PanelLayout} from "#shared/types/app/settings";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import PanelArrangement from "~/components/Settings/PanelArrangement.vue";
@@ -13,18 +13,6 @@ const {t} = useI18n()
 const {config, load} = useAppSettings()
 const scope = useSettingsScope()
 onMounted(load)
-
-type FileTreeKey = keyof AppViewConfig['fileTree']
-
-const fileTreeRows: {key: FileTreeKey, label: string}[] = [
-    {key: 'showFileExtInName', label: 'showExtInName'},
-    {key: 'showFileExtAsTag', label: 'showExtAsTag'},
-    {key: 'showDefaultFileIcons', label: 'showFileIcons'},
-    {key: 'showDefaultFolderIcons', label: 'showFolderIcons'},
-    {key: 'showFoldArrows', label: 'showFoldArrows'},
-    {key: 'allowCustomFileIcons', label: 'customFileIcons'},
-    {key: 'allowCustomFolderIcons', label: 'customFolderIcons'},
-]
 
 const statusBarItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.statusBarOnHover'), value: 'show-on-hover'},
@@ -59,7 +47,6 @@ const editorPanelPaths = [
     'viewConfig.editorPanel.showStatusBar' as const,
     ...[...editorToggles, ...headerTools].map(k => `viewConfig.editorPanel.${k}` as const),
 ]
-const fileTreePaths = fileTreeRows.map(r => `viewConfig.fileTree.${r.key}` as const)
 
 const panelStyleItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.panelStyleButtons'), value: 'buttons'},
@@ -79,21 +66,6 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
 <template>
     <SettingsScrollLayout :title="t('app.settings.view.title')" v-if="config">
         <div class="space-y-4">
-            <SettingsSection :title="t('app.settings.view.fileTree')" :dirty="scope.isDirty(fileTreePaths)" @reset="scope.reset(fileTreePaths)">
-                <SettingsRow
-                    v-for="row in fileTreeRows"
-                    :key="row.key"
-                    :setting="`viewConfig.fileTree.${row.key}`"
-                    :label="t(`app.settings.view.${row.label}`)"
-                    :description="t(`app.settings.view.${row.label}Description`)"
-                >
-                    <USwitch
-                        :model-value="scope.value(`viewConfig.fileTree.${row.key}`)"
-                        @update:model-value="scope.set({[`viewConfig.fileTree.${row.key}`]: $event})"
-                    />
-                </SettingsRow>
-            </SettingsSection>
-
             <SettingsSection :title="t('app.settings.view.files')" :dirty="scope.isDirty(filePaths)" @reset="scope.reset(filePaths)">
                 <SettingsRow setting="fileConfig.updateLinks" :label="t('app.settings.view.updateLinks')" :description="t('app.settings.view.updateLinksDescription')">
                     <USelect

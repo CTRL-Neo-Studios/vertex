@@ -10,7 +10,7 @@ import type {AppSettingPath} from '#shared/utils/settings/scopes'
 import {registerCommand} from '~/utils/commands'
 import {
     codeBlocks, editorExtensions, embeds, fileMenuItems, fileTypes, fileViewers, homeActions, linkExtractors, markdownSyntax,
-    noteMenuItems, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
+    noteMenuItems, overlays, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
 } from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
 import {pluginEntries} from '~/utils/plugins/catalog'
@@ -38,6 +38,7 @@ const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]
     command: registerCommand,
     paletteGroup: paletteGroups.register,
     panel: registerPanelView,
+    overlay: overlays.register,
     tabKind: tabKinds.register,
     viewer: fileViewers.register,
     statusItem: statusItems.register,

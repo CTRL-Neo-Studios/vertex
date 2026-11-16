@@ -246,15 +246,6 @@ export function defaultAppSessionContext(data?: LegacyContext, root = ''): AppSe
 
 export function defaultAppViewConfig(data?: DeepPartial<AppViewConfig>): AppViewConfig {
     return {
-        fileTree: {
-            showDefaultFileIcons: data?.fileTree?.showDefaultFileIcons ?? false,
-            showDefaultFolderIcons: data?.fileTree?.showDefaultFolderIcons ?? true,
-            showFoldArrows: data?.fileTree?.showFoldArrows ?? false,
-            showFileExtInName: data?.fileTree?.showFileExtInName ?? false,
-            showFileExtAsTag: data?.fileTree?.showFileExtAsTag ?? true,
-            allowCustomFolderIcons: data?.fileTree?.allowCustomFolderIcons ?? true,
-            allowCustomFileIcons: data?.fileTree?.allowCustomFileIcons ?? true,
-        },
         editorPanel: {
             showStatusBar: data?.editorPanel?.showStatusBar || 'always-shown',
             selectionToolbar: data?.editorPanel?.selectionToolbar ?? true,

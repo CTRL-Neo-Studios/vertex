@@ -607,9 +607,48 @@ Blocked by X3.
   - `files.drag.start`: the `FILES_DRAG` data, the drag image and the native drag-out; `files.drag.rows`: what a drop carries. The editor and chat keep taking those drops.
 - `palette`: `WorkspaceCommandPalette` over the command and file-type registries (quick switcher, commands, New items), and the Search panel action.
 
+### Decisions
+
+- **What the kernel keeps** (`app/composables/active/useFileActions.ts`, given to plugins on `SessionContext.files`): the file menu, copy and paste through the system clipboard, duplicate, delete (the dialog when deletes are for good), the drop of OS files, the drag start (its `FILES_DRAG` data, the drag image drawn on the DOM, the native drag-out) and the New items. What the tree keeps: rows, selection, drag select, the keyboard, drop targets and what it shows.
+- **The contract grows by what a file browser needs:**
+  - `index.tree()` (folders and files as Files shows them; `UITreeNode` exported);
+  - `files.iconFor(name)` (a file type's icon, or the folder properties file's);
+  - `files.openFolders` (a `Ref` of folder uuids, saved with the session as before);
+  - `files.menuFor(uuids, {added})`: a row's menu, a selection's, or empty space's with none. `added(uuids, folder)` hands the browser what Paste and Duplicate made, so it can select them. Plugins' `menuItem` groups come first, as now.
+  - `files.newItems(folder?)`: New note, New folder, then each file type's New, each asking for a name. Files' empty space and header buttons and the palette's Quick actions use it, instead of three copies.
+  - `files.copy(uuids)`, `files.paste(folder)`, `files.remove(uuids)`, `files.importDrop(transfer, folder, {copy})`, `files.drag.start(event, uuids, ended)`.
+  - `PluginMenuItem` gains `kbds` and `color`.
+- **`readMany` waits for X8**, its only user (chat); nothing reads in batches today.
+- **The palette is drawn by an overlay**: `ctx.views.overlay({id, when, component | mount})`, drawn once in each session window with `{session}`. A single-file window's empty `UDashboardSearch` goes: ⌘P did nothing useful there.
+- **What the palette reads:** `session.commands.list()` (registered commands; it shows those with `palette`) and `session.commands.paletteGroups()`, on the `SessionContext` its overlay gets. The registry stays the kernel's, so Bases and workflows keep `ctx.commands.paletteGroup`.
+- **Search's button:** `PanelActionContext.shownSearch` is the shown view's own search when it has one. The palette plugin's Search runs it, or opens the palette.
+- **Settings:** all seven `viewConfig.fileTree` keys move to `plugins.config.files`, workspace-overridable, drawn by the schema page; Settings → View loses its File Tree section. The editor's breadcrumbs showed a folder's custom icon only with the tree's `allowCustomFolderIcons`; they now always show it (the user set it in the folder's properties), so the kernel reads no plugin's config.
+- **Published UI:** `useScrollFade` (the panels' fading edges) joins `app/plugin/ui`.
+- **Strings:** the menu's stay the kernel's (`app.editor.ui.filetree.*`); the palette's two New descriptions move there too. The tree's own strings and its settings go to `plugins.files.*`, the palette's to `plugins.palette.*`; the panel names leave `app.chat.*`.
+- `CommandPaletteButton` (unused) and `StateKey.fileSearchOpen` go.
+
 ### Acceptance
-- [ ] The shared acceptance; with `files` off, another panel view can take its place and file operations still work from the palette.
-- [ ] The File Explorer plan's SMOKE rows pass.
+- [x] The shared acceptance; with `files` off, another panel view can take its place and file operations still work from the palette. (In `tauri dev`, separate app identifier, a temporary harness, a fixture vault; deleted after. On: the tree's rows, `openFolders`, a click opening a note, the right-click row menu, Duplicate handing its copy to `added`, the empty-space and selection menus, undo, `newItems`, `iconFor`, the drag image styled and drawn to a PNG, ⌘P and Search opening the palette with Quick actions, commands and files. Settings written before the move: `viewConfig.fileTree.showFoldArrows` in the global file shows on the Files settings page and in the tree, and `showFileExtAsTag: false` in a workspace's `.vertex/settings.json` hides the tags; Settings → View has no File Tree section. Files off: no tree, its code not fetched, Chats takes the left area, ⌘P's New Markdown File asks for a name and creates the note. Palette off: ⌘P opens nothing, no Search button, its code not fetched.)
+- [ ] The File Explorer plan's SMOKE rows pass. (Not run by hand: rows 96, 99, 100, 105 (modifier clicks, drag select, moves with their clash dialogs, the native drag to Finder); 11 (create, rename, delete from the tree) only through the kernel menu's items as listed above.)
+
+### As built
+
+- **Layers:**
+  - `layers/files/`: `plugin.json` (the seven switches as its schema, each workspace-overridable); `app/plugin.ts` (the `files` view; `filesContext()` for its config); `app/components/View.vue` (header buttons from `newItems`), `Tree.vue` (was `FileTreeComponent`, over `session` alone).
+  - `layers/palette/`: `app/plugin.ts` (the overlay, the `search` view); `app/components/Palette.vue` (was `WorkspaceCommandPalette`); `app/lib/open.ts`.
+- **Kernel:**
+  - `useFileActions` (the menu builders, clipboard, duplicate, delete, drops, drag start, New items, moved out of the tree).
+  - `app/utils/dragImage.ts` (the drag image, built on the DOM once per window, and its PNG).
+  - The `overlays` registry, drawn in `session.vue`; `usePanels` returns its `context` and fills `shownSearch`.
+  - `PanelFilesView`'s, the palette's and the tree's three lists of New items are `newItems` now.
+- **Settings:**
+  - Seven `LEGACY_PATHS` rows (`viewConfig.fileTree.*` → `plugins.config.files.*`); `AppViewConfig.fileTree` is gone.
+  - The breadcrumbs show a folder's custom icon always.
+  - The scopes test uses `editorPanel` where it used `fileTree`.
+- **Strings:** `plugins.files.*` (its name, settings, the move toast), `plugins.palette.*` (Search, the group names); the New descriptions moved to `app.editor.ui.filetree.*`; `app.chat.files`/`search`, `app.settings.view.fileTree` and its rows, `app.editor.ui.palette.{quickActions,commands,files}` and `filetree.moveFailed` are gone.
+- **Boundaries:** `RESIDENTS` loses `files` and `palette`, `KERNEL_EXCEPTIONS` the session layout's palette; `EXCEPTIONS` stays empty.
+- **Found on the way:** with the Files view off, the left area shows Chats, so its Search button runs Chats' own search (as `PanelViewDef.search` says), not the palette; ⌘P still opens the palette. A layer's locale file is still fetched while it's off (known since X1); its code isn't.
+- **Numbers:** 374 tests (43 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X5: Workflows
 

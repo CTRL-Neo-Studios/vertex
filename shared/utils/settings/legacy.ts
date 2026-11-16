@@ -10,6 +10,9 @@ export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = [
     // X2: canvas became a plugin.
     ...['wheelBehavior', 'modDragBehavior', 'cardLabels', 'snapToGrid', 'snapToObjects', 'zoomBreakpoint']
         .map(key => [`viewConfig.canvas.${key}`, `plugins.config.canvas.${key}`] as const),
+    // X4: the file tree became the files plugin.
+    ...['showFoldArrows', 'showFileExtInName', 'showFileExtAsTag', 'showDefaultFileIcons', 'showDefaultFolderIcons', 'allowCustomFileIcons', 'allowCustomFolderIcons']
+        .map(key => [`viewConfig.fileTree.${key}`, `plugins.config.files.${key}`] as const),
 ]
 
 /** `raw` with each old path's value at its new one (unless the new one is set), and the old one gone. */

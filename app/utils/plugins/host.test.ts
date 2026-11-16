@@ -8,13 +8,16 @@ const SESSION = {
     session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'},
     views: {show: () => {}, openInTab: () => {}},
     index: {
-        files: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
+        files: () => [], tree: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
         backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {},
     },
+    commands: {list: () => [], paletteGroups: () => []},
     files: {
         assetUrl: () => '', write: async () => {}, create: async () => undefined, edit: async () => {}, move: async () => {},
         undo: async () => {}, redo: async () => {}, importAttachments: async () => [], pick: async () => undefined,
-        drag: {rows: () => undefined},
+        iconFor: () => undefined, openFolders: ref<string[]>([]), menuFor: () => [], newItems: () => [],
+        copy: async () => {}, paste: async () => [], remove: async () => {}, importDrop: async () => [],
+        drag: {start: () => {}, rows: () => undefined},
     },
     properties: {types: () => ({}), setType: async () => {}},
     tabs: {open: async () => {}, close: async () => {}, active: () => null, list: () => []},

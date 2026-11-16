@@ -1,0 +1,25 @@
+{
+  "plugins": {
+    "files": {
+      "name": "Files",
+      "itemCount": "{count} item(s)",
+      "moveFailed": "Could not move {name}",
+      "settings": {
+        "showExtInName": "Show Extension in File Name",
+        "showExtInNameDescription": "Shows the file extension in the item name label.",
+        "showExtAsTag": "Show Extension as Tag",
+        "showExtAsTagDescription": "Shows the file extension as a tag at the end of the item entry.",
+        "showFileIcons": "Show File Icons",
+        "showFileIconsDescription": "Shows the file item icon.",
+        "showFolderIcons": "Show Folder Icons",
+        "showFolderIconsDescription": "Shows the folder item icons.",
+        "showFoldArrows": "Show Folder Fold Arrows",
+        "showFoldArrowsDescription": "Shows the folder folding arrows on the right side.",
+        "customFileIcons": "Allow Custom File Icons",
+        "customFileIconsDescription": "Allow displaying custom icons configured in the file.",
+        "customFolderIcons": "Allow Custom Folder Icons",
+        "customFolderIconsDescription": "Allow displaying custom icons configured in the folder."
+      }
+    }
+  }
+}

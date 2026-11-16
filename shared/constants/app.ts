@@ -49,7 +49,6 @@ export const StateKey = {
     rightPanel: (s: string) => `active.layouts.right-panel.${s}`,
     bottomPanel: (s: string) => `active.layouts.bottom-panel.${s}`,
     shownPanelViews: (s: string) => `active.layouts.shown-panel-views.${s}`,
-    fileSearchOpen: (s: string) => `active.layouts.file-search-open.${s}`,
     workspaceIndex: (s: string) => `active.workspace.indexMap.${s}`,
     workspaceUuidToPath: (s: string) => `active.workspace.uuidToFilePathIndexMap.${s}`,
     expandedFolders: (s: string) => `active.workspace.expanded-file-tree-items-${s}`,

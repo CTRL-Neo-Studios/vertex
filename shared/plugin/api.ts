@@ -4,16 +4,18 @@
  */
 import type {Extension} from '@codemirror/state'
 import type {EditorView} from '@codemirror/view'
+import type {Ref} from 'vue'
 import type {ActiveSession} from '#shared/types/active/sessions'
-import type {ActiveWorkspaceFileIndex, WorkspaceIndexListener} from '#shared/types/active/workspace'
+import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexListener} from '#shared/types/active/workspace'
 import type {PanelViewId} from '#shared/types/app/settings'
 import type {
     CodeBlockDef, EditorActionDef, EditorHost, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
-    MarkdownSyntaxDef, NoteMenuItemDef, PaletteGroupDef, PanelViewDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
+    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PanelViewDef, PluginMenuItem, SettingsPageDef, StatusItemDef,
+    TabKindDef, ViewerDef,
 } from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
 
-export type {ActiveSession, ActiveWorkspaceFileIndex}
+export type {ActiveSession, ActiveWorkspaceFileIndex, UITreeNode}
 export type {PluginManifest, WindowKind}
 export type * from './contributions'
 
@@ -68,6 +70,8 @@ export interface SessionContext {
     /** The workspace's files and links (empty in a single-file window). Files by absolute path or uuid. */
     index: {
         files(): ActiveWorkspaceFileIndex[]
+        /** Folders and files as Files shows them: the top level, each folder's children, sorted. Reactive. */
+        tree(): UITreeNode[]
         byPath(path: string): ActiveWorkspaceFileIndex | undefined
         byUuid(uuid: string): ActiveWorkspaceFileIndex | undefined
         /** The file a link target (`[[target]]`) finds, as the editor resolves it. */
@@ -82,7 +86,15 @@ export interface SessionContext {
         /** Files created, removed, renamed, modified (removed with the session). */
         on(listener: WorkspaceIndexListener): () => void
     }
-    /** The kernel's file operations (X4 adds the rest). */
+    /** The registered commands and palette groups, for a command palette. Reactive. */
+    commands: {
+        list(): readonly (PluginCommand & { plugin: string })[]
+        paletteGroups(): readonly PaletteGroupDef[]
+    }
+    /**
+     * The kernel's file operations. Those a file browser runs (menu, copy, paste, delete, drops) take uuids and
+     * workspace-relative folders (`''` for the top level), and report failures themselves.
+     */
     files: {
         /** A URL the webview can load an absolute path from (images, media). */
         assetUrl(path: string): string
@@ -107,7 +119,35 @@ export interface SessionContext {
         importAttachments(files: File[]): Promise<string[]>
         /** The vault picker: workspace-relative paths, `undefined` when it closes without a choice. */
         pick(options: VaultPickOptions): Promise<string[] | undefined>
+        /** The icon of a file named `name`: its file type's (`ctx.files.type`), or the folder properties file's; `undefined` for others. */
+        iconFor(name: string): string | undefined
+        /** The folders a file browser shows open, by uuid: saved with the session, restored with it. */
+        openFolders: Ref<string[]>
+        /**
+         * The menu for rows of a file browser: one row's, a selection's, or the empty space's (`[]`). Plugins' items
+         * (`ctx.files.menuItem`) come first. `added` gets what Paste and Duplicate made.
+         */
+        menuFor(uuids: string[], options?: { added?(uuids: string[]): void }): PluginMenuItem[][]
+        /** New note, New folder, then each file type's New; each asks for a name, then creates it in `folder` (default the top level). */
+        newItems(folder?: string): PluginMenuItem[]
+        /** Puts the files on the system clipboard as files (Finder and Explorer paste them too). */
+        copy(uuids: string[]): Promise<void>
+        /** Copies the system clipboard's files into `folder`; in their own folder they're named like Keep both. The new uuids. */
+        paste(folder: string): Promise<string[]>
+        /** Deletes into a trash (with Undo), or asks first when deletes are for good (`fileConfig.deletedFiles`). */
+        remove(uuids: string[]): Promise<unknown>
+        /**
+         * The OS files of a drop into `folder`: copied, or moved when they're the workspace's own (`copy` copies them
+         * anyway). Call it inside the drop event. The new uuids.
+         */
+        importDrop(transfer: DataTransfer, folder: string, options?: { copy?: boolean }): Promise<string[]>
         drag: {
+            /**
+             * Starts a drag of the rows (inside `dragstart`): the drag image (a card per row, from `grab`, the row's
+             * icon and name), `FILES_DRAG` for the editor and chat, and in the app a native drag Finder and Explorer
+             * copy from. `ended` runs when it's over, also when the page never sees `dragend`.
+             */
+            start(event: DragEvent, uuids: string[], grab: Element | null, ended: () => void): void
             /** The workspace-relative paths of rows dragged from Files (a folder's ends with `/`); `undefined` for any other drag. */
             rows(transfer: DataTransfer | null): string[] | undefined
         }
@@ -217,10 +257,11 @@ export interface PluginContext<Config = Record<string, unknown>> extends HostSer
         tabKind(def: TabKindDef): () => void
         fileViewer(def: ViewerDef): () => void
         statusItem(def: StatusItemDef): () => void
+        overlay(def: OverlayDef): () => void
     }
     files: {
         type(def: FileTypeDef): () => void
-        /** Items in Files' row menu. */
+        /** Items in the file menu of a row or a selection (`session.files.menuFor`). */
         menuItem(def: FileMenuItemDef): () => void
     }
     settings: {

@@ -1,0 +1,10 @@
+{
+  "plugins": {
+    "palette": {
+      "search": "搜索",
+      "quickActions": "快捷操作",
+      "commands": "命令",
+      "files": "文件（{count}）"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import type {
     CodeBlockDef, EditorActionDef, EditorExtensionDef, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
-    MarkdownSyntaxDef, NoteMenuItemDef, PaletteGroupDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
+    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
 } from '#shared/plugin/api'
 import {panelViews} from '~/utils/panelViews'
 import {createList, createRegistry} from '~/utils/registry'
@@ -16,6 +16,8 @@ export const fileTypes = createRegistry<FileTypeDef>('file type', d => d.id)
 export const fileMenuItems = createRegistry<FileMenuItemDef>('file menu item', d => d.id)
 export const paletteGroups = createRegistry<PaletteGroupDef>('palette group', d => d.id)
 export const homeActions = createRegistry<HomeActionDef>('home action', d => d.id)
+/** Drawn once in each session window (`session.vue`). */
+export const overlays = createRegistry<OverlayDef>('overlay', d => d.id)
 
 // The editor's (K4): what every note editor draws with (`useNoteEditor`), and the index's link extractors.
 export const codeBlocks = createRegistry<CodeBlockDef>('code block', d => d.language)

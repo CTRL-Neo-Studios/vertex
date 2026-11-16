@@ -104,7 +104,10 @@ export function usePanels(session?: ActiveSession) {
     /** What an action sees: the view shown in the pane holding it. */
     const actionContext = (area: PanelArea, id: PanelViewId): PanelActionContext => {
         const pane = paneOf(area, id)
-        return {...context.value, area, shown: areas.value[area].open ? pane?.active : undefined}
+        const shown = areas.value[area].open ? pane?.active : undefined
+        const search = shown === undefined ? undefined : panelViews.get(shown)?.search
+        const ctx: PanelActionContext = {...context.value, area, shown, shownSearch: search && (() => search(ctx))}
+        return ctx
     }
 
     /** The keyboard hints of an area's view buttons, by view. */
@@ -192,5 +195,5 @@ export function usePanels(session?: ActiveSession) {
     const slotMenu = (area: PanelArea, index?: number, pane?: PanelPaneState) =>
         panelSlotMenu({layout: layout.value, list: area, index, shown: areas.value[area].slots.map(s => s.index), splitBefore: pane?.splitBefore, save, reset, t})
 
-    return {style, layout, areas, available, kbdsOf, select, toggle, showView, placeView, openInTab, moveToPanel, move, slotMenu}
+    return {style, layout, areas, available, context, kbdsOf, select, toggle, showView, placeView, openInTab, moveToPanel, move, slotMenu}
 }

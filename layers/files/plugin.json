@@ -1,0 +1,72 @@
+{
+  "id": "files",
+  "name": "Files",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": [
+    "session",
+    "settings"
+  ],
+  "config": {
+    "overridable": {
+      "showFileExtInName": "workspace",
+      "showFileExtAsTag": "workspace",
+      "showDefaultFileIcons": "workspace",
+      "showDefaultFolderIcons": "workspace",
+      "showFoldArrows": "workspace",
+      "allowCustomFileIcons": "workspace",
+      "allowCustomFolderIcons": "workspace"
+    },
+    "schema": [
+      {
+        "key": "showFileExtInName",
+        "type": "switch",
+        "default": false,
+        "label": "plugins.files.settings.showExtInName",
+        "description": "plugins.files.settings.showExtInNameDescription"
+      },
+      {
+        "key": "showFileExtAsTag",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.files.settings.showExtAsTag",
+        "description": "plugins.files.settings.showExtAsTagDescription"
+      },
+      {
+        "key": "showDefaultFileIcons",
+        "type": "switch",
+        "default": false,
+        "label": "plugins.files.settings.showFileIcons",
+        "description": "plugins.files.settings.showFileIconsDescription"
+      },
+      {
+        "key": "showDefaultFolderIcons",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.files.settings.showFolderIcons",
+        "description": "plugins.files.settings.showFolderIconsDescription"
+      },
+      {
+        "key": "showFoldArrows",
+        "type": "switch",
+        "default": false,
+        "label": "plugins.files.settings.showFoldArrows",
+        "description": "plugins.files.settings.showFoldArrowsDescription"
+      },
+      {
+        "key": "allowCustomFileIcons",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.files.settings.customFileIcons",
+        "description": "plugins.files.settings.customFileIconsDescription"
+      },
+      {
+        "key": "allowCustomFolderIcons",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.files.settings.customFolderIcons",
+        "description": "plugins.files.settings.customFolderIconsDescription"
+      }
+    ]
+  }
+}

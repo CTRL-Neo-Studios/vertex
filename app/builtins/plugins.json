@@ -1,6 +1,4 @@
 [
-	{"id": "files", "name": "Files", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
-	{"id": "palette", "name": "Command palette", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
 	{"id": "workflows", "name": "Workflows", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
 	{"id": "git", "name": "Git", "version": "0", "apiVersion": 1, "windows": ["main", "session", "settings"]},
 	{"id": "ai", "name": "AI", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},

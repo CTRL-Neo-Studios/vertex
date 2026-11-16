@@ -105,15 +105,6 @@ export interface AppAdvancedThemeConfig {
 }
 
 export interface AppViewConfig {
-    fileTree: {
-        showFoldArrows: boolean,
-        showFileExtInName: boolean,
-        showFileExtAsTag: boolean,
-        showDefaultFileIcons: boolean,
-        showDefaultFolderIcons: boolean,
-        allowCustomFileIcons: boolean,
-        allowCustomFolderIcons: boolean,
-    },
     editorPanel: {
         showStatusBar: 'show-on-hover' | 'always-shown' | 'always-hidden',
         selectionToolbar: boolean,

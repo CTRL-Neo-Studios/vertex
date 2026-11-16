@@ -1,0 +1,25 @@
+{
+  "plugins": {
+    "files": {
+      "name": "文件",
+      "itemCount": "{count} 个项目",
+      "moveFailed": "无法移动 {name}",
+      "settings": {
+        "showExtInName": "在文件名中显示扩展名",
+        "showExtInNameDescription": "在条目名称中显示文件扩展名。",
+        "showExtAsTag": "以标签显示扩展名",
+        "showExtAsTagDescription": "在条目末尾以标签形式显示文件扩展名。",
+        "showFileIcons": "显示文件图标",
+        "showFileIconsDescription": "显示文件条目的图标。",
+        "showFolderIcons": "显示文件夹图标",
+        "showFolderIconsDescription": "显示文件夹条目的图标。",
+        "showFoldArrows": "显示文件夹折叠箭头",
+        "showFoldArrowsDescription": "在右侧显示文件夹折叠箭头。",
+        "customFileIcons": "允许自定义文件图标",
+        "customFileIconsDescription": "允许显示在文件中配置的自定义图标。",
+        "customFolderIcons": "允许自定义文件夹图标",
+        "customFolderIconsDescription": "允许显示在文件夹中配置的自定义图标。"
+      }
+    }
+  }
+}

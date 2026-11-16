@@ -11,14 +11,14 @@ describe('effectiveSettings', () => {
     it('lays allowlisted overrides over the global settings and ignores the rest', () => {
         const local = {
             themeConfig: {primaryColor: 'rose'},
-            viewConfig: {fileTree: {showFoldArrows: true}},
+            viewConfig: {editorPanel: {slashMenu: false}},
             language: 'zh-CN',
             updateChannel: 'evil',
             workflowConfig: {confirmTrash: false},
         }
         const s = effectiveSettings(global, local, false, kernel)
         expect(s.themeConfig).toEqual({...global.themeConfig, primaryColor: 'rose'})
-        expect(s.viewConfig.fileTree).toEqual({...global.viewConfig.fileTree, showFoldArrows: true})
+        expect(s.viewConfig.editorPanel).toEqual({...global.viewConfig.editorPanel, slashMenu: false})
         expect([s.language, s.updateChannel, s.workflowConfig.confirmTrash, s.deviceId]).toEqual(['system', 'stable', true, 'd'])
     })
 
@@ -64,7 +64,7 @@ describe('plugins in a workspace', () => {
 
 describe('overrides', () => {
     it('knows what a workspace may override, by entry or anything under it', () => {
-        expect(['themeConfig', 'themeConfig.primaryColor', 'viewConfig.fileTree.showFoldArrows'].map(p => overridableAs(p, kernel)))
+        expect(['themeConfig', 'themeConfig.primaryColor', 'viewConfig.editorPanel.slashMenu'].map(p => overridableAs(p, kernel)))
             .toEqual(['workspace', 'workspace', 'workspace'])
         expect(overridableAs('advancedThemeConfig.customCss', kernel)).toBe('trustedWorkspace')
         expect(['advancedThemeConfig', 'language', 'workflowConfig.fileTrust', 'themeConfigX', 'plugins.config.graph.depth'].map(p => overridableAs(p, kernel)))
