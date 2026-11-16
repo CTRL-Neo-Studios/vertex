@@ -401,10 +401,27 @@ Blocked by K0. Independent of K1–K4.
 - **Capabilities** by window kind, replacing one grant for all: `main`, `session-*`, `settings` and `about`, each with what it uses. The app's commands aren't checked against capabilities today; as `plugin:vertex|…` commands they are, so every window's capability must name what it calls, and K5 is the first time a window can be refused one.
 
 ### Acceptance
-- [ ] The Rust tests pass in their new crates; `tauri dev` and a release build work on the three systems.
-- [ ] No command is defined in the app crate; a command outside a window's capability is refused.
-- [ ] SMOKE rows 1–8 and 15 (windows, recovery, quit, settings broadcast) pass.
-- [ ] Concepts doc: state ownership and the host services.
+- [ ] The Rust tests pass in their new crates; `tauri dev` and a release build work on the three systems. (macOS: all three hold. Windows and Linux not run.)
+- [x] No command is defined in the app crate; a command outside a window's capability is refused.
+- [ ] SMOKE rows 1–8 and 15 (windows, recovery, quit, settings broadcast) pass. (1, 2, 8 and 15 in `tauri dev`; 3 to 7 not run: 5 and 6 need the installed app's file associations; closing one of two workspaces before a relaunch, a single-file window and the menu weren't exercised.)
+- [x] Concepts doc: state ownership and the host services.
+
+### As built
+
+- **Crates** (`src-tauri/crates/`, a Cargo workspace; `target/` stays at `src-tauri/target`): `tauri-plugin-vertex` (`state.rs`, `trash.rs`, `fonts.rs`, `updater.rs`, `web.rs`, `notes.rs`, the old `lib.rs` commands, `api.rs`, `host.rs`), `tauri-plugin-vertex-ai`, `-chats`, `-git` (moved as they were). Each has `links`, a `build.rs` over its `COMMANDS`, and its generated `permissions/`. The app crate builds the plugins (the kernel first: the feature plugins call its API from their setup, and Tauri sets plugins up in registration order), window lifecycle, file opening and `ExitRequested` through `tauri_plugin_vertex::api`. It has no command and no `invoke_handler`.
+- **Rust API** (`api.rs`): `workspace_root`, `write_atomic`, `write_bytes_atomic`, `blocking`, `KEYRING_SERVICE` and `keychain_get/set/delete`, `install_crypto`, `snippet`, `settings(app)`, `plugin_config(app, id)`, `on_settings_change(app, …)` (run after `settings_set` saves, before it returns, so key cleanup ends before the call does), and what the app crate needs (`ensure_trust`, `push_open_request`, `session_window`, `set_quitting`, `SESSION_WINDOW_PREFIX`).
+- **Feature knowledge:** the AI crate registers the removed providers' key cleanup with `on_settings_change` and reads its base URLs from `settings(app)`; the git crate reads `git_path` there. The commands in feature crates aren't `pub` (Tauri can't build `pub` commands in a crate's `lib.rs`); git's own `init` helper became `init_repo`. `http_fetch` sends `Vertex/<app version>` as its user agent (it was the crate's version).
+- **Host services:** `secret_*` (keychain account `plugin:<id>:<name>`), `data_get`/`data_set` (`null` only when the file is missing; an unreadable one is an error, so nothing is overwritten silently), both checking the id against `PLUGIN_ID`. In the contract, `ctx.http`, `ctx.secrets`, `ctx.data` (`app/utils/plugins/services.ts`); a store's `set` waits for its `onChange` listeners to register, so a window hears its own write (the first run missed it).
+- **Calls:** `vertexInvoke` / `pluginInvoke('vertex-git')` (`app/utils/vertexInvoke.ts`) prefix every call; `httpFetch` (`app/utils/httpFetch.ts`) is the kernel fetch the chat's web tool and `ctx.http.fetch` share.
+- **Capabilities:** `main.json`, `session.json`, `settings.json`, `about.json` (the tracing is in each file's commands). The app's commands are split by what each window kind calls. Not done: core and third-party permissions (`fs:` and its scopes, `dialog:`, `opener:`…) are the same in all four, as `default.json` gave every window.
+- **Checked in `tauri dev`** (separate identifier; a temporary harness and a core plugin in `layers/`, both deleted after), in three runs:
+  - start window: `git_status` refused (the error names `session` as the capability that allows it); sessions listed;
+  - two workspaces, three tabs each; `git_status` (git's own `not-repo`) and `search_notes` allowed; a settings change reached both;
+  - `ctx.data` wrote, read back and heard its change; `ctx.secrets` wrote, read and deleted; `ctx.http.fetch` got 200;
+  - `quit_app`, then a relaunch with recovery on: both workspaces back with their tabs; closing both brought the start window back;
+  - the About and Settings windows: every Settings page with no refusal, `system_fonts` allowed, `git_status` refused.
+  - A release build (`tauri build --no-bundle`, 1 m 10 s) starts.
+- **Numbers:** 319 tests (43 files); 37 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X phases: what each one does
 
