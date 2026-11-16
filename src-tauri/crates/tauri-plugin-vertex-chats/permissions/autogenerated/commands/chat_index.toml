@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-index"
+description = "Enables the chat_index command without any pre-configured scope."
+commands.allow = ["chat_index"]
+
+[[permission]]
+identifier = "deny-chat-index"
+description = "Denies the chat_index command without any pre-configured scope."
+commands.deny = ["chat_index"]

@@ -1,0 +1,45 @@
+[package]
+name = "tauri-plugin-vertex"
+version = "0.1.0"
+description = "Vertex's kernel: shared state, files, and the host services every plugin builds on."
+authors = ["Type-32"]
+edition = "2021"
+rust-version = "1.90"
+publish = false
+links = "tauri-plugin-vertex"
+
+[build-dependencies]
+tauri-plugin = { version = "2.7.2", features = ["build"] }
+
+[dependencies]
+tauri = "2.12.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rayon = "1.12"
+tokio = { version = "1", features = ["sync", "time"] }
+url = "2.5.8"
+
+[dev-dependencies]
+uuid = { version = "1.29.0", features = ["v4"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+# Already in the tree through the clipboard plugin; used directly for file lists (Copy/Paste in Files).
+arboard = "3.7"
+fontdb = "0.23"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3.6", features = ["apple-native"] }
+# Files' Delete to the Trash, keeping where each item went so Undo can put it back (`trash.rs`).
+objc2-foundation = { version = "0.3.2", features = ["NSFileManager", "NSURL", "NSError", "NSString"] }
+
+# The Trash and Recycle Bin, with the listing that restoring needs (`trash.rs`); macOS uses NSFileManager instead.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+trash = "5.3"
+
+[target."cfg(windows)".dependencies]
+keyring = { version = "3.6", features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-git-identity"
+description = "Enables the git_identity command without any pre-configured scope."
+commands.allow = ["git_identity"]
+
+[[permission]]
+identifier = "deny-git-identity"
+description = "Denies the git_identity command without any pre-configured scope."
+commands.deny = ["git_identity"]

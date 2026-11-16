@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-clipboard-files-get"
+description = "Enables the clipboard_files_get command without any pre-configured scope."
+commands.allow = ["clipboard_files_get"]
+
+[[permission]]
+identifier = "deny-clipboard-files-get"
+description = "Denies the clipboard_files_get command without any pre-configured scope."
+commands.deny = ["clipboard_files_get"]

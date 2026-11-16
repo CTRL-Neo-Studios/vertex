@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-sessions-list"
+description = "Enables the sessions_list command without any pre-configured scope."
+commands.allow = ["sessions_list"]
+
+[[permission]]
+identifier = "deny-sessions-list"
+description = "Denies the sessions_list command without any pre-configured scope."
+commands.deny = ["sessions_list"]

@@ -1,4 +1,4 @@
-import {invoke} from "@tauri-apps/api/core"
+import {vertexInvoke} from "~/utils/vertexInvoke"
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames"
 import {defaultTrustRecords, normalizeTrustPath, type TrustRecords} from "#shared/utils/trust"
 import {stateClient} from "~/utils/stateClient"
@@ -29,12 +29,12 @@ async function pinsUnder(folder: string, nested: boolean): Promise<Record<string
         const ext = getFileExtensionFromPath(name)
         return [...trustedFormats].find(f => f.match(ext))
     }
-    const entries = await invoke<{path: string, name: string, is_directory: boolean}[]>('scan_directory_recursive', {rootPath: folder})
+    const entries = await vertexInvoke<{path: string, name: string, is_directory: boolean}[]>('scan_directory_recursive', {rootPath: folder})
     const paths = entries
         .filter(e => !e.is_directory && formatOf(e.name))
         .map(e => normalizeTrustPath(e.path))
         .filter(path => nested || path.slice(0, path.lastIndexOf('/')) === folder)
-    const read = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths})
+    const read = await vertexInvoke<{path: string, content?: string}[]>('read_text_files_batch', {paths})
     const pins: Record<string, string> = {}
     for (const {path, content} of read) {
         const hash = content === undefined ? undefined : await formatOf(path)?.hash(content)

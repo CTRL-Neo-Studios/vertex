@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-data-get"
+description = "Enables the data_get command without any pre-configured scope."
+commands.allow = ["data_get"]
+
+[[permission]]
+identifier = "deny-data-get"
+description = "Denies the data_get command without any pre-configured scope."
+commands.deny = ["data_get"]

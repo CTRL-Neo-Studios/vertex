@@ -3,7 +3,7 @@ import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
 import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {join} from "@tauri-apps/api/path"
-import {invoke} from "@tauri-apps/api/core"
+import {vertexInvoke} from "~/utils/vertexInvoke"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
 import type {ActiveSession} from "#shared/types/active/sessions";
@@ -149,7 +149,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         rt.wholeFolder = true
         const started = Date.now()
 
-        const entries = await invoke<DirectoryEntry[]>('scan_directory_recursive', {rootPath: root})
+        const entries = await vertexInvoke<DirectoryEntry[]>('scan_directory_recursive', {rootPath: root})
         const next: Record<string, ActiveWorkspaceFileIndex> = {}
         const uuidMap = unref(uuidToFilePathIndex)
         uuidMap.clear()
@@ -171,7 +171,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
 
         const textPaths = Object.values(next).filter(n => !n.isFolder && isIndexedText(n.fullPath)).map(n => n.fullPath)
-        const results = await invoke<FileReadResult[]>('read_text_files_batch', {paths: textPaths})
+        const results = await vertexInvoke<FileReadResult[]>('read_text_files_batch', {paths: textPaths})
         fileIndex.value = next
         for (const r of results) {
             if (r.error || r.content === undefined) {

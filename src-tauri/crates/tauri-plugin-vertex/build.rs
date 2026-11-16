@@ -1,0 +1,40 @@
+/// Every command, so `tauri_plugin` generates its `allow-`/`deny-` permissions (keep in sync with `init`).
+const COMMANDS: &[&str] = &[
+    "read_text_files_batch",
+    "scan_directory_recursive",
+    "sessions_list",
+    "sessions_upsert",
+    "sessions_remove",
+    "settings_get",
+    "settings_set",
+    "trust_get",
+    "trust_set",
+    "trust_clear",
+    "trust_move",
+    "trust_follow_edit",
+    "trust_pin",
+    "workspace_settings_get",
+    "workspace_settings_update",
+    "workspace_settings_reload",
+    "take_open_requests",
+    "quit_app",
+    "clipboard_files_get",
+    "clipboard_files_set",
+    "trash_item",
+    "trash_restore",
+    "update_token_get",
+    "update_token_set",
+    "update_channels",
+    "system_fonts",
+    "http_fetch",
+    "search_notes",
+    "secret_get",
+    "secret_set",
+    "secret_delete",
+    "data_get",
+    "data_set",
+];
+
+fn main() {
+    tauri_plugin::Builder::new(COMMANDS).build();
+}

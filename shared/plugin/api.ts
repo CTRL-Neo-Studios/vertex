@@ -110,7 +110,39 @@ export interface PluginConfigAccess<Config> {
     overridden(path: string): boolean
 }
 
-export interface PluginContext<Config = Record<string, unknown>> {
+/** A plugin's JSON document in one scope (`ctx.data`), kept by the kernel; writes are atomic. */
+export interface Store<T> {
+    /** `undefined` until something is set. */
+    get(): Promise<T | undefined>
+    set(value: T): Promise<void>
+    /** Runs after every write to this document, from any window, with the new value; removed like a registration. */
+    onChange(fn: (value: T | undefined) => void): () => void
+}
+
+/** The kernel's services every plugin gets (`ctx.http`, `ctx.secrets`, `ctx.data`), each kept apart per plugin. */
+export interface HostServices {
+    http: {
+        /**
+         * One GET from Rust, outside the webview's CORS, `init`'s `Accept` passed on. Redirects come back unfollowed,
+         * the body stops past 2 MiB, and addresses on this computer or the local network are refused.
+         */
+        fetch(url: string, init?: { headers?: HeadersInit, signal?: AbortSignal | null }): Promise<Response>
+    }
+    /** Strings in the OS keychain, by name, this plugin's own. */
+    secrets: {
+        get(name: string): Promise<string | undefined>
+        set(name: string, value: string): Promise<void>
+        delete(name: string): Promise<void>
+    }
+    data: {
+        /** The plugin's document in the app's data folder. */
+        global: Store<unknown>
+        /** The plugin's document in the window's workspace (`.vertex/plugins-data/`); `undefined` outside a workspace window. */
+        workspace: Store<unknown> | undefined
+    }
+}
+
+export interface PluginContext<Config = Record<string, unknown>> extends HostServices {
     plugin: { id: string, version: string, source: PluginSource }
     window: { kind: WindowKind, label: string }
     config: PluginConfigAccess<Config>

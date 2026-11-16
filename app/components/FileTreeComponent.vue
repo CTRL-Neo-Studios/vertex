@@ -6,7 +6,8 @@ import {isPropertiesFile, parentPathOf, PROPERTIES_FILE_NAMES} from "#shared/uti
 import {fileNameFromPath, getFileExtensionFromPath} from "#shared/utils/fs/filenames";
 import {fileMenuItems, fileTypes} from "~/utils/contributions";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager"
-import {invoke, isTauri} from "@tauri-apps/api/core"
+import {isTauri} from "@tauri-apps/api/core"
+import {vertexInvoke} from "~/utils/vertexInvoke"
 import {platform} from "@tauri-apps/plugin-os"
 import NewFileModal from "~/components/Modals/NewFileModal.vue";
 import DeleteFilesModal from "~/components/Modals/DeleteFilesModal.vue";
@@ -194,7 +195,7 @@ async function copySelection(ids: Iterable<string> = selected.value) {
     const files = topOf(ids)
     if (!files.length) return
     try {
-        await invoke('clipboard_files_set', {paths: files.map(f => f.fullPath)})
+        await vertexInvoke('clipboard_files_set', {paths: files.map(f => f.fullPath)})
         $qt.success(t('app.editor.ui.filetree.copied', {count: files.length}))
     } catch (error) {
         $qt.error(t('app.editor.ui.filetree.copyFailed'), String(error))
@@ -209,7 +210,7 @@ function pasteTarget() {
 
 async function pasteInto(dest: string) {
     if (!session?.rootPath) return
-    const paths = await invoke<string[]>('clipboard_files_get')
+    const paths = await vertexInvoke<string[]>('clipboard_files_get')
     if (!paths.length) return $qt.info(t('app.editor.ui.filetree.nothingToPaste'))
     await addInto(dest, await outsideItemsAt(paths), {copy: true, inPlace: true})
 }

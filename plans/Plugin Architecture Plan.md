@@ -393,10 +393,12 @@ Blocked by K0. Independent of K1–K4.
   - commands: sessions, settings, trust, workspace settings, the open queue, quit; directory scan and batch read; trash; clipboard files; fonts; update channels;
   - host services for every plugin: `http_fetch` (from `web_fetch`), `search_notes`, `secret_get` / `secret_set` / `secret_delete` (keychain, named `plugin:<id>:<name>`), `data_get` / `data_set` (a JSON store per plugin, global in app data or per workspace in `.vertex/plugins-data/`, atomic writes, a change event);
   - a Rust API for plugin crates: `workspace_root`, `write_atomic`, `blocking`, the keychain, `install_crypto`, `snippet`, `plugin_config(app, id)`, and `on_settings_change(|old, new| …)`.
-- **Feature knowledge leaves the kernel:** `ai_provider_base_url`, `git_path` and the AI key cleanup in `settings_set` become their plugins' use of `plugin_config` and `on_settings_change` (in X6 and X7; until then they stay behind the same API inside the old modules).
+- **Feature crates now:** "no command in the app crate" means `ai.rs`, `chats.rs` and `git.rs` move too, as they are, into `crates/tauri-plugin-vertex-ai`, `-chats` and `-git` (plugins `vertex-ai`, `vertex-chats`, `vertex-git`) on the kernel crate's Rust API. Their X phases keep the settings work: `plugin_config` and `on_settings_change` once their settings live in `plugins.config.<id>`.
+- **Feature knowledge leaves the kernel:** `ai_provider_base_url`, `git_path` and the AI key cleanup in `settings_set` move into the AI and git crates, reading the settings through the kernel's API and registering the cleanup with `on_settings_change`.
 - **The app crate** (`src-tauri/src/lib.rs`) only builds: the plugins, window lifecycle, file-open handling.
-- **Calls:** `stateClient.ts` and the other clients call `plugin:vertex|…`.
-- **Capabilities** by window kind, replacing one grant for all: `main`, `session-*`, `settings`, each with what it uses. The app's commands aren't checked against capabilities today; as `plugin:vertex|…` commands they are, so every window's capability must name what it calls, and K5 is the first time a window can be refused one.
+- **Calls:** `stateClient.ts` and the other clients call `plugin:vertex|…`; the feature clients their crate's (`plugin:vertex-git|…`). `web_fetch` becomes `http_fetch`, `notes_search` `search_notes`.
+- **Host services in the contract:** `ctx.http.fetch`, `ctx.secrets.{get, set, delete}` (names kept per plugin) and `ctx.data.global` / `ctx.data.workspace` (a JSON document per plugin: `get`, `set`, `onChange`), over the kernel crate's commands.
+- **Capabilities** by window kind, replacing one grant for all: `main`, `session-*`, `settings` and `about`, each with what it uses. The app's commands aren't checked against capabilities today; as `plugin:vertex|…` commands they are, so every window's capability must name what it calls, and K5 is the first time a window can be refused one.
 
 ### Acceptance
 - [ ] The Rust tests pass in their new crates; `tauri dev` and a release build work on the three systems.
@@ -481,7 +483,7 @@ Blocked by X4.
 Blocked by X5 and K5.
 
 - `ai`: providers, model profiles, parameters, keys, `aiFetch`, the model catalog, its settings pages; `aiConfig` → `plugins.config.ai`.
-- `crates/tauri-plugin-vertex-ai` from `ai.rs`: reads its providers with `plugin_config`, and deletes stale keys from `on_settings_change`.
+- `crates/tauri-plugin-vertex-ai` (moved there in K5): reads its providers with `plugin_config`, and deletes stale keys from `on_settings_change`.
 - API: `registerFeature({id, label, description})` (replacing `AI_FEATURES`), `resolveFeature(id)`, `generate`, `registerTool` (for X8's chat).
 
 ### Acceptance
@@ -493,7 +495,7 @@ Blocked by X5 and K5.
 Blocked by X6.
 
 - The Changes and History views, the `git-diff` tab kind, setup, sign-in, clone (a home action), auto-sync (`onSession`), its settings page; `gitConfig` → `plugins.config.git`, `aiConfig.commitMessages` → `plugins.config.git.commitMessages`.
-- `crates/tauri-plugin-vertex-git` from `git.rs`.
+- `crates/tauri-plugin-vertex-git` (moved there in K5): `git_path` from `plugin_config`.
 - Commit messages use `ai` when it's on (`whenPlugin('ai', …)` registers the feature and shows the button).
 
 ### Acceptance
@@ -505,7 +507,7 @@ Blocked by X6.
 Blocked by X7.
 
 - `chat` (requires `ai`): the Chats and Chat views, the `chat` and `chat-change` tab kinds, tools, transport, staging and changes, attachments, the note menu's Ask in chat; `aiConfig.chatStorage`, `chatMode`, `chatTitles` → `plugins.config.chat`.
-- `crates/tauri-plugin-vertex-chats` from `chats.rs`. `fetchUrl` and `searchNotes` use the kernel's `http_fetch` and `search_notes`.
+- `crates/tauri-plugin-vertex-chats` (moved there in K5). `fetchUrl` and `searchNotes` use the kernel's `http_fetch` and `search_notes`.
 - Chat's tools are registered through `ai.registerTool`; `runWorkflow` only when `workflows` is on.
 - Check whether the editor's `/comark` plugin (`ofm()`, 0.5) can replace `app/utils/comarkPlugins.ts`'s wikilinks, so replies render callouts, tags and highlights as notes do; adopt it if the chat's streaming and quoted frontmatter still work.
 - `ai-assistant` (requires `ai`): `useAiEditorExtension` as an editor extension; `aiConfig.editorAssistant` → `plugins.config.ai-assistant`.

@@ -92,9 +92,27 @@ This design prevents confusion between "what's currently happening" (ActiveSessi
 
 ## State Ownership
 
-Anything shared between windows lives in Rust (`src-tauri/src/state.rs`), which is the **only writer** of
-`sessions.json` and `settings.json`. Windows call commands and listen for change events; they never read or
-write those files themselves. This removes the cross-window lost-update races the old design had.
+Anything shared between windows lives in Rust (the kernel crate, `src-tauri/crates/tauri-plugin-vertex/src/state.rs`),
+which is the **only writer** of `sessions.json` and `settings.json`. Windows call commands and listen for change events;
+they never read or write those files themselves. This removes the cross-window lost-update races the old design had.
+
+The Rust is a Cargo workspace (`src-tauri/crates/`) of Tauri plugins: `tauri-plugin-vertex` (the kernel, plugin `vertex`)
+and the features' `tauri-plugin-vertex-ai`, `-chats` and `-git`. The app crate (`src-tauri/src/lib.rs`) only builds them
+with the third-party plugins and handles windows and file opening; it defines no command. A plugin's commands are
+`plugin:<plugin>|<command>` (the frontend's `vertexInvoke`, `pluginInvoke('vertex-git')`), so every window is checked
+against its capability (`src-tauri/capabilities/`: `main.json`, `session.json`, `settings.json`, `about.json`, each
+naming the commands that window kind calls): a command outside it is refused ("not allowed by ACL").
+
+- **The kernel's Rust API** (`tauri_plugin_vertex::api`) for plugin crates: `workspace_root`, `write_atomic`, `blocking`,
+  the keychain, `install_crypto`, `snippet`, `settings(app)`, `plugin_config(app, id)`, `on_settings_change(app, …)`
+  (run by `settings_set` after a save: the AI crate deletes removed providers' keys there). Plugins register in the app
+  crate after the kernel, which their setup relies on.
+- **Host services** (kernel commands, `ctx` in the plugin contract): `http_fetch` (`ctx.http.fetch`: one GET from Rust,
+  outside CORS, refusing local addresses), `search_notes`, `secret_get` / `secret_set` / `secret_delete` (`ctx.secrets`:
+  the keychain, account `plugin:<id>:<name>`), and `data_get` / `data_set` (`ctx.data.global` / `.workspace`: one JSON
+  document per plugin, in `<app data>/plugins-data/<id>.json` or `<root>/.vertex/plugins-data/<id>.json`, written
+  atomically and announced as `vertex://plugin-data-changed`; `set` waits for the store's `onChange` listeners to
+  register, so a window hears its own write). A plugin id is checked against the manifest's rule.
 
 | Rust command | Purpose |
 |---|---|
@@ -121,8 +139,8 @@ Rows select like a file manager's. The selection is the tree's own (uuids plus a
 - Keys, with the tree focused: Esc clears the selection; Cmd/Ctrl+A selects every shown row; Delete (or Cmd+Backspace on macOS) deletes the selection, as `fileConfig.deletedFiles` says (below); Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z (Ctrl+Y on Windows too) undo and redo Files' operations.
 
 Deleting (`deleteFiles`, `useActiveWorkspaceTools`) follows `fileConfig.deletedFiles`, workspace-overridable (Settings → View → Files):
-- **`'trash'`** (the default): the system Trash or Recycle Bin, through Rust `trash_item` (`src-tauri/src/trash.rs`). On macOS it uses `NSFileManager trashItemAtURL:resultingItemURL:` (`objc2-foundation`), which says where the item went; elsewhere it uses the `trash` crate. `trash_restore` puts an item back: on macOS by moving it from where it went, elsewhere by finding it in the Trash's listing by original path and deletion time. It fails with `taken` or `missing`.
-- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index. Like `.vertex`, it's listed in the fs scopes (`capabilities/default.json`), whose `**/*` doesn't match dot paths.
+- **`'trash'`** (the default): the system Trash or Recycle Bin, through Rust `trash_item` (the kernel crate's `trash.rs`). On macOS it uses `NSFileManager trashItemAtURL:resultingItemURL:` (`objc2-foundation`), which says where the item went; elsewhere it uses the `trash` crate. `trash_restore` puts an item back: on macOS by moving it from where it went, elsewhere by finding it in the Trash's listing by original path and deletion time. It fails with `taken` or `missing`.
+- **`'workspaceTrash'`:** a move into `<root>/.trash/`, under a free name (`freeName`). Like every dot-folder, it's hidden from Files and the index. Like `.vertex`, it's listed in the fs scopes (each window kind's capability in `src-tauri/capabilities/`), whose `**/*` doesn't match dot paths.
 - **`'permanent'`:** `DeleteFilesModal` asks first, then the items are removed for good, with no undo.
 - Either trash asks nothing, and the toast ("Moved N item(s) to the Trash.") has an **Undo** button. An item a clash's Replace displaces goes the same way.
 - **Tabs:** every removed item's tab closes through `closeTabElsewhere`, so a shown one hands the page to the next tab first. Undo doesn't reopen the tab.
@@ -151,7 +169,7 @@ Rows drag like a file manager's:
   - **Back over Vertex,** the drag arrives as plain OS files. The rows it started stay known (`draggedRows`) until the plugin reports the end, plus half a second, since the page may see the drop after that report. The tree moves them, the chat attaches them and a note links them, as with the HTML5 drag.
   - **Copy only:** the drag offers only a copy, so the outside never moves files out of the workspace. Inside the tree, the move therefore shows the copy cursor; asking for a move would get the drop refused.
   - **In a browser** (no Tauri), the tree keeps the HTML5 drag with `FILES_DRAG`.
-  - The plugin's command is allowed in every window by `capabilities/drag.json`.
+  - The plugin's command is allowed in every window kind's capability.
 
 Files from the OS (Finder or Explorer) drop onto the tree like rows, with the same targets and outline. `dragDropEnabled` stays false, so they arrive as HTML5 `Files`. `outsideItems` (`app/utils/outsideItems.ts`) reads them while the event lasts: folders whole, skipping `.DS_Store`/`Thumbs.db`/`desktop.ini`. `importItems` then decides what each one is:
 - **Already the workspace's:** an item with the same path when the webview gives one, or else the only one with the same name, size and modified time, moves instead (as on the same disk). Option/Alt copies it anyway.
@@ -169,7 +187,7 @@ Copy and paste in Files go through the system clipboard's file list (Rust `clipb
 
 ### AI requests
 
-Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys never reach the webview:
+Every AI call goes through Rust (`src-tauri/crates/tauri-plugin-vertex-ai`) so provider API keys never reach the webview:
 
 | Rust command | Purpose |
 |---|---|
@@ -186,7 +204,7 @@ Every AI call goes through Rust (`src-tauri/src/ai.rs`) so provider API keys nev
 
 ### Chats
 
-Chats belong to a workspace (singlespace has none) and are stored by Rust (`src-tauri/src/chats.rs`); the webview only
+Chats belong to a workspace (singlespace has none) and are stored by Rust (`src-tauri/crates/tauri-plugin-vertex-chats`); the webview only
 calls `app/utils/chatClient.ts`.
 
 | `aiConfig.chatStorage` | Where | Format |
@@ -235,7 +253,7 @@ calls `app/utils/chatClient.ts`.
 - Ask in chat: the markdown editor's right-click menu (`RichText.vue`; Cut, Copy, Paste, Select all, then a group per `noteMenuItems` registration: Ask in chat, the chat builtin's, in workspaces) replaces the webview's own, so spelling suggestions and Look Up aren't there. Paste goes through a synthetic `paste` event so CodeMirror's and the editor's paste handling apply; a table's own menu takes its right-clicks first. Ask in chat quotes the selection into the side-panel chat's prompt (a new chat when none is shown) and attaches the note, through `useChats.pendingPrompt`; like every plugin item it runs once the menu has closed, so focus ends in the prompt, and a failure shows as a toast.
 - Tools (`app/utils/chatTools.ts`, sent unless the model profile's Tools switch is off, `AiModelProfile.tools: false`):
   - One list in every mode: a tool made for one mode starts its description with it ("Suggest mode: …"), and called in another it answers with `modeError` (the mode it needs, this mode's equivalent: `proposeEdit`/`proposeInsert` ↔ `editNote`, `writeNote` → `proposeEdit`; in Read, ask the user to switch) instead of running: `execute` tools through `gated`, the editor tools in `onToolCall`.
-  - Note tools, run in the webview: `searchNotes` (Rust `notes_search` in `src-tauri/src/notes.rs`: paths and text, case-insensitive, dot-names skipped, 20 hits with a snippet), `readNote` (a path or a note's name, even partial when only one note matches, or no path for the open note; the mounted editor's buffer, else the file; `startLine`/`endLine`, 1-based and inclusive; `readLines` ends a read at the last whole line under 20k characters and returns `endLine`, `totalLines` and `truncated` so the model reads on; it never shows the note), `openInEditorTab` (shows a note in its tab with the chat beside it, `editorFor`; reads nothing), `findFiles` (every file and folder in the index but dot-named ones, by part of the path, folder and kind, 200 at most; it replaced `listNotes`, whose rows in older chats keep their name). Older chats' `readDocument` rows keep their name; the tool is gone (`readNote` without a path replaced it).
+  - Note tools, run in the webview: `searchNotes` (the kernel's `search_notes`, in its crate's `notes.rs`: paths and text, case-insensitive, dot-names skipped, 20 hits with a snippet), `readNote` (a path or a note's name, even partial when only one note matches, or no path for the open note; the mounted editor's buffer, else the file; `startLine`/`endLine`, 1-based and inclusive; `readLines` ends a read at the last whole line under 20k characters and returns `endLine`, `totalLines` and `truncated` so the model reads on; it never shows the note), `openInEditorTab` (shows a note in its tab with the chat beside it, `editorFor`; reads nothing), `findFiles` (every file and folder in the index but dot-named ones, by part of the path, folder and kind, 200 at most; it replaced `listNotes`, whose rows in older chats keep their name). Older chats' `readDocument` rows keep their name; the tool is gone (`readNote` without a path replaced it).
   - `fetchUrl` (`url`, `offset`; any mode): the AI SDK's web fetch (`experimental_createWebFetchTool` from `@ai-sdk/tool-web-fetch`; `webFetch` in `app/utils/webPage.ts`, one for the app so its cache of converted pages, 16 for 5 min, outlives a send and `offset` paging doesn't refetch). It asks for `text/markdown` first, turns HTML into Markdown with defuddle over linkedom (both imported on the first HTML page, about 1.1 MB unzipped), passes text types (JSON, XML, plain text) as they are, and refuses the rest (a PDF: `unsupported_content_type`); 20k characters per call, 2 MB per response, 30 s, 5 redirects, each followed by the tool; failures are results (`{type: 'error', errorCode, message}`) and the row shows them as failed. Its transport is `rustFetch`: Rust `web_fetch` (`src-tauri/src/web.rs`) does one GET with the tool's `Accept`, no cookies, keys or proxy, 15 s, never following a redirect, and returns the status, headers and up to 2 MB + 1 byte of body (so the tool's size check fires) framed as raw bytes (`frame` / `unframe`: the head's JSON length, the head, the body); a resolver that drops non-public addresses (loopback, private, link-local, CGNAT, …) and a check of IP-literal URLs refuse this machine and the local network at every hop, which `rustFetch` reports as a `DownloadError` (the tool: "resolves to a private or reserved address"); other Rust errors go to the console, as the tool tells the model only "The request failed". In the webview, linkedom's `defaultView` is a Proxy over the real window, so defuddle called the webview's `getComputedStyle` on linkedom elements and fell back to the whole page; `webPage.ts` patches `getComputedStyle` to answer a call it rejects (`TypeError`) with no style. `needsApproval` unless the chat allows the URL's `hostname` (`ChatFile.allowedHosts`, kept by Rust's `rest`) or the user wrote the URL in one of their messages (`urlInUserMessages`: user text only, fragment and trailing punctuation aside; the AI SDK's `requireUrlInUserMessage` idea, but other URLs ask instead of failing): the row shows the URL with Fetch, "Always for <host>" (`useChats.allowHost`, then approves) and Don't fetch; typing in the prompt declines.
   - Editor tools: the editor package's `readSelection` (any mode; the open note: the shown one, or from a chat tab the note shown last, `lastShownNoteOf`, while its tab is open; the system prompt names it; run on that editor without showing anything), and our `proposeEdit`/`proposeInsert` (Suggest), the package's with an optional `path` (path or name, `findNote`) for a note that isn't open; it must be in the scope (`editTargetFor`). They have no `execute`: `useChats`' `onToolCall` runs them; a proposal first shows the note with the chat beside it (`editorFor`: a chat tab moves to the side panel, the note's tab opens, and it waits for the editor to mount; `editorViewOf` is a shallow-reactive registry fed by the outline plugin in `useActiveEditorExtensions`), then runs `runEditorTool`. An insert without `after` into a note that wasn't open goes at its end. A proposal shows in the editor's preview and answers once accepted or rejected, and `sendAutomaticallyWhen` continues the reply. The preview is the editor assistant's: with only Chat on, `useAiEditorExtension` installs it on Chat's model with its own toolbar, slash items and shortcut off.
   - Closing a chat's tab (`closeChatTab`, `editorFor`) moves the route off it first: a route left on a closed tab falls back to SessionTab, which sends the window to the empty page.
@@ -249,7 +267,7 @@ calls `app/utils/chatClient.ts`.
 
 ### Git
 
-Git runs in Rust (`src-tauri/src/git.rs`), which spawns the installed `git`, so the user's config, credential helpers, SSH agent, hooks and LFS apply as in their terminal; the webview calls `app/utils/gitClient.ts` (types in `shared/types/app/git.d.ts`). Plan and phases: `Git Integration Plan.md` (#42).
+Git runs in Rust (`src-tauri/crates/tauri-plugin-vertex-git`), which spawns the installed `git`, so the user's config, credential helpers, SSH agent, hooks and LFS apply as in their terminal; the webview calls `app/utils/gitClient.ts` (types in `shared/types/app/git.d.ts`). Plan and phases: `Git Integration Plan.md` (#42).
 
 - Finding git (`find_git`, cached until it goes missing): `gitConfig.path` alone when set (global settings only, so a workspace can't choose the program), else on macOS `/opt/homebrew/bin/git` and `/usr/local/bin/git` (an app opened from Finder gets launchd's `PATH`), then `PATH`. `/usr/bin/git` on macOS counts only when `xcode-select -p` succeeds, since the stub opens the developer tools installer.
 - Every run: `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C` (English messages for `classify`), stdin closed, no console window on Windows. Commands run in the repository's top folder (`rev-parse --show-toplevel`; it may sit above the workspace) and paths are relative to it; paths go after `--` with `--literal-pathspecs`, and anything that isn't a plain relative path, or reaches into `.git`, is refused.

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-http-fetch"
+description = "Enables the http_fetch command without any pre-configured scope."
+commands.allow = ["http_fetch"]
+
+[[permission]]
+identifier = "deny-http-fetch"
+description = "Denies the http_fetch command without any pre-configured scope."
+commands.deny = ["http_fetch"]

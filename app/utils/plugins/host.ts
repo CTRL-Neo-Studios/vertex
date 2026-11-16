@@ -1,5 +1,5 @@
 import {effectScope, getCurrentScope, onScopeDispose, shallowReactive, type EffectScope} from 'vue'
-import type {ContributionPoints, PluginApis, PluginConfigAccess, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
+import type {ContributionPoints, HostServices, PluginApis, PluginConfigAccess, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
 import {parseRequirement, pluginWindows, type PluginManifest, type WindowKind} from '#shared/plugin/manifest'
 import {resolvePlugins, type OffReason} from '#shared/plugin/resolve'
 
@@ -15,6 +15,8 @@ export interface PluginHostOptions {
     contribute<P extends keyof ContributionPoints>(point: P, owner: string, def: ContributionPoints[P]): () => void
     /** A plugin's `ctx.config`: its settings in this window. */
     config(manifest: PluginManifest): PluginConfigAccess<Record<string, unknown>>
+    /** A plugin's `ctx.http`, `ctx.secrets` and `ctx.data`; `own` ties a listener to the current scope like a registration. */
+    services(id: string, own: (dispose: () => void) => void): HostServices
     /** A plugin failed to load or start, or one of its callbacks threw. */
     onFailed(manifest: PluginManifest, error: unknown): void
     /** A running plugin was turned off: the window starts over, as nothing guarantees a plugin can undo itself. */
@@ -110,6 +112,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
         return {
             plugin: {id, version: manifest.version, source},
             config: options.config(manifest),
+            ...options.services(id, own),
             window: {...options.window},
             commands: {
                 register: command => add('command', {...command, id: `${id}:${command.id}`, plugin: id}),

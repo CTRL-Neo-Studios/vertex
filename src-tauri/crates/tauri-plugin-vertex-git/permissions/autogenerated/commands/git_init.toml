@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-git-init"
+description = "Enables the git_init command without any pre-configured scope."
+commands.allow = ["git_init"]
+
+[[permission]]
+identifier = "deny-git-init"
+description = "Denies the git_init command without any pre-configured scope."
+commands.deny = ["git_init"]

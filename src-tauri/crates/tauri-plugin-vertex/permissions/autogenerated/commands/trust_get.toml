@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-trust-get"
+description = "Enables the trust_get command without any pre-configured scope."
+commands.allow = ["trust_get"]
+
+[[permission]]
+identifier = "deny-trust-get"
+description = "Denies the trust_get command without any pre-configured scope."
+commands.deny = ["trust_get"]

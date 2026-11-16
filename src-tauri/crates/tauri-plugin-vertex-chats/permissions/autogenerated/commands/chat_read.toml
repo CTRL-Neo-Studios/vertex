@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-read"
+description = "Enables the chat_read command without any pre-configured scope."
+commands.allow = ["chat_read"]
+
+[[permission]]
+identifier = "deny-chat-read"
+description = "Denies the chat_read command without any pre-configured scope."
+commands.deny = ["chat_read"]

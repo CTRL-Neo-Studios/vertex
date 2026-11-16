@@ -1,5 +1,5 @@
 import colors from 'tailwindcss/colors'
-import {invoke} from '@tauri-apps/api/core'
+import {vertexInvoke} from '~/utils/vertexInvoke'
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import type {AppThemeConfig} from "#shared/types/app/settings";
@@ -33,7 +33,7 @@ export function cssFontName(name: string) {
 // One scan per window; the Rust side caches across windows (src-tauri/src/fonts.rs).
 let systemFonts: Promise<FontFamily[]> | undefined
 export function loadSystemFonts() {
-    systemFonts ??= invoke<FontFamily[]>('system_fonts').catch((error) => {
+    systemFonts ??= vertexInvoke<FontFamily[]>('system_fonts').catch((error) => {
         console.error('[useAppTheme] could not list system fonts:', error)
         systemFonts = undefined
         return []

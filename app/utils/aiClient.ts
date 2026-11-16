@@ -1,7 +1,10 @@
-import {invoke, type Channel} from "@tauri-apps/api/core";
+import type {Channel} from "@tauri-apps/api/core";
+import {pluginInvoke} from "~/utils/vertexInvoke";
+
+const invoke = pluginInvoke('vertex-ai')
 
 /**
- * Thin client for the Rust AI commands (src-tauri). Provider API keys go in through `setKey` and never come
+ * Thin client for the Rust AI commands (the Tauri plugin `vertex-ai`). Provider API keys go in through `setKey` and never come
  * back out: Rust adds them to `request`s itself, and only for URLs on the provider's own `baseURL` origin.
  */
 export const AiCommand = {

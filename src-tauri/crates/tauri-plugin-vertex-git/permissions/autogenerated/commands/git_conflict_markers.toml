@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-git-conflict-markers"
+description = "Enables the git_conflict_markers command without any pre-configured scope."
+commands.allow = ["git_conflict_markers"]
+
+[[permission]]
+identifier = "deny-git-conflict-markers"
+description = "Denies the git_conflict_markers command without any pre-configured scope."
+commands.deny = ["git_conflict_markers"]

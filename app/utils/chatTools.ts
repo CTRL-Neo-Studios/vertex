@@ -11,7 +11,7 @@ export interface WorkspaceEntry {
 
 /** What the note tools reach in the workspace; `useChats` binds them to a session. */
 export interface NoteToolDeps {
-    /** Notes whose path or text matches (Rust `notes_search`). */
+    /** Notes whose path or text matches (Rust `search_notes`). */
     search: (query: string) => Promise<{ path: string, snippet: string | null }[]>
     /** A note's text by workspace-relative path (the open editor's buffer when it's mounted); `null` when there's none. */
     read: (path: string) => Promise<string | null>

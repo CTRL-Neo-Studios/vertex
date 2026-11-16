@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-folder-rename"
+description = "Enables the chat_folder_rename command without any pre-configured scope."
+commands.allow = ["chat_folder_rename"]
+
+[[permission]]
+identifier = "deny-chat-folder-rename"
+description = "Denies the chat_folder_rename command without any pre-configured scope."
+commands.deny = ["chat_folder_rename"]

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-ai-request-cancel"
+description = "Enables the ai_request_cancel command without any pre-configured scope."
+commands.allow = ["ai_request_cancel"]
+
+[[permission]]
+identifier = "deny-ai-request-cancel"
+description = "Denies the ai_request_cancel command without any pre-configured scope."
+commands.deny = ["ai_request_cancel"]

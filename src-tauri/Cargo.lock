@@ -6,16 +6,7 @@ version = 4
 name = "Vertex"
 version = "0.2.0-beta.7"
 dependencies = [
- "age",
- "arboard",
- "fontdb",
- "keyring",
  "log",
- "objc2-foundation",
- "rayon",
- "reqwest",
- "rustls",
- "serde",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -31,11 +22,12 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tauri-plugin-vertex",
+ "tauri-plugin-vertex-ai",
+ "tauri-plugin-vertex-chats",
+ "tauri-plugin-vertex-git",
  "tauri-plugin-window-state",
- "tokio",
- "trash",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -5951,6 +5943,67 @@ dependencies = [
  "url",
  "windows-sys 0.61.2",
  "zip",
+]
+
+[[package]]
+name = "tauri-plugin-vertex"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "fontdb",
+ "keyring",
+ "objc2-foundation",
+ "rayon",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tokio",
+ "trash",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "tauri-plugin-vertex-ai"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-vertex",
+ "tokio",
+]
+
+[[package]]
+name = "tauri-plugin-vertex-chats"
+version = "0.1.0"
+dependencies = [
+ "age",
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-vertex",
+ "uuid",
+]
+
+[[package]]
+name = "tauri-plugin-vertex-git"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-vertex",
+ "url",
+ "uuid",
 ]
 
 [[package]]

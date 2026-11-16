@@ -1,4 +1,4 @@
-import {invoke} from "@tauri-apps/api/core";
+import {vertexInvoke} from "~/utils/vertexInvoke";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import {fileNameFromPath, getFileExtensionFromPath, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -88,7 +88,7 @@ export function useChatAttach(session: ActiveSession | undefined, chatId: () => 
      * (image data without a file, such as a screenshot: saved as a pasted image).
      */
     async function fromPaste(images: File[]): Promise<string[]> {
-        const paths = await invoke<string[]>('clipboard_files_get')
+        const paths = await vertexInvoke<string[]>('clipboard_files_get')
         if (paths.length) {
             const inside = paths.flatMap(p => refOf(getFileByPath(p)?.uuid) ?? [])
             const outside = paths.filter(p => !getFileByPath(p))

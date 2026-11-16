@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-git-resolve"
+description = "Enables the git_resolve command without any pre-configured scope."
+commands.allow = ["git_resolve"]
+
+[[permission]]
+identifier = "deny-git-resolve"
+description = "Denies the git_resolve command without any pre-configured scope."
+commands.deny = ["git_resolve"]

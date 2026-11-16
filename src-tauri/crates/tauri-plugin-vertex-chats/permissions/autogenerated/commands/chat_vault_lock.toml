@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-vault-lock"
+description = "Enables the chat_vault_lock command without any pre-configured scope."
+commands.allow = ["chat_vault_lock"]
+
+[[permission]]
+identifier = "deny-chat-vault-lock"
+description = "Denies the chat_vault_lock command without any pre-configured scope."
+commands.deny = ["chat_vault_lock"]

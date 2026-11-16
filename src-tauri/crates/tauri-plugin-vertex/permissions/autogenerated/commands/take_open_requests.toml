@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-take-open-requests"
+description = "Enables the take_open_requests command without any pre-configured scope."
+commands.allow = ["take_open_requests"]
+
+[[permission]]
+identifier = "deny-take-open-requests"
+description = "Denies the take_open_requests command without any pre-configured scope."
+commands.deny = ["take_open_requests"]

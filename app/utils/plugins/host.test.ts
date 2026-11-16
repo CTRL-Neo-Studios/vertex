@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest'
 import {nextTick, ref, watch} from 'vue'
-import type {PluginContext, PluginDefinition, PluginEntry} from '#shared/plugin/api'
+import type {HostServices, PluginContext, PluginDefinition, PluginEntry} from '#shared/plugin/api'
 import type {PluginManifest} from '#shared/plugin/manifest'
 import {createPluginHost} from './host'
 
@@ -34,6 +34,7 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
     const host = createPluginHost(entries, {
         window: {kind: 'session', label: 'session-s1'},
         config: () => ({value: {}, set: async () => {}, overridden: () => false}),
+        services: () => ({}) as HostServices,
         contribute(point, owner, def) {
             // Commands by their id; other points by `point:owner`, enough to see them come and go.
             const key = point === 'command' ? (def as {id: string}).id : `${point}:${owner}`

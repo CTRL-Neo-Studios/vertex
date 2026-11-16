@@ -1,5 +1,5 @@
 import {copyFile, exists, mkdir, readDir, readTextFile, rename, stat, writeFile, writeTextFile} from "@tauri-apps/plugin-fs"
-import {invoke} from "@tauri-apps/api/core"
+import {vertexInvoke} from "~/utils/vertexInvoke"
 import {dirname, join} from "@tauri-apps/api/path"
 import {linkExtractorFor, useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
@@ -59,7 +59,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             const path = await join(dir, freeName(file.fileName, (await readDir(dir)).map(e => e.name), file.isFolder))
             await rename(file.fullPath, path)
             item = {original: file.fullPath, trashed: path, deletedAt: Math.floor(Date.now() / 1000), workspace: true, nodes: []}
-        } else item = {...await invoke<Omit<Trashed, 'nodes'>>('trash_item', {path: file.fullPath}), nodes: []}
+        } else item = {...await vertexInvoke<Omit<Trashed, 'nodes'>>('trash_item', {path: file.fullPath}), nodes: []}
         const removed = removeFileFromIndex(file.fullPath)
         // The route leaves a shown tab first; left on it, the page kept showing the gone note in a plain editor.
         for (const node of removed) await $tabs.closeTabElsewhere(node.uuid)
@@ -73,7 +73,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         if (item.workspace) {
             if (await exists(item.original) || !item.trashed || !await exists(item.trashed)) return false
             await rename(item.trashed, item.original)
-        } else await invoke('trash_restore', {item: {original: item.original, trashed: item.trashed, deletedAt: item.deletedAt}})
+        } else await vertexInvoke('trash_restore', {item: {original: item.original, trashed: item.trashed, deletedAt: item.deletedAt}})
         for (const node of item.nodes) await addFileToIndex(node.path, session!.rootPath!, node.uuid)
     }
 

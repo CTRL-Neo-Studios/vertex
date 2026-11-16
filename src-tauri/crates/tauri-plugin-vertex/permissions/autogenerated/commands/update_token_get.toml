@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-update-token-get"
+description = "Enables the update_token_get command without any pre-configured scope."
+commands.allow = ["update_token_get"]
+
+[[permission]]
+identifier = "deny-update-token-get"
+description = "Denies the update_token_get command without any pre-configured scope."
+commands.deny = ["update_token_get"]

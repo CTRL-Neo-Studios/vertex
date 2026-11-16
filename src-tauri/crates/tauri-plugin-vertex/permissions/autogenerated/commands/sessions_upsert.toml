@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-sessions-upsert"
+description = "Enables the sessions_upsert command without any pre-configured scope."
+commands.allow = ["sessions_upsert"]
+
+[[permission]]
+identifier = "deny-sessions-upsert"
+description = "Denies the sessions_upsert command without any pre-configured scope."
+commands.deny = ["sessions_upsert"]

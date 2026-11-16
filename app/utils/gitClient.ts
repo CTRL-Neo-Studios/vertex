@@ -1,8 +1,10 @@
-import {invoke} from "@tauri-apps/api/core";
 import type {GitBranch, GitChange, GitCommit, GitIdentity, GitRemote, GitStatus, GitToken, GitVersion} from "#shared/types/app/git";
+import {pluginInvoke} from "~/utils/vertexInvoke";
+
+const invoke = pluginInvoke('vertex-git')
 
 /**
- * Thin client for the git backend (src-tauri/src/git.rs), which runs the installed `git`. `root` is the workspace
+ * Thin client for the git backend (the Tauri plugin `vertex-git`), which runs the installed `git`. `root` is the workspace
  * root; paths are relative to the repository's top folder (`GitStatus.top`). Changing commands wait for each
  * other per repository; reads don't.
  */

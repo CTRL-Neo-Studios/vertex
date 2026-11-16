@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-folders-set"
+description = "Enables the chat_folders_set command without any pre-configured scope."
+commands.allow = ["chat_folders_set"]
+
+[[permission]]
+identifier = "deny-chat-folders-set"
+description = "Denies the chat_folders_set command without any pre-configured scope."
+commands.deny = ["chat_folders_set"]

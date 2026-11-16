@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-workspace-settings-update"
+description = "Enables the workspace_settings_update command without any pre-configured scope."
+commands.allow = ["workspace_settings_update"]
+
+[[permission]]
+identifier = "deny-workspace-settings-update"
+description = "Denies the workspace_settings_update command without any pre-configured scope."
+commands.deny = ["workspace_settings_update"]

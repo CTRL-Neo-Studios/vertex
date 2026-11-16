@@ -1,4 +1,4 @@
-import {invoke} from "@tauri-apps/api/core";
+import {vertexInvoke as invoke} from "~/utils/vertexInvoke";
 import {emit, listen, type UnlistenFn} from "@tauri-apps/api/event";
 import type {AppSession} from "#shared/types/app/sessions";
 import type {AppSettings} from "#shared/types/app/settings";
@@ -6,7 +6,7 @@ import type {TrustRecords} from "#shared/utils/trust";
 import type {DeepPartial} from "#shared/types/types";
 
 /**
- * Thin, lifecycle-free client for the Rust single-writer state (src-tauri/src/state.rs).
+ * Thin, lifecycle-free client for the Rust single-writer state (the kernel plugin `vertex`, `state.rs`).
  * Safe to call from plugins, callbacks and composables alike. Names mirror the Rust commands/events.
  */
 export const StateCommand = {

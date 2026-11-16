@@ -1,4 +1,4 @@
-import {invoke} from '@tauri-apps/api/core'
+import {vertexInvoke} from '~/utils/vertexInvoke'
 import {check} from '@tauri-apps/plugin-updater'
 import {relaunch} from '@tauri-apps/plugin-process'
 import {ask} from '@tauri-apps/plugin-dialog'
@@ -12,11 +12,11 @@ export interface UpdateChannel {
 
 /** The channel token lives in the OS credential store; these Rust commands (src-tauri/src/updater.rs) own it. */
 export const updaterClient = {
-    getToken: () => invoke<string | null>('update_token_get'),
+    getToken: () => vertexInvoke<string | null>('update_token_get'),
     /** Empty string removes the token. */
-    setToken: (token: string) => invoke('update_token_set', {token}),
+    setToken: (token: string) => vertexInvoke('update_token_set', {token}),
     /** Public channels plus the restricted ones the saved token grants. */
-    listChannels: () => invoke<UpdateChannel[]>('update_channels'),
+    listChannels: () => vertexInvoke<UpdateChannel[]>('update_channels'),
 }
 
 /**

@@ -1,8 +1,10 @@
-import {invoke} from "@tauri-apps/api/core";
 import type {ChatFile, ChatHit, ChatIndex, ChatStorage, ChatVaultState} from "#shared/types/app/chats";
+import {pluginInvoke} from "~/utils/vertexInvoke";
+
+const invoke = pluginInvoke('vertex-chats')
 
 /**
- * Thin client for the Rust chat store (src-tauri/src/chats.rs). Rust owns the files, the encryption and the
+ * Thin client for the Rust chat store (the Tauri plugin `vertex-chats`). Rust owns the files, the encryption and the
  * workspace's id (`.vertex/workspace.json`); the unlocked key never leaves Rust. `root` is the workspace root.
  */
 export const ChatCommand = {

@@ -1,6 +1,6 @@
 import type {Extension} from "@codemirror/state";
 import {dropCursor, EditorView} from "@codemirror/view";
-import {invoke} from "@tauri-apps/api/core";
+import {vertexInvoke} from "~/utils/vertexInvoke";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
 import {fileNameFromPath, isImage} from "#shared/utils/fs/filenames";
@@ -74,7 +74,7 @@ export function useEditorFileDrops(session: ActiveSession | undefined): Extensio
     }
 
     async function fromPaste(images: File[]) {
-        const paths = await invoke<string[]>('clipboard_files_get')
+        const paths = await vertexInvoke<string[]>('clipboard_files_get')
         if (!paths.length) return bringIn(images.map(file => pastedImage(file)))
         const outside = paths.filter(p => !getFileByPath(p))
         return [...paths.flatMap(p => getFileByPath(p)?.uuid ?? []), ...outside.length ? await bringIn(await outsideItemsAt(outside)) : []]

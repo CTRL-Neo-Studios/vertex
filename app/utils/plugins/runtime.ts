@@ -18,6 +18,7 @@ import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import useQuickToasts from '~/composables/utility/useQuickToasts'
 import {createPluginHost, type PluginHost} from '~/utils/plugins/host'
+import {hostServices} from '~/utils/plugins/services'
 
 /** One host per window: each window is its own JavaScript realm. */
 let host: PluginHost | undefined
@@ -117,6 +118,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
                 overridden: path => !!workspace() && scope.overridden(at(path)),
             }
         },
+        services: (id, own) => hostServices(id, workspace(), own),
         onFailed(manifest, error) {
             console.error(`[plugins] ${manifest.id} failed:`, error)
             toasts.error(t('app.plugins.failed', {name: manifest.name}), error instanceof Error ? error.message : String(error))

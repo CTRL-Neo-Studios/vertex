@@ -2,7 +2,7 @@ import {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls} from "ai";
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {CompileError} from "@type32/workflows/core";
-import {invoke} from "@tauri-apps/api/core";
+import {vertexInvoke} from "~/utils/vertexInvoke";
 import {readFile} from "@tauri-apps/plugin-fs";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveTab} from "#shared/types/active/tabs";
@@ -251,7 +251,7 @@ export function useChats(session?: ActiveSession) {
         const files = $index.getFilteredFiles(f => !f.isFolder && !isImage(f.fileExt) && attached.has(f.relativePath))
         if (files.length === 0) return notes
         const relative = new Map(files.map(f => [f.fullPath, f.relativePath]))
-        const read = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [...relative.keys()]})
+        const read = await vertexInvoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [...relative.keys()]})
         for (const r of read) {
             const path = relative.get(r.path)
             if (path && r.content !== undefined) notes.push({path, content: r.content})
@@ -314,7 +314,7 @@ export function useChats(session?: ActiveSession) {
         if (!file) return null
         const view = editorViewOf(session, file.uuid)
         if (view) return view.state.doc.toString()
-        const [read] = await invoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [file.fullPath]})
+        const [read] = await vertexInvoke<{path: string, content?: string}[]>('read_text_files_batch', {paths: [file.fullPath]})
         return read?.content ?? null
     }
 
@@ -583,7 +583,7 @@ export function useChats(session?: ActiveSession) {
         const list = (folder: string) => noteFiles().map(f => slashed(f.relativePath)).filter(p => !folder || p.startsWith(`${folder}/`)).sort()
         const read = mode === 'write' ? (path: string) => readStaged(entry, path) : readNote
         const tools = toolsOn ? chatTools({
-            search: query => invoke('notes_search', {root: requireRoot(), query}),
+            search: query => vertexInvoke('search_notes', {root: requireRoot(), query}),
             read,
             openNote: () => {
                 const shown = editTarget()

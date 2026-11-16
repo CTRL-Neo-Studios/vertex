@@ -1,144 +1,12 @@
-mod ai;
-mod chats;
-mod fonts;
-mod git;
-mod notes;
-mod state;
-mod trash;
-mod updater;
-mod web;
+//! The app: builds the plugins (the kernel `tauri-plugin-vertex`, the feature plugins, third-party ones), keeps the
+//! windows' lifecycle and hands files the OS asks it to open to the kernel. Every command lives in a plugin.
 
-use rayon::prelude::*;
-use state::AppState;
-use std::fs;
-use std::path::Path;
 use tauri::{Listener, Manager, WebviewWindow};
 use tauri_plugin_decorum::WebviewWindowExt;
+use tauri_plugin_vertex::api::{self, SESSION_WINDOW_PREFIX};
 use url::Url;
 
 const MAIN_WINDOW: &str = "main";
-const SESSION_WINDOW_PREFIX: &str = "session-";
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct FileReadResult {
-    path: String,
-    content: Option<String>,
-    error: Option<String>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct DirectoryEntry {
-    path: String,
-    name: String,
-    is_directory: bool,
-    size: u64,
-    created: Option<i64>,  // Unix timestamp in milliseconds
-    modified: Option<i64>, // Unix timestamp in milliseconds
-    children: Vec<String>, // Paths of direct children
-}
-
-/// Reads multiple text files in parallel using Rust's native I/O and rayon for parallelism.
-/// This is much faster than calling readTextFile multiple times from the frontend
-/// because it reduces IPC overhead and uses efficient native I/O.
-#[tauri::command]
-fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
-    paths
-        .par_iter()
-        .map(|path| match fs::read_to_string(path) {
-            Ok(content) => FileReadResult {
-                path: path.clone(),
-                content: Some(content),
-                error: None,
-            },
-            Err(e) => FileReadResult {
-                path: path.clone(),
-                content: None,
-                error: Some(e.to_string()),
-            },
-        })
-        .collect()
-}
-
-/// Recursively scans a directory tree and returns all entries with metadata.
-/// This is much faster than doing recursive readDir calls from JavaScript
-/// because it eliminates all the IPC overhead and does the entire traversal in native code.
-#[tauri::command]
-fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, String> {
-    let mut entries = Vec::new();
-    let mut properties_files = Vec::new();
-
-    fn scan_dir(
-        path: &Path,
-        entries: &mut Vec<DirectoryEntry>,
-        properties_files: &mut Vec<String>,
-    ) -> Result<Vec<String>, String> {
-        let dir_entries = fs::read_dir(path)
-            .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?;
-
-        let mut children = Vec::new();
-
-        for entry in dir_entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let entry_path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-
-            // Skip hidden files (starting with .)
-            if name.starts_with('.') {
-                continue;
-            }
-
-            let metadata = fs::metadata(&entry_path).map_err(|e| {
-                format!("Failed to get metadata for {}: {}", entry_path.display(), e)
-            })?;
-
-            let is_directory = metadata.is_dir();
-            let size = metadata.len();
-
-            let created = metadata
-                .created()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64);
-
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64);
-
-            let path_str = entry_path.to_string_lossy().to_string();
-            children.push(path_str.clone());
-
-            // Track properties files
-            if !is_directory && (name == "properties.yml" || name == "properties.yaml") {
-                properties_files.push(path_str.clone());
-            }
-
-            let child_children = if is_directory {
-                scan_dir(&entry_path, entries, properties_files)?
-            } else {
-                Vec::new()
-            };
-
-            entries.push(DirectoryEntry {
-                path: path_str,
-                name,
-                is_directory,
-                size,
-                created,
-                modified,
-                children: child_children,
-            });
-        }
-
-        // Sort children for consistent ordering
-        children.sort();
-        Ok(children)
-    }
-
-    scan_dir(Path::new(&root_path), &mut entries, &mut properties_files)?;
-    Ok(entries)
-}
 
 fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(main) = app.get_webview_window(MAIN_WINDOW) {
@@ -164,70 +32,15 @@ fn sync_main_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>, closing: O
     }
 }
 
-/// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
-/// holds no files or can't be read.
-#[tauri::command]
-fn clipboard_files_get() -> Vec<String> {
-    arboard::Clipboard::new()
-        .and_then(|mut clipboard| clipboard.get().file_list())
-        .map(|list| list.into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
-        .unwrap_or_default()
-}
-
-/// Puts files on the system clipboard, as Finder's or Explorer's Copy does: they paste there, and into Vertex.
-#[tauri::command]
-fn clipboard_files_set(paths: Vec<String>) -> Result<(), String> {
-    arboard::Clipboard::new()
-        .and_then(|mut clipboard| clipboard.set().file_list(&paths))
-        .map_err(|e| e.to_string())
-}
-
-/// Quits the app after every session window has flushed its pending session write.
-/// Each window answers `vertex://flush-requested` by awaiting its last write and calling `flush_done`.
-/// The timeout only guards against a hung webview; normal flushes finish in milliseconds.
-#[tauri::command]
-async fn quit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
-    use std::sync::{Arc, Mutex};
-    use tauri::{Emitter, Listener};
-
-    app.state::<AppState>().set_quitting();
-    let pending: std::collections::HashSet<String> = app
-        .webview_windows()
-        .into_keys()
-        .filter(|l| l.starts_with(SESSION_WINDOW_PREFIX))
-        .collect();
-    if !pending.is_empty() {
-        let pending = Arc::new(Mutex::new(pending));
-        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-        let tx = Arc::new(Mutex::new(Some(tx)));
-        let id = {
-            let (pending, tx) = (pending.clone(), tx.clone());
-            app.listen_any(state::EVENT_FLUSH_DONE, move |event| {
-                let label = event.payload().trim_matches('"').to_owned();
-                let mut p = pending.lock().unwrap();
-                p.remove(&label);
-                if p.is_empty() {
-                    if let Some(tx) = tx.lock().unwrap().take() {
-                        let _ = tx.send(());
-                    }
-                }
-            })
-        };
-        let _ = app.emit(state::EVENT_FLUSH_REQUESTED, ());
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(3), rx).await;
-        app.unlisten(id);
-    }
-    app.exit(0);
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The kernel first: the feature plugins use its API when they're set up.
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(AppState::default())
-        .manage(ai::AiRequests::default())
-        .manage(chats::ChatVaults::default())
-        .manage(git::Git::default())
+        .plugin(tauri_plugin_vertex::init())
+        .plugin(tauri_plugin_vertex_ai::init())
+        .plugin(tauri_plugin_vertex_chats::init())
+        .plugin(tauri_plugin_vertex_git::init())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -235,7 +48,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Second launch (Windows/Linux file association, or user re-opening the app).
             match parse_file_path_from_args(&args) {
-                Some(path) => app.state::<AppState>().push_open_request(app, path),
+                Some(path) => api::push_open_request(app, path),
                 None => show_main_window(app),
             }
         }));
@@ -253,88 +66,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_decorum::init())
-        .invoke_handler(tauri::generate_handler![
-            read_text_files_batch,
-            scan_directory_recursive,
-            state::sessions_list,
-            state::sessions_upsert,
-            state::sessions_remove,
-            state::settings_get,
-            state::settings_set,
-            state::trust_get,
-            state::trust_set,
-            state::trust_clear,
-            state::trust_move,
-            state::trust_follow_edit,
-            state::trust_pin,
-            state::workspace_settings_get,
-            state::workspace_settings_update,
-            state::workspace_settings_reload,
-            state::take_open_requests,
-            quit_app,
-            clipboard_files_get,
-            clipboard_files_set,
-            trash::trash_item,
-            trash::trash_restore,
-            updater::update_token_get,
-            updater::update_token_set,
-            updater::update_channels,
-            fonts::system_fonts,
-            ai::ai_key_set,
-            ai::ai_key_has,
-            ai::ai_request,
-            ai::ai_request_cancel,
-            ai::ai_model_catalog,
-            web::web_fetch,
-            chats::chat_vault_state,
-            chats::chat_vault_create,
-            chats::chat_vault_unlock,
-            chats::chat_vault_lock,
-            chats::chat_vault_change,
-            notes::notes_search,
-            chats::chat_index,
-            chats::chat_read,
-            chats::chat_write,
-            chats::chat_delete,
-            chats::chat_folders_set,
-            chats::chat_folder_rename,
-            chats::chat_folder_delete,
-            chats::chat_search,
-            git::git_version,
-            git::git_status,
-            git::git_log,
-            git::git_commit_files,
-            git::git_diff,
-            git::git_show_file,
-            git::git_stage,
-            git::git_unstage,
-            git::git_discard,
-            git::git_commit,
-            git::git_fetch,
-            git::git_pull,
-            git::git_push,
-            git::git_branches,
-            git::git_switch,
-            git::git_remotes,
-            git::git_remote_set,
-            git::git_merge_abort,
-            git::git_init,
-            git::git_clone,
-            git::git_tokens,
-            git::git_token_set,
-            git::git_identity,
-            git::git_identity_set,
-            git::git_install_tools,
-            git::git_resolve,
-            git::git_conflict_markers,
-            git::git_merge_continue,
-        ])
         .setup(|app| {
             let main_window = app.get_webview_window(MAIN_WINDOW).unwrap();
             apply_decorum_style(&main_window);
 
             // trust.json exists from launch (and old settings migrate then), not only once a window reads it.
-            if let Err(e) = app.state::<AppState>().ensure_trust(app.handle()) {
+            if let Err(e) = api::ensure_trust(app.handle()) {
                 eprintln!("[state] could not create trust.json: {e}");
             }
 
@@ -343,8 +80,7 @@ pub fn run() {
             {
                 let args: Vec<String> = std::env::args().collect();
                 if let Some(path) = parse_file_path_from_args(&args) {
-                    app.state::<AppState>()
-                        .push_open_request(app.handle(), path);
+                    api::push_open_request(app.handle(), path);
                 }
             }
 
@@ -356,7 +92,7 @@ pub fn run() {
                         apply_decorum_style(&win);
                     }
                     sync_main_visibility(&app_handle, None);
-                    app_handle.state::<AppState>().session_window(&app_handle, uuid, true);
+                    api::session_window(&app_handle, uuid, true);
                 }
             });
 
@@ -373,7 +109,7 @@ pub fn run() {
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(uuid) = window.label().strip_prefix(SESSION_WINDOW_PREFIX) {
                     sync_main_visibility(window.app_handle(), Some(window.label()));
-                    window.app_handle().state::<AppState>().session_window(window.app_handle(), uuid, false);
+                    api::session_window(window.app_handle(), uuid, false);
                 }
             }
         })
@@ -382,14 +118,13 @@ pub fn run() {
         .run(|_app_handle, _event| {
             // Quitting by any route (menu, Dock, ⌘Q, shutdown): windows destroyed from now on stay `open`, for recovery.
             if let tauri::RunEvent::ExitRequested { .. } = _event {
-                _app_handle.state::<AppState>().set_quitting();
+                api::set_quitting(_app_handle);
             }
             // macOS delivers file associations (cold and warm) as RunEvent::Opened, possibly several at once.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = _event {
-                let state = _app_handle.state::<AppState>();
                 for path in urls.iter().filter_map(|u| u.to_file_path().ok()) {
-                    state.push_open_request(_app_handle, path.to_string_lossy().into_owned());
+                    api::push_open_request(_app_handle, path.to_string_lossy().into_owned());
                 }
             }
         });

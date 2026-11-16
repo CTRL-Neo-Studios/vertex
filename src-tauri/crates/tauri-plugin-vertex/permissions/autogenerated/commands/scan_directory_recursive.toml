@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-scan-directory-recursive"
+description = "Enables the scan_directory_recursive command without any pre-configured scope."
+commands.allow = ["scan_directory_recursive"]
+
+[[permission]]
+identifier = "deny-scan-directory-recursive"
+description = "Denies the scan_directory_recursive command without any pre-configured scope."
+commands.deny = ["scan_directory_recursive"]

@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-vertex-chats"
+version = "0.1.0"
+description = "Vertex's AI chat store, plain or age-encrypted in the workspace."
+authors = ["Type-32"]
+edition = "2021"
+rust-version = "1.90"
+publish = false
+links = "tauri-plugin-vertex-chats"
+
+[build-dependencies]
+tauri-plugin = { version = "2.7.2", features = ["build"] }
+
+[dependencies]
+tauri = "2.12.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri-plugin-vertex = { path = "../tauri-plugin-vertex" }
+age = "0.12.1"
+log = "0.4"
+uuid = { version = "1.29.0", features = ["v4"] }
