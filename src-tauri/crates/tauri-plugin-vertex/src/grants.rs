@@ -6,13 +6,16 @@
 //! off keeps its grants until the app restarts ([`plugins_waiting_restart`]).
 
 use crate::api::SESSION_WINDOW_PREFIX;
+use crate::reach::Entry;
 use crate::state::AppState;
 use crate::windows::{ABOUT_WINDOW, MAIN_WINDOW, SETTINGS_WINDOW};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{LazyLock, Mutex, PoisonError};
 use tauri::ipc::CapabilityBuilder;
+use tauri::scope::fs::Pattern;
 use tauri::{AppHandle, Manager, Runtime};
 
 /// The kinds of window, each with its own grant.
@@ -65,6 +68,20 @@ fn on() -> bool {
 impl PluginManifest {
     pub fn parse(json: &str) -> Result<Self, String> {
         serde_json::from_str(json).map_err(|e| format!("a plugin.json: {e}"))
+    }
+
+    /// A `plugin.json`, or a list of them (`app/builtins/plugins.json`).
+    pub fn parse_all(json: &str) -> Result<Vec<Self>, String> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum OneOrMany {
+            One(PluginManifest),
+            Many(Vec<PluginManifest>),
+        }
+        match serde_json::from_str(json).map_err(|e| format!("a plugin manifest: {e}"))? {
+            OneOrMany::One(manifest) => Ok(vec![manifest]),
+            OneOrMany::Many(manifests) => Ok(manifests),
+        }
     }
 }
 
@@ -141,12 +158,16 @@ const SHARED: &[&str] = &[
     "core:webview:allow-webview-hide",
     "core:webview:allow-webview-show",
     "decorum:allow-show-snap-overlay",
-    "dialog:default",
+    // `ask` too (it's the `message` command); Open and Save are the kernel's (`dialogs.rs`), whose picks join one
+    // window's reach only.
+    "dialog:allow-message",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-write-image",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-read-image",
-    "opener:default",
+    // Not `opener:default`: its `allow-reveal-item-in-dir` would be unscoped. Paths are the session windows' (below).
+    "opener:allow-open-url",
+    "opener:allow-default-urls",
     "os:default",
     "process:default",
     "notification:default",
@@ -158,20 +179,49 @@ const SHARED: &[&str] = &[
     "fs:deny-webview-data-windows",
 ];
 
-/// What the file commands reach. `**/*` doesn't match a dot path (Tauri wants a literal leading dot on Unix), so the
-/// app's own dot folders are named.
-const READ: &[&str] = &["**/*", "**/.trash", "**/.trash/**", "**/.vertex/types.json", "**/.obsidian/types.json"];
-const WRITE: &[&str] = &["**/*", "**/.vertex", "**/.vertex/**", "**/.trash", "**/.trash/**"];
+/// Under a folder, as glob tails: reads with the app's own dot folders and writes (`**` doesn't match a dot path, as
+/// Tauri wants a literal leading dot on Unix).
+const READ: &[&str] = &["**", "**/.trash", "**/.trash/**", "**/.vertex/types.json", "**/.obsidian/types.json"];
+const WRITE: &[&str] = &["**", "**/.vertex", "**/.vertex/**", "**/.trash", "**/.trash/**"];
 
-/// File access, scoped on each command and so on this window only. Never a global `fs:scope`: Tauri merges those
-/// across every window, whoever was granted them.
-const SCOPED: &[(&str, &[&str])] = &[
-    ("fs:read-all", READ),
-    ("fs:write-all", WRITE),
-    ("fs:allow-exists", WRITE),
-    ("opener:allow-open-path", &["**/*"]),
-    ("opener:allow-reveal-item-in-dir", &["**/*"]),
-];
+/// Every window but About may see whether any path exists, its size and dates (recents, recovery, the open, new and
+/// clone flows): never its content.
+const METADATA: &[&str] = &["fs:allow-exists", "fs:allow-stat"];
+
+/// `tail`'s `/`s as the platform's separator, after `prefix` (an escaped path, or `""` for anywhere).
+fn under(prefix: &str, tail: &str) -> String {
+    let tail = tail.replace('/', std::path::MAIN_SEPARATOR_STR);
+    if prefix.is_empty() {
+        tail
+    } else {
+        format!("{prefix}{}{tail}", std::path::MAIN_SEPARATOR)
+    }
+}
+
+/// The file and opener permissions under `root` (an escaped path, `""` for anywhere), recursive with the dot folders or
+/// only what's directly in it. Never a global `fs:scope`: Tauri merges those across every window.
+fn file_scopes(root: &str, recursive: bool) -> Vec<(&'static str, Vec<String>)> {
+    let (read, write) = if recursive { (READ, WRITE) } else { (&["*"][..], &["*"][..]) };
+    let mut read: Vec<String> = read.iter().map(|t| under(root, t)).collect();
+    let write: Vec<String> = write.iter().map(|t| under(root, t)).collect();
+    if !root.is_empty() {
+        // The folder itself: listing and watching it.
+        read.push(root.to_owned());
+    }
+    vec![
+        ("fs:read-all", read.clone()),
+        ("fs:write-all", write.clone()),
+        // The dot folders' existence (`read-all`'s `exists` covers the rest).
+        ("fs:allow-exists", write),
+        // Reveal in Finder is the kernel's `reveal_paths`: the opener's command checks no scope.
+        ("opener:allow-open-path", read),
+    ]
+}
+
+fn scoped(capability: CapabilityBuilder, permission: &str, paths: &[String]) -> CapabilityBuilder {
+    let allow = paths.iter().map(|path| serde_json::json!({ "path": path })).collect();
+    capability.permission_scoped(permission, allow, Vec::new())
+}
 
 /// The kernel's own commands, per kind: what the kernel and the built-ins call in each. A plugin gets `http_fetch` and
 /// the secret commands through its `network` and `secrets`.
@@ -180,6 +230,8 @@ const KERNEL: Grants = &[
         WindowKind::Main,
         &[
             "vertex:allow-window-open",
+            "vertex:allow-dialog-open",
+            "vertex:allow-dialog-save",
             "vertex:allow-sessions-list",
             "vertex:allow-sessions-upsert",
             "vertex:allow-sessions-remove",
@@ -196,6 +248,8 @@ const KERNEL: Grants = &[
         WindowKind::Session,
         &[
             "vertex:allow-window-open",
+            "vertex:allow-dialog-open",
+            "vertex:allow-dialog-save",
             "vertex:allow-sessions-list",
             "vertex:allow-sessions-upsert",
             "vertex:allow-sessions-remove",
@@ -214,11 +268,10 @@ const KERNEL: Grants = &[
             "vertex:allow-scan-directory-recursive",
             "vertex:allow-clipboard-files-get",
             "vertex:allow-clipboard-files-set",
+            "vertex:allow-reveal-paths",
             "vertex:allow-trash-item",
             "vertex:allow-trash-restore",
             "vertex:allow-update-token-get",
-            // The chat built-in's web fetch tool (`webPage.ts`); X8 moves it to chat's manifest as `network`.
-            "vertex:allow-http-fetch",
             "vertex:allow-search-notes",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
@@ -228,6 +281,7 @@ const KERNEL: Grants = &[
         WindowKind::Settings,
         &[
             "vertex:allow-window-open",
+            "vertex:allow-dialog-open",
             "vertex:allow-sessions-list",
             "vertex:allow-settings-get",
             "vertex:allow-settings-set",
@@ -282,26 +336,19 @@ pub fn plugin_on(manifest: &PluginManifest, kind: WindowKind, global: &Value, wo
     global.pointer(&pointer).and_then(Value::as_bool).unwrap_or(manifest.enabled_by_default)
 }
 
-/// The plugins on in a window: those of `catalog` [`plugin_on`] says are, and every crate's plugin without a manifest
-/// (a built-in, not extracted yet, so always on).
-pub fn plugins_on(kind: WindowKind, catalog: &[PluginManifest], crates: &[(&str, Grants)], global: &Value, workspace: Option<(&Value, bool)>) -> BTreeSet<String> {
-    let builtins = crates.iter().map(|(id, _)| *id).filter(|id| !catalog.iter().any(|m| m.id == *id));
-    catalog
-        .iter()
-        .filter(|m| plugin_on(m, kind, global, workspace))
-        .map(|m| m.id.as_str())
-        .chain(builtins)
-        .map(str::to_owned)
-        .collect()
+/// The plugins of `catalog` on in a window ([`plugin_on`]).
+pub fn plugins_on(kind: WindowKind, catalog: &[PluginManifest], global: &Value, workspace: Option<(&Value, bool)>) -> BTreeSet<String> {
+    catalog.iter().filter(|m| plugin_on(m, kind, global, workspace)).map(|m| m.id.clone()).collect()
 }
 
-/// What a window's grants are made of: its kind's base (when `base`), and one capability per plugin in `plugins` with
-/// anything to grant. Tauri panics on an identifier it doesn't know, so the app crate's test resolves these against the
-/// real ACL; a permission name outside the table is an error here.
+/// What a window's grants are made of: its kind's base (when `base`; a session window's files under `root`), and one
+/// capability per plugin in `plugins` with anything to grant. Tauri panics on an identifier it doesn't know, so the app
+/// crate's test resolves these against the real ACL; a permission name outside the table is an error here.
 pub fn capabilities<'a>(
     label: &str,
     kind: WindowKind,
     base: bool,
+    root: Option<&Entry>,
     plugins: impl IntoIterator<Item = &'a str>,
     catalog: &[PluginManifest],
     crates: &[(&str, Grants)],
@@ -312,9 +359,15 @@ pub fn capabilities<'a>(
         for permission in SHARED {
             capability = capability.permission(*permission);
         }
-        for (permission, paths) in SCOPED {
-            let allow = paths.iter().map(|path| serde_json::json!({ "path": path })).collect();
-            capability = capability.permission_scoped(*permission, allow, Vec::new());
+        if kind != WindowKind::About {
+            for permission in METADATA {
+                capability = scoped(capability, permission, &["**".to_owned()]);
+            }
+        }
+        if let Some(root) = root {
+            for (permission, paths) in file_scopes(&Pattern::escape(&root.path.to_string_lossy()), root.recursive) {
+                capability = scoped(capability, permission, &paths);
+            }
         }
         for (_, permissions) in KERNEL.iter().filter(|(k, _)| *k == kind) {
             for permission in *permissions {
@@ -324,21 +377,60 @@ pub fn capabilities<'a>(
         out.push(capability);
     }
     for plugin in plugins {
-        let mut permissions = Vec::new();
+        let mut capability = CapabilityBuilder::new(format!("window-{label}-plugin-{plugin}")).window(label);
+        let mut any = false;
         for name in catalog.iter().filter(|m| m.id == plugin).flat_map(|m| &m.permissions) {
             let granted = PERMISSION_TABLE.get(name).ok_or_else(|| format!("plugin {plugin:?} asks for an unknown permission {name:?}"))?;
-            permissions.extend(granted.iter().cloned());
+            for permission in granted {
+                capability = capability.permission(permission.clone());
+                any = true;
+            }
+            if name == "files-outside-workspace" {
+                // The files every window reached before W4.
+                for (permission, paths) in file_scopes("", true) {
+                    capability = scoped(capability, permission, &paths);
+                }
+                any = true;
+            }
         }
         for (_, commands) in crates.iter().filter(|(id, _)| *id == plugin).flat_map(|(_, grants)| grants.iter()).filter(|(k, _)| *k == kind) {
-            permissions.extend(commands.iter().map(|c| c.to_string()));
+            for command in *commands {
+                capability = capability.permission(*command);
+                any = true;
+            }
         }
-        if permissions.is_empty() {
-            continue;
+        if any {
+            out.push(capability);
         }
-        let capability = permissions.into_iter().fold(CapabilityBuilder::new(format!("window-{label}-plugin-{plugin}")).window(label), |c, p| c.permission(p));
-        out.push(capability);
     }
     Ok(out)
+}
+
+/// What a window may do with files it reaches outside its root.
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum Files {
+    /// Picked in an Open dialog.
+    Read,
+    /// On the clipboard: read, and copied from (`copy_file` checks its source against its own scope).
+    Paste,
+    /// Picked in a Save dialog.
+    Write,
+}
+
+/// Lets the window `label` reach `path` and what's under it, for `files`.
+pub(crate) fn grant_files<R: Runtime>(app: &AppHandle<R>, label: &str, path: &str, files: Files) -> Result<(), String> {
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    crate::reach::add(app, label, path, files != Files::Paste);
+    let at = Pattern::escape(&crate::reach::canonical(std::path::Path::new(path)).to_string_lossy());
+    let paths = [at.clone(), under(&at, "**")];
+    let id = NEXT.fetch_add(1, Ordering::Relaxed);
+    let mut capability = scoped(CapabilityBuilder::new(format!("window-{label}-files-{id}")).window(label), "fs:read-all", &paths);
+    match files {
+        Files::Read => {}
+        Files::Paste => capability = scoped(capability, "fs:allow-copy-file", &paths),
+        Files::Write => capability = scoped(capability, "fs:write-all", &paths),
+    }
+    app.add_capability(capability).map_err(|e| e.to_string())
 }
 
 /// The core plugins' manifests, the core crates' grants, and what each label was granted.
@@ -359,19 +451,22 @@ pub(crate) fn register<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, gra
 }
 
 pub(crate) fn set_catalog<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
-    let catalog = manifests.iter().map(|json| PluginManifest::parse(json)).collect::<Result<Vec<_>, _>>()?;
+    let mut catalog = Vec::new();
+    for json in manifests {
+        catalog.extend(PluginManifest::parse_all(json)?);
+    }
     *lock(&app.state::<WindowGrants>().catalog) = catalog;
     Ok(())
 }
 
 /// The plugins on in the window `label` now, from what Rust owns: the settings, a workspace window's
 /// `.vertex/settings.json` and whether its folder is trusted.
-fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog: &[PluginManifest], crates: &[(&str, Grants)]) -> BTreeSet<String> {
+fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog: &[PluginManifest]) -> BTreeSet<String> {
     let state = app.state::<AppState>();
     let global = state.read_settings(app, Value::clone);
-    let root = label.strip_prefix(SESSION_WINDOW_PREFIX).and_then(|uuid| state.workspace_of(app, uuid));
+    let root = label.strip_prefix(SESSION_WINDOW_PREFIX).and_then(|uuid| state.session_root(app, uuid)).filter(|(_, workspace)| *workspace).map(|(root, _)| root);
     let workspace = root.map(|root| (crate::state::workspace_settings(&root), state.folder_trusted(app, &root)));
-    plugins_on(kind, catalog, crates, &global, workspace.as_ref().map(|(local, trusted)| (local, *trusted)))
+    plugins_on(kind, catalog, &global, workspace.as_ref().map(|(local, trusted)| (local, *trusted)))
 }
 
 /// Adds what the window `label` isn't granted yet: its base, before it's first built, and the plugins on for it.
@@ -383,14 +478,26 @@ pub(crate) fn grant_window<R: Runtime>(app: &AppHandle<R>, label: &str) -> Resul
     // Held throughout, so two callers can't add the same grant twice.
     let mut granted = lock(&state.granted);
     let base = !granted.contains_key(label);
-    let on = on_for(app, label, kind, &catalog, &crates);
+    // Fixed at the first grant: what the window reaches never follows a later change of its session's root.
+    let root = if base { crate::reach::session_root(app, label) } else { None };
+    let on = on_for(app, label, kind, &catalog);
     let had = granted.entry(label.to_owned()).or_default();
     let new: Vec<&str> = on.iter().filter(|id| !had.contains(*id)).map(String::as_str).collect();
-    for capability in capabilities(label, kind, base, new.iter().copied(), &catalog, &crates)? {
+    for capability in capabilities(label, kind, base, root.as_ref(), new.iter().copied(), &catalog, &crates)? {
         app.add_capability(capability).map_err(|e| e.to_string())?;
     }
     had.extend(new.into_iter().map(str::to_owned));
     Ok(())
+}
+
+/// Whether a plugin granted to the window `label` asks for `files-outside-workspace`: it reaches every file.
+pub(crate) fn everywhere<R: Runtime>(app: &AppHandle<R>, label: &str) -> bool {
+    let state = app.state::<WindowGrants>();
+    let catalog = lock(&state.catalog);
+    let granted = lock(&state.granted);
+    granted.get(label).is_some_and(|ids| {
+        catalog.iter().any(|m| ids.contains(&m.id) && m.permissions.iter().any(|p| p == "files-outside-workspace"))
+    })
 }
 
 /// After a change to what's on (the settings, a workspace's, trust): grants every open window the plugins newly on for
@@ -407,12 +514,12 @@ pub(crate) fn regrant<R: Runtime>(app: &AppHandle<R>) {
 #[tauri::command]
 pub(crate) fn plugins_waiting_restart<R: Runtime>(app: AppHandle<R>) -> Vec<String> {
     let state = app.state::<WindowGrants>();
-    let (catalog, crates) = (lock(&state.catalog), lock(&state.crates));
+    let catalog = lock(&state.catalog);
     let granted = lock(&state.granted).clone();
     let mut waiting = BTreeSet::new();
     for (label, had) in granted {
         let Some(kind) = WindowKind::of(&label) else { continue };
-        let on = on_for(&app, &label, kind, &catalog, &crates);
+        let on = on_for(&app, &label, kind, &catalog);
         waiting.extend(had.into_iter().filter(|id| !on.contains(id)));
     }
     waiting.into_iter().collect()
@@ -455,15 +562,19 @@ mod tests {
     fn a_plugins_grant_is_its_permissions_and_its_crates_commands() {
         const GIT: Grants = &[(WindowKind::Session, &["vertex-git:allow-git-status"]), (WindowKind::Main, &["vertex-git:allow-git-clone"])];
         let crates: &[(&str, Grants)] = &[("git", GIT)];
-        let catalog = [manifest(json!({"id": "fetcher", "windows": ["main"], "permissions": ["network", "secrets"]}))];
-        let on = plugins_on(WindowKind::Main, &catalog, crates, &json!({}), None);
-        assert_eq!(on, BTreeSet::from(["fetcher".to_owned(), "git".to_owned()]), "git has no manifest: a built-in, always on");
-        assert_eq!(capabilities("main", WindowKind::Main, false, on.iter().map(String::as_str), &catalog, crates).unwrap().len(), 2);
+        let catalog = PluginManifest::parse_all(
+            &json!([{"id": "fetcher", "windows": ["main"], "permissions": ["network", "secrets"]}, {"id": "git", "windows": ["main", "session"]}]).to_string(),
+        )
+        .unwrap();
+        let on = plugins_on(WindowKind::Main, &catalog, &json!({}), None);
+        assert_eq!(on, BTreeSet::from(["fetcher".to_owned(), "git".to_owned()]));
+        assert_eq!(capabilities("main", WindowKind::Main, false, None, on.iter().map(String::as_str), &catalog, crates).unwrap().len(), 2);
+        assert!(plugins_on(WindowKind::Main, &catalog, &json!({"plugins": {"enabled": {"git": false}}}), None).len() == 1);
 
         let unknown = [manifest(json!({"id": "odd", "permissions": ["camera"]}))];
-        let Err(error) = capabilities("session-a", WindowKind::Session, false, ["odd"], &unknown, &[]) else { panic!("an unknown permission was granted") };
+        let Err(error) = capabilities("session-a", WindowKind::Session, false, None, ["odd"], &unknown, &[]) else { panic!("an unknown permission was granted") };
         assert!(error.contains("camera"), "{error}");
-        assert!(capabilities("session-a", WindowKind::Session, false, ["plain"], &[manifest(json!({"id": "plain"}))], &[]).unwrap().is_empty());
+        assert!(capabilities("session-a", WindowKind::Session, false, None, ["plain"], &[manifest(json!({"id": "plain"}))], &[]).unwrap().is_empty());
     }
 
     #[test]

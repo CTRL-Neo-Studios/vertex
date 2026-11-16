@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {hashProgram} from "@type32/workflows/core";
-import {open} from "@tauri-apps/plugin-dialog";
+import {pickToOpen} from "~/utils/dialogs";
 import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {AppWorkflowConfig} from "#shared/types/app/settings";
 import {defaultAppWorkflowConfig} from "#shared/utils/defaults/apps";
@@ -60,13 +60,13 @@ async function attempt(action: () => Promise<unknown>) {
 }
 
 const addFolder = () => attempt(async () => {
-    const path = await open({directory: true, multiple: false})
+    const path = await pickToOpen({directory: true})
     if (path) await trust.trustFolder(path, false)
 })
 
 // The hash is kept either way, so switching to content mode keeps this file trusted until it's edited.
 const addFile = () => attempt(async () => {
-    const path = await open({multiple: false, directory: false, filters: [{name: 'Workflow', extensions: ['workflow']}]})
+    const path = await pickToOpen({filters: [{name: 'Workflow', extensions: ['workflow']}]})
     if (!path) return
     const {doc, problems} = parseWorkflow(await readTextFile(path))
     if (!doc) throw new Error(problems[0]?.message ?? t('app.editor.ui.workflow.invalid'))

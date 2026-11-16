@@ -3,10 +3,13 @@
 //! every plugin builds on (`http_fetch`, `search_notes`, secrets, plugin data). Plugin crates use its Rust API, [`api`].
 
 pub mod api;
+mod dialogs;
 mod fonts;
 mod grants;
 mod host;
 mod notes;
+mod protocol;
+mod reach;
 mod state;
 mod trash;
 mod updater;
@@ -143,13 +146,19 @@ fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, St
 }
 
 /// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
-/// holds no files or can't be read.
+/// holds no files or can't be read. The asking window may read them from now on: they're what it pastes.
 #[tauri::command]
-fn clipboard_files_get() -> Vec<String> {
-    arboard::Clipboard::new()
+fn clipboard_files_get<R: Runtime>(webview: tauri::Webview<R>) -> Vec<String> {
+    let paths: Vec<String> = arboard::Clipboard::new()
         .and_then(|mut clipboard| clipboard.get().file_list())
         .map(|list| list.into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    for path in &paths {
+        if let Err(e) = grants::grant_files(webview.app_handle(), webview.label(), path, grants::Files::Paste) {
+            eprintln!("[clipboard] {path}: {e}");
+        }
+    }
+    paths
 }
 
 /// Puts files on the system clipboard, as Finder's or Explorer's Copy does: they paste there, and into Vertex.
@@ -158,6 +167,12 @@ fn clipboard_files_set(paths: Vec<String>) -> Result<(), String> {
     arboard::Clipboard::new()
         .and_then(|mut clipboard| clipboard.set().file_list(&paths))
         .map_err(|e| e.to_string())
+}
+
+/// Shows `paths` in Finder or Explorer. The opener plugin's own command checks no scope; this one goes through the gate.
+#[tauri::command]
+async fn reveal_paths(paths: Vec<String>) -> Result<(), String> {
+    api::blocking(move || tauri_plugin_opener::reveal_items_in_dir(&paths).map_err(|e| e.to_string())).await
 }
 
 /// Asks every session window to flush its pending session write (`vertex://flush-requested`; each answers with
@@ -218,7 +233,8 @@ async fn restart_app<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
 /// registration order).
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex")
-        .invoke_handler(tauri::generate_handler![
+        // Every command taking a path is checked against the calling window's reach first (`reach.rs`).
+        .invoke_handler(reach::gate(reach::kernel_path_args, tauri::generate_handler![
             read_text_files_batch,
             scan_directory_recursive,
             state::sessions_list,
@@ -241,6 +257,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             grants::plugins_waiting_restart,
             clipboard_files_get,
             clipboard_files_set,
+            reveal_paths,
             trash::trash_item,
             trash::trash_restore,
             updater::update_token_get,
@@ -255,10 +272,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             host::data_get,
             host::data_set,
             windows::window_open,
-        ])
+            dialogs::dialog_open,
+            dialogs::dialog_save,
+        ]))
+        .register_asynchronous_uri_scheme_protocol(protocol::SCHEME, protocol::handle)
         .setup(|app, _api| {
             app.manage(AppState::default());
             app.manage(grants::WindowGrants::default());
+            app.manage(reach::Reaches::default());
             Ok(())
         })
         .on_event(|app, event| {

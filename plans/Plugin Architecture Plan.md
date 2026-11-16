@@ -440,7 +440,8 @@ Every extraction is accepted when:
 
 ## X1: Small plugins
 
-Blocked by K4 and the Window Permissions Plan (W0–W4), so each extraction declares its plugin's permissions once.
+Blocked by K4 and the Window Permissions Plan (W0–W4, both done), so each extraction declares its plugin's permissions
+once. A built-in moving to its layer keeps its manifest from `app/builtins/plugins.json`, permissions included.
 
 - `mermaid` (code block, preview modal), `image` (viewer, embed), `yaml-form` (viewer), `latex` (viewer; `latex2vue.client.ts` becomes part of its activation), `outline` (the TOC view and the line TOC), `backlinks`, `outgoing-links`, `writers-tools` (its view and the word counter).
 - They prove panel views, viewers, code blocks, embeds and status items, with almost no logic to move.

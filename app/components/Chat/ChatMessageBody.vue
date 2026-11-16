@@ -2,7 +2,7 @@
 import type {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart, type DynamicToolUIPart, type ToolUIPart} from "ai";
 import type {VertexChatMessage} from "#shared/types/app/chats";
-import {convertFileSrc} from "@tauri-apps/api/core";
+import {fileUrl} from "~/utils/fileUrl";
 import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useChats} from "~/composables/ai/useChats";
@@ -24,8 +24,8 @@ const {t, te} = useI18n()
 const $route = useRoute()
 const $qt = useQuickToasts()
 const {allowHost, root} = useChats(useActiveSessions().getSession(computed(() => $route.params.sessionId as string)))
-/** An attached image shows as itself (from disk, by the asset protocol), not as a name. */
-const imageSrc = (note: string) => root.value && isImage(getFileExtensionFromPath(note)) ? convertFileSrc(`${root.value}/${note}`) : undefined
+/** An attached image shows as itself (from disk, through `vertex-file`), not as a name. */
+const imageSrc = (note: string) => root.value && isImage(getFileExtensionFromPath(note)) ? fileUrl(`${root.value}/${note}`) : undefined
 
 const refName = (ref: string) => ref.endsWith('/') ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
 

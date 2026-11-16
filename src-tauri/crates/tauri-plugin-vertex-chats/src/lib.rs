@@ -535,7 +535,8 @@ pub const GRANTS: api::Grants = &[(
 /// The chats plugin (`vertex-chats`); register it after the kernel's.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-chats")
-        .invoke_handler(tauri::generate_handler![
+        // `root` must be in the calling window's reach.
+        .invoke_handler(api::gate(|_| &["root"], tauri::generate_handler![
             chat_vault_state,
             chat_vault_create,
             chat_vault_unlock,
@@ -549,7 +550,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             chat_folder_rename,
             chat_folder_delete,
             chat_search,
-        ])
+        ]))
         .setup(|app, _api| {
             app.manage(ChatVaults::default());
             api::grant(app, PLUGIN, GRANTS);

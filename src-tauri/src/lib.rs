@@ -6,8 +6,8 @@ use tauri_plugin_decorum::WebviewWindowExt;
 use tauri_plugin_vertex::api;
 use url::Url;
 
-/// Every core plugin's `plugin.json` (`layers/*/`), embedded by `build.rs`.
-const CORE_PLUGINS: &[&str] = include!(concat!(env!("OUT_DIR"), "/core_plugins.rs"));
+/// Every plugin's manifest: the built-ins' list and each `layers/*/plugin.json`, embedded by `build.rs`.
+const PLUGINS: &[&str] = include!(concat!(env!("OUT_DIR"), "/plugins.rs"));
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -49,7 +49,7 @@ pub fn run() {
             api::set_window_style(app.handle(), |window| {
                 let _ = window.create_overlay_titlebar();
             });
-            api::set_core_plugins(app.handle(), CORE_PLUGINS)?;
+            api::set_plugins(app.handle(), PLUGINS)?;
             api::open_launch_windows(app.handle())?;
 
             // trust.json exists from launch (and old settings migrate then), not only once a window reads it.
@@ -129,8 +129,8 @@ mod tests {
         (tauri_plugin_vertex_git::PLUGIN, tauri_plugin_vertex_git::GRANTS),
     ];
 
-    /// The app's real ACL with a window of each kind granted as the kernel does it, for the core plugins `catalog` and
-    /// the global settings `global`. Tauri panics on an identifier it doesn't know, as it would opening the window.
+    /// The app's real ACL with a window of each kind granted as the kernel does it, for the plugins `catalog` and the
+    /// global settings `global`. Tauri panics on an identifier it doesn't know, as it would opening the window.
     struct Granted(tauri::Context<tauri::Wry>);
 
     impl Granted {
@@ -142,8 +142,9 @@ mod tests {
                 ("settings", WindowKind::Settings),
                 ("about", WindowKind::About),
             ] {
-                let on = api::plugins_on(kind, catalog, CRATES, &global, None);
-                for capability in api::capabilities(label, kind, true, on.iter().map(String::as_str), catalog, CRATES).unwrap() {
+                let on = api::plugins_on(kind, catalog, &global, None);
+                let root = (kind == WindowKind::Session).then(|| api::Entry { path: std::env::temp_dir(), recursive: true });
+                for capability in api::capabilities(label, kind, true, root.as_ref(), on.iter().map(String::as_str), catalog, CRATES).unwrap() {
                     context.runtime_authority_mut().add_capability(capability).unwrap();
                 }
             }
@@ -159,9 +160,14 @@ mod tests {
         PluginManifest::parse(&json.to_string()).unwrap()
     }
 
+    /// The app's own plugins: the built-ins and the core layers.
+    fn app_plugins() -> Vec<PluginManifest> {
+        super::PLUGINS.iter().flat_map(|json| PluginManifest::parse_all(json).unwrap()).collect()
+    }
+
     #[test]
     fn each_window_kind_gets_its_grant_and_no_more() {
-        let mut acl = Granted::new(&[], json!({}));
+        let mut acl = Granted::new(&app_plugins(), json!({}));
         assert!(acl.allows("plugin:vertex-git|git_status", "session-a"));
         assert!(!acl.allows("plugin:vertex-git|git_status", "settings"));
         assert!(acl.allows("plugin:vertex-git|git_clone", "main"));
@@ -174,24 +180,35 @@ mod tests {
         assert!(acl.allows("plugin:fs|watch", "session-a"));
         assert!(acl.allows("plugin:vertex|restart_app", "settings"));
         assert!(!acl.allows("plugin:vertex|restart_app", "session-a"));
-        // Only through a plugin's `network` and `secrets` (the chat built-in's web fetch keeps it in workspaces).
+        // Only through a plugin's `network` and `secrets`: chat's `network` in the windows it runs in.
         assert!(acl.allows("plugin:vertex|http_fetch", "session-a"));
         assert!(!acl.allows("plugin:vertex|http_fetch", "main"));
         assert!(!acl.allows("plugin:vertex|secret_get", "session-a"));
+        // Files: their content only under a session window's root (scoped there), whether one exists from anywhere;
+        // dialogs only the kernel's, which grant the pick to one window.
+        assert!(!acl.allows("plugin:fs|read_text_file", "main"));
+        assert!(!acl.allows("plugin:fs|write_text_file", "settings"));
+        assert!(acl.allows("plugin:fs|exists", "main"));
+        assert!(!acl.allows("plugin:fs|exists", "about"));
+        assert!(!acl.allows("plugin:dialog|open", "session-a"));
+        assert!(acl.allows("plugin:dialog|message", "session-a"));
+        assert!(acl.allows("plugin:vertex|dialog_save", "main"));
+        // The opener's reveal checks no scope: only the kernel's, through the gate.
+        assert!(!acl.allows("plugin:opener|reveal_item_in_dir", "session-a"));
+        assert!(acl.allows("plugin:vertex|reveal_paths", "session-a"));
         // A label the kernel never makes gets nothing.
         assert!(!acl.allows("plugin:fs|read_text_file", "session"));
         assert!(!acl.allows("plugin:vertex|window_open", "evil"));
     }
 
     #[test]
-    fn a_core_crates_commands_reach_only_the_windows_where_its_plugin_is_on() {
-        let git = || [manifest(json!({"id": "git", "windows": ["main", "session", "settings"]}))];
-        let mut off = Granted::new(&git(), json!({"plugins": {"enabled": {"git": false}}}));
-        for (command, label) in [("git_status", "session-a"), ("git_clone", "main"), ("git_tokens", "settings")] {
-            assert!(!off.allows(&format!("plugin:vertex-git|{command}"), label), "{command} in {label}");
+    fn a_built_in_turned_off_takes_its_crates_commands_with_it() {
+        let mut off = Granted::new(&app_plugins(), json!({"plugins": {"enabled": {"git": false, "chat": false}}}));
+        for (command, label) in [("vertex-git|git_status", "session-a"), ("vertex-git|git_clone", "main"), ("vertex-git|git_tokens", "settings"), ("vertex-chats|chat_read", "session-a")] {
+            assert!(!off.allows(&format!("plugin:{command}"), label), "{command} in {label}");
         }
-        let mut on = Granted::new(&git(), json!({}));
-        assert!(on.allows("plugin:vertex-git|git_status", "session-a"));
+        assert!(!off.allows("plugin:vertex|http_fetch", "session-a"), "chat's network went with it");
+        assert!(off.allows("plugin:vertex-ai|ai_request", "session-a"));
     }
 
     #[test]

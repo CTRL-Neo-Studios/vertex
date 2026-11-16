@@ -1,4 +1,4 @@
-import {save} from "@tauri-apps/plugin-dialog";
+import {pickToSave} from "~/utils/dialogs";
 import {create, exists, mkdir} from "@tauri-apps/plugin-fs";
 import {defaultAppSession} from "#shared/utils/defaults/apps";
 import {sessionWindowLabel} from "#shared/constants/app";
@@ -45,7 +45,7 @@ export function useAppSessionActions() {
     }
 
     async function createNewFileForSinglespace(openImmediately: boolean = true) {
-        const path = await save({
+        const path = await pickToSave({
             filters: [{
                 name: 'Markdown Files',
                 extensions: ['md']
@@ -84,7 +84,7 @@ export function useAppSessionActions() {
 
     /** A save dialog for the new folder's place and name; creates it and opens it as a workspace. */
     async function newWorkspaceAction() {
-        const path = await save({title: t('app.home.newWorkspaceDialog'), defaultPath: t('app.home.newWorkspaceName')})
+        const path = await pickToSave({title: t('app.home.newWorkspaceDialog'), defaultPath: t('app.home.newWorkspaceName')})
         if (!path) return
         if (await exists(path)) return $qt.error(t('app.home.folderExists'), path)
         try {

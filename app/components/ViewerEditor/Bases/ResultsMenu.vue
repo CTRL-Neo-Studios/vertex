@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {save} from "@tauri-apps/plugin-dialog";
+import {pickToSave} from "~/utils/dialogs";
 import {writeTextFile} from "@tauri-apps/plugin-fs";
 import {setLimit} from "@type32/obsidian-bases-parser";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
@@ -37,7 +37,7 @@ function copy() {
 async function exportCsv() {
     open.value = false
     const text = toCsv(cells())
-    const target = await save({defaultPath: `${ctx.view.value.name || t('app.editor.ui.bases.untitled')}.csv`, filters: [{name: 'CSV', extensions: ['csv']}]})
+    const target = await pickToSave({defaultPath: `${ctx.view.value.name || t('app.editor.ui.bases.untitled')}.csv`, filters: [{name: 'CSV', extensions: ['csv']}]})
     if (!target) return
     try {
         await writeTextFile(target, text)

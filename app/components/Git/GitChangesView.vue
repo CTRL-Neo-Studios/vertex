@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import {ask, open as openDialog} from "@tauri-apps/plugin-dialog";
+import {ask} from "@tauri-apps/plugin-dialog";
+import {pickToOpen} from "~/utils/dialogs";
 import {platform} from "@tauri-apps/plugin-os";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {CommandPaletteGroup, ContextMenuItem} from "@nuxt/ui";
@@ -67,7 +68,7 @@ async function setGitPath(path: string) {
     await git.refresh()
 }
 async function locateGit() {
-    const path = await openDialog({multiple: false, directory: false, title: t('app.git.missing.locateTitle')})
+    const path = await pickToOpen({title: t('app.git.missing.locateTitle')})
     if (path) await setGitPath(path)
 }
 async function installTools() {

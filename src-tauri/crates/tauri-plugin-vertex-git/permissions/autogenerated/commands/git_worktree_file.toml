@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-git-worktree-file"
+description = "Enables the git_worktree_file command without any pre-configured scope."
+commands.allow = ["git_worktree_file"]
+
+[[permission]]
+identifier = "deny-git-worktree-file"
+description = "Denies the git_worktree_file command without any pre-configured scope."
+commands.deny = ["git_worktree_file"]

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {readTextFile} from "@tauri-apps/plugin-fs";
 import type {TabProps} from "#shared/plugin/api";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -32,7 +31,7 @@ async function load() {
     const show = (rev: string | null, path: string) => gitClient.showFile(root, rev, path).catch(() => undefined)
     const old = spec.origPath ?? spec.path
     const [before, after] = await Promise.all(
-        spec.side === 'worktree' ? [show('HEAD', old), readTextFile(`${spec.top}/${spec.path}`).catch(() => undefined)]
+        spec.side === 'worktree' ? [show('HEAD', old), gitClient.worktreeFile(root, spec.path).catch(() => undefined)]
             : spec.side === 'staged' ? [show('HEAD', old), show(null, spec.path)]
                 : [show(`${spec.side}^`, old), show(spec.side, spec.path)],
     )

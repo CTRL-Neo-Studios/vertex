@@ -590,6 +590,12 @@ impl Repo {
         self.git(&["cat-file", "--filters", &spec])
     }
 
+    /// The working copy of a file anywhere in the repository (above the workspace too: git reaches the whole
+    /// repository, the window only its workspace).
+    fn worktree_file(&self, path: &str) -> Result<String, String> {
+        std::fs::read_to_string(self.top.join(relative(path)?)).map_err(|e| e.to_string())
+    }
+
     fn stage(&self, paths: &[String]) -> Result<(), String> {
         let paths = checked(paths)?;
         if paths.is_empty() {
@@ -880,6 +886,11 @@ async fn git_show_file<R: Runtime>(app: AppHandle<R>, root: String, rev: Option<
 }
 
 #[tauri::command]
+async fn git_worktree_file<R: Runtime>(app: AppHandle<R>, root: String, path: String) -> Result<String, String> {
+    with_repo(app, root, false, move |r| r.worktree_file(&path)).await
+}
+
+#[tauri::command]
 async fn git_stage<R: Runtime>(app: AppHandle<R>, root: String, paths: Vec<String>) -> Result<(), String> {
     with_repo(app, root, true, move |r| r.stage(&paths)).await
 }
@@ -1047,6 +1058,7 @@ pub const GRANTS: api::Grants = &[
             "vertex-git:allow-git-commit-files",
             "vertex-git:allow-git-diff",
             "vertex-git:allow-git-show-file",
+            "vertex-git:allow-git-worktree-file",
             "vertex-git:allow-git-stage",
             "vertex-git:allow-git-unstage",
             "vertex-git:allow-git-discard",
@@ -1079,7 +1091,8 @@ pub const GRANTS: api::Grants = &[
 /// The git plugin (`vertex-git`); register it after the kernel's.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-git")
-        .invoke_handler(tauri::generate_handler![
+        // `root` and a clone's `dest` must be in the calling window's reach.
+        .invoke_handler(api::gate(|_| &["root", "dest"], tauri::generate_handler![
             git_version,
             git_status,
             git_log,
@@ -1108,7 +1121,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             git_resolve,
             git_conflict_markers,
             git_merge_continue,
-        ])
+            git_worktree_file,
+        ]))
         .setup(|app, _api| {
             app.manage(Git::default());
             api::grant(app, PLUGIN, GRANTS);

@@ -1,4 +1,4 @@
-import {open} from "@tauri-apps/plugin-dialog";
+import {pickToOpen} from "~/utils/dialogs";
 import {stat} from "@tauri-apps/plugin-fs"
 import {dirname} from "@tauri-apps/api/path"
 import type {ActiveSession} from "#shared/types/active/sessions";
@@ -24,7 +24,7 @@ export function useAppSessionNavigator() {
     const $navi = useAppNavigator()
 
     function pickPath(asFile: boolean) {
-        return open(asFile ? {directory: false, filters: FILE_PICKER_FILTERS} : {directory: true})
+        return pickToOpen(asFile ? {filters: FILE_PICKER_FILTERS} : {directory: true})
     }
 
     async function openFolderOrFileFromPath(absolutePath: PossiblyRef<string>): Promise<{

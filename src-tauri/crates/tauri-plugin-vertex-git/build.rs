@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "git_commit_files",
     "git_diff",
     "git_show_file",
+    "git_worktree_file",
     "git_stage",
     "git_unstage",
     "git_discard",

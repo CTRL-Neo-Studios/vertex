@@ -8,6 +8,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifests} from "~/utils/plugins/catalog";
 import {stateClient} from "~/utils/stateClient";
+import RestartModal from "~/components/Modals/RestartModal.vue";
 
 definePageMeta({
     layout: 'settings'
@@ -16,7 +17,8 @@ definePageMeta({
 /**
  * Settings → Plugins: every plugin with its switch, in the scope being edited. A workspace may turn any plugin off;
  * one it turns on that's off in the user's settings runs only once the workspace is trusted. A plugin turned off runs
- * on until Vertex restarts (its windows keep their grants till then), which the page says, with Restart now.
+ * on until Vertex restarts (its windows keep their grants till then): switching one off asks to restart, and its row
+ * says it waits for one.
  */
 const {t} = useI18n()
 const {load} = useAppSettings()
@@ -30,7 +32,13 @@ const enabledPath = (id: string) => `plugins.enabled.${id}` as AppSettingPath
 
 /** The switch: this scope's own choice (a workspace's even before it applies), else the effective one, else the default. */
 const isOn = (m: PluginManifest) => (scope.value(enabledPath(m.id)) as boolean | undefined) ?? m.enabledByDefault ?? true
-const setOn = (m: PluginManifest, on: boolean) => scope.set({[enabledPath(m.id)]: on})
+const restartModal = useOverlay().create(RestartModal)
+
+async function setOn(m: PluginManifest, on: boolean) {
+    await scope.set({[enabledPath(m.id)]: on})
+    waiting.value = await stateClient.pluginsWaitingRestart()
+    if (!on && waiting.value.includes(m.id) && await restartModal.open({name: m.name})) await stateClient.restart()
+}
 
 const resolution = computed(() => resolvePlugins(
     manifests,
@@ -82,15 +90,6 @@ function describe(m: PluginManifest) {
                 :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                 data-plugins-untrusted
             />
-            <UAlert
-                v-if="waiting.length"
-                color="info"
-                variant="subtle"
-                icon="i-lucide-rotate-ccw"
-                :title="t('app.settings.plugins.waitsForRestart', {names: waiting.map(nameOf).join(', ')})"
-                :actions="[{label: t('app.settings.plugins.restartNow'), color: 'neutral', variant: 'outline', onClick: () => stateClient.restart()}]"
-                data-plugins-restart
-            />
             <SettingsSection :title="t('app.settings.plugins.core')" :description="t('app.settings.plugins.coreDescription')">
                 <p v-if="!manifests.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.plugins.none') }}</p>
                 <SettingsRow
@@ -103,6 +102,7 @@ function describe(m: PluginManifest) {
                     :data-plugin-row="m.id"
                 >
                     <UBadge v-if="blocked(m)" size="sm" color="warning" variant="subtle" :label="t('app.settings.plugins.waitsForTrust')"/>
+                    <UBadge v-if="waiting.includes(m.id)" size="sm" color="info" variant="subtle" :label="t('app.settings.plugins.waitsForRestart')" data-plugin-restart/>
                     <UTooltip v-if="m.config?.schema?.length" :text="t('app.settings.plugins.settings')">
                         <UButton
                             size="xs"

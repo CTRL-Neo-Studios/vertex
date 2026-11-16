@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {convertFileSrc} from "@tauri-apps/api/core";
+import {fileUrl} from "~/utils/fileUrl";
 import {toDisplay, toText, type RowScope, type Value} from "@type32/obsidian-bases-parser";
 import {filterXSS} from "xss";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
@@ -56,7 +56,7 @@ const shown = computed(() => {
     if (v.type === 'Null') return {as: 'none' as const}
     if (v.type === 'URL') return {as: 'url' as const, url: v.value}
     if (v.type === 'HTML') return {as: 'html' as const, html: filterXSS(v.value)}
-    if (v.type === 'Image') return {as: 'image' as const, src: /^[a-z][\w+.-]*:/i.test(v.src) ? v.src : convertFileSrc(`${ctx.session.rootPath}/${v.src}`)}
+    if (v.type === 'Image') return {as: 'image' as const, src: /^[a-z][\w+.-]*:/i.test(v.src) ? v.src : fileUrl(`${ctx.session.rootPath}/${v.src}`)}
     if (v.type === 'String' && v.icon) return {as: 'icon' as const, icon: `i-lucide-${v.value}`}
     if (v.type === 'Error') return {as: 'error' as const, message: v.message}
     return {as: 'text' as const, text: toDisplay(v)}

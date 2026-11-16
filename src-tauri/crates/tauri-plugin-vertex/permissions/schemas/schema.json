@@ -343,6 +343,30 @@
           "markdownDescription": "Denies the data_set command without any pre-configured scope."
         },
         {
+          "description": "Enables the dialog_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dialog-open",
+          "markdownDescription": "Enables the dialog_open command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dialog_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dialog-open",
+          "markdownDescription": "Denies the dialog_open command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dialog_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dialog-save",
+          "markdownDescription": "Enables the dialog_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dialog_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dialog-save",
+          "markdownDescription": "Denies the dialog_save command without any pre-configured scope."
+        },
+        {
           "description": "Enables the http_fetch command without any pre-configured scope.",
           "type": "string",
           "const": "allow-http-fetch",
@@ -401,6 +425,18 @@
           "type": "string",
           "const": "deny-restart-app",
           "markdownDescription": "Denies the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reveal_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-reveal-paths",
+          "markdownDescription": "Enables the reveal_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reveal_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-reveal-paths",
+          "markdownDescription": "Denies the reveal_paths command without any pre-configured scope."
         },
         {
           "description": "Enables the scan_directory_recursive command without any pre-configured scope.",

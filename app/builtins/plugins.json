@@ -1,0 +1,19 @@
+[
+	{"id": "files", "name": "Files", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "palette", "name": "Command palette", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "outline", "name": "Outline", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "backlinks", "name": "Backlinks", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "outgoing-links", "name": "Outgoing links", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "writers-tools", "name": "Writer's tools", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "image", "name": "Image", "version": "0", "apiVersion": 1},
+	{"id": "mermaid", "name": "Mermaid", "version": "0", "apiVersion": 1},
+	{"id": "yaml-form", "name": "YAML form", "version": "0", "apiVersion": 1},
+	{"id": "latex", "name": "LaTeX", "version": "0", "apiVersion": 1},
+	{"id": "canvas", "name": "Canvas", "version": "0", "apiVersion": 1},
+	{"id": "bases", "name": "Bases", "version": "0", "apiVersion": 1},
+	{"id": "workflows", "name": "Workflows", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "git", "name": "Git", "version": "0", "apiVersion": 1, "windows": ["main", "session", "settings"]},
+	{"id": "ai", "name": "AI", "version": "0", "apiVersion": 1, "windows": ["session", "settings"]},
+	{"id": "ai-assistant", "name": "AI assistant", "version": "0", "apiVersion": 1, "requires": ["ai"]},
+	{"id": "chat", "name": "Chat", "version": "0", "apiVersion": 1, "windows": ["session", "settings"], "requires": ["ai"], "permissions": ["network"]}
+]

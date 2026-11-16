@@ -1,4 +1,5 @@
-import { openUrl, openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
+import { openUrl, openPath } from "@tauri-apps/plugin-opener"
+import { vertexInvoke } from "~/utils/vertexInvoke"
 
 export function useAppOpener() {
     /**
@@ -14,8 +15,9 @@ export function useAppOpener() {
         await openPath(unref(absoluteFilePath))
     }
 
+    /** Through the kernel: only what this window reaches (the opener's own command checks no scope). */
     async function revealFilesInFileManager(absoluteFilePaths: PossiblyRef<string[]>) {
-        await revealItemInDir(unref(absoluteFilePaths))
+        await vertexInvoke('reveal_paths', {paths: unref(absoluteFilePaths)})
     }
 
     return {

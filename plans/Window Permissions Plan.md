@@ -170,11 +170,13 @@ As built:
   the three secret commands, `files-outside-workspace` nothing until W4), one file for both sides: `manifest.ts` takes
   `PLUGIN_PERMISSIONS` and the `PluginPermission` type from its keys, the kernel reads it at build (`include_str!`). A
   name outside it is an error when the grant is made (tested).
-- **Which plugins Rust knows:** the core plugins' `plugin.json`s, embedded by the app crate's `build.rs`
-  (`layers/*/plugin.json`; `layers/.gitkeep` keeps the folder, as Cargo reruns a build script on every build while a
-  watched path is missing) and handed over with `api::set_core_plugins`. What it reads of one: `id`, `windows`,
-  `permissions`, `enabledByDefault`. The built-ins have no manifest Rust can read, so a core crate's plugin without a
-  manifest counts as always on, until its X phase gives it one.
+- **Which plugins Rust knows:** every manifest, embedded by the app crate's `build.rs`: the built-ins' list
+  (`app/builtins/plugins.json`, moved out of TypeScript for this and validated when the module loads) and each
+  `layers/*/plugin.json` (`layers/.gitkeep` keeps the folder, as Cargo reruns a build script on every build while a
+  watched path is missing), handed over with `api::set_plugins`. What it reads of one: `id`, `windows`,
+  `permissions`, `enabledByDefault`. The built-ins turn off like any plugin (Settings → Plugins lists them; `chat` and
+  `ai-assistant` require `ai`); what the kernel still wires to one directly stays until its X phase (git's
+  commit-message button asks AI with `ai` off).
 - **On for a window** (`plugin_on`, `plugins_on`; tested): made for its kind; the global `plugins.enabled`, and in a
   workspace's window its `.vertex/settings.json` (off from any workspace, on only from a trusted one: `folder_trusted`,
   the frontend's `folderTrustedBy`, tested), else the manifest's default. Rust follows the user's choice, not
@@ -182,15 +184,15 @@ As built:
 - **Grants:** a window's base, then one capability per plugin on with anything to grant
   (`window-<label>-plugin-<id>`): its permissions' Tauri permissions and its crate's commands for the kind (crates
   register with `api::grant(app, PLUGIN, GRANTS)`; `ai`, `chat`, `git`). `grant_window` adds only what a label lacks.
-  `http_fetch` and the secret commands left the base grants; `http_fetch` stays in the session base for the chat
-  built-in's web fetch, which X8 moves to chat's manifest. Settings got `restart_app` and `plugins_waiting_restart`.
+  `http_fetch` and the secret commands left the base grants: chat's manifest asks for `network`, which the web fetch
+  tool uses. Settings got `restart_app` and `plugins_waiting_restart`.
 - **Turned on:** a save of the global settings, a workspace's settings (update or reload) or trust now emits its event
   only after its lock is released and `regrant` has granted every open window what's newly on for it, so a window
   hears of a plugin only once it may call its commands.
 - **Turned off:** the host leaves a running plugin running (no window reload: `reload`, `isPluginReload`,
   `onBeforePluginReload` and the persistence's `flush` export are gone). `plugins_waiting_restart` lists the plugins
-  a label was granted but which are off for it now. Settings → Plugins shows them in an alert with Restart now, rather
-  than a Restart now / Later dialog: the alert stays until the restart, so Later is leaving it.
+  a label was granted but which are off for it now. Switching off a plugin in that list asks to restart
+  (`RestartModal`: Later / Restart now), and its row says "Waits for a restart" until then.
 - **Restart:** `restart_app` flushes the session windows as `quit_app` does (`flush_windows`, shared), leaves a
   `restarting` file in the app data and asks Tauri to restart. At launch `api::open_launch_windows` (was `open_main`)
   opens the start window, and when that file is there, every session window that was open (`reopen`), whatever the
@@ -204,7 +206,9 @@ As built:
   all deleted after): `zz-plain`'s `ctx.http.fetch` refused; `zz-net` turned on: started at once and fetched (200), and
   the window could call `http_fetch`; turned off: still running, still allowed, Settings → Plugins listed it with
   Restart now; Restart now: the app came back with the workspace window it had (recovery off), `zz-net` off and
-  `http_fetch` refused again. With git still a built-in, "git off" is the Rust test's, not the app's.
+  `http_fetch` refused again. Then, with the built-ins in the list: git switched off in Settings → Plugins asked to
+  restart; Later left its row "Waits for a restart" and the workspace window still allowed `git_status`; after the
+  restart git was off, the reopened workspace window was refused `git_status`, and Clone Workspace was gone.
 
 ### W4: Workspace file scope
 - Every access outside the workspace, listed and decided: importing dropped or pasted files, attachments in chat,
@@ -218,6 +222,79 @@ As built:
 - Acceptance: a session window can't read or write a path outside its workspace except through those flows; the
   File Explorer plan's SMOKE rows pass.
 
+Decisions (the inventory: about 120 call sites, every one listed with where its path comes from; user's answers on
+metadata, git, symlinks and the two holes):
+
+| Access | Decided |
+|---|---|
+| A window's **reach** | A workspace window: its root, recursive. A single-file window: its file's folder, not recursive (the index watches it flat, `stat`s siblings and renames there). Settings: every workspace root in `sessions.json` (it edits their settings and scans them for trust). The start window and About: nothing. All of them: what the user picked in a dialog there, and the files on the clipboard it asked for. A session window's root is fixed when it's first granted, not read again from `sessions.json` (a window could upsert its own session's root). Roots are canonical, as Tauri's fs scope resolves symlinks: a link to outside the workspace is refused. |
+| `exists` / `stat` | Any path, from any window but About: recents, recovery, OS open requests and the open, new and clone flows all check paths the window doesn't otherwise reach. A path's existence, size and dates are visible; its content isn't. |
+| Reading and writing (fs plugin) | Scoped per command to the window's reach, with today's dot folders (`.vertex`, `.trash`, `types.json`); no `**/*` grant left anywhere. A plugin asking for `files-outside-workspace` brings back today's `**/*` grants to the windows it's on in. |
+| Kernel commands taking a path | Checked by one gate per plugin around its `invoke_handler`: the arguments that are paths (the kernel: per command; git: `root`, `dest`; chats: `root`) must lie in the calling window's reach. Covers the index's scan and batch read, search, plugin data, workspace settings, trust (any window could trust any folder: closed), git (clone's destination under a picked folder) and chats. |
+| Open and Save dialogs | Kernel commands that show them from Rust (`tauri-plugin-dialog`'s Rust API, which widens no scope) and add the pick to the asking window's reach and fs grant (open: read; save: write). `dialog:allow-open`/`allow-save` leave every grant; `ask` and `message` stay. |
+| Pasted files | `clipboard_files_get` adds the clipboard's paths to the asking window's reach (read), so the import reads them as it does today. `clipboard_files_set` only takes paths in reach (else a window could put any path there and ask for it back). Dropped files are read by the webview (File API): no change. |
+| OS Trash | `trash_item` takes a path in reach; `trash_restore` only an item this run of the app trashed (an item names where it went, which a window could forge). |
+| Exports (canvas PNG, Bases CSV), new file, new workspace | The Save dialog's pick (write). |
+| Workspace files the webview loads (images, canvas, Bases, chat) | A kernel protocol, `vertex-file`, serving a file in the asking window's reach; the asset protocol is removed. Paths from note content (`..`) are refused there. |
+| Open with the default app, reveal in Finder | The opener's commands scoped to a session window's root; nothing elsewhere. |
+| Git above the workspace | The git crate reads a working copy anywhere in the repository (`git_worktree_file`): git already reaches the whole repository. Open and reveal stay inside the workspace. |
+| The git binary (`gitConfig.path`) | `settings_set` refuses a new value that isn't a file picked in the saving window's dialog: any window could otherwise point Rust at a script in a vault and have it run. |
+| The app's own data | Rust only (plugin data, chats in app storage, settings): no webview path reaches it. |
+
+Slices, each checked before the next:
+- **W4a, reach:** `reach.rs` (roots per label, picks, clipboard), the gates, the Trash memory, the git path rule,
+  `git_worktree_file`.
+- **W4b, dialogs:** `dialog_open`, `dialog_save`; every `open`/`save` call site moves to them.
+- **W4c, fs and opener scopes:** per window from its reach; `exists`/`stat` anywhere; `files-outside-workspace`.
+- **W4d, the file protocol:** `vertex-file`, `fileUrl(path)` for every `convertFileSrc`; the asset protocol goes.
+- **W4e, check:** tests, and in the app: a session window refused outside its root on each path (fs, kernel command,
+  protocol, opener), each flow above working, the File Explorer plan's SMOKE rows.
+
+As built (W4 done):
+- **`reach.rs`** (kernel): `Entry` (a path, recursive or flat), `canonical` (`..` resolved, symlinks followed as far as
+  the path exists: Tauri's fs scope does the same), `session_root` (fixed at the window's first grant), `entries`
+  (Settings: every workspace root in `sessions.json`), `add` and `picked` (dialog picks and clipboard files), and
+  `reaches` (or a granted plugin's `files-outside-workspace`: `grants::everywhere`). Tested: covering, `..`, and a
+  symlink out of a vault.
+- **The gate** (`reach::gate`, `api::gate`) wraps a plugin's `invoke_handler`: the kernel's path arguments per command
+  (`kernel_path_args`), git's `root` and `dest`, chats' `root`. A call naming a path outside the window's reach is
+  refused before the command runs ("… is outside what this window may reach").
+- **File grants** (`grants.rs`): every window but About gets `fs:allow-exists` and `fs:allow-stat` on `**`; a session
+  window's base adds `read-all`, `write-all`, `allow-exists` and `opener:allow-open-path` under its canonical, escaped
+  root (recursive with the dot folders, or flat for a single file's folder). `grant_files` adds a pick or a clipboard
+  file to one window: reach plus `read-all`, with `write-all` for a Save pick and `allow-copy-file` for a pasted file
+  (`copy_file` checks its source against its own scope). A plugin asking for `files-outside-workspace` brings the old
+  `**` grants. `dialog:default` and `opener:default` left the shared grant for `dialog:allow-message` (`ask` is the
+  `message` command) and `opener:allow-open-url`/`allow-default-urls`.
+- **Reveal in Finder:** the opener's `reveal_item_in_dir` checks no scope at all (found in the app check), so it's the
+  kernel's `reveal_paths` now, through the gate (`tauri-plugin-opener`'s Rust API); `open_path` keeps the opener's
+  scoped command.
+- **Dialogs** (`dialogs.rs`, `app/utils/dialogs.ts`: `pickToOpen`, `pickToSave`): every `open`/`save` call site moved.
+  Clone's parent is always picked now (it defaulted to Documents, which the window wouldn't reach).
+- **`vertex-file`** (`protocol.rs`, `app/utils/fileUrl.ts`): a file in the asking window's reach, with a content type
+  by extension and the asking origin echoed in `Access-Control-Allow-Origin` (as the asset protocol did: a canvas
+  export draws its images, and `fetch` works); 403 outside. The asset protocol and the `protocol-asset` feature are gone.
+- **Also:** `trash_restore` takes only what this run trashed; `settings_set` refuses an unpicked `gitConfig.path`;
+  `git_worktree_file` reads a working copy anywhere in the repository (`GitDiffView`); `clipboard_files_get` grants the
+  clipboard's files to the asking window.
+- **Checked in `tauri dev`** (fixtures in a home folder; the Finder clipboard set by `osascript`; the harness logged
+  through plugin data, as W4 refuses the windows' writes to `/tmp`): 41 checks, every one as designed.
+  - **Workspace window:** fs read, write, list and `..` outside refused, inside allowed, `exists` outside allowed,
+    watch inside allowed; batch read, scan, search, workspace settings, trust, Trash, git, chats and clipboard-set
+    outside refused; a forged Trash item refused; the protocol 200 inside, 403 outside and via `..`; reveal outside
+    refused (opener and kernel); the JS Open dialog refused.
+  - **Paste:** the clipboard's folder became readable, a file beside it didn't, and the real import copied it in.
+  - **Files:** create, rename, delete to the Trash and undo through `useActiveWorkspaceTools`.
+  - **The note's image embed** showed through `vertex-file`.
+  - **Single-file window:** its file and a sibling yes; a subfolder and another workspace no.
+  - **Settings:** a session root's workspace settings and batch read yes, a folder outside no, fs read no.
+  - **Start window:** a workspace file refused, `exists` outside allowed, an unpicked git path refused.
+- **Not run:** the dialogs themselves (native: no automation without assistive access) and the SMOKE rows needing a
+  mouse (drags in Files, from and to Finder, chats, canvases: 92, 96–101, 103–105); Windows and Linux.
+- **Seen, not W4's:** with a vault under a symlink (`/tmp` → `/private/tmp`), Files showed a renamed note under its
+  old name too, and an imported folder twice: the watcher reports resolved paths, the index the paths as given. The
+  same run under a real folder was right. The fs plugin watches the path as given, so W4 doesn't change this.
+
 ## Status
 
-W0 to W3 done. W4 next.
+W0 to W4 done.

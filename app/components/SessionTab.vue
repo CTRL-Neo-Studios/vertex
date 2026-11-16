@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {convertFileSrc} from "@tauri-apps/api/core"
+import {fileUrl} from "~/utils/fileUrl"
 import {readTextFile} from "@tauri-apps/plugin-fs"
 import type {ViewerMountProps, ViewerProps} from "#shared/plugin/api";
 import type {SessionMode} from "#shared/constants/app";
@@ -60,7 +60,7 @@ const viewerProps = computed((): ViewerProps | ViewerMountProps => {
         'onUpdate:contentSaved': value => { isContentSaved.value = value },
         renaming: renaming.value,
         disabled: !isContentLoaded.value,
-        assetUrl: convertFileSrc(fullFilePath.value ?? ''),
+        assetUrl: fileUrl(fullFilePath.value ?? ''),
         onRename,
     }
     if (!viewer.value?.loadsText) return props

@@ -114,6 +114,58 @@ Denies the data_set command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-dialog-open`
+
+</td>
+<td>
+
+Enables the dialog_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-dialog-open`
+
+</td>
+<td>
+
+Denies the dialog_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:allow-dialog-save`
+
+</td>
+<td>
+
+Enables the dialog_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-dialog-save`
+
+</td>
+<td>
+
+Denies the dialog_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-http-fetch`
 
 </td>
@@ -237,6 +289,32 @@ Enables the restart_app command without any pre-configured scope.
 <td>
 
 Denies the restart_app command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:allow-reveal-paths`
+
+</td>
+<td>
+
+Enables the reveal_paths command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-reveal-paths`
+
+</td>
+<td>
+
+Denies the reveal_paths command without any pre-configured scope.
 
 </td>
 </tr>

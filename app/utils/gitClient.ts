@@ -15,6 +15,7 @@ export const GitCommand = {
     commitFiles: 'git_commit_files',
     diff: 'git_diff',
     showFile: 'git_show_file',
+    worktreeFile: 'git_worktree_file',
     stage: 'git_stage',
     unstage: 'git_unstage',
     discard: 'git_discard',
@@ -68,6 +69,8 @@ export const gitClient = {
     diff: (root: string, staged: boolean) => invoke<string>(GitCommand.diff, {root, staged}),
     /** A file's text at `rev`, or in the index when `rev` is null. */
     showFile: (root: string, rev: string | null, path: string) => invoke<string>(GitCommand.showFile, {root, rev, path}),
+    /** A file's working copy, anywhere in the repository (`path` from its top). */
+    worktreeFile: (root: string, path: string) => invoke<string>(GitCommand.worktreeFile, {root, path}),
     stage: (root: string, paths: string[]) => invoke(GitCommand.stage, {root, paths}),
     unstage: (root: string, paths: string[]) => invoke(GitCommand.unstage, {root, paths}),
     /** Back to the last commit; files it doesn't have are deleted. */

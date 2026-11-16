@@ -629,6 +629,18 @@
           "type": "string",
           "const": "deny-git-version",
           "markdownDescription": "Denies the git_version command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the git_worktree_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-git-worktree-file",
+          "markdownDescription": "Enables the git_worktree_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the git_worktree_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-git-worktree-file",
+          "markdownDescription": "Denies the git_worktree_file command without any pre-configured scope."
         }
       ]
     }

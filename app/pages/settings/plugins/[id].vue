@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {open} from "@tauri-apps/plugin-dialog";
+import {pickToOpen} from "~/utils/dialogs";
 import type {ConfigField} from "#shared/plugin/manifest";
 import {sanitizeField} from "#shared/plugin/config";
 import {getAt} from "#shared/utils/settings/paths";
@@ -52,8 +52,8 @@ const inputValue = (event: Event) => (event.target as HTMLInputElement).value
 async function pick(field: Extract<ConfigField, {type: 'path'}>) {
     const root = scope.root.value
     if (!root) return
-    const chosen = await open({directory: field.kind === 'folder', defaultPath: root})
-    if (typeof chosen !== 'string') return
+    const chosen = await pickToOpen({directory: field.kind === 'folder', defaultPath: root})
+    if (!chosen) return
     if (chosen !== root && !chosen.startsWith(`${root}/`)) return $qt.error(t('app.settings.plugins.pickOutside'))
     await set(field, chosen.slice(root.length + 1))
 }

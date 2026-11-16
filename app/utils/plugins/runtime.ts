@@ -13,7 +13,7 @@ import {
     noteMenuItems, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
 } from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
-import {isBuiltin, pluginEntries} from '~/utils/plugins/catalog'
+import {pluginEntries} from '~/utils/plugins/catalog'
 import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import useQuickToasts from '~/composables/utility/useQuickToasts'
@@ -118,7 +118,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     // Nuxt's composables, also when a settings change turns one on later.
     const nuxtApp = useNuxtApp()
     inApp = fn => nuxtApp.runWithContext(fn)
-    const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => isBuiltin(manifest.id) || pluginEnabled(manifest, enabled())))
+    const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => pluginEnabled(manifest, enabled())))
     await apply()
     watch(() => JSON.stringify(enabled()), () => void apply())
 }

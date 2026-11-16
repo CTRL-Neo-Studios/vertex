@@ -1,17 +1,23 @@
 //! The system Trash (Recycle Bin on Windows): Files' Delete sends items there, and its Undo brings them back.
 
+use std::collections::HashSet;
 use std::path::Path;
+use std::sync::{LazyLock, Mutex, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// An item put in the Trash, as restoring it needs: on macOS where it went (`trashed`, from
 /// `trashItemAtURL:resultingItemURL:`); elsewhere when (`deleted_at`, Unix seconds), to find it in the Trash's listing.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Trashed {
     original: String,
     trashed: Option<String>,
     deleted_at: i64,
 }
+
+/// What this run of the app put in the Trash. `trash_restore` takes only those: an item names where it went, which a
+/// window could otherwise point at any file to have it moved into its workspace.
+static TRASHED: LazyLock<Mutex<HashSet<Trashed>>> = LazyLock::new(Mutex::default);
 
 /// Moves one file or folder to the Trash.
 #[tauri::command]
@@ -32,13 +38,18 @@ pub fn trash_item(path: String) -> Result<Trashed, String> {
         trash::delete(&path).map_err(|e| e.to_string())?;
         None
     };
-    Ok(Trashed { original: path, trashed, deleted_at })
+    let item = Trashed { original: path, trashed, deleted_at };
+    TRASHED.lock().unwrap_or_else(PoisonError::into_inner).insert(item.clone());
+    Ok(item)
 }
 
 /// Puts an item from the Trash back where it was. Fails with `taken` when something is there now, and with
 /// `missing` when the item has left the Trash (emptied, or put back from Finder or Explorer).
 #[tauri::command]
 pub fn trash_restore(item: Trashed) -> Result<(), String> {
+    if !TRASHED.lock().unwrap_or_else(PoisonError::into_inner).contains(&item) {
+        return Err("not an item Vertex put in the Trash".into());
+    }
     let original = Path::new(&item.original);
     if original.symlink_metadata().is_ok() {
         return Err("taken".into());

@@ -510,8 +510,13 @@
 				},
 				"untrusted": "This workspace turns on plugins that are off in your settings. They run once you trust it.",
 				"waitsForTrust": "Waits for trust",
-				"waitsForRestart": "Turned off, but running until Vertex restarts: {names}.",
-				"restartNow": "Restart now",
+				"waitsForRestart": "Waits for a restart",
+				"restart": {
+					"title": "Restart Vertex to turn off {name}?",
+					"description": "It keeps running until Vertex restarts. Your workspace windows open again after the restart.",
+					"later": "Later",
+					"now": "Restart now"
+				},
 				"settingsWaitForTrust": "Some of this workspace's changes here apply only once you trust it.",
 				"settings": "Settings",
 				"noSettings": "This plugin has no settings.",

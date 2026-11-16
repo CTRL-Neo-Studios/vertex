@@ -10,17 +10,19 @@ use tauri::{AppHandle, Manager, Runtime};
 pub use crate::notes::snippet;
 pub use crate::state::{workspace_root, write_atomic, write_bytes_atomic};
 pub use crate::grants::{capabilities, plugins_on, Grants, PluginManifest, WindowKind};
+pub use crate::reach::{gate, Entry};
 pub use crate::windows::{open_launch_windows, show_main, MAIN_WINDOW};
 
 /// Lets the windows where plugin `plugin` is on call the crate's commands, per kind (`grants`). Call it in the crate's
-/// setup, before any window opens. A plugin with no manifest is a built-in, always on.
+/// setup, before any window opens. A plugin with no manifest is never on.
 pub fn grant<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, grants: Grants) {
     crate::grants::register(app, plugin, grants);
 }
 
-/// The core plugins' `plugin.json`s (the app crate embeds them at build time), before [`open_launch_windows`]: which
-/// windows each runs in, whether it's on by default, and what its `permissions` grant there.
-pub fn set_core_plugins<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
+/// The plugins' manifests (the app crate embeds them at build time: each `plugin.json`, or the built-ins' list),
+/// before [`open_launch_windows`]: which windows each runs in, whether it's on by default, and what its `permissions`
+/// grant there.
+pub fn set_plugins<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
     crate::grants::set_catalog(app, manifests)
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {FormError} from "@nuxt/ui";
 import {documentDir, join} from "@tauri-apps/api/path";
-import {open} from "@tauri-apps/plugin-dialog";
+import {pickToOpen} from "~/utils/dialogs";
 import {exists} from "@tauri-apps/plugin-fs";
 import {errorKey} from "~/composables/git/useGitRepo";
 import {useGitSignIn} from "~/composables/git/useGitSignIn";
@@ -12,10 +12,8 @@ const emit = defineEmits<{ close: [string | undefined] }>()
 const {t} = useI18n()
 const signIn = useGitSignIn()
 
+/** `parent` is always picked in the dialog: Rust clones only into a folder this window picked. */
 const state = reactive({url: '', parent: '', name: ''})
-onMounted(async () => {
-    state.parent ||= await documentDir().catch(() => '')
-})
 /** `notes` from `https://host/me/notes.git` or `git@host:me/notes.git`. */
 const nameOf = (url: string) => url.trim().replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() ?? ''
 // The folder's name follows the URL until the user types their own.
@@ -25,7 +23,7 @@ watch(() => state.url, url => {
 })
 const nameTyped = () => void (named = true)
 async function pickParent() {
-    const path = await open({directory: true, multiple: false, title: t('app.git.clone.parentTitle')})
+    const path = await pickToOpen({directory: true, title: t('app.git.clone.parentTitle'), defaultPath: state.parent || await documentDir().catch(() => undefined)})
     if (path) state.parent = path
 }
 

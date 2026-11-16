@@ -1,6 +1,6 @@
-import {convertFileSrc} from "@tauri-apps/api/core";
+import {fileUrl} from "~/utils/fileUrl";
 import {dirname, join} from "@tauri-apps/api/path";
-import {save} from "@tauri-apps/plugin-dialog";
+import {pickToSave} from "~/utils/dialogs";
 import {readTextFile, writeFile} from "@tauri-apps/plugin-fs";
 import {fileKind, type FileKind} from "@type32/jsoncanvas-editor/core";
 import type {CanvasHost} from "@type32/jsoncanvas-editor/vue";
@@ -44,7 +44,7 @@ export function useCanvasHost(session: ActiveSession, canvasPath: () => string |
     return {
         resolveFile(path) {
             const file = fileAt(path)
-            return file && !file.isFolder ? {exists: true, url: convertFileSrc(file.fullPath)} : {exists: false}
+            return file && !file.isFolder ? {exists: true, url: fileUrl(file.fullPath)} : {exists: false}
         },
         readText: path => readTextFile(`${root}/${path}`),
         async writeText(path, text) {
@@ -92,7 +92,7 @@ export function useCanvasHost(session: ActiveSession, canvasPath: () => string |
         async saveImage(png) {
             const canvas = canvasPath()
             const name = `${fileNameFromPath(canvas ?? 'Canvas.canvas', true)}.png`
-            const target = await save({
+            const target = await pickToSave({
                 title: t('app.editor.ui.canvas.exportTitle'),
                 defaultPath: canvas ? await join(await dirname(canvas), name) : name,
                 filters: [{name: 'PNG', extensions: ['png']}],

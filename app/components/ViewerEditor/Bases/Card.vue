@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {convertFileSrc} from "@tauri-apps/api/core";
+import {fileUrl} from "~/utils/fileUrl";
 import {toText, type RowScope} from "@type32/obsidian-bases-parser";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
@@ -24,7 +24,7 @@ const imageId = computed(() => (typeof view.value.image === 'string' && view.val
 /** The cover: an image address, a colour, or neither (an empty cover). */
 const cover = computed((): { image?: string, color?: string } => {
     const value = props.row.property(imageId.value!)
-    const file = (path: string | null) => (path ? {image: convertFileSrc(`${ctx.session.rootPath}/${path}`)} : {})
+    const file = (path: string | null) => (path ? {image: fileUrl(`${ctx.session.rootPath}/${path}`)} : {})
     if (value.type === 'Link') return file(ctx.host.resolve(value.path.split('#')[0]!, value.from))
     if (value.type === 'URL') return {image: value.value}
     if (value.type === 'Image') return /^[a-z][\w+.-]*:/i.test(value.src) ? {image: value.src} : file(value.src)

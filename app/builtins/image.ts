@@ -1,4 +1,4 @@
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {fileUrl} from '~/utils/fileUrl'
 import {definePlugin} from '#shared/plugin/api'
 import {fileNameFromPath, isImage} from '#shared/utils/fs/filenames'
 
@@ -8,7 +8,7 @@ export default definePlugin({
         // `![[pic.png]]` in notes, through its asset URL; captioned with the file's name.
         ctx.editor.embed({
             id: 'image', match: isImage,
-            props: f => ({srcPath: convertFileSrc(f.fullPath), display: fileNameFromPath(f.fullPath, true)}),
+            props: f => ({srcPath: fileUrl(f.fullPath), display: fileNameFromPath(f.fullPath, true)}),
             component: () => import('~/components/EditorProse/Embed/ImageDisplay.vue'),
         })
     },

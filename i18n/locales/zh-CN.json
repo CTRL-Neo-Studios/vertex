@@ -510,8 +510,13 @@
 				},
 				"untrusted": "此工作区开启了你在设置中关闭的插件。信任此工作区后它们才会运行。",
 				"waitsForTrust": "等待信任",
-				"waitsForRestart": "已关闭，但在 Vertex 重启前仍在运行：{names}。",
-				"restartNow": "立即重启",
+				"waitsForRestart": "等待重启",
+				"restart": {
+					"title": "重启 Vertex 以关闭 {name}？",
+					"description": "在 Vertex 重启前它会继续运行。重启后，你的工作区窗口会重新打开。",
+					"later": "稍后",
+					"now": "立即重启"
+				},
 				"settingsWaitForTrust": "此工作区在这里的部分更改需要信任此工作区后才会生效。",
 				"settings": "设置",
 				"noSettings": "此插件没有设置。",

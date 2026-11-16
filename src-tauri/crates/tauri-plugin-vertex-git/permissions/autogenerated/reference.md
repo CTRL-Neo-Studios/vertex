@@ -734,4 +734,30 @@ Denies the git_version command without any pre-configured scope.
 
 </td>
 </tr>
+
+<tr>
+<td>
+
+`vertex-git:allow-git-worktree-file`
+
+</td>
+<td>
+
+Enables the git_worktree_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-git:deny-git-worktree-file`
+
+</td>
+<td>
+
+Denies the git_worktree_file command without any pre-configured scope.
+
+</td>
+</tr>
 </table>

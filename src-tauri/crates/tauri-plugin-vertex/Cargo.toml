@@ -19,6 +19,14 @@ serde_json = "1.0"
 rayon = "1.12"
 tokio = { version = "1", features = ["sync", "time"] }
 url = "2.5.8"
+# Canonical paths as Tauri's fs scope makes them, without Windows' `\\?\` prefix (`reach.rs`); already in the tree.
+dunce = "1.0.5"
+# Open and Save dialogs shown from Rust (`dialogs.rs`): its Rust API widens no scope. The app crate registers the plugin.
+tauri-plugin-dialog = "2.8.4"
+# Decoding `vertex-file` URLs (`protocol.rs`); already in the tree through `url`.
+percent-encoding = "2.3.2"
+# Reveal in Finder or Explorer (`reveal_paths`); the app crate registers the plugin.
+tauri-plugin-opener = "2.7.2"
 
 [dev-dependencies]
 uuid = { version = "1.29.0", features = ["v4"] }

@@ -555,21 +555,36 @@ impl AppState {
         self.with_trust(app, |t| Ok(folder_trusted(t, root)), false).unwrap_or(false)
     }
 
-    /// The root of session `uuid` when it's a workspace's (a single file's window has no workspace settings).
-    pub(crate) fn workspace_of<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str) -> Option<String> {
+    /// Session `uuid`'s root, and whether it's a workspace's (else a single file's).
+    pub(crate) fn session_root<R: Runtime>(&self, app: &AppHandle<R>, uuid: &str) -> Option<(String, bool)> {
         self.with_sessions(
             app,
             |list| {
-                Ok(list
-                    .iter()
-                    .find(|s| session_uuid(s) == Some(uuid))
-                    .filter(|s| s.get("sessionType").and_then(Value::as_str) == Some("workspace"))
-                    .and_then(|s| s.get("rootFileOrFolderAbsolutePath")?.as_str().map(str::to_owned)))
+                Ok(list.iter().find(|s| session_uuid(s) == Some(uuid)).and_then(|s| {
+                    let root = s.get("rootFileOrFolderAbsolutePath")?.as_str()?.to_owned();
+                    Some((root, s.get("sessionType").and_then(Value::as_str) == Some("workspace")))
+                }))
             },
             false,
         )
         .ok()
         .flatten()
+    }
+
+    /// Every workspace's root in `sessions.json`.
+    pub(crate) fn workspace_roots<R: Runtime>(&self, app: &AppHandle<R>) -> Vec<String> {
+        self.with_sessions(
+            app,
+            |list| {
+                Ok(list
+                    .iter()
+                    .filter(|s| s.get("sessionType").and_then(Value::as_str) == Some("workspace"))
+                    .filter_map(|s| s.get("rootFileOrFolderAbsolutePath")?.as_str().map(str::to_owned))
+                    .collect())
+            },
+            false,
+        )
+        .unwrap_or_default()
     }
 
     /// `f` on the global settings as they are (read from disk the first time); `T`'s default if the lock is poisoned.
@@ -674,12 +689,19 @@ pub fn settings_get<R: Runtime>(
 
 /// Saves the global settings, then runs the [`crate::api::on_settings_change`] callbacks with the old and new value
 /// before returning, so what they do (the AI plugin deleting stale keys) can't undo a call issued after this resolves.
+/// A new `gitConfig.path` must be a file picked in the saving window's dialog: Rust runs that program.
 #[tauri::command]
 pub fn settings_set<R: Runtime>(
     app: AppHandle<R>,
+    webview: tauri::Webview<R>,
     state: tauri::State<'_, AppState>,
     settings: Value,
 ) -> Result<(), String> {
+    let git = |s: &Value| s.pointer("/gitConfig/path").and_then(Value::as_str).unwrap_or_default().to_owned();
+    let path = git(&settings);
+    if !path.is_empty() && path != state.read_settings(&app, git) && !crate::reach::picked(&app, webview.label(), &path) {
+        return Err(format!("{path:?} wasn't picked in this window: choose git in its dialog"));
+    }
     let (old, new) = state.with_settings(&app, |s| (std::mem::replace(s, settings), s.clone()), true)?;
     for f in state.settings_listeners.lock().map_err(|e| e.to_string())?.iter() {
         f(&old, &new);
