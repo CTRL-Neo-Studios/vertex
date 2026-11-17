@@ -775,10 +775,30 @@ Blocked by X7.
 - Check whether the editor's `/comark` plugin (`ofm()`, 0.5) can replace `app/utils/comarkPlugins.ts`'s wikilinks, so replies render callouts, tags and highlights as notes do; adopt it if the chat's streaming and quoted frontmatter still work.
 - `ai-assistant` (requires `ai`): `useAiEditorExtension` as an editor extension; `aiConfig.editorAssistant` → `plugins.config.ai-assistant`.
 
+### New chat tools
+
+Asked for after a chat told to reorganise a workspace wrote copies of the files instead of moving them. The cause, in today's code: no tool moves a file, so the model recreates it (`createNote` at the new path) or runs `mv` in `bash`, where `chatBash.ts` stages a move's destination as a new note and drops the removal (`sandboxWrites`: "deletions are left out"). Either way the original stays.
+
+What exists today, so nothing is built twice: `findFiles` (part of a name, a folder, an extension; lists a folder flat), `searchNotes` (one word or phrase, 20 hits with a snippet, no folder filter, no line numbers), `readNote`, `createNote` / `writeNote` / `editNote`, `bash` (the sandbox's grep, find, sed, awk), `findTools`. Missing: move, copy, glob, regex search, a tree.
+
+- **`moveFiles({moves: [{from, to}]})`** (Write mode): files or folders, moved and/or renamed, missing folders created. One call takes the whole list and asks once (`needsApproval`, as `runWorkflow` does), the row listing each `from → to`. It then runs the kernel's move and rename, so links are rewritten as `fileConfig.updateLinks` says, open tabs follow, and it's one step of Files' undo history with its toast. Applied at once, not staged with the reply's note changes: the tools that follow see the real paths. The kernel gains `session.files.rename(uuid, name)`; `session.files.move` gets a way to answer a name clash without the dialog (the tool returns the clashes for the model to resolve, it never replaces).
+- **`copyFiles({copies: [{from, to}]})`** (Write mode): the same shape and approval; a duplicate is a copy beside the original. The kernel gains `session.files.copyTo(uuid, folder, name)` (from `importItems`, which Duplicate already uses).
+- **`bash` stops faking moves:** a command that moved or removed a workspace file gets a result saying that didn't happen on disk and to use `moveFiles`; a moved file's destination is no longer staged as a new note. The system prompt says the same: move with `moveFiles`, never by recreating a file.
+- **`findFiles` gains `glob`** (`Projects/**/*.md`, `**/*.{png,jpg}`): `*`, `**`, `?` and `{a,b}` over the index's workspace-relative paths, a small matcher of its own with a test (no new dependency). Its description names "glob" so `findTools` finds it.
+- **`searchNotes` becomes the grep:** optional `regex`, `folder` (or `glob`), `caseSensitive`, `context` (lines around a hit) and `limit` (default 20, at most 200); hits carry line numbers, and the result says how many more there were. The kernel's `search_notes` takes them (Rust's `regex` crate, a new direct dependency of the kernel crate: in the webview it would be one IPC read per file). One tool rather than a second `grep` beside it, so the model has one place to search text; its description names "grep".
+- **`folderTree({folder?, depth?})`** (any mode): the folders as an indented tree, each with its file count and its files up to a cap per folder (then "… N more"), from `session.index.tree()`. What a reorganisation reads first, instead of a flat list of every path.
+- **`toolFeedback({kind, tool?, summary, details})`** (any mode), `kind` one of `missing` (no tool does what the task needs), `bug` (a tool failed or returned something wrong) or `confusing` (its description or result misled). One tool instead of three: the model picks a kind more reliably than a tool. The system prompt tells it to call this, and say so in its reply, rather than work around a gap (the copies above were a workaround).
+  - Kept on this computer only (`ctx.data.global`, the newest 200, each with the time, the model and the chat's id): nothing is sent anywhere, since `details` may quote notes.
+  - Settings → Chat lists them (newest first; Copy as a GitHub issue, Remove, Clear), so the user decides what leaves the machine.
+- **Not built until a feedback entry or a user asks:** `trashFiles`, `createFolder` (`moveFiles` and `createNote` make the folders they need).
+
 ### Acceptance
 - [ ] The shared acceptance, for both; SMOKE row 43 and the chat rows pass.
 - [ ] With `workflows` off, chat has no `runWorkflow` tool; with `chat` off, chats stay on disk.
 - [ ] Every list of kernel-internal imports in the boundary test is empty or each entry has a written reason to stay.
+- [ ] "Reorganise this folder" in Write mode (a fixture vault, a real model): the files are moved after one approval, none exists twice, links to them still resolve, and Files' Undo puts them back. The same request through `bash`'s `mv` leaves no copy and tells the model to use `moveFiles`.
+- [ ] `findFiles` with a glob, `searchNotes` with a regex and a folder, and `folderTree` return what the same query gives on the command line for the fixture vault (unit tests for the glob matcher and `search_notes`).
+- [ ] A request no tool can do (e.g. "empty the trash") ends in a `toolFeedback` entry that shows on Settings → Chat and copies as an issue; no request leaves the app for it.
 
 ## C1: Package format and SDK
 
