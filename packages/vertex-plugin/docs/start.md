@@ -152,8 +152,8 @@ fails with what's wrong when `plugin.json` or a locale file breaks a rule.
 ## Run it in Vertex
 
 Settings → Plugins → the arrow beside **Install…** → **From a folder (development)…**, and pick `dist/`. The dialog
-shows what the plugin is and asks; **Install** turns it on. In a workspace window, the right sidebar's view menu now
-has Hello.
+shows what the plugin is and asks; **Install** turns it on. In a workspace window, open the right sidebar (the button
+at the window's top right): its header has the view's icon, the hand, and a click on it shows "Hello, Vertex".
 
 Pick `dist/`, not the project: the folder you pick is copied as it is and watched.
 
@@ -167,7 +167,7 @@ bunx vite build --watch
 ```
 
 and each save of a source file shows in Vertex a moment later. An error in `setup` or in what the plugin draws shows
-in Vertex as "Hello couldn't start" or in place of the view; the window's devtools (right-click → Inspect, in a
-development build of Vertex) have the stack.
+in Vertex as "Hello couldn't start" or in place of the view; the window's web inspector has the stack and the
+console (on macOS, Safari → Develop → your Mac's name → the Vertex window).
 
 To ship it, see [Publishing](publishing.md).

@@ -107,13 +107,19 @@ export function vertex(options: VertexOptions = {}): PluginOption[] {
         tailwindcss(),
         {
             name: 'vertex:package',
-            config: () => ({
+            config: config => ({
                 // Library builds leave `process.env.NODE_ENV` for the consumer; a plugin is the end of the line.
                 define: {'process.env.NODE_ENV': JSON.stringify('production')},
                 build: {
                     lib: {entry: options.entry ?? 'src/main.ts', formats: ['es'], fileName: () => 'main.js', cssFileName: 'styles'},
                     // The host imports `main.js` from a blob URL, where a sibling chunk can't be imported.
-                    rolldownOptions: {output: {inlineDynamicImports: true}},
+                    rolldownOptions: {output: {codeSplitting: false}},
+                    // Tailwind watches the files it scans, the build's own output among them unless Git ignores it: a
+                    // watching build (`vite build --watch`) would see each build and build again, forever.
+                    ...(config.build?.watch && {watch: {exclude: [
+                        `${resolve(config.root ?? process.cwd(), config.build.outDir ?? 'dist')}/**`,
+                        resolve(config.root ?? process.cwd(), 'plugin.zip'),
+                    ]}}),
                 },
             }),
             configResolved(config) {

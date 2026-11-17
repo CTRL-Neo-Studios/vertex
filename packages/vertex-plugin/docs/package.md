@@ -10,7 +10,7 @@ A folder named by the plugin's id:
 | `main.js` | One ES module with no imports; its default export is `definePlugin({setup})`. |
 | `styles.css` | Optional. Put in the page when the plugin loads, before its code runs. |
 | `locales/<locale>.json` | Optional. The plugin's strings. |
-| anything else | Assets, read through [`ctx.plugin.assetUrl`](context.md#ctxpluginid-ctxpluginversion-ctxpluginsource-ctxpluginassetur). |
+| anything else | Assets, read through [`ctx.plugin.assetUrl`](context.md#ctxpluginid-ctxpluginversion-ctxpluginsource-ctxpluginasseturl). |
 
 Vertex keeps it in its data folder (`plugins/<id>/`), or in a workspace's `.vertex/plugins/<id>/` for a workspace's
 own ([Trust](trust.md#a-workspaces-plugins)), with `.install.json` beside, its record of where it came from.
@@ -48,6 +48,7 @@ Unknown keys are errors; the build lists every problem.
 - checks `plugin.json` and `locales/*.json` and copies them;
 - copies `public/` (Vite's own rule) to the top of `dist/`;
 - with `pack: true`, writes `plugin.zip` beside `dist/`, the asset a release carries ([Publishing](publishing.md)).
+- with `vite build --watch`, builds again on each change of the source, never of its own output.
 
 Add `@vitejs/plugin-vue` before it to write `.vue` files.
 

@@ -414,4 +414,4 @@ The system's Open and Save dialogs: an absolute path, `null` when cancelled. Wha
 const path = await ctx.dialogs.open({title: 'Import', filters: [{name: 'CSV', extensions: ['csv']}]})
 ```
 
-`directory: true` picks a folder. Files inside the workspace are the session's ([session](session.md#sessionfiles)).
+`directory: true` picks a folder. Files inside the workspace are the session's ([session](session.md#files)).

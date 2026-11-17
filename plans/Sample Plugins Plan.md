@@ -31,7 +31,7 @@ building and released.
 | What a sample may import | The SDK's modules and what it bundles itself. The SDK's build already fails on any other import of the app's. |
 | What a sample's author may read | The author docs and the SDK's published types. Not Vertex's source (Open questions, 3). |
 | A gap | The sample stops. The gap gets a row under Gaps, is closed in Vertex (contract, a test, the docs), and Vertex is committed before the sample goes on. Nothing reaches into the kernel's internals to get by. |
-| Contract changes | Additions only, within `apiVersion` 1 while the SDK is an alpha. A sample sets `minAppVersion` to the Vertex that has what it uses. |
+| Contract changes | Additions only, within `apiVersion` 1 (the docs' Versions page). A sample sets `minAppVersion` to the Vertex that has what it uses. |
 | Author docs | In the SDK's package (`packages/vertex-plugin/docs/`, shipped with it), since they version with the contract and reach an author with the types. `Concepts and Structures.md` links them. |
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
 | Order | The graph first, alone: it is the plan's first user of the docs and finds the gaps the others share. Then the small ones, each on a different part of the contract. The file browser last: the widest surface. |
@@ -74,6 +74,7 @@ Found by reading the contract, before any sample is written. P0 closes the first
 | `/ui`'s components' props | S2, S6 | Closed in P0: `shared/plugin/components.ts`. |
 | The SDK outside this machine | all | Closed: published (Decisions). |
 | A worker | the graph, maybe | A plugin is one `main.js` imported from a blob URL. Whether a `Worker` can start from a plugin's asset isn't known; only needed if 5,000 notes don't lay out on the main thread (S1 measures first). |
+| A community plugin's API, typed | a community plugin another uses (none of the six) | Found in D1. `ctx.provide` works for any plugin, but `PluginApis` is augmented through `#shared/plugin/api`, which only the SDK's own files resolve, so `ctx.use('<community id>')` doesn't type-check. The docs say so (the package, what can't be done). |
 
 ## P0: What every sample needs
 
@@ -132,8 +133,16 @@ In `packages/vertex-plugin/docs/`. Written before the samples so they can be wri
   Git repository (C2b); how a view is named (C3); C1's Not done list.
 
 ### Acceptance
-- [ ] Every member of `PluginContext` and `SessionContext` and every contribution point is in the docs (a test compares the docs' headings with the contract's names).
-- [ ] The Start page, followed from an empty folder, ends with a plugin running in Vertex.
+- [x] Every member of `PluginContext` and `SessionContext` and every contribution point is in the docs (a test compares the docs' headings with the contract's names). (`src/docs.test.ts`: the contract's names are read from `api.ts`'s syntax; every contribution point is a member, `ctx.views.panel` and the rest, so it's covered with them.)
+- [x] The Start page, followed from an empty folder, ends with a plugin running in Vertex. (Each file of the page written as it shows it into an empty `/tmp` folder, built and type-checked against the published SDK `1.1.0`; in `tauri dev`, with a temporary harness standing in for the Settings window's picker, installed from `dist/` and turned on: the right sidebar had its icon, and the view drew "Hello, Vertex". Then the development loop, with this tree's preset over the published one (below): a watching build and an edit of a string and of a class reloaded the window, which drew "Hi there, Vertex". All deleted after.)
+
+### As built
+
+- **Docs** (`packages/vertex-plugin/docs/`, shipped: `files` has `docs`): `README.md` (the index), `start.md`, `package.md` (what's installed, `plugin.json` key by key, the build, the shared modules and helpers, dependencies, strings and how labels are keys, what can't be done), `context.md` (each `ctx` member, a contribution point each with an example), `session.md`, `ui.md` (the two tiers, Vue, Nuxt UI, icons, `/ui`'s components with a settings page, styles), `config.md` (config and its schema, overrides, data, secrets, the network, permissions), `trust.md`, `publishing.md` (a release's workflow, a branch, what users can install, updates), `versions.md`. The carried notes: the parent `.gitignore` (Start, UI), how a view is named (the package's strings), C1's bundled `@vue/*` (dependencies).
+- **Checked:** `src/docs.test.ts` (above); every TypeScript and Vue example compiled with `vue-tsc` against the SDK built from this tree (each fragment in a function given `ctx` and `session`); every link between the pages resolves. Both throwaway.
+- **Found while following the Start page:** `vite build --watch` built forever: Tailwind watches the files it scans, `dist/` among them when nothing ignores it (the template's `.gitignore` does, the page's files had none), and in Vertex the watched folder reloaded the window as often. The preset now excludes `dist/` and `plugin.zip` from a watching build (one build per change, checked). It also writes `codeSplitting: false` for the deprecated `inlineDynamicImports` (Vite 8 warned on every build; still one `main.js` with a dynamic import, checked). The template's README said to install the project folder; a folder install copies and watches the whole folder, `node_modules` too, so it says `dist/` now.
+- **Not done:** the web inspector line (Safari's Develop menu) wasn't tried. These changes, with K6's (`SettingsPageDef.icon` optional, `SettingsRowProps.icon`), are in no published SDK yet: the next minor carries them, and the Start page's `^1.1.0` takes it.
+- **Numbers:** 368 tests (53 files); typecheck unchanged (the 7 errors in `@type32/latex2vue`); the SDK's `tsc` clean.
 
 ## The samples' shared acceptance
 

@@ -5,7 +5,8 @@
   "description": "Vertex SDK - Types, the host's shared modules and a Vite preset for Vertex community plugins.",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "docs"
   ],
   "exports": {
     ".": {
