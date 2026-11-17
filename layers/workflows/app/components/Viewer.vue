@@ -7,7 +7,8 @@ import {ViewerLayout} from "~/plugin/ui"
 import type {UndoResult} from "../../shared/effects"
 import {useNotify} from "../lib/notify"
 import {useWorkflowManifest} from "../lib/useWorkflowManifest"
-import {failureOf, newWorkflow, parseWorkflow, useWorkflowRunner, type RunOutcome} from "../lib/useWorkflowRunner"
+import {failureOf, newWorkflow, parseWorkflow, useWorkflowRunner} from "../lib/useWorkflowRunner"
+import type {RunOutcome} from "../api"
 
 /**
  * The `.workflow` editor (workspace mode only). The file is untrusted JSON: it's loaded through `migrate`, and

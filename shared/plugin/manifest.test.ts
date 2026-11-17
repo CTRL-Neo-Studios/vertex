@@ -25,6 +25,15 @@ describe('validateManifest', () => {
         if (!result.ok) expect(result.errors[0]).toMatch(/newer than this Vertex supports/)
     })
 
+    it('refuses a plugin that needs a later app than the one running', () => {
+        const runs = (minAppVersion: string, app: string) => validateManifest({...valid, minAppVersion}, app).ok
+        expect(runs('0.10.0', '0.9.2')).toBe(false)
+        expect(runs('0.9', '0.9.2')).toBe(true)
+        expect(runs('0.9.2', '0.9.2-beta.1')).toBe(true)
+        expect(runs('1.0.0', '0.9.9')).toBe(false)
+        expect(validateManifest({...valid, minAppVersion: 'soon'}).ok).toBe(false)
+    })
+
     it('refuses a plugin that requires itself or an invalid id', () => {
         const result = validateManifest({...valid, requires: ['graph-view', 'Bad Id?']})
         expect(result.ok).toBe(false)

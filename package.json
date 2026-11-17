@@ -2,7 +2,8 @@
   "name": "@type32/vertex",
   "private": true,
   "workspaces": [
-    "layers/*"
+    "layers/*",
+    "packages/*"
   ],
   "type": "module",
   "scripts": {

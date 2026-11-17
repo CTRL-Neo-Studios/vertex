@@ -15,8 +15,11 @@ export type WindowKind = typeof WINDOW_KINDS[number]
  * What a plugin may use beyond the window's own grant. Rust grants a window what each name stands for
  * (`permissions.json`, the kernel's `grants.rs`) while a plugin asking for it is on there.
  */
+export type PluginPermission = 'network' | 'secrets' | 'files-outside-workspace'
 export const PLUGIN_PERMISSIONS = Object.keys(permissionTable) as PluginPermission[]
-export type PluginPermission = keyof typeof permissionTable
+// Spelled out above so the SDK's types don't import JSON; this fails to compile when `permissions.json` names others.
+const permissionsMatch: [PluginPermission, keyof typeof permissionTable] extends [keyof typeof permissionTable, PluginPermission] ? true : false = true
+void permissionsMatch
 
 /** Who may override a plugin's setting from a workspace's `.vertex/settings.json`. */
 export const OVERRIDE_LEVELS = ['workspace', 'trustedWorkspace'] as const
@@ -57,6 +60,7 @@ export interface PluginManifest {
     icon?: string
     author?: string
     apiVersion: number
+    /** The oldest Vertex it runs in (`0.9.2`); an older app keeps it off. */
     minAppVersion?: string
     /** The windows it runs in; default `['session']`. */
     windows?: WindowKind[]
@@ -152,8 +156,19 @@ function validateConfig(config: unknown, errors: string[]) {
     }
 }
 
-/** Checks a parsed `plugin.json`; every problem is listed, not only the first. */
-export function validateManifest(raw: unknown): ManifestResult {
+/** `a` is a later version than `b`, by their leading numbers (`0.10` > `0.9.2`; a pre-release suffix is ignored). */
+function laterVersion(a: string, b: string): boolean {
+    const parts = (v: string) => (/^\d+(?:\.\d+)*/.exec(v)?.[0] ?? '0').split('.').map(Number)
+    const [x, y] = [parts(a), parts(b)]
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0)
+    return false
+}
+
+/**
+ * Checks a parsed `plugin.json`; every problem is listed, not only the first. With `appVersion` (the running app's),
+ * a `minAppVersion` above it is one.
+ */
+export function validateManifest(raw: unknown, appVersion?: string): ManifestResult {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {ok: false, errors: ['the manifest must be a JSON object']}
     const m = raw as Record<string, unknown>
     const errors: string[] = []
@@ -164,8 +179,12 @@ export function validateManifest(raw: unknown): ManifestResult {
     }
     if (!isString(m.name) || !m.name.trim()) errors.push('"name" must be a non-empty string')
     if (!isString(m.version) || !m.version.trim()) errors.push('"version" must be a non-empty string')
-    for (const key of ['description', 'icon', 'author', 'minAppVersion'] as const) {
+    for (const key of ['description', 'icon', 'author'] as const) {
         if (m[key] !== undefined && !isString(m[key])) errors.push(`"${key}" must be a string`)
+    }
+    if (m.minAppVersion !== undefined) {
+        if (!isString(m.minAppVersion) || !/^\d+(?:\.\d+){0,2}$/.test(m.minAppVersion)) errors.push('"minAppVersion" must be a version like 0.9.2')
+        else if (appVersion && laterVersion(m.minAppVersion, appVersion)) errors.push(`"minAppVersion" ${m.minAppVersion} is newer than this Vertex (${appVersion})`)
     }
     if (typeof m.apiVersion !== 'number' || !Number.isInteger(m.apiVersion) || m.apiVersion < 1) {
         errors.push('"apiVersion" must be a positive integer')

@@ -1,7 +1,7 @@
 <script lang="ts">
 import type {CapabilityDef} from "@type32/workflows/core"
 import type {DropdownMenuItem} from "@nuxt/ui"
-import type {RunOutcome} from "../lib/useWorkflowRunner"
+import type {RunOutcome} from "../api"
 
 /** What the user trusted: the workflow's file, or a folder (with its subfolders when `nested`). */
 export type TrustAnswer = { kind: 'file' } | { kind: 'folder', path: string, nested: boolean }

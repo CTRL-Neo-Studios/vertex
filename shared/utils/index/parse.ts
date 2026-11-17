@@ -1,4 +1,4 @@
-import type {YamlFormData} from "@type32/yaml-editor-form";
+import type {NoteProperties} from "#shared/types/active/workspace";
 import type {FileLink} from "@type32/obsidian-bases-parser";
 import {getFileExtensionFromPath, isPlainTextFile, isYamlFile} from "#shared/utils/fs/filenames";
 import type {LinkExtractorDef} from "#shared/plugin/contributions";
@@ -28,14 +28,14 @@ export function parentPathOf(path: string) {
  * Properties of a file: YAML body for .yml/.yaml, frontmatter for md/txt, nothing otherwise.
  * Parse errors are reported via `error` instead of silently becoming `{}`.
  */
-export function parseProperties(path: string, content: string, parsers: ContentParsers): { properties: YamlFormData, error?: unknown } {
+export function parseProperties(path: string, content: string, parsers: ContentParsers): { properties: NoteProperties, error?: unknown } {
     const ext = getFileExtensionFromPath(path)
     const parse = isYamlFile(ext) ? parsers.parseYaml : isPlainTextFile(ext) ? parsers.parseFrontmatter : undefined
     // An empty note has no properties (the frontmatter parser throws "No markdown text provided" on it).
     if (!parse || !content.trim()) return {properties: {}}
     try {
         const result = parse(content)
-        return {properties: (result.data ?? {}) as YamlFormData, error: result.error}
+        return {properties: (result.data ?? {}) as NoteProperties, error: result.error}
     } catch (error) {
         return {properties: {}, error}
     }
@@ -70,7 +70,7 @@ function wikiLink(path: string, subpath: string | undefined, display: string | u
 }
 
 /** A note's tags, links and embeds as Obsidian's metadata cache has them (checked against Obsidian 1.15.1). */
-export function parseNoteMeta(content: string, properties: YamlFormData): NoteMeta {
+export function parseNoteMeta(content: string, properties: NoteProperties): NoteMeta {
     const links: FileLink[] = [], embeds: FileLink[] = []
     for (const value of Object.values(properties).flat()) {
         const m = typeof value === 'string' && /^\[\[([^\]]+)\]\]$/.exec(value.trim())

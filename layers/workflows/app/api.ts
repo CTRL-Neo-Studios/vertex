@@ -1,10 +1,19 @@
 /**
  * The workflows plugin's API (`ctx.use('workflows')`): run a vault's workflows, and add nodes to their language.
  */
-import type {RunOutcome} from './lib/useWorkflowRunner'
+import type {RunResult} from '@type32/workflows/core'
+import type {Op} from '../shared/effects'
 import type {VertexExtension} from '../shared/vertex'
 
-export type {RunOutcome, VertexExtension}
+export type {VertexExtension}
+
+export interface RunOutcome {
+    dry: boolean
+    result: RunResult
+    /** What changed, or for a dry run what would change. */
+    ops: Op[]
+}
+
 export type {VertexBuilder, VertexEffects, VertexValues} from '../shared/vertex'
 
 export interface WorkflowsApi {

@@ -1,0 +1,7 @@
+/*
+ * A plugin's Tailwind: `@import "@type32/vertex-plugin/tailwind.css";` in its CSS. Its classes compile against
+ * Vertex's theme (colors, fonts, Nuxt UI's `text-muted`, `bg-elevated`…, the `dark:` variant) to the variables the app
+ * already defines; no preflight and no theme variables of its own, so it can't restyle the app.
+ */
+@import "./theme.css" reference;
+@import "tailwindcss/utilities.css" layer(utilities);

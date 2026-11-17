@@ -1,9 +1,10 @@
-import {CompileError, compile, DOCUMENT_FORMAT, hashProgram, migrate, type Diagnostic, type DocumentV1, type RunOptions, type RunResult} from "@type32/workflows/core"
+import {CompileError, compile, DOCUMENT_FORMAT, hashProgram, migrate, type Diagnostic, type DocumentV1, type RunOptions} from "@type32/workflows/core"
 import type {SessionContext} from "#shared/plugin/api"
 import {baseNameOf, obsidianYaml, type Vault} from "#shared/plugin/vault"
 import {overlayVault} from "../../shared/dryRun"
 import {createVertexEffects, undoOps, type Op, type UndoResult} from "../../shared/effects"
 import type {PickOptions, VertexEffects} from "../../shared/vertex"
+import type {RunOutcome} from "../api"
 import AskModal, {type Ask} from "../components/AskModal.vue"
 import TrashModal from "../components/TrashModal.vue"
 import TrustModal from "../components/TrustModal.vue"
@@ -33,13 +34,6 @@ export function parseWorkflow(text: string): { doc?: DocumentV1, problems: Diagn
     }
     const loaded = migrate(raw, language())
     return 'doc' in loaded ? {doc: loaded.doc, problems: []} : {problems: loaded.diagnostics}
-}
-
-export interface RunOutcome {
-    dry: boolean
-    result: RunResult
-    /** What changed, or for a dry run what would change. */
-    ops: Op[]
 }
 
 /** Where a run starts from. */

@@ -1,6 +1,8 @@
 /*@import url('https://fonts.cdnfonts.com/css/segoe-ui-variable-static-display');*/
 /*@import url('https://fonts.cdnfonts.com/css/sf-pro-display');*/
-@import 'tailwindcss';
+/* `static`: every theme variable is defined, so community plugins' Tailwind classes, compiled against this theme
+   (`@type32/vertex-plugin/tailwind.css`), find theirs. */
+@import 'tailwindcss' theme(static);
 @import '@nuxt/ui';
 /* The workflows plugin's canvas (@type32/workflows/vue) is built from Nuxt UI classes. Nuxt UI scans the layers' own
    `app/` folders but no package, so it's named here; bun hoists the layer's dependency to the root `node_modules`. */
@@ -47,7 +49,7 @@
     --fade-bottom: 2rem;
 }
 
-@theme {
+@theme static {
     --font-sans: 'Geist', 'Inter', sans-serif;
 
     --font-mono: 'Geist Mono', 'JetBrains Mono', 'Google Sans Code', monospace, ui-monospace;

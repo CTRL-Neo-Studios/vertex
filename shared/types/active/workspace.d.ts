@@ -1,5 +1,7 @@
-import type {YamlFormData} from "@type32/yaml-editor-form";
 import type {NoteMeta} from "#shared/utils/index/parse";
+
+/** A file's properties as parsed: a note's frontmatter, a YAML file's body. */
+export type NoteProperties = Record<string, unknown>
 
 /*
 Usage Scope: Active Workspaces
@@ -13,7 +15,7 @@ export interface ActiveWorkspaceFileIndex {
     isFolder: boolean,
     size: number,
     children: string[]
-    properties: YamlFormData,
+    properties: NoteProperties,
     forelinks: string[]
     backlinks: string[]
     /** Body tags, link texts and embeds of a note, for Bases; empty for other files. */
