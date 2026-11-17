@@ -34,6 +34,9 @@ export function contributionOwner(def: object): string | undefined {
     return id && (pluginEntries().find(e => e.manifest.id === id)?.manifest.name ?? id)
 }
 
+/** The id of the plugin that registered `def`; `undefined` for the kernel's own. */
+export const contributionPlugin = (def: object): string | undefined => owners.get(def)
+
 /** Where each contribution point's definitions go. */
 const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]) => () => void } = {
     command: registerCommand,

@@ -1,5 +1,5 @@
 import {Chat} from "@ai-sdk/vue";
-import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls} from "ai";
+import {getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type LanguageModel} from "ai";
 import {aiField, discardProposal, isEditorTool, runEditorTool} from "@type32/codemirror-rich-obsidian-editor/ext/ai";
 import {vertexInvoke} from "~/utils/vertexInvoke";
 import {readFile} from "@tauri-apps/plugin-fs";
@@ -8,7 +8,6 @@ import type {ActiveTab} from "#shared/types/active/tabs";
 import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, ChatSummary, ChatVaultState, VertexChatMessage} from "#shared/types/app/chats";
 import {pluginStateKey, sessionScope} from "#shared/constants/app";
 import {fileNameFromPath, getFileExtensionFromPath, IMAGE_TYPES, isImage, isPlainTextFile} from "#shared/utils/fs/filenames";
-import {toChatMode} from "#shared/utils/defaults/apps";
 import {ChatError, chatClient} from "~/utils/chatClient";
 import {createChatTransport, dataUrl, generateChatTitle, type ChatSendSetup} from "~/utils/chatTransport";
 import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "~/utils/chatTools";
@@ -18,8 +17,6 @@ import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from 
 import {TRASH_DIR} from "#shared/utils/vault";
 import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault";
 import {chatUses} from "~/builtins/chat";
-import {resolveAiFeature} from "~/composables/ai/useAiConfig";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {usePanels} from "~/composables/active/usePanels";
@@ -60,6 +57,16 @@ const saveErrors = shallowReactive(new Map<string, string>())
 const parentsOf = (path: string) => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
 const inFolder = (folder: string, path: string) => folder === path || folder.startsWith(`${path}/`)
 
+/** What chat reads of a model from the AI plugin (its `AiModel`, which the kernel can't import). */
+interface ChatModel {
+    profile: { id: string, modelId: string, systemPrompt: string, tools?: false }
+    provider: { models: { id: string, inputModalities?: string[] }[] }
+    languageModel(options?: { params?: boolean }): LanguageModel
+}
+
+/** A stored chat mode (settings or a chat file) as a mode: `ask` is Read's old name; anything unknown is Suggest. */
+const toChatMode = (value: unknown): ChatMode => value === 'read' || value === 'ask' ? 'read' : value === 'write' ? 'write' : 'suggest'
+
 /** A workflow run's change (the workflows plugin's `Op`), in a few words for the model. */
 const opText = (op: { kind: string, why: string, path?: string, from?: string, to?: string }) =>
     op.kind === 'move' ? `${op.why}: "${op.from}" → "${op.to}"` : `${op.kind === 'create' ? `new ${op.why}` : op.why}: "${op.path}"`
@@ -75,14 +82,15 @@ export const chatSummaryOf = (session: ActiveSession, id: string): ChatSummary |
 export function useChats(session?: ActiveSession) {
     const scope = sessionScope(session, 'useChats')
     const nuxtApp = useNuxtApp()
-    const {effective} = useSettingsScope()
+    /** The AI plugin's API: chat requires AI, so it's there while chat runs. */
+    const ai = () => chatUses('ai')
     const $tabs = useActiveTabs(session)
     const $index = useActiveWorkspaceIndex(session)
     const panels = usePanels(session)
     const $navi = useAppNavigator()
 
     const root = computed(() => session?.workspaceSession && session.rootPath ? session.rootPath : null)
-    const storage = computed<ChatStorage>(() => effective.value?.aiConfig.chatStorage ?? 'app')
+    const storage = computed<ChatStorage>(() => ai()?.config().chatStorage ?? 'app')
     const vault = useState<ChatVaultState | null>(pluginStateKey('chat', 'vault', scope), () => null)
     const index = useState<ChatIndex | null>(pluginStateKey('chat', 'index', scope), () => null)
     const error = useState<string | null>(pluginStateKey('chat', 'error', scope), () => null)
@@ -195,18 +203,16 @@ export function useChats(session?: ActiveSession) {
     const saveLogged = (entry: LiveChat) => save(entry).catch(e => console.error(`[useChats] could not save chat ${entry.meta.id}`, e))
 
     /** The pinned profile while it's still usable, else the chat feature's. */
-    function resolveModel(pinned: string | undefined) {
-        const ai = effective.value?.aiConfig
-        if (!ai || ai.features.chat === '') throw new Error(CHAT_NO_MODEL)
-        const profile = ai.modelProfiles.find(p => p.id === pinned)
-        const provider = profile && ai.providers.find(p => p.id === profile.providerId)
-        const resolved = profile?.modelId && provider ? {profile, provider} : resolveAiFeature(ai, 'chat')
+    function resolveModel(pinned: string | undefined): ChatModel {
+        const api = ai()
+        if (!api?.featureOn('chat')) throw new Error(CHAT_NO_MODEL)
+        const resolved = (pinned ? api.resolveProfile(pinned) : null) ?? api.resolveFeature('chat')
         if (!resolved) throw new Error(CHAT_NO_MODEL)
         return resolved
     }
 
     /** Whether a profile's model takes images, from its provider's model list (`inputModalities`); unknown when it doesn't say. */
-    function takesImages({profile, provider}: ReturnType<typeof resolveModel>): boolean | undefined {
+    function takesImages({profile, provider}: ChatModel): boolean | undefined {
         const modalities = provider.models.find(m => m.id === profile.modelId)?.inputModalities
         return modalities ? modalities.includes('image') : undefined
     }
@@ -215,7 +221,7 @@ export function useChats(session?: ActiveSession) {
      * Every image attached in the conversation, read now as data URLs: the stored chat holds their paths, not their
      * bytes. A model known not to take images gets an error instead of a silent drop; one deleted since is skipped.
      */
-    async function imagesFor(messages: VertexChatMessage[], model: ReturnType<typeof resolveModel>): Promise<ChatSendSetup['images']> {
+    async function imagesFor(messages: VertexChatMessage[], model: ChatModel): Promise<ChatSendSetup['images']> {
         const wanted = messages.flatMap(m => m.role !== 'user' ? [] : (m.metadata?.notes ?? [])
             .filter(path => isImage(getFileExtensionFromPath(path)))
             .map(path => ({messageId: m.id, path})))
@@ -322,7 +328,7 @@ export function useChats(session?: ActiveSession) {
         return await editorFor(chatId, file.uuid) ? {path: slashed(file.relativePath), opened: true} : {error: 'The note could not be shown in the editor.'}
     }
 
-    const defaultMode = (): ChatMode => toChatMode(effective.value?.aiConfig.chatMode)
+    const defaultMode = (): ChatMode => toChatMode(ai()?.config().chatMode)
     const modeOf = (entry: LiveChat) => entry.meta.mode ?? defaultMode()
 
     /** Every file and folder in the workspace but dot-named ones (and what's in them), for `findFiles`. */
@@ -568,7 +574,8 @@ export function useChats(session?: ActiveSession) {
             entry.staging = undefined
             entry.sandbox = undefined
         }
-        const {profile, provider} = resolveModel(pinned)
+        const model = resolveModel(pinned)
+        const {profile} = model
         // Every send starts here, right after the user message was added.
         void saveLogged(entry)
         const toolsOn = profile.tools !== false
@@ -612,7 +619,7 @@ export function useChats(session?: ActiveSession) {
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
         ].filter(Boolean).join('\n\n')
-        return {provider, profileId: profile.id, modelId: profile.modelId, params: profile.params, prompt, notes: await notesFor(messages), images: await imagesFor(messages, {profile, provider}), tools}
+        return {model: model.languageModel(), profileId: profile.id, modelId: profile.modelId, prompt, notes: await notesFor(messages), images: await imagesFor(messages, model), tools}
     }
 
     const firstLineTitle = (text: string) => text.trim().slice(0, 60)
@@ -620,17 +627,16 @@ export function useChats(session?: ActiveSession) {
 
     /**
      * After the first reply: the chat's model names it, unless the title was changed from the first message's or chat
-     * titles are off (`aiConfig.chatTitles`).
+     * titles are off (the AI config's `chatTitles`).
      */
     async function autoTitle(entry: LiveChat) {
-        if (!effective.value?.aiConfig.chatTitles) return
+        if (!ai()?.config().chatTitles) return
         const [question, answer, ...later] = entry.chat.messages
         if (later.length || question?.role !== 'user' || answer?.role !== 'assistant' || !textOf(answer).trim()) return
         const initial = firstLineTitle(textOf(question))
         if (entry.meta.title !== initial) return
         try {
-            const {profile, provider} = resolveModel(entry.meta.profileId)
-            const title = await generateChatTitle(provider, profile.modelId, textOf(question), textOf(answer))
+            const title = await generateChatTitle(resolveModel(entry.meta.profileId).languageModel({params: false}), textOf(question), textOf(answer))
             // Renamed while the model was answering: the user's name wins.
             if (!title || entry.meta.title !== initial) return
             entry.meta.title = title

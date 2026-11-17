@@ -1,4 +1,4 @@
-import type {AiModelInfo} from "#shared/types/app/ai";
+import type {AiModelInfo} from "./types";
 
 /**
  * Model metadata from three sources, none complete: the provider's OpenAI `/models` list (OpenRouter's carries

@@ -38,15 +38,6 @@ export const WORKSPACE_OVERRIDABLE = {
     themeConfig: 'workspace',
     viewConfig: 'workspace',
     'advancedThemeConfig.customCss': 'trustedWorkspace',
-    // A workspace picking which model its notes go to (or turning AI back on) could send them to a provider the user
-    // didn't choose for it.
-    'aiConfig.enabled': 'trustedWorkspace',
-    'aiConfig.features': 'trustedWorkspace',
-    'aiConfig.chatStorage': 'workspace',
-    'aiConfig.chatMode': 'workspace',
-    'aiConfig.chatTitles': 'workspace',
-    'aiConfig.editorAssistant': 'workspace',
-    'aiConfig.commitMessages': 'workspace',
     // A shared vault's settings mustn't start committing and pushing a user's edits on their own.
     'gitConfig.autoSync': 'trustedWorkspace',
     fileConfig: 'workspace',

@@ -1,22 +1,17 @@
 import type {GitFile, GitStatus} from "#shared/types/app/git";
-import {resolveAiFeature} from "~/composables/ai/useAiConfig";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {gitUses} from "~/builtins/git";
 import {isStaged} from "~/composables/git/useGitRepo";
 import {generateCommitMessage} from "~/utils/chatTransport";
 import {gitClient} from "~/utils/gitClient";
 
 /**
- * AI commit messages (feature `commitMessage`, this window's effective settings): whether there's a model for them,
- * whether it writes one by itself for an empty box or auto-sync (`aiConfig.commitMessages`), and a message for what
- * the next commit takes, written from its diff and the repository's recent subjects.
+ * AI commit messages (feature `commitMessage`, through the AI plugin while it's on): whether there's a model for them,
+ * whether it writes one by itself for an empty box or auto-sync (the AI config's `commitMessages`), and a message for
+ * what the next commit takes, written from its diff and the repository's recent subjects.
  */
 export function useCommitMessage(root: string | undefined) {
-    const {effective} = useSettingsScope()
-    const model = computed(() => {
-        const ai = effective.value?.aiConfig
-        return ai ? resolveAiFeature(ai, 'commitMessage') : null
-    })
-    const when = computed(() => effective.value?.aiConfig.commitMessages)
+    const model = computed(() => gitUses('ai')?.resolveFeature('commitMessage') ?? null)
+    const when = computed(() => gitUses('ai')?.config().commitMessages)
 
     /** `all`: the commit takes every change (nothing is staged, or Sync); else only what's staged. */
     async function generate(status: GitStatus, all: boolean): Promise<string> {
@@ -29,7 +24,7 @@ export function useCommitMessage(root: string | undefined) {
             all ? gitClient.diff(root, false) : '',
             gitClient.log(root, 0, 10).catch(() => []),
         ])
-        return generateCommitMessage(resolved.provider, resolved.profile.modelId, {
+        return generateCommitMessage(resolved.languageModel({params: false}), {
             files: files.map(f => `${letter(f)} ${f.path}`),
             diff: [staged, unstaged].filter(Boolean).join('\n'),
             subjects: log.map(c => c.subject),

@@ -1,5 +1,4 @@
 import type {FileTrustMode} from "#shared/utils/trust"
-import type {AppAiConfig} from "#shared/types/app/ai"
 import type {PluginConfigs} from "#shared/plugin/api"
 
 export type SessionRecoveryMode = 'none' | 'workspaces' | 'singlespaces' | 'both'
@@ -14,8 +13,6 @@ export interface AppSettings {
     viewConfig: AppViewConfig,
     /** Global only: what trust remembers (the trusted folders and files themselves are in `trust.json`). */
     trustConfig: AppTrustConfig,
-    /** Assistive AI; only `features` is workspace-overridable (trusted workspaces). Keys are in the keychain. */
-    aiConfig: AppAiConfig,
     /** Global only: a workspace mustn't choose which program runs as git. */
     gitConfig: AppGitConfig,
     /** Moving and renaming files; workspace-overridable. */

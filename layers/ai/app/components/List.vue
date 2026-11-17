@@ -51,7 +51,7 @@ function toggle(ids: string[], on: boolean) {
 }
 async function removeSelected() {
     const ids = [...selected.value]
-    if (!ids.length || !(await ask(props.confirm(ids.length), {kind: 'warning', okLabel: t('app.settings.ai.list.remove'), cancelLabel: t('app.generic.cancel')}))) return
+    if (!ids.length || !(await ask(props.confirm(ids.length), {kind: 'warning', okLabel: t('plugins.ai.list.remove'), cancelLabel: t('app.generic.cancel')}))) return
     selected.value = new Set()
     emit('remove', ids)
 }
@@ -63,7 +63,7 @@ async function removeSelected() {
             <UCheckbox
                 :model-value="allState"
                 :disabled="!selectableShown.length"
-                :aria-label="t('app.settings.ai.list.selectAll')"
+                :aria-label="t('plugins.ai.list.selectAll')"
                 @update:model-value="on => toggle(selectableShown.map(item => item.id), on === true)"
             />
             <UInput v-model="query" class="flex-1" size="sm" icon="i-lucide-search" :placeholder/>
@@ -73,7 +73,7 @@ async function removeSelected() {
                 color="error"
                 variant="soft"
                 icon="i-lucide-trash-2"
-                :label="t('app.settings.ai.list.removeSelected', {count: selected.size})"
+                :label="t('plugins.ai.list.removeSelected', {count: selected.size})"
                 @click="removeSelected"
             />
         </div>
@@ -82,7 +82,7 @@ async function removeSelected() {
                 <UCheckbox
                     :model-value="selected.has(item.id)"
                     :disabled="!canSelect(item)"
-                    :aria-label="t('app.settings.ai.list.select')"
+                    :aria-label="t('plugins.ai.list.select')"
                     @update:model-value="on => toggle([item.id], on === true)"
                 />
                 <div class="flex-1 min-w-0">
@@ -90,7 +90,7 @@ async function removeSelected() {
                 </div>
                 <slot name="actions" :item/>
             </div>
-            <p v-if="!shown.length" class="px-3 py-4 text-sm text-muted">{{ items.length ? t('app.settings.ai.list.noMatch') : empty }}</p>
+            <p v-if="!shown.length" class="px-3 py-4 text-sm text-muted">{{ items.length ? t('plugins.ai.list.noMatch') : empty }}</p>
         </div>
     </div>
 </template>

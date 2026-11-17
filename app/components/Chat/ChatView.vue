@@ -6,10 +6,9 @@ import {ask} from "@tauri-apps/plugin-dialog";
 import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/utils/fs/filenames";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {chatUses} from "~/builtins/chat";
 import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
-import {useAiConfig} from "~/composables/ai/useAiConfig";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useChatAttach} from "~/composables/ai/useChatAttach";
 import {FILES_DRAG, draggedRows, outsideItems} from "~/utils/outsideItems";
@@ -46,10 +45,8 @@ const {
 	pendingPrompt,
 	chatTakesImages,
 } = useChats(session)
-const {updateModelProfile} = useAiConfig()
 const {chatActions} = useChatActions(session)
 const {getFilteredFiles} = useActiveWorkspaceIndex(session)
-const settings = useSettingsScope().effective
 
 const title = computed(() => summary(props.chatId).value?.title || t('app.chat.untitled'))
 const current = computed(() => summary(props.chatId).value)
@@ -205,7 +202,7 @@ watch(() => chat.value?.error, async error => {
 		cancelLabel: t('app.generic.cancel'),
 	})
 	if (!turnOff || !profile) return
-	await updateModelProfile(profile.id, {tools: false})
+	await chatUses('ai')?.updateProfile(profile.id, {tools: false})
 	await live.regenerate()
 })
 
@@ -338,7 +335,7 @@ watch(pendingPrompt, async request => {
 // provider and model, which the search also matches.
 const DEFAULT_PROFILE = '@default'
 const profileItems = computed(() => {
-	const ai = settings.value?.aiConfig
+	const ai = chatUses('ai')?.config()
 	return [
 		{label: t('app.chat.defaultProfile'), value: DEFAULT_PROFILE, description: undefined as string | undefined},
 		...(ai?.modelProfiles ?? []).map(p => ({

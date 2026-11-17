@@ -1,0 +1,18 @@
+{
+  "id": "ai",
+  "name": "AI",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": ["session", "settings"],
+  "config": {
+    "overridable": {
+      "enabled": "trustedWorkspace",
+      "features": "trustedWorkspace",
+      "chatStorage": "workspace",
+      "chatMode": "workspace",
+      "chatTitles": "workspace",
+      "editorAssistant": "workspace",
+      "commitMessages": "workspace"
+    }
+  }
+}

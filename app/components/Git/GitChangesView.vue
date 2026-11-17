@@ -11,7 +11,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
 import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useAppSettings} from "~/composables/app/useAppSettings";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {gitUses} from "~/builtins/git";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useScrollFade} from "~/composables/utility/useScrollFade";
 import {useTour} from "~/composables/utility/useTour";
@@ -52,8 +52,7 @@ const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
 const drafting = ref(false)
 const idle = computed(() => !busy.value && !!status.value && !drafting.value)
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
-const settings = useSettingsScope()
-const chatsInWorkspace = computed(() => settings.effective.value?.aiConfig.chatStorage === 'workspace')
+const chatsInWorkspace = computed(() => gitUses('ai')?.config().chatStorage === 'workspace')
 
 // No git: install it (macOS: Apple's developer tools), or point Vertex at one (`gitConfig.path`, global only).
 const $qt = useQuickToasts()
@@ -290,7 +289,7 @@ async function writeMessage(all: boolean) {
 }
 const writeForBox = computed(() => (commitMessage.available.value ? () => writeMessage(!staged.value.length) : undefined))
 /**
- * The message for an empty box: the model's when `aiConfig.commitMessages.whenEmpty` is on, else (or when it fails)
+ * The message for an empty box: the model's when the AI config's `commitMessages.whenEmpty` is on, else (or when it fails)
  * `''`, which `useGitRepo` commits as "Update N file(s)".
  */
 async function emptyBoxMessage(all: boolean) {

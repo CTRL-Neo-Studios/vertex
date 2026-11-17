@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {sanitizeModelParams, withModelParams} from "./aiParams";
+import {sanitizeModelParams, withModelParams} from "./params";
 
 describe('sanitizeModelParams', () => {
     it('clamps numbers to their range, rounds integer ones and drops anything invalid', () => {

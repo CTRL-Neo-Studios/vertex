@@ -17,6 +17,8 @@ export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = [
     ...['maxLoopIterations', 'maxStackDepth', 'wallClockTimeoutMs', 'confirmTrash']
         .map(key => [`workflowConfig.${key}`, `plugins.config.workflows.${key}`] as const),
     ['workflowConfig.fileTrust', 'trustConfig.fileTrust'],
+    // X6: AI became a plugin, carrying chat's, the editor assistant's and git's options until X7 and X8.
+    ['aiConfig', 'plugins.config.ai'],
 ]
 
 /** `raw` with each old path's value at its new one (unless the new one is set), and the old one gone. */

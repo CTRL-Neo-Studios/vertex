@@ -4,7 +4,7 @@ import type {VertexChatMessage} from "#shared/types/app/chats";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import {ask} from "@tauri-apps/plugin-dialog";
 import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {chatUses} from "~/builtins/chat";
 import {useChats} from "~/composables/ai/useChats";
 import {useChatActions} from "~/composables/ai/useChatActions";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
@@ -27,7 +27,6 @@ const $qt = useQuickToasts()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
 const {summary, editMessage, retryMessage, rewindTo, appliedAfter, showBranch, branchesOf} = useChats(session)
 const {showContext} = useChatActions(session)
-const settings = useSettingsScope().effective
 const current = computed(() => summary(props.chatId).value)
 
 const WINDOW = 50
@@ -96,7 +95,7 @@ function sendEdit() {
 
 const retryItems = (message: VertexChatMessage) => [
 	{type: 'label' as const, label: t('app.chat.retryWith')},
-	...(settings.value?.aiConfig.modelProfiles ?? []).map(p => ({
+	...(chatUses('ai')?.config().modelProfiles ?? []).map(p => ({
 		label: p.name,
 		icon: 'i-lucide-bot',
 		onSelect: () => act(() => retryMessage(props.chatId, message.id, p.id)),

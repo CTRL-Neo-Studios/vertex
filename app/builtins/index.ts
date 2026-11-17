@@ -5,7 +5,6 @@ import manifests from './plugins.json'
 /** Each built-in's entry, by its id in `plugins.json`. */
 const LOAD: Record<string, PluginEntry['load']> = {
     'git': () => import('./git'),
-    'ai': () => import('./ai'),
     'ai-assistant': () => import('./ai-assistant'),
     'chat': () => import('./chat'),
 }

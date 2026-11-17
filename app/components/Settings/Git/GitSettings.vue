@@ -59,7 +59,7 @@ const untrusted = computed(() => scope.root.value !== null && scope.overridden(A
                         variant="subtle"
                         icon="i-lucide-shield-alert"
                         :title="t('app.settings.git.autoSync.untrusted')"
-                        :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
+                        :actions="[{label: t('app.settings.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                     />
                 </div>
                 <SettingsRow :setting="INTERVAL" :label="t('app.settings.git.autoSync.interval')" :description="t('app.settings.git.autoSync.intervalDescription')">

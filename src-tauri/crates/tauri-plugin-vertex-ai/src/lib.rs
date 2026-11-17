@@ -48,9 +48,10 @@ fn delete_key(provider_id: &str) -> Result<(), String> {
     api::keychain_delete(&account(provider_id))
 }
 
-/// `aiConfig.providers` as id → baseURL; `None` when the settings have no provider list at all.
+/// The AI plugin's providers (`plugins.config.ai.providers`) as id → baseURL; `None` when the settings have no
+/// provider list at all.
 fn ai_providers(settings: &Value) -> Option<HashMap<&str, &str>> {
-    let list = settings.get("aiConfig")?.get("providers")?.as_array()?;
+    let list = settings.pointer("/plugins/config/ai/providers")?.as_array()?;
     Some(
         list.iter()
             .filter_map(|p| Some((p.get("id")?.as_str()?, p.get("baseURL").and_then(Value::as_str).unwrap_or(""))))
@@ -58,7 +59,7 @@ fn ai_providers(settings: &Value) -> Option<HashMap<&str, &str>> {
     )
 }
 
-/// `settings.aiConfig.providers[id].baseURL`, the only origin `ai_request` may call for that provider.
+/// The provider's `baseURL` in the AI plugin's config, the only origin `ai_request` may call for that provider.
 fn provider_base_url<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<String> {
     let settings = api::settings(app);
     ai_providers(&settings)?.get(id).map(|url| (*url).to_owned())
@@ -340,7 +341,7 @@ mod tests {
 
     #[test]
     fn ai_keys_go_with_removed_or_moved_providers() {
-        let cfg = |providers: serde_json::Value| json!({"aiConfig": {"providers": providers}});
+        let cfg = |providers: serde_json::Value| json!({"plugins": {"config": {"ai": {"providers": providers}}}});
         let old = cfg(json!([
             {"id": "a", "baseURL": "https://a.dev/v1"},
             {"id": "b", "baseURL": "https://b.dev/v1"},

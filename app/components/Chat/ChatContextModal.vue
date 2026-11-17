@@ -4,6 +4,7 @@ import type {ChatRequestInfo, VertexChatMessage} from "#shared/types/app/chats";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {Routes} from "#shared/constants/app";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
+import {chatUses} from "~/builtins/chat";
 import {useAppSettings} from "~/composables/app/useAppSettings";
 
 /**
@@ -16,11 +17,11 @@ const emit = defineEmits<{ close: [] }>()
 
 const {t, locale} = useI18n()
 const scope = useSettingsScope()
-const settings = scope.effective
 const {createOrFocusSettingsWindow} = useAppSettings()
 
-const profileName = (id: string) => settings.value?.aiConfig.modelProfiles.find(p => p.id === id)?.name ?? id
-const profileExists = (id: string) => !!settings.value?.aiConfig.modelProfiles.some(p => p.id === id)
+const profiles = () => chatUses('ai')?.config().modelProfiles ?? []
+const profileName = (id: string) => profiles().find(p => p.id === id)?.name ?? id
+const profileExists = (id: string) => profiles().some(p => p.id === id)
 /** The profile's page in Settings (opened, or brought forward and switched to it). */
 const editProfile = (id: string) => createOrFocusSettingsWindow(scope.root.value, `${Routes.settings}/ai/models/${id}`)
 const num = (n: number | undefined) => n === undefined ? '—' : n.toLocaleString(locale.value)
@@ -113,7 +114,7 @@ const tokens = (r: ChatRequestInfo) => [
                                         <dt class="text-muted">{{ $t('app.chat.context.model') }}</dt>
                                         <dd class="flex items-center gap-1 min-w-0">
                                             <span class="truncate">{{ request.modelId }} ({{ profileName(request.profileId) }})</span>
-                                            <UButton v-if="profileExists(request.profileId)" size="xs" color="neutral" variant="link" :label="$t('app.settings.ai.features.editProfile')" @click="editProfile(request.profileId)"/>
+                                            <UButton v-if="profileExists(request.profileId)" size="xs" color="neutral" variant="link" :label="$t('app.chat.editProfile')" @click="editProfile(request.profileId)"/>
                                         </dd>
                                         <dt class="text-muted">{{ $t('app.chat.context.started') }}</dt>
                                         <dd>{{ when(request.startedAt) }}</dd>

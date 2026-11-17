@@ -1,0 +1,9 @@
+{
+  "name": "@vertex-plugins/ai",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.90",
+    "ai": "^7.0.170"
+  }
+}

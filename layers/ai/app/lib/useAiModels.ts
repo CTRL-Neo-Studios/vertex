@@ -1,8 +1,7 @@
-import type {AiModelInfo, AiProviderProfile} from "#shared/types/app/ai";
-import {enrichFromCatalog, enrichFromOllamaShow, normalizeModels} from "#shared/utils/ai/models";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {aiClient} from "~/utils/aiClient";
-import {createAiFetch} from "~/utils/aiFetch";
+import type {AiModelInfo, AiProviderProfile} from "../../shared/types";
+import {enrichFromCatalog, enrichFromOllamaShow, normalizeModels} from "../../shared/models";
+import {aiClient} from "./aiClient";
+import {createAiFetch} from "./aiFetch";
 
 async function json(response: Response) {
     if (!response.ok) throw new Error(`${response.status} ${(await response.text()).slice(0, 500)}`)
@@ -12,7 +11,7 @@ async function json(response: Response) {
 /** A provider's models, with metadata from its `/models` list, Ollama and models.dev. Failures are toasts. */
 export function useAiModels() {
     const {t} = useI18n()
-    const $qt = useQuickToasts()
+    const toast = useToast()
 
     /** Every model the provider lists, enriched from models.dev; `undefined` (toasted) when the list fails. */
     async function list(provider: AiProviderProfile): Promise<AiModelInfo[] | undefined> {
@@ -25,7 +24,7 @@ export function useAiModels() {
             })
             return catalog ? enrichFromCatalog(models, catalog, provider.baseURL) : models
         } catch (error) {
-            $qt.error(t('app.settings.ai.providers.listFailed', {name: provider.name}), String(error))
+            toast.add({title: t('plugins.ai.providers.listFailed', {name: provider.name}), description: String(error), color: 'error', icon: 'i-lucide-circle-alert'})
         }
     }
 

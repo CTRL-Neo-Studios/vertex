@@ -18,10 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'ai': [
-        'app/composables/ai/useAiConfig', 'app/composables/ai/useAiModels', 'app/utils/aiClient', 'app/utils/aiFetch',
-        'app/components/Settings/Ai/', 'shared/utils/ai/', 'shared/utils/aiParams', 'shared/constants/ai', 'shared/types/app/ai',
-    ],
     'git': ['app/components/Git/', 'app/composables/git/', 'app/utils/git', 'app/components/Settings/Git/', 'shared/utils/gitGraph', 'shared/types/app/git'],
     'chat': [
         'app/components/Chat/', 'app/components/Modals/ImportToChatModal', 'app/composables/ai/useChat', 'app/utils/chat',
@@ -31,16 +27,7 @@ const RESIDENTS: Record<string, string[]> = {
 }
 
 /** Kernel module → feature module it still reaches → why, and the phase that ends it. An unused entry fails. */
-const KERNEL_EXCEPTIONS: Record<string, Record<string, string>> = {
-    'shared/types/app/settings': {
-        'shared/types/app/ai': '`AppSettings.aiConfig`: X6 moves it to `plugins.config.ai`',
-    },
-    'shared/utils/defaults/apps': {
-        'shared/types/app/ai': 'the AI settings defaults: X6 moves them to `plugins.config.ai`',
-        'shared/types/app/chats': '`aiConfig.chatMode`: X8 moves it to `plugins.config.chat`',
-        'shared/utils/aiParams': 'model params in the AI settings defaults: X6',
-    },
-}
+const KERNEL_EXCEPTIONS: Record<string, Record<string, string>> = {}
 
 /** Kernel modules every plugin may import: the contract, and the published UI components. */
 const PUBLIC = ['shared/plugin/', 'app/plugin/ui']

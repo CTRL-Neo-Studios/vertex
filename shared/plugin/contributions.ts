@@ -252,6 +252,33 @@ export interface PaletteGroupDef {
 export interface SettingsPageProps {
     /** The route below the page (`/settings/ai/providers/x` → `['providers', 'x']`). */
     path: string[]
+    /** The page's plugin's config in the scope Settings is editing (User, or a workspace). */
+    config: ScopedConfig
+}
+
+/**
+ * A plugin's config as Settings edits it: in User, or in a workspace (its overrides, as far as the manifest's
+ * `config.overridable` lets it). Paths are inside the config (`features.chat`).
+ */
+export interface ScopedConfig {
+    /** The workspace being edited (its root), or `null` for User. */
+    readonly root: string | null
+    /** Whether that workspace is trusted, so its trusted-only overrides apply. */
+    readonly trusted: boolean
+    /** The config in effect in this scope (the workspace's applicable overrides on User's), as stored. Reactive. */
+    readonly effective: Record<string, unknown>
+    /** This scope's own value at `path` (a workspace's even before it applies), else the effective one. */
+    value(path: string): unknown
+    /** Writes paths in this scope; `null` removes one (in a workspace: Use global). */
+    set(patch: Record<string, unknown>): Promise<unknown>
+    /** Whether the workspace overrides `path` (or something under it). */
+    overridden(path: string): boolean
+    /** In User: whether any of `paths` differs from `defaults` (the config's defaults). In a workspace: overridden. */
+    isDirty(paths: string[], defaults: Record<string, unknown>): boolean
+    /** Puts `paths` back: to `defaults` in User, to the global values in a workspace (its overrides go). */
+    reset(paths: string[], defaults: Record<string, unknown>): Promise<unknown>
+    /** The full setting path of `path` (`plugins.config.<id>.<path>`), for `SettingsRow`'s `setting`. */
+    path(path: string): `plugins.config.${string}`
 }
 
 /** A page in the Settings window, at `/settings/<id>/…`, listed in its nav after the kernel's. */

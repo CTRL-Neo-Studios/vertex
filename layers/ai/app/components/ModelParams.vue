@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type {AiModelInfo, AiModelParams} from "#shared/types/app/ai";
-import {AI_NUMBER_PARAMS, sanitizeModelParams} from "#shared/utils/aiParams";
+import type {AiModelInfo, AiModelParams} from "../../shared/types";
+import {AI_NUMBER_PARAMS, sanitizeModelParams} from "../../shared/params";
+import {SettingsRow, SettingsSection} from "~/plugin/ui";
 
 type NumberParam = typeof AI_NUMBER_PARAMS[number]
 
@@ -36,7 +37,7 @@ function saveExtra() {
         value = null
     }
     if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) {
-        extraError.value = t('app.settings.ai.models.params.extraInvalid')
+        extraError.value = t('plugins.ai.models.params.extraInvalid')
         return
     }
     extraError.value = undefined
@@ -46,16 +47,16 @@ function saveExtra() {
 
 <template>
     <SettingsSection
-        :title="t('app.settings.ai.models.params.title')"
-        :description="t('app.settings.ai.models.params.description')"
+        :title="t('plugins.ai.models.params.title')"
+        :description="t('plugins.ai.models.params.description')"
         :dirty="!!params"
         @reset="emit('save', undefined)"
     >
     <SettingsRow
         v-for="p in AI_NUMBER_PARAMS"
         :key="p.key"
-        :label="t(`app.settings.ai.models.params.${p.key}`)"
-        :description="t(`app.settings.ai.models.params.${p.key}Description`)"
+        :label="t(`plugins.ai.models.params.${p.key}`)"
+        :description="t(`plugins.ai.models.params.${p.key}Description`)"
     >
         <template v-if="current[p.key] !== undefined">
             <USlider
@@ -78,21 +79,21 @@ function saveExtra() {
                 @update:model-value="value => commit(p, value ?? undefined)"
             />
         </template>
-        <span v-else class="text-xs text-dimmed">{{ t('app.settings.ai.models.params.providerDefault') }}</span>
-        <USwitch :model-value="current[p.key] !== undefined" :aria-label="t(`app.settings.ai.models.params.${p.key}`)" @update:model-value="on => toggle(p, on)"/>
+        <span v-else class="text-xs text-dimmed">{{ t('plugins.ai.models.params.providerDefault') }}</span>
+        <USwitch :model-value="current[p.key] !== undefined" :aria-label="t(`plugins.ai.models.params.${p.key}`)" @update:model-value="on => toggle(p, on)"/>
     </SettingsRow>
-    <SettingsRow :label="t('app.settings.ai.models.params.stop')" :description="t('app.settings.ai.models.params.stopDescription')">
+    <SettingsRow :label="t('plugins.ai.models.params.stop')" :description="t('plugins.ai.models.params.stopDescription')">
         <UInputTags
             class="w-72"
             size="sm"
-            :placeholder="t('app.settings.ai.models.params.stopPlaceholder')"
+            :placeholder="t('plugins.ai.models.params.stopPlaceholder')"
             :model-value="current.stop ?? []"
             @update:model-value="stop => set({stop})"
         />
     </SettingsRow>
     <div class="px-4 py-2.5 space-y-1.5">
-        <div class="text-sm">{{ t('app.settings.ai.models.params.extra') }}</div>
-        <div class="text-xs" :class="extraError ? 'text-error' : 'text-muted'">{{ extraError ?? t('app.settings.ai.models.params.extraDescription') }}</div>
+        <div class="text-sm">{{ t('plugins.ai.models.params.extra') }}</div>
+        <div class="text-xs" :class="extraError ? 'text-error' : 'text-muted'">{{ extraError ?? t('plugins.ai.models.params.extraDescription') }}</div>
         <UTextarea
             v-model="extraDraft"
             class="w-full font-mono"

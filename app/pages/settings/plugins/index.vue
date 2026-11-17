@@ -87,7 +87,7 @@ function describe(m: PluginManifest) {
                 variant="subtle"
                 icon="i-lucide-shield-alert"
                 :title="t('app.settings.plugins.untrusted')"
-                :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
+                :actions="[{label: t('app.settings.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                 data-plugins-untrusted
             />
             <SettingsSection :title="t('app.settings.plugins.core')" :description="t('app.settings.plugins.coreDescription')">

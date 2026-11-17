@@ -11,7 +11,7 @@ const FOCUS_PULL_GAP = 60_000
  * Auto-sync for a workspace window (`gitConfig.autoSync` in its effective settings: global, or the workspace's own
  * once its folder is trusted; all off by default): every `interval` minutes and, with `onOpen`, once when the window
  * opens, it commits every change, pulls and pushes, like Sync; with `pullOnFocus`, it pulls when the window gets
- * focus. The commit's message is the model's with `aiConfig.commitMessages.autoSync` (falling back quietly), else
+ * focus. The commit's message is the model's with the AI config's `commitMessages.autoSync` (falling back quietly), else
  * "Update N file(s)". It runs only in a repository, never during a merge or rebase, and stops after the remote
  * refuses to sign in (`autoSyncPaused`) until an operation from the Git view works. Each kind of failure shows once,
  * until a run succeeds. It runs beside the Git view, which picks its changes up from the watcher. Runs in the git

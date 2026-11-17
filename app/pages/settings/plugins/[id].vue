@@ -83,7 +83,7 @@ async function pick(field: Extract<ConfigField, {type: 'path'}>) {
                 variant="subtle"
                 icon="i-lucide-shield-alert"
                 :title="t('app.settings.plugins.settingsWaitForTrust')"
-                :actions="[{label: t('app.settings.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
+                :actions="[{label: t('app.settings.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                 data-plugin-untrusted
             />
             <SettingsSection

@@ -698,9 +698,39 @@ Blocked by X5 and K5.
 - `crates/tauri-plugin-vertex-ai` (moved there in K5): reads its providers with `plugin_config`, and deletes stale keys from `on_settings_change`.
 - API: `registerFeature({id, label, description})` (replacing `AI_FEATURES`), `resolveFeature(id)`, `generate`, `registerTool` (for X8's chat).
 
+### Decisions
+
+- **All of `aiConfig` moves to `plugins.config.ai`** (the user's choice, as written): one `LEGACY_PATHS` row moves the whole object, global and workspace. The AI plugin carries chat's (`chatStorage`, `chatMode`, `chatTitles`), the editor assistant's (`editorAssistant`) and git's (`commitMessages`) options, and Features draws them as now, until X7 and X8 take them to their plugins. Their override levels move from `WORKSPACE_OVERRIDABLE` to the AI manifest's `overridable`.
+- **The config's shape and seed are the plugin's** (`layers/ai/shared/config.ts`, was `defaultAppAiConfig`): the plugin reads `ctx.config.value` through it. With no `plugins.config.ai` stored, it writes the seed (Local Ollama and an empty Default profile) to the global settings when it starts, so Rust, which checks every request against the stored providers, has them. `toChatMode` goes to chat's own code, so the kernel's defaults import nothing of chat or AI.
+- **Settings written at load:** `useAppSettings.load` writes the settings back when they still hold a moved path (`movedPathsIn`), instead of when `aiConfig` was missing: Rust reads only `plugins.config.ai.providers`.
+- **A plugin's own settings page edits its config in the scope being edited:** `SettingsPageProps.config` (`root`, `trusted`, `effective`, `value(path)`, `set(patch)`, `overridden(path)`, `isDirty(paths)`, `reset(paths)`, `path(p)`, the full setting path for `SettingsRow`), bound to the page's plugin (`[...path].vue`, by the registration's owner). Features is per scope (a workspace's features and switch); Providers and Models stay global (`ctx.config.set`).
+- **API** (`layers/ai/app/api.ts`), shaped by its users (chat, the editor assistant, git):
+  - `config()`: the effective AI config, reactive;
+  - `featureOn(id)`, `resolveFeature(id)`, `resolveProfile(id)` (a chat's own profile): an `AiModel` (`profile`, `provider`, `fetch` through Rust with the profile's params, `languageModel(params = true)`, an ai-sdk model) or `null`;
+  - `updateProfile(id, patch)` (a chat turning its profile's tools off);
+  - `registerFeature({id, label, description})`, removed with the caller's scope: chat, the assistant and git register theirs (`AI_FEATURES` goes). The assistant's manifest gains the `settings` window, so its feature shows there.
+  - **Not in X6:** `generate`, since `generateText({model: m.languageModel()})` is the same call, and the callers keep their prompts; `registerTool` waits for X8, its only user.
+- **Consumers** (still kernel residents) go through the API: chat (`chatUses('ai')`), the assistant (its `ctx`), git (`gitUses('ai')`, its manifest gains `ai?`, so with AI off the commit-message button isn't offered). They name the few fields they read in local types: the kernel can't import a layer's.
+- **Rust:** `ai_providers` reads `plugins.config.ai.providers`; the key cleanup compares that path. The crate's commands are already granted only where the `ai` plugin runs.
+- **Strings** to `plugins.ai.*` (including the options it draws for chat, git and the assistant). The three features' labels go to their owners (`app.aiFeatures.*`); the kernel's Trust workspace buttons get `app.settings.trustWorkspace`.
+
 ### Acceptance
-- [ ] The shared acceptance; SMOKE row 40 passes; changing a provider's base URL still deletes its key.
-- [ ] With `ai` off, no AI request can be made and no feature offers one.
+- [ ] The shared acceptance; SMOKE row 40 passes; changing a provider's base URL still deletes its key. (In `tauri dev`, separate app identifiers, a temporary harness and a fixture workspace, deleted after. Settings written before the move (`aiConfig`) are written back as `plugins.config.ai` at load; Providers, Model profiles and Features show them, Features lists Chat, Editor assistant and Commit message; the migrated switches, chat options and default profile resolve through the API. A key saved in Settings goes when its provider's base URL changes. An untrusted workspace's `enabled: false` is ignored; trusted, it turns chat and commit messages off. Fresh install: the seed is written; with a local Ollama model on the Default profile, a chat-model call and a commit message go through Rust and answer. Not run by hand: row 40 itself (OpenRouter, the editor assistant's ⌘J and slash menu).)
+- [x] With `ai` off, no AI request can be made and no feature offers one. (Launched with `plugins.enabled.ai: false`: chat and the assistant are off (`requirementOff`), git runs without the API (no commit model), `vertex-ai` commands are refused in the session window, no AI layer code is fetched.)
+
+### As built
+
+- **Layer** (`layers/ai/`): `plugin.json` (windows `session` and `settings`; the seven override levels); `package.json` (`ai`, `@ai-sdk/openai-compatible`); `nuxt.config.ts` (prefix `Ai`); `app/plugin.ts` (writes the seed when nothing is stored, the settings page `ai` with Providers, Model profiles and Features, `ctx.provide`); `app/api.ts`; `app/lib/` (`aiFetch`, `aiClient` (calls `plugin:vertex-ai|…` itself), `useAiModels`, `useAiConfig` over `ctx.config`, `features` (the registry), `notify`); `app/components/` (`Settings`, `Providers`, `Provider`, `Models`, `Model`, `ModelParams`, `Features`, `List`, `AddModelsModal`, `ModelBadges`, `OffBanner`; the pages import `SettingsRow`, `SettingsSection` and `SettingsScrollLayout` from `~/plugin/ui`); `shared/` (`config.ts`: `aiConfigOf`, `AI_SEED`, `featureOn`, `resolveFeature`, `profileWithProvider`, with tests; `params.ts`, `models.ts`, `types.ts`, with their tests).
+- **Kernel:**
+  - `SettingsPageProps.config` (`ScopedConfig`, `shared/plugin/contributions.ts`), built by `[...path].vue` over `useSettingsScope` for the page's owner (`contributionPlugin`).
+  - `AppSettings.aiConfig`, `defaultAppAiConfig` and its helpers, `shared/constants/ai.ts`, `AI_FEATURES` and the `aiConfig.*` rows of `WORKSPACE_OVERRIDABLE` are gone; one `LEGACY_PATHS` row (`aiConfig` → `plugins.config.ai`); `useAppSettings.load` writes back when a moved path is stored.
+  - Chat: `chatUses('ai')` for the config, models (`resolveModel` → `AiModel`), `updateProfile`; `ChatSendSetup.model` is the ai-sdk model (`modelFor` gone); `generateChatTitle` and `generateCommitMessage` take a model; `toChatMode` is `useChats`'.
+  - Git: `gitUses('ai')` (`useCommitMessage`, the Changes view's chat-storage check); registers `commitMessage` through `ctx.whenPlugin('ai')`; manifest `requires: ["ai?"]`.
+  - Assistant: `useAiEditorExtension(ai)` takes the API; manifest gains the `settings` window.
+  - `app.aiFeatures.*` (the three features' labels), `app.chat.editProfile`, `app.settings.trustWorkspace`; the rest of `app.settings.ai` is `plugins.ai.*`.
+- **Rust:** `ai_providers` reads `/plugins/config/ai/providers`; its test follows.
+- **Boundaries:** `RESIDENTS` loses `ai`; `KERNEL_EXCEPTIONS` is empty.
+- **Numbers:** 384 tests (44 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X7: Git
 

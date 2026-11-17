@@ -2,25 +2,26 @@ import {h} from 'vue'
 import type {PanelViewContext, PluginApis, PluginContext, TabProps} from '#shared/plugin/api'
 import {definePlugin} from '#shared/plugin/api'
 import {pluginStateKey, sessionScope} from '#shared/constants/app'
-import {aiFeatureOn} from '~/composables/ai/useAiConfig'
 import {chatSummaryOf, useChats} from '~/composables/ai/useChats'
 import {useChatActions} from '~/composables/ai/useChatActions'
-import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import {chatChangeOf} from '~/utils/chatChanges'
 import {pluginSession} from '~/utils/plugins/runtime'
 
-const chatOn = (c: PanelViewContext) => c.isWorkspace && aiFeatureOn(c.settings?.aiConfig, 'chat')
-
 let use: PluginContext['use'] | undefined
-/** Another plugin's API while that plugin is on, for chat's components (replies draw ```mermaid with mermaid's). */
+/** Another plugin's API while that plugin is on, for chat's code (its models are AI's; replies draw ```mermaid with mermaid's). */
 export const chatUses = <K extends keyof PluginApis>(id: K) => use?.(id)
+
+/** Whether AI is on and chat with it (chat requires AI, so its API is there while chat runs). */
+const chatOn = () => !!chatUses('ai')?.featureOn('chat')
+const chatViewOn = (c: PanelViewContext) => c.isWorkspace && chatOn()
 
 export default definePlugin({
     setup(ctx) {
         use = ctx.use
+        ctx.use('ai')?.registerFeature({id: 'chat', label: 'app.aiFeatures.chat', description: 'app.aiFeatures.chatDescription'})
         ctx.views.panel({
             id: 'chats', label: 'app.chat.chats', icon: 'i-lucide-messages-square', defaultArea: 'left',
-            when: chatOn,
+            when: chatViewOn,
             // Search beside the Chats view searches chats.
             search: ({session}) => {
                 useState<boolean>(pluginStateKey('chat', 'search-open', sessionScope(session, 'search')), () => false).value = true
@@ -29,7 +30,7 @@ export default definePlugin({
         })
         ctx.views.panel({
             id: 'chat', label: 'app.chat.chat', icon: 'i-lucide-message-square', defaultArea: 'right',
-            when: chatOn,
+            when: chatViewOn,
             component: () => import('~/components/Chat/ChatSidePanelView.vue'),
         })
         const {t} = useNuxtApp().$i18n
@@ -75,13 +76,12 @@ export default definePlugin({
         ctx.onSession(({session}) => {
             if (!session.workspaceSession) return
             const {newChat} = useChatActions(session)
-            const {effective} = useSettingsScope()
             ctx.commands.register({
                 id: 'new',
                 label: 'app.commands.newChat',
                 accelerator: 'CmdOrCtrl+Shift+L',
                 menu: {section: 'file', group: 0},
-                enabled: () => aiFeatureOn(effective.value?.aiConfig, 'chat'),
+                enabled: chatOn,
                 run: () => newChat(),
             })
         })
@@ -89,10 +89,9 @@ export default definePlugin({
         ctx.onSession(({session}) => {
             if (!session.workspaceSession) return
             const {root, askInChat} = useChats(session)
-            const {effective} = useSettingsScope()
             ctx.editor.noteMenuItem({
                 id: 'ask-in-chat',
-                items: ({host, selection}) => (root.value && aiFeatureOn(effective.value?.aiConfig, 'chat') ? [{
+                items: ({host, selection}) => (root.value && chatOn() ? [{
                     label: t('app.editor.ui.askInChat'), icon: 'i-lucide-message-square-quote', disabled: !selection,
                     onSelect: () => askInChat(selection, host.notePath),
                 }] : []),

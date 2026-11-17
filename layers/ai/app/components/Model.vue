@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
 import {generateText} from "ai";
-import type {AiModelProfile} from "#shared/types/app/ai";
-import {Routes} from "#shared/constants/app";
-import {useAiConfig} from "~/composables/ai/useAiConfig";
-import {useAppSettings} from "~/composables/app/useAppSettings";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {createAiFetch} from "~/utils/aiFetch";
+import {SettingsRow, SettingsScrollLayout, SettingsSection} from "~/plugin/ui";
+import type {AiModelProfile} from "../../shared/types";
+import {useAiConfig} from "../lib/useAiConfig";
+import {useNotify} from "../lib/notify";
+import {createAiFetch} from "../lib/aiFetch";
 
 /** One model profile: a provider's model, how features use it (system prompt, tools) and its request parameters. */
 const props = defineProps<{ id: string }>()
 const {t} = useI18n()
 const $route = useRoute()
-const $qt = useQuickToasts()
-const {load} = useAppSettings()
+const notify = useNotify()
 const {ai, updateModelProfile, removeModelProfiles, setDefaultModelProfile} = useAiConfig()
-onMounted(load)
 
-const back = computed(() => ({path: `${Routes.settings}/ai/models`, query: {q: $route.query.q || undefined}}))
+const back = computed(() => ({path: '/settings/ai/models', query: {q: $route.query.q || undefined}}))
 const profile = computed(() => ai.value?.modelProfiles.find(p => p.id === props.id))
 const save = (patch: Partial<AiModelProfile>) => profile.value && updateModelProfile(profile.value.id, patch)
 
@@ -49,9 +46,9 @@ async function test() {
             maxOutputTokens: 5,
             maxRetries: 0,
         })
-        $qt.success(t('app.settings.ai.models.testOk', {name: p.name}), text.trim() || undefined)
+        notify.success(t('plugins.ai.models.testOk', {name: p.name}), text.trim() || undefined)
     } catch (error) {
-        $qt.error(t('app.settings.ai.models.testFailed', {name: p.name}), error instanceof Error ? error.message : String(error))
+        notify.error(t('plugins.ai.models.testFailed', {name: p.name}), error instanceof Error ? error.message : String(error))
     } finally {
         testing.value = false
     }
@@ -65,9 +62,9 @@ async function remove() {
 </script>
 
 <template>
-    <SettingsScrollLayout v-if="ai" :title="profile ? profile.name || t('app.settings.ai.models.unnamed') : t('app.settings.ai.models.title')" global-only>
+    <SettingsScrollLayout v-if="ai" :title="profile ? profile.name || t('plugins.ai.models.unnamed') : t('plugins.ai.models.title')" global-only>
         <template #header-leading>
-            <UButton :to="back" size="sm" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :aria-label="t('app.settings.ai.models.back')"/>
+            <UButton :to="back" size="sm" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :aria-label="t('plugins.ai.models.back')"/>
         </template>
         <template v-if="profile" #header-trailing>
             <UButton
@@ -77,34 +74,34 @@ async function remove() {
                 icon="i-lucide-plug-zap"
                 :loading="testing"
                 :disabled="!provider || !profile.modelId"
-                :label="t('app.settings.ai.models.test')"
+                :label="t('plugins.ai.models.test')"
                 @click="test"
             />
-            <UButton v-if="!isDefault" size="sm" color="neutral" variant="ghost" icon="i-lucide-star" :label="t('app.settings.ai.models.setDefault')" @click="setDefaultModelProfile(profile.id)"/>
-            <UTooltip :text="isDefault ? t('app.settings.ai.models.cannotRemoveDefault') : undefined" :disabled="!isDefault">
-                <UButton size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" :disabled="isDefault" :label="t('app.settings.ai.models.remove')" @click="remove"/>
+            <UButton v-if="!isDefault" size="sm" color="neutral" variant="ghost" icon="i-lucide-star" :label="t('plugins.ai.models.setDefault')" @click="setDefaultModelProfile(profile.id)"/>
+            <UTooltip :text="isDefault ? t('plugins.ai.models.cannotRemoveDefault') : undefined" :disabled="!isDefault">
+                <UButton size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" :disabled="isDefault" :label="t('plugins.ai.models.remove')" @click="remove"/>
             </UTooltip>
         </template>
 
         <div v-if="profile" class="space-y-4">
-            <SettingsAiOffBanner/>
-            <SettingsSection :title="t('app.settings.ai.models.general')" :description="isDefault ? t('app.settings.ai.models.isDefault') : undefined">
-                <SettingsRow :label="t('app.settings.ai.models.name')">
+            <AiOffBanner/>
+            <SettingsSection :title="t('plugins.ai.models.general')" :description="isDefault ? t('plugins.ai.models.isDefault') : undefined">
+                <SettingsRow :label="t('plugins.ai.models.name')">
                     <UInput v-model="name" class="w-72" @blur="name.trim() && name !== profile.name && save({name: name.trim()})"/>
                 </SettingsRow>
-                <SettingsRow :label="t('app.settings.ai.models.provider')" :error="profile.providerId && !provider ? t('app.settings.ai.models.providerMissing') : undefined">
+                <SettingsRow :label="t('plugins.ai.models.provider')" :error="profile.providerId && !provider ? t('plugins.ai.models.providerMissing') : undefined">
                     <USelect
                         class="w-72"
                         :items="providerItems"
                         :model-value="provider ? profile.providerId : undefined"
-                        :placeholder="t('app.settings.ai.models.chooseProvider')"
+                        :placeholder="t('plugins.ai.models.chooseProvider')"
                         @update:model-value="save({providerId: $event as string, modelId: ''})"
                     />
                 </SettingsRow>
                 <SettingsRow
-                    :label="t('app.settings.ai.models.model')"
-                    :description="provider && !provider.models.length ? t('app.settings.ai.models.noModels') : undefined"
-                    :error="modelMissing ? t('app.settings.ai.models.modelMissing', {model: profile.modelId}) : undefined"
+                    :label="t('plugins.ai.models.model')"
+                    :description="provider && !provider.models.length ? t('plugins.ai.models.noModels') : undefined"
+                    :error="modelMissing ? t('plugins.ai.models.modelMissing', {model: profile.modelId}) : undefined"
                 >
                     <USelectMenu
                         class="w-72"
@@ -113,49 +110,49 @@ async function remove() {
                         :filter-fields="['label', 'value']"
                         :model-value="profile.modelId || undefined"
                         :disabled="!provider"
-                        :placeholder="modelMissing ? profile.modelId : t('app.settings.ai.models.chooseModel')"
-                        :search-input="{placeholder: t('app.settings.ai.models.searchModels')}"
+                        :placeholder="modelMissing ? profile.modelId : t('plugins.ai.models.chooseModel')"
+                        :search-input="{placeholder: t('plugins.ai.models.searchModels')}"
                         :ui="{content: 'min-w-96'}"
                         @update:model-value="save({modelId: $event as string})"
                     >
                         <template #item-label="{item}">
                             <div class="min-w-0">
                                 <div class="truncate">{{ item.label }}</div>
-                                <SettingsAiModelBadges :model="item.model" class="mt-0.5"/>
+                                <AiModelBadges :model="item.model" class="mt-0.5"/>
                             </div>
                         </template>
                     </USelectMenu>
                 </SettingsRow>
             </SettingsSection>
 
-            <SettingsSection :title="t('app.settings.ai.models.behaviour')">
-                <SettingsRow :label="t('app.settings.ai.models.tools')" :description="t('app.settings.ai.models.toolsDescription')">
+            <SettingsSection :title="t('plugins.ai.models.behaviour')">
+                <SettingsRow :label="t('plugins.ai.models.tools')" :description="t('plugins.ai.models.toolsDescription')">
                     <USwitch :model-value="profile.tools !== false" @update:model-value="save({tools: $event ? undefined : false})"/>
                 </SettingsRow>
                 <div class="px-4 py-2.5 space-y-1.5">
-                    <div class="text-sm">{{ t('app.settings.ai.models.systemPrompt') }}</div>
-                    <div class="text-xs text-muted">{{ t('app.settings.ai.models.systemPromptDescription') }}</div>
+                    <div class="text-sm">{{ t('plugins.ai.models.systemPrompt') }}</div>
+                    <div class="text-xs text-muted">{{ t('plugins.ai.models.systemPromptDescription') }}</div>
                     <UTextarea
                         v-model="systemPrompt"
                         class="w-full"
                         :rows="3"
                         autoresize
                         :maxrows="16"
-                        :placeholder="t('app.settings.ai.models.systemPromptPlaceholder')"
+                        :placeholder="t('plugins.ai.models.systemPromptPlaceholder')"
                         @blur="systemPrompt !== profile.systemPrompt && save({systemPrompt})"
                     />
                 </div>
             </SettingsSection>
 
-            <SettingsAiModelParams :params="profile.params" :model="modelInfo" @save="params => save({params})"/>
+            <AiModelParams :params="profile.params" :model="modelInfo" @save="params => save({params})"/>
         </div>
         <UEmpty
             v-else
             class="mt-12"
             variant="naked"
             icon="i-lucide-box"
-            :title="t('app.settings.ai.models.notFound')"
-            :actions="[{label: t('app.settings.ai.models.back'), icon: 'i-lucide-arrow-left', color: 'neutral', variant: 'outline', to: back}]"
+            :title="t('plugins.ai.models.notFound')"
+            :actions="[{label: t('plugins.ai.models.back'), icon: 'i-lucide-arrow-left', color: 'neutral', variant: 'outline', to: back}]"
         />
     </SettingsScrollLayout>
 </template>

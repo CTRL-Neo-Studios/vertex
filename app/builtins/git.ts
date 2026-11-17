@@ -1,3 +1,4 @@
+import type {PluginApis, PluginContext} from '#shared/plugin/api'
 import {definePlugin} from '#shared/plugin/api'
 import {useGitAutoSync} from '~/composables/git/useGitAutoSync'
 import {isGitRepo, watchGitPresence} from '~/composables/git/useGitRepo'
@@ -5,8 +6,14 @@ import {diffSpecOf, diffTitle} from '~/utils/gitDiff'
 import {useAppSessionActions} from '~/composables/app/useAppSessionActions'
 import GitCloneModal from '~/components/Git/GitCloneModal.vue'
 
+let use: PluginContext['use'] | undefined
+/** Another plugin's API while that plugin is on, for git's code (AI writes commit messages when it's on). */
+export const gitUses = <K extends keyof PluginApis>(id: K) => use?.(id)
+
 export default definePlugin({
     setup(ctx) {
+        use = ctx.use
+        ctx.whenPlugin('ai', ai => ai.registerFeature({id: 'commitMessage', label: 'app.aiFeatures.commitMessage', description: 'app.aiFeatures.commitMessageDescription'}))
         ctx.views.panel({
             id: 'git', label: 'app.git.label', icon: 'i-lucide-git-branch', defaultArea: 'left',
             when: c => c.isWorkspace,

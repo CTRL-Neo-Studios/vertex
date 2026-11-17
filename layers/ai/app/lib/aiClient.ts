@@ -1,7 +1,6 @@
-import type {Channel} from "@tauri-apps/api/core";
-import {pluginInvoke} from "~/utils/vertexInvoke";
+import {invoke as tauriInvoke, type Channel, type InvokeArgs} from "@tauri-apps/api/core";
 
-const invoke = pluginInvoke('vertex-ai')
+const invoke = <T>(command: string, args?: InvokeArgs) => tauriInvoke<T>(`plugin:vertex-ai|${command}`, args)
 
 /**
  * Thin client for the Rust AI commands (the Tauri plugin `vertex-ai`). Provider API keys go in through `setKey` and never come

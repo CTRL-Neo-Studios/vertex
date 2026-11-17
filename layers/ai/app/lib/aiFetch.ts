@@ -1,7 +1,7 @@
 import {Channel} from "@tauri-apps/api/core";
-import type {AiModelParams} from "#shared/types/app/ai";
-import {withModelParams} from "#shared/utils/aiParams";
-import {aiClient, type AiChunk} from "~/utils/aiClient";
+import type {AiModelParams} from "../../shared/types";
+import {withModelParams} from "../../shared/params";
+import {aiClient, type AiChunk} from "./aiClient";
 
 const abortError = () => new DOMException('The operation was aborted.', 'AbortError')
 /** Statuses whose `Response` must have a null body. */

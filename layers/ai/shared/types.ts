@@ -1,4 +1,6 @@
-import type {ChatMode, ChatStorage} from "#shared/types/app/chats";
+/** Chat's options the AI config carries until chat takes them (X8): where its chats are kept, and the mode they start in. */
+export type ChatStorage = 'app' | 'workspace'
+export type ChatMode = 'read' | 'suggest' | 'write'
 
 /** One model a provider serves, with whatever metadata its `/models` list, Ollama or models.dev knew. */
 export interface AiModelInfo {
@@ -68,7 +70,8 @@ export interface AiEditorAssistantEntries {
     shortcut: boolean,
 }
 
-export interface AppAiConfig {
+/** `plugins.config.ai` as the plugin reads it (`aiConfigOf`). */
+export interface AiConfig {
     providers: AiProviderProfile[],
     /** Every AI feature; off is as if each one were off. */
     enabled: boolean,

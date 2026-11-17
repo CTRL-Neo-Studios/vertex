@@ -1,4 +1,4 @@
-import type {AiModelParams} from "#shared/types/app/ai";
+import type {AiModelParams} from "./types";
 
 type NumberParam = Exclude<keyof AiModelParams, 'stop' | 'extra'>
 

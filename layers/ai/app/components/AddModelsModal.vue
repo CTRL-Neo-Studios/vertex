@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type {TableColumn} from "@nuxt/ui";
-import type {AiModelInfo, AiProviderProfile} from "#shared/types/app/ai";
-import {useAiConfig} from "~/composables/ai/useAiConfig";
-import {useAiModels} from "~/composables/ai/useAiModels";
+import type {AiModelInfo, AiProviderProfile} from "../../shared/types";
+import {useAiConfig} from "../lib/useAiConfig";
+import {useAiModels} from "../lib/useAiModels";
 
 /** Picks which of a provider's listed models to enable; saves them with their metadata. */
 const props = defineProps<{ provider: AiProviderProfile }>()
@@ -47,8 +47,8 @@ function toggle(id: string, on: boolean) {
 
 const columns = computed<TableColumn<AiModelInfo>[]>(() => [
     {id: 'select'},
-    {accessorKey: 'id', header: t('app.settings.ai.providers.model')},
-    {id: 'capabilities', header: t('app.settings.ai.providers.capabilities')},
+    {accessorKey: 'id', header: t('plugins.ai.providers.model')},
+    {id: 'capabilities', header: t('plugins.ai.providers.capabilities')},
 ])
 
 // Already-enabled models the server no longer lists are kept as they were.
@@ -66,14 +66,14 @@ async function save() {
 <template>
     <UModal
         v-model:open="open"
-        :title="t('app.settings.ai.providers.addModelsTitle', {name: provider.name})"
-        :description="t('app.settings.ai.providers.addModelsDescription')"
+        :title="t('plugins.ai.providers.addModelsTitle', {name: provider.name})"
+        :description="t('plugins.ai.providers.addModelsDescription')"
         :ui="{content: 'max-w-3xl'}"
     >
         <template #body>
             <div class="space-y-3">
-                <UInput v-model="query" class="w-full" icon="i-lucide-search" :placeholder="t('app.settings.ai.providers.searchModels')" autofocus/>
-                <UTable :data="shown" :columns="columns" :loading="loading" :empty="t('app.settings.ai.providers.noModels')" class="max-h-[50vh]" sticky>
+                <UInput v-model="query" class="w-full" icon="i-lucide-search" :placeholder="t('plugins.ai.providers.searchModels')" autofocus/>
+                <UTable :data="shown" :columns="columns" :loading="loading" :empty="t('plugins.ai.providers.noModels')" class="max-h-[50vh]" sticky>
                     <template #select-cell="{row}">
                         <UCheckbox
                             :model-value="selected.has(row.original.id)"
@@ -88,7 +88,7 @@ async function save() {
                         </div>
                     </template>
                     <template #capabilities-cell="{row}">
-                        <SettingsAiModelBadges :model="row.original"/>
+                        <AiModelBadges :model="row.original"/>
                     </template>
                 </UTable>
                 <div v-if="filtered.length > PAGE_SIZE" class="flex justify-center">
@@ -98,9 +98,9 @@ async function save() {
         </template>
         <template #footer="{close}">
             <div class="flex items-center gap-2 w-full">
-                <span class="text-sm text-muted flex-1">{{ t('app.settings.ai.providers.selectedCount', {count: selected.size}) }}</span>
-                <UButton color="neutral" variant="ghost" :label="t('app.settings.ai.cancel')" @click="close"/>
-                <UButton :loading="saving" :disabled="loading" :label="t('app.settings.ai.providers.saveModels')" @click="save"/>
+                <span class="text-sm text-muted flex-1">{{ t('plugins.ai.providers.selectedCount', {count: selected.size}) }}</span>
+                <UButton color="neutral" variant="ghost" :label="t('plugins.ai.cancel')" @click="close"/>
+                <UButton :loading="saving" :disabled="loading" :label="t('plugins.ai.providers.saveModels')" @click="save"/>
             </div>
         </template>
     </UModal>

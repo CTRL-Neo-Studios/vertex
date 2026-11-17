@@ -1,5 +1,6 @@
 import {emitTo} from "@tauri-apps/api/event";
 import {defaultAppSettings} from "#shared/utils/defaults/apps";
+import {movedPathsIn} from "#shared/utils/settings/legacy";
 import type {AppSettings} from "#shared/types/app/settings";
 import type {DeepPartial} from "#shared/types/types";
 import {StateKey, WindowLabel} from "#shared/constants/app";
@@ -25,9 +26,9 @@ export function useAppSettings() {
         try {
             const stored = await stateClient.getSettings()
             config.value = defaultAppSettings(stored ?? undefined)
-            // First launch, or a file that still needs migrating to the current shape. Rust reads `aiConfig`
-            // (AI requests are checked against its providers), so the seeded one must reach the file too.
-            if (!stored || !('recoverSessions' in stored) || !('aiConfig' in stored)) await stateClient.setSettings(config.value)
+            // First launch, or a file that still needs migrating to the current shape. Rust reads plugins' config
+            // (AI requests are checked against `plugins.config.ai.providers`), so moved settings must reach the file too.
+            if (!stored || !('recoverSessions' in stored) || movedPathsIn(stored).length) await stateClient.setSettings(config.value)
         } catch (error) {
             console.error("[useAppSettings] failed to load settings:", error)
             config.value = defaultAppSettings()
