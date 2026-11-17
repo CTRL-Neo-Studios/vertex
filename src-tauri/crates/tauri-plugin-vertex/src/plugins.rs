@@ -1,37 +1,65 @@
-//! Community plugins installed for every workspace (Plugin Architecture Plan, C2): `<app_data>/plugins/<id>/` holds each
-//! one's `plugin.json`, `main.js`, `styles.css` and assets. Installing is two steps: [`plugin_stage`] unpacks a folder,
-//! a `.zip` or a URL to one into `<app_data>/plugins-staging/`, and the Settings window validates its manifest (the
-//! frontend's `validateManifest`, the one validator) and asks before [`plugin_install`] moves it into place. A plugin
-//! installed from a folder (`plugins.sources.<id>` is a folder) is copied again when that folder changes, for
-//! development. The kernel's catalog of manifests (`grants.rs`) follows every install and removal.
+//! Community plugins installed for every workspace (Plugin Architecture Plan, C2, C2b): `<app_data>/plugins/<id>/` holds
+//! each one's `plugin.json`, `main.js`, `styles.css`, assets, and `.install.json` (where it was fetched from). Installing
+//! is two steps: [`plugin_stage`] fetches a source (a Git repository's release or ref, a `.zip` URL: `sources.rs`) or
+//! copies a picked folder or `.zip` into `<app_data>/plugins-staging/`, and the Settings window validates its manifest
+//! (the frontend's `validateManifest`, the one validator) and asks before [`plugin_install`] moves it into place. An
+//! update is a stage of the same source; [`plugin_updates`] says which sources have something newer, only when asked
+//! or while `plugins.checkUpdates` is on. A plugin installed from a folder is copied again when that folder changes,
+//! for development. The kernel's catalog of manifests (`grants.rs`) follows every install and removal.
 
 use crate::api::blocking;
 use crate::grants::PluginManifest;
 use crate::host::check_plugin;
+use crate::sources::{Source, MAX_BYTES};
 use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::http::header::{ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_TYPE, ORIGIN};
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
 const PLUGINS: &str = "plugins";
 const STAGING: &str = "plugins-staging";
+/// Where an installed plugin came from, written into its folder by [`plugin_install`].
+const RECORD: &str = ".install.json";
 /// A plugin's folder as the webview loads it: `vertex-plugin://localhost/<id>/<path>` (`convertFileSrc`).
 pub const SCHEME: &str = "vertex-plugin";
 /// The windows list the installed plugins again (an install, a removal, a development copy).
 const EVENT_PLUGINS_CHANGED: &str = "vertex://plugins-changed";
 /// A plugin's files were copied again from its folder: the windows running it reload.
 const EVENT_PLUGIN_UPDATED: &str = "vertex://plugin-updated";
-/// A download or an unpacked `.zip` larger than this is refused.
-const MAX_BYTES: u64 = 128 * 1024 * 1024;
+/// A check found what [`plugin_updates`] returns.
+const EVENT_PLUGIN_UPDATES: &str = "vertex://plugin-updates";
+/// While `plugins.checkUpdates` is on: how often the sources are checked.
+const CHECK_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Where an installed plugin was fetched from (`.install.json`), and the stage's before it's installed: its source,
+/// that source's origin (the repository, the URL, the path), what it resolved to, and the fetched file's SHA-256.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Record {
+    source: String,
+    origin: String,
+    /// `release`, `branch`, `tag`, `commit`, `zip` (a URL), `file` or `folder`.
+    kind: String,
+    name: Option<String>,
+    commit: Option<String>,
+    sha256: Option<String>,
+    version: Option<String>,
+    /// Seconds since 1970.
+    installed_at: Option<u64>,
+}
+
+fn read_record(folder: &Path) -> Option<Record> {
+    serde_json::from_slice(&std::fs::read(folder.join(RECORD)).ok()?).ok()
+}
 
 fn dir<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join(name);
@@ -86,9 +114,18 @@ pub struct Installed {
     /// `plugin.json` as it is, `null` when it can't be read.
     manifest: Value,
     error: Option<String>,
+    /// Where it was fetched from; none for one installed before C2b.
+    record: Option<Record>,
+    /// The origin of the repository its manifest names (`repository`), to compare with the record's.
+    claimed: Option<String>,
 }
 
-/// Every installed plugin, by folder name, with its manifest unchecked: the frontend validates it.
+/// The origin of the repository a manifest names: what it says of itself, not where it was fetched from.
+fn claimed(manifest: &Value) -> Option<String> {
+    manifest.get("repository")?.as_str().map(crate::sources::origin_of_repo)
+}
+
+/// Every installed plugin, by folder name, with its manifest unchecked (the frontend validates it) and its record.
 #[tauri::command]
 pub fn plugins_list<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Installed>, String> {
     let mut out: Vec<Installed> = std::fs::read_dir(dir(&app, PLUGINS)?)
@@ -98,9 +135,10 @@ pub fn plugins_list<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Installed>, Str
         .filter_map(|entry| {
             let id = entry.file_name().to_str()?.to_owned();
             check_plugin(&id).ok()?;
+            let record = read_record(&entry.path());
             Some(match read_manifest(&entry.path()) {
-                Ok(manifest) => Installed { id, manifest, error: None },
-                Err(error) => Installed { id, manifest: Value::Null, error: Some(error) },
+                Ok(manifest) => Installed { id, claimed: claimed(&manifest), manifest, error: None, record },
+                Err(error) => Installed { id, manifest: Value::Null, error: Some(error), record, claimed: None },
             })
         })
         .collect();
@@ -173,104 +211,153 @@ fn unzip(file: &Path, to: &Path) -> Result<(), String> {
     Ok(())
 }
 
-async fn download(url: &str, to: &Path) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("only http(s) URLs".into());
-    }
-    crate::api::install_crypto();
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(120)).build().map_err(|e| e.to_string())?;
-    let mut response = client.get(url).send().await.and_then(reqwest::Response::error_for_status).map_err(|e| e.to_string())?;
-    let mut out = std::fs::File::create(to).map_err(|e| e.to_string())?;
-    let mut total = 0u64;
-    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
-        total += chunk.len() as u64;
-        if total > MAX_BYTES {
-            return Err(format!("the download is larger than {} MB", MAX_BYTES / 1024 / 1024));
-        }
-        out.write_all(&chunk).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/// The folder holding `plugin.json` in what was unpacked: its top, or its one top folder (a `.zip` of the folder).
+/// The built plugin in what was unpacked: `plugin.json` and `main.js` together, at its top or in `dist/` (a repository
+/// with its build in `dist/`); a `.zip` of the folder or a forge's archive add one top folder. A `plugin.json` without
+/// `main.js` beside it is a plugin's source, which Vertex can't build.
 fn package_root(stage: &Path) -> Result<PathBuf, String> {
-    if stage.join("plugin.json").is_file() {
-        return Ok(stage.to_owned());
-    }
     let entries: Vec<PathBuf> = std::fs::read_dir(stage).map_err(|e| e.to_string())?.flatten().map(|e| e.path()).collect();
-    match entries.as_slice() {
-        [only] if only.join("plugin.json").is_file() => Ok(only.clone()),
-        _ => Err("there's no plugin.json at its top or in its one folder".into()),
+    let top = match entries.as_slice() {
+        [only] if only.is_dir() && !stage.join("plugin.json").is_file() => only.clone(),
+        _ => stage.to_owned(),
+    };
+    let candidates = [top.clone(), top.join("dist")];
+    if let Some(root) = candidates.iter().find(|c| c.join("plugin.json").is_file() && c.join("main.js").is_file()) {
+        return Ok(root.clone());
     }
+    if candidates.iter().any(|c| c.join("plugin.json").is_file()) {
+        return Err("it holds the plugin's source, not its build (no main.js beside plugin.json, nor in dist/): install its release, or a branch with the built files".into());
+    }
+    Err("there's no plugin.json at its top, in its one folder, or in dist/".into())
 }
 
-/// A stage named by [`plugin_stage`]: a uuid, so it can't name another path.
+/// A stage named by [`plugin_stage`]: a uuid, so it can't name another path. Its record is beside it (`<stage>.json`),
+/// so what was unpacked keeps its own top folder.
 fn stage_dir<R: Runtime>(app: &AppHandle<R>, stage: &str) -> Result<PathBuf, String> {
     uuid::Uuid::parse_str(stage).map_err(|_| format!("no stage {stage:?}"))?;
     Ok(dir(app, STAGING)?.join(stage))
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Resolution {
+    /// The link as a source string, with what it named (a repository alone: its releases).
+    source: String,
+    origin: String,
+    /// For a repository: its default branch, branches, tags, and the newest release with a `plugin.zip`.
+    repository: Option<String>,
+    default_branch: Option<String>,
+    branches: Vec<String>,
+    tags: Vec<String>,
+    release: Option<String>,
+}
+
+/// Reads a link (a repository, a branch or release page, `owner/repo`, a `.zip` URL) for the install dialog: the
+/// repository's refs (one request, and one per release tag tried), so the user can pick what to install.
+#[tauri::command]
+pub async fn plugin_source_resolve(link: String) -> Result<Resolution, String> {
+    let source = crate::sources::from_link(&link)?;
+    let (source_string, origin) = (source.to_source_string(), source.origin());
+    let Source::Git { repo, .. } = &source else {
+        return Ok(Resolution { source: source_string, origin, repository: None, default_branch: None, branches: vec![], tags: vec![], release: None });
+    };
+    let client = crate::sources::client()?;
+    let refs = crate::sources::fetch_refs(&client, repo).await?;
+    let release = crate::sources::newest_release(&client, repo, &refs).await.map(|(tag, ..)| tag);
+    Ok(Resolution {
+        source: source_string,
+        origin,
+        repository: Some(repo.clone()),
+        default_branch: refs.default_branch,
+        branches: refs.branches.into_iter().map(|(b, _)| b).collect(),
+        tags: refs.tags.into_iter().map(|(t, _)| t).collect(),
+        release,
+    })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Staged {
     stage: String,
     manifest: Value,
+    /// Where it's from and what that resolved to.
+    resolved: Record,
+    /// The record of the installed plugin with the same id, which installing replaces.
+    installed: Option<Record>,
+    claimed: Option<String>,
 }
 
-/// Unpacks a plugin into a stage: from `path` (a folder, or a `.zip` file; picked in this window) or `url` (a `.zip`).
-/// Returns the stage and the raw manifest, for the window to validate and ask about.
+/// Fetches a source into `folder`, or copies `path` (a folder or `.zip` this window picked); returns where it's from
+/// and what that resolved to.
+async fn stage_into(folder: &Path, path: Option<String>, source: Option<String>) -> Result<Record, String> {
+    match (path, source) {
+        (Some(path), None) => {
+            let (from, to) = (PathBuf::from(&path), folder.to_owned());
+            let kind = if from.is_dir() { "folder" } else { "file" };
+            blocking(move || if from.is_dir() { copy_dir(&from, &to) } else { unzip(&from, &to) }).await?;
+            Ok(Record { source: path.clone(), origin: path, kind: kind.to_owned(), ..Record::default() })
+        }
+        (None, Some(source)) => {
+            let source = Source::parse(&source)?;
+            let client = crate::sources::client()?;
+            let resolved = crate::sources::resolve(&client, &source).await?;
+            let file = folder.with_extension("zip");
+            let fetched = crate::sources::download(&client, &resolved.urls, &file).await;
+            let unzipped = match fetched {
+                Ok((_, sha256)) => {
+                    let (file, to) = (file.clone(), folder.to_owned());
+                    blocking(move || unzip(&file, &to)).await.map(|()| sha256)
+                }
+                Err(e) => Err(e),
+            };
+            let _ = std::fs::remove_file(&file);
+            let sha256 = unzipped?;
+            Ok(Record {
+                source: resolved.source,
+                origin: resolved.origin,
+                kind: resolved.kind.to_owned(),
+                name: resolved.name,
+                commit: resolved.commit,
+                sha256: Some(sha256),
+                ..Record::default()
+            })
+        }
+        _ => Err("give a path or a source".to_owned()),
+    }
+}
+
 #[tauri::command]
-pub async fn plugin_stage<R: Runtime>(app: AppHandle<R>, path: Option<String>, url: Option<String>) -> Result<Staged, String> {
+pub async fn plugin_stage<R: Runtime>(app: AppHandle<R>, path: Option<String>, source: Option<String>) -> Result<Staged, String> {
     let stage = uuid::Uuid::new_v4().to_string();
     let folder = stage_dir(&app, &stage)?;
     let result = async {
-        match (path, url) {
-            (Some(path), None) => {
-                let folder = folder.clone();
-                blocking(move || {
-                    let source = Path::new(&path);
-                    if source.is_dir() { copy_dir(source, &folder) } else { unzip(source, &folder) }
-                })
-                .await?
-            }
-            (None, Some(url)) => {
-                let file = folder.with_extension("zip");
-                let downloaded = download(&url, &file).await;
-                let unzipped = match downloaded {
-                    Ok(()) => {
-                        let (file, folder) = (file.clone(), folder.clone());
-                        blocking(move || unzip(&file, &folder)).await
-                    }
-                    Err(e) => Err(e),
-                };
-                let _ = std::fs::remove_file(&file);
-                unzipped?
-            }
-            _ => return Err("give a path or a URL".to_owned()),
-        }
-        read_manifest(&package_root(&folder)?)
+        let resolved = stage_into(&folder, path, source).await?;
+        let manifest = read_manifest(&package_root(&folder)?)?;
+        std::fs::write(folder.with_extension("json"), serde_json::to_vec(&resolved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let installed = manifest.get("id").and_then(Value::as_str).and_then(|id| plugin_dir(&app, id).ok()).and_then(|dir| read_record(&dir));
+        Ok::<_, String>(Staged { stage: stage.clone(), claimed: claimed(&manifest), manifest, resolved, installed })
     }
     .await;
-    match result {
-        Ok(manifest) => Ok(Staged { stage, manifest }),
-        Err(e) => {
-            let _ = std::fs::remove_dir_all(&folder);
-            Err(e)
-        }
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&folder);
     }
+    result
 }
 
 #[tauri::command]
 pub fn plugin_discard<R: Runtime>(app: AppHandle<R>, stage: String) -> Result<(), String> {
-    match std::fs::remove_dir_all(stage_dir(&app, &stage)?) {
+    let folder = stage_dir(&app, &stage)?;
+    let _ = std::fs::remove_file(folder.with_extension("json"));
+    match std::fs::remove_dir_all(folder) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
         _ => Ok(()),
     }
 }
 
-/// Moves `root` (a package: `plugin.json`, `main.js`…) to the installed plugin's folder, replacing what was there.
-/// Checks what Rust's own work needs: the id rule, not a core plugin, `main.js`, a manifest it can grant.
-fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&str>) -> Result<String, String> {
-    let manifest = PluginManifest::parse(&std::fs::read_to_string(root.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?)?;
+/// Moves `root` (a package: `plugin.json`, `main.js`…) to the installed plugin's folder with its `record`, replacing
+/// what was there. Checks what Rust's own work needs: the id rule, not a core plugin, `main.js`, a manifest it can grant.
+fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&str>, mut record: Record) -> Result<String, String> {
+    let text = std::fs::read_to_string(root.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
+    let manifest = PluginManifest::parse(&text)?;
     let id = manifest.id.clone();
     check_plugin(&id)?;
     if expected.is_some_and(|expected| expected != id) {
@@ -283,6 +370,9 @@ fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&s
         return Err("there's no main.js".into());
     }
     crate::grants::check_permissions(&manifest)?;
+    record.version = serde_json::from_str::<Value>(&text).ok().and_then(|m| m.get("version")?.as_str().map(str::to_owned));
+    record.installed_at = SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
+    std::fs::write(root.join(RECORD), serde_json::to_vec_pretty(&record).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let target = plugin_dir(app, &id)?;
     // The old copy goes aside first, so a failed move leaves something to put back.
     let old = dir(app, STAGING)?.join(format!("{}-old", uuid::Uuid::new_v4()));
@@ -300,19 +390,128 @@ fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&s
     Ok(id)
 }
 
-/// Installs a stage (replacing the plugin's older copy) and returns the plugin's id.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledFrom {
+    id: String,
+    source: String,
+}
+
+/// Installs a stage (replacing the plugin's older copy) with its record; returns the plugin's id and source. Replacing
+/// one (an update) reloads the windows running it, as a folder install's copy does.
 #[tauri::command]
-pub async fn plugin_install<R: Runtime>(app: AppHandle<R>, stage: String) -> Result<String, String> {
+pub async fn plugin_install<R: Runtime>(app: AppHandle<R>, stage: String) -> Result<InstalledFrom, String> {
     let folder = stage_dir(&app, &stage)?;
     let handle = app.clone();
-    let id = blocking(move || {
-        let installed = package_root(&folder).and_then(|root| put_in_place(&handle, &root, None));
+    let (installed, replaced) = blocking(move || {
+        let meta = folder.with_extension("json");
+        let installed = std::fs::read(&meta)
+            .map_err(|_| format!("no stage {stage:?}"))
+            .and_then(|bytes| serde_json::from_slice::<Record>(&bytes).map_err(|e| e.to_string()))
+            .and_then(|record| {
+                let source = record.source.clone();
+                let root = package_root(&folder)?;
+                let id = read_manifest(&root).ok().and_then(|m| m.get("id")?.as_str().map(str::to_owned));
+                let replaced = id.is_some_and(|id| plugin_dir(&handle, &id).is_ok_and(|dir| dir.exists()));
+                put_in_place(&handle, &root, None, record).map(|id| (InstalledFrom { id, source }, replaced))
+            });
         let _ = std::fs::remove_dir_all(&folder);
+        let _ = std::fs::remove_file(&meta);
         installed
     })
     .await?;
     changed(&app);
-    Ok(id)
+    let _ = app.state::<Updates>().0.lock().map(|mut found| found.retain(|u| u.id != installed.id));
+    if replaced {
+        let _ = app.emit(EVENT_PLUGIN_UPDATED, serde_json::json!({ "id": installed.id }));
+    }
+    Ok(installed)
+}
+
+/// An installed plugin whose source has something newer.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Update {
+    id: String,
+    source: String,
+    /// The release tag or branch, and commit, installed now and available.
+    installed: Record,
+    available: Record,
+}
+
+/// The last check's updates (none before one), for the Settings page without asking the hosts again.
+#[derive(Default)]
+pub(crate) struct Updates(Mutex<Vec<Update>>, Mutex<Option<SystemTime>>);
+
+/// Whether `record`'s source has something newer: a release with another tag, a branch at another commit, a `.zip`
+/// URL with other bytes. A pinned tag or commit, a file and a folder (watched) never do. One request per repository
+/// (and one per release tag tried); a `.zip` URL is downloaded to be hashed.
+async fn newer(client: &reqwest::Client, record: &Record, staging: &Path) -> Result<Option<Record>, String> {
+    let Ok(source) = Source::parse(&record.source) else { return Ok(None) };
+    if let Source::Git { pick: crate::sources::Pick::Tag(_) | crate::sources::Pick::Commit(_), .. } = &source {
+        return Ok(None);
+    }
+    let resolved = crate::sources::resolve(client, &source).await?;
+    let changed = match resolved.kind {
+        "release" => resolved.name != record.name,
+        "zip" => {
+            let file = staging.join(format!("{}.check", uuid::Uuid::new_v4()));
+            let sha = crate::sources::download(client, &resolved.urls, &file).await.map(|(_, sha)| sha);
+            let _ = std::fs::remove_file(&file);
+            Some(sha?) != record.sha256
+        }
+        _ => resolved.commit != record.commit,
+    };
+    Ok(changed.then(|| Record { source: resolved.source, origin: resolved.origin, kind: resolved.kind.to_owned(), name: resolved.name, commit: resolved.commit, ..Record::default() }))
+}
+
+/// Checks every installed plugin's source, keeps the result and tells the windows (`vertex://plugin-updates`).
+async fn check_updates<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<Update>, String> {
+    let client = crate::sources::client()?;
+    let staging = dir(app, STAGING)?;
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(dir(app, PLUGINS)?).map_err(|e| e.to_string())?.flatten() {
+        let (Some(id), Some(record)) = (entry.file_name().to_str().map(str::to_owned), read_record(&entry.path())) else { continue };
+        match newer(&client, &record, &staging).await {
+            Ok(Some(available)) => found.push(Update { id, source: record.source.clone(), installed: record, available }),
+            Ok(None) => {}
+            Err(e) => eprintln!("[plugins] {id}: couldn't check {}: {e}", record.source),
+        }
+    }
+    found.sort_by(|a, b| a.id.cmp(&b.id));
+    let state = app.state::<Updates>();
+    *state.0.lock().map_err(|e| e.to_string())? = found.clone();
+    *state.1.lock().map_err(|e| e.to_string())? = Some(SystemTime::now());
+    let _ = app.emit(EVENT_PLUGIN_UPDATES, &found);
+    Ok(found)
+}
+
+/// The updates found: with `check`, by asking each installed plugin's source now; without, the last check's (nothing
+/// is sent).
+#[tauri::command]
+pub async fn plugin_updates<R: Runtime>(app: AppHandle<R>, check: bool) -> Result<Vec<Update>, String> {
+    if check {
+        return check_updates(&app).await;
+    }
+    Ok(app.state::<Updates>().0.lock().map_err(|e| e.to_string())?.clone())
+}
+
+/// While `plugins.checkUpdates` is on: checks a minute after launch, then daily. Off (the default), nothing is sent.
+pub(crate) fn start_update_checks<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(60)).await;
+        loop {
+            let on = crate::api::settings(&app).pointer("/plugins/checkUpdates").and_then(Value::as_bool) == Some(true);
+            let last = app.state::<Updates>().1.lock().ok().and_then(|l| *l);
+            if on && last.is_none_or(|t| t.elapsed().unwrap_or_default() >= CHECK_EVERY) {
+                if let Err(e) = check_updates(&app).await {
+                    eprintln!("[plugins] update check: {e}");
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+        }
+    });
 }
 
 /// Deletes an installed plugin's folder. Its config and data stay; a window running it runs it until Vertex restarts.
@@ -332,7 +531,8 @@ pub(crate) struct Watches(Mutex<HashMap<String, (String, Debouncer<RecommendedWa
 fn recopy<R: Runtime>(app: &AppHandle<R>, id: &str, source: &Path) {
     let result = (|| {
         let stage = dir(app, STAGING)?.join(uuid::Uuid::new_v4().to_string());
-        let copied = copy_dir(source, &stage).and_then(|()| package_root(&stage)).and_then(|root| put_in_place(app, &root, Some(id)));
+        let record = Record { source: source.to_string_lossy().into_owned(), origin: source.to_string_lossy().into_owned(), kind: "folder".into(), ..Record::default() };
+        let copied = copy_dir(source, &stage).and_then(|()| package_root(&stage)).and_then(|root| put_in_place(app, &root, Some(id), record));
         let _ = std::fs::remove_dir_all(&stage);
         copied
     })();
@@ -469,32 +669,49 @@ mod tests {
         assert!(!inside(Path::new("/etc/passwd")));
     }
 
+    fn built(dir: &Path) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join("plugin.json"), "{}").unwrap();
+        std::fs::write(dir.join("main.js"), "").unwrap();
+    }
+
     #[test]
-    fn a_package_is_its_top_or_its_one_folder() {
+    fn a_package_is_its_built_files_at_its_top_in_its_one_folder_or_in_dist() {
         let flat = temp("flat");
-        std::fs::write(flat.join("plugin.json"), "{}").unwrap();
+        built(&flat);
         assert_eq!(package_root(&flat).unwrap(), flat);
 
         let nested = temp("nested");
-        std::fs::create_dir_all(nested.join("my-plugin")).unwrap();
-        std::fs::write(nested.join("my-plugin/plugin.json"), "{}").unwrap();
+        built(&nested.join("my-plugin"));
         assert_eq!(package_root(&nested).unwrap(), nested.join("my-plugin"));
-
         std::fs::create_dir_all(nested.join("other")).unwrap();
         assert!(package_root(&nested).is_err(), "two folders: which one?");
-        for dir in [flat, nested] {
+
+        // A forge's archive of a repository: one top folder, the source's plugin.json at its top, the build in dist/.
+        let archive = temp("archive");
+        std::fs::create_dir_all(archive.join("repo-abc/src")).unwrap();
+        std::fs::write(archive.join("repo-abc/plugin.json"), "{}").unwrap();
+        built(&archive.join("repo-abc/dist"));
+        assert_eq!(package_root(&archive).unwrap(), archive.join("repo-abc/dist"));
+
+        // Only the source: refused with what to install instead.
+        std::fs::remove_dir_all(archive.join("repo-abc/dist")).unwrap();
+        assert!(package_root(&archive).unwrap_err().contains("source, not its build"));
+        for dir in [flat, nested, archive] {
             std::fs::remove_dir_all(dir).unwrap();
         }
     }
 
     #[test]
     fn a_zip_unpacks_inside_its_folder_only() {
+        use std::io::Write;
         let dir = temp("zip");
         let file = dir.join("p.zip");
         let mut zip = zip::ZipWriter::new(std::fs::File::create(&file).unwrap());
         let options = zip::write::SimpleFileOptions::default();
         zip.start_file("p/plugin.json", options).unwrap();
         zip.write_all(br#"{"id":"p"}"#).unwrap();
+        zip.start_file("p/main.js", options).unwrap();
         zip.start_file("../escape.txt", options).unwrap();
         zip.write_all(b"no").unwrap();
         zip.finish().unwrap();
@@ -505,5 +722,32 @@ mod tests {
         assert!(!dir.join("escape.txt").exists());
         assert_eq!(package_root(&out).unwrap(), out.join("p"));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_update_is_another_release_or_commit_and_never_a_pin() {
+        let (base, log) = crate::sources::tests::local_forge();
+        let client = crate::sources::client().unwrap();
+        let staging = std::env::temp_dir();
+        let (a, b) = ("a".repeat(40), "b".repeat(40));
+        let at = |pick: &str, name: &str, commit: &str| Record {
+            source: format!("git+{base}/gh/o/r#{pick}"),
+            name: Some(name.to_owned()),
+            commit: Some(commit.to_owned()),
+            ..Record::default()
+        };
+        tauri::async_runtime::block_on(async {
+            let found = newer(&client, &at("releases", "v0.1.0", &a), &staging).await.unwrap().unwrap();
+            assert_eq!(found.name.as_deref(), Some("v0.2.0"));
+            assert!(newer(&client, &at("releases", "v0.2.0", &b), &staging).await.unwrap().is_none());
+            let found = newer(&client, &at("branch:dist", "dist", &a), &staging).await.unwrap().unwrap();
+            assert_eq!(found.commit, Some(b.clone()));
+            assert!(newer(&client, &at("branch:dist", "dist", &b), &staging).await.unwrap().is_none());
+
+            let before = log.lock().unwrap().len();
+            assert!(newer(&client, &at("tag:v0.1.0", "v0.1.0", &a), &staging).await.unwrap().is_none());
+            assert!(newer(&client, &at(&format!("commit:{a}"), &a, &a), &staging).await.unwrap().is_none());
+            assert_eq!(log.lock().unwrap().len(), before, "a pin asks nothing");
+        });
     }
 }

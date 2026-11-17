@@ -296,6 +296,32 @@ Denies the plugin_remove command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-plugin-source-resolve`
+
+</td>
+<td>
+
+Enables the plugin_source_resolve command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-plugin-source-resolve`
+
+</td>
+<td>
+
+Denies the plugin_source_resolve command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-plugin-stage`
 
 </td>
@@ -315,6 +341,32 @@ Enables the plugin_stage command without any pre-configured scope.
 <td>
 
 Denies the plugin_stage command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:allow-plugin-updates`
+
+</td>
+<td>
+
+Enables the plugin_updates command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-plugin-updates`
+
+</td>
+<td>
+
+Denies the plugin_updates command without any pre-configured scope.
 
 </td>
 </tr>

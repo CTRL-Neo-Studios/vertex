@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugin-updates"
+description = "Enables the plugin_updates command without any pre-configured scope."
+commands.allow = ["plugin_updates"]
+
+[[permission]]
+identifier = "deny-plugin-updates"
+description = "Denies the plugin_updates command without any pre-configured scope."
+commands.deny = ["plugin_updates"]

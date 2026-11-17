@@ -15,8 +15,28 @@ export interface BrokenPlugin {
     errors: string[]
 }
 
-/** What Rust's `plugins_list` returns: each installed folder's manifest as it is. */
-interface Installed {
+/** Where an installed plugin was fetched from (Rust's `.install.json`); the same shape describes a stage's source. */
+export interface InstallRecord {
+    source: string
+    /** The repository (`github.com/o/r`), the `.zip` URL, or the path. */
+    origin: string
+    kind: 'release' | 'branch' | 'tag' | 'commit' | 'zip' | 'file' | 'folder'
+    /** The release tag, branch or tag. */
+    name: string | null
+    commit: string | null
+    sha256: string | null
+    version: string | null
+    installedAt: number | null
+}
+
+/** Where an installed plugin is from: its record (none for one installed before records), and the origin of the repository its manifest names. */
+export interface InstalledOrigin {
+    record: InstallRecord | null
+    claimed: string | null
+}
+
+/** What Rust's `plugins_list` returns: each installed folder's manifest as it is, and where it's from. */
+interface Installed extends InstalledOrigin {
     id: string
     manifest: unknown
     error: string | null
@@ -30,6 +50,7 @@ interface PluginCode {
 
 const community = shallowRef<readonly PluginEntry[]>([])
 const broken = shallowRef<readonly BrokenPlugin[]>([])
+const origins = shallowRef<Readonly<Record<string, InstalledOrigin>>>({})
 
 /** Every plugin this build and this device run: the core plugins (`layers/*`), then the installed ones. Reactive. */
 export const pluginEntries = (): readonly PluginEntry[] => [...core, ...community.value]
@@ -43,6 +64,9 @@ export const pluginManifests = (): PluginManifest[] => pluginEntries().map(e => 
 export const pluginManifest = (id: string): PluginManifest | undefined => pluginEntries().find(e => e.manifest.id === id)?.manifest
 
 export const brokenPlugins = (): readonly BrokenPlugin[] => broken.value
+
+/** Where an installed plugin is from. Reactive. */
+export const installedOrigin = (id: string): InstalledOrigin | undefined => origins.value[id]
 
 /** Runs an installed plugin: its `styles.css` in a `<style data-plugin>`, then its `main.js` with the app's modules. */
 async function loadInstalled(id: string, app: App) {
@@ -83,4 +107,5 @@ export async function loadInstalledPlugins(app: App): Promise<void> {
     }
     community.value = entries
     broken.value = failed
+    origins.value = Object.fromEntries(installed.map(({id, record, claimed}) => [id, {record, claimed}]))
 }

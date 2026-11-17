@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {getVersion} from "@tauri-apps/api/app";
+import {listen} from "@tauri-apps/api/event";
 import type {DropdownMenuItem} from "@nuxt/ui";
 import {parseRequirement, validateManifest, type PluginManifest} from "#shared/plugin/manifest";
 import {pluginEnabled, resolvePlugins, type OffReason} from "#shared/plugin/resolve";
@@ -9,11 +10,14 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {useTrust} from "~/composables/app/useTrust";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
+import {openUrlInBrowser} from "~/composables/app/useAppOpener";
 import {pickToOpen} from "~/utils/dialogs";
-import {brokenPlugins, pluginEntries} from "~/utils/plugins/catalog";
+import {brokenPlugins, installedOrigin, pluginEntries, type InstallRecord} from "~/utils/plugins/catalog";
+import {describeOrigin, originUrl} from "~/utils/plugins/origin";
 import {pluginStates} from "~/utils/plugins/runtime";
 import {stateClient} from "~/utils/stateClient";
 import {vertexInvoke} from "~/utils/vertexInvoke";
+import PluginGitModal from "~/components/Modals/PluginGitModal.vue";
 import PluginInstallModal from "~/components/Modals/PluginInstallModal.vue";
 import PluginRemoveModal from "~/components/Modals/PluginRemoveModal.vue";
 import PluginUrlModal from "~/components/Modals/PluginUrlModal.vue";
@@ -27,8 +31,9 @@ definePageMeta({
  * Settings → Plugins: every plugin with its switch, in the scope being edited. A workspace may turn any plugin off;
  * one it turns on that's off in the user's settings runs only once the workspace is trusted. A plugin turned off runs
  * on until Vertex restarts (its windows keep their grants till then): switching one off asks to restart, and its row
- * says it waits for one. Community plugins are installed here (Rust stages one, this page validates its manifest and
- * asks), for every workspace, and removed here.
+ * says it waits for one. Community plugins are installed here, for every workspace, from a Git repository (or a `.zip`,
+ * or a folder while developing one): Rust stages one, this page validates its manifest and asks. Their updates are
+ * checked when asked (or daily, when the user turns that on) and installed only through the same dialog.
  */
 const {t} = useI18n()
 const appSettings = useAppSettings()
@@ -49,6 +54,7 @@ const overlay = useOverlay()
 const restartModal = overlay.create(RestartModal)
 const installModal = overlay.create(PluginInstallModal)
 const urlModal = overlay.create(PluginUrlModal)
+const gitModal = overlay.create(PluginGitModal)
 const removeModal = overlay.create(PluginRemoveModal)
 
 async function offerRestart(id: string, name: string) {
@@ -112,33 +118,49 @@ async function saveGlobal(patch: Record<string, unknown>) {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const busy = ref(false)
 
-async function install(from: 'folder' | 'zip' | 'url') {
-    const source = from === 'url'
-        ? await urlModal.open()
-        : await pickToOpen(from === 'folder'
-            ? {directory: true, title: t('app.settings.plugins.pickFolder')}
-            : {title: t('app.settings.plugins.pickZip'), filters: [{name: 'Zip', extensions: ['zip']}]})
-    if (!source) return
+interface Staged {
+    stage: string
+    manifest: unknown
+    resolved: InstallRecord
+    installed: InstallRecord | null
+    claimed: string | null
+}
+
+/** Stages `what` (a source string, or a picked path), validates its manifest, asks, and installs it on. */
+async function stageAndInstall(what: { source: string } | { path: string }) {
     busy.value = true
     try {
-        const {stage, manifest} = await vertexInvoke<{ stage: string, manifest: unknown }>('plugin_stage', from === 'url' ? {url: source} : {path: source})
+        const {stage, manifest, resolved, installed, claimed} = await vertexInvoke<Staged>('plugin_stage', what)
         const result = validateManifest(manifest, await getVersion())
         const errors = !result.ok ? result.errors
             : core.value.some(m => m.id === result.manifest.id) ? [t('app.settings.plugins.coreId', {id: result.manifest.id})] : []
-        const replaces = result.ok ? community.value.find(m => m.id === result.manifest.id)?.version : undefined
-        const accepted = await installModal.open({manifest: (manifest ?? {}) as Partial<PluginManifest>, errors, replaces})
+        const current = result.ok ? community.value.find(m => m.id === result.manifest.id) : undefined
+        const accepted = await installModal.open({manifest: (manifest ?? {}) as Partial<PluginManifest>, errors, resolved, claimed, current, installed})
         if (!accepted || !result.ok || errors.length) {
             await vertexInvoke('plugin_discard', {stage})
             return
         }
-        const id = await vertexInvoke<string>('plugin_install', {stage})
+        const {id, source} = await vertexInvoke<{ id: string, source: string }>('plugin_install', {stage})
         await saveGlobal({[`plugins.enabled.${id}`]: true, [`plugins.sources.${id}`]: source})
-        toasts.success(t('app.settings.plugins.installed', {name: result.manifest.name}))
+        updates.value = updates.value.filter(u => u.id !== id)
+        toasts.success(t(current ? 'app.settings.plugins.updated' : 'app.settings.plugins.installed', {name: result.manifest.name}))
     } catch (error) {
         toasts.error(t('app.settings.plugins.installFailed'), message(error))
     } finally {
         busy.value = false
     }
+}
+
+async function install(from: 'git' | 'folder' | 'zip' | 'url', link?: string) {
+    if (from === 'git' || from === 'url') {
+        const source = from === 'git' ? await gitModal.open({link}) : await urlModal.open()
+        if (source) await stageAndInstall({source})
+        return
+    }
+    const path = await pickToOpen(from === 'folder'
+        ? {directory: true, title: t('app.settings.plugins.pickFolder')}
+        : {title: t('app.settings.plugins.pickZip'), filters: [{name: 'Zip', extensions: ['zip']}]})
+    if (path) await stageAndInstall({path})
 }
 
 async function remove(id: string, name: string) {
@@ -152,11 +174,58 @@ async function remove(id: string, name: string) {
     }
 }
 
-const installItems = computed<DropdownMenuItem[]>(() => [
-    {label: t('app.settings.plugins.installFolder'), icon: 'i-lucide-folder', onSelect: () => install('folder')},
+const otherWays = computed<DropdownMenuItem[]>(() => [
     {label: t('app.settings.plugins.installZip'), icon: 'i-lucide-file-archive', onSelect: () => install('zip')},
     {label: t('app.settings.plugins.installUrl'), icon: 'i-lucide-link', onSelect: () => install('url')},
+    {label: t('app.settings.plugins.installFolder'), icon: 'i-lucide-folder-code', onSelect: () => install('folder')},
 ])
+
+/** An installed plugin whose source has something newer (Rust's `plugin_updates`). */
+interface Update {
+    id: string
+    source: string
+    installed: InstallRecord
+    available: InstallRecord
+}
+
+/** The last check's updates: opening this page asks nobody; Check for updates asks each plugin's source. */
+const updates = ref<Update[]>([])
+const checking = ref(false)
+const updateOf = (id: string) => updates.value.find(u => u.id === id)
+let unlisten: (() => void) | undefined
+onMounted(async () => {
+    updates.value = await vertexInvoke<Update[]>('plugin_updates', {check: false})
+    unlisten = await listen<Update[]>('vertex://plugin-updates', e => (updates.value = e.payload))
+})
+onBeforeUnmount(() => unlisten?.())
+
+async function checkUpdates() {
+    checking.value = true
+    try {
+        updates.value = await vertexInvoke<Update[]>('plugin_updates', {check: true})
+        if (!updates.value.length) toasts.success(t('app.settings.plugins.upToDate'))
+    } catch (error) {
+        toasts.error(t('app.settings.plugins.checkFailed'), message(error))
+    } finally {
+        checking.value = false
+    }
+}
+
+const checkAutomatically = computed({
+    get: () => appSettings.config.value?.plugins.checkUpdates ?? false,
+    set: on => void saveGlobal({'plugins.checkUpdates': on}).catch(error => toasts.error(t('app.settings.plugins.saveFailed'), message(error))),
+})
+
+/** A plugin's origin line, and whether to offer its repository as its source (it names one it wasn't fetched from). */
+function originOf(m: PluginManifest) {
+    const origin = installedOrigin(m.id)
+    const record = origin?.record
+    return {
+        text: record ? describeOrigin(record, t) : t('app.settings.plugins.origin.unknown'),
+        url: record ? originUrl(record) : undefined,
+        claim: origin?.claimed && origin.claimed !== record?.origin ? origin.claimed : undefined,
+    }
+}
 </script>
 
 <template>
@@ -178,9 +247,13 @@ const installItems = computed<DropdownMenuItem[]>(() => [
                     :data-plugins-section="group.id"
                 >
                     <template v-if="group.id === 'community'" #actions>
-                        <UDropdownMenu :items="installItems" :content="{align: 'end'}">
-                            <UButton size="xs" color="neutral" variant="outline" icon="i-lucide-download" :loading="busy" :label="t('app.settings.plugins.install')" data-plugins-install/>
-                        </UDropdownMenu>
+                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" :loading="checking" :label="t('app.settings.plugins.checkUpdates')" data-plugins-check @click="checkUpdates"/>
+                        <UFieldGroup size="xs">
+                            <UButton color="neutral" variant="outline" icon="i-lucide-git-branch" :loading="busy" :label="t('app.settings.plugins.install')" data-plugins-install @click="install('git')"/>
+                            <UDropdownMenu :items="otherWays" :content="{align: 'end'}">
+                                <UButton color="neutral" variant="outline" icon="i-lucide-chevron-down" :aria-label="t('app.settings.plugins.installOther')" data-plugins-install-other/>
+                            </UDropdownMenu>
+                        </UFieldGroup>
                     </template>
                     <p v-if="!group.list.length && (group.id === 'core' || !brokenPlugins().length)" class="text-sm text-muted px-4 py-2.5">
                         {{ t(group.id === 'core' ? 'app.settings.plugins.none' : 'app.settings.plugins.noneInstalled') }}
@@ -190,12 +263,35 @@ const installItems = computed<DropdownMenuItem[]>(() => [
                         :key="m.id"
                         :setting="enabledPath(m.id)"
                         :label="m.name"
-                        :description="describe(m)"
+                        :description="group.id === 'community' ? [describe(m), originOf(m).text, originOf(m).claim && t('app.settings.plugins.origin.claims', {origin: originOf(m).claim})].filter(Boolean).join(' · ') : describe(m)"
                         :error="reasonText(m)"
                         :data-plugin-row="m.id"
                     >
                         <UBadge v-if="blocked(m)" size="sm" color="warning" variant="subtle" :label="t('app.settings.plugins.waitsForTrust')"/>
                         <UBadge v-if="waiting.includes(m.id)" size="sm" color="info" variant="subtle" :label="t('app.settings.plugins.waitsForRestart')" data-plugin-restart/>
+                        <template v-if="group.id === 'community'">
+                            <UButton
+                                v-if="updateOf(m.id)"
+                                size="xs"
+                                icon="i-lucide-arrow-up-circle"
+                                :loading="busy"
+                                :label="t('app.settings.plugins.updateTo', {to: updateOf(m.id)!.available.name ?? updateOf(m.id)!.available.commit?.slice(0, 7) ?? ''})"
+                                data-plugin-update
+                                @click="stageAndInstall({source: updateOf(m.id)!.source})"
+                            />
+                            <UButton
+                                v-if="originOf(m).claim"
+                                size="xs"
+                                color="neutral"
+                                variant="outline"
+                                :label="t('app.settings.plugins.useRepository')"
+                                data-plugin-use-repository
+                                @click="install('git', `https://${originOf(m).claim}`)"
+                            />
+                            <UTooltip v-if="originOf(m).url" :text="t('app.settings.plugins.openOrigin')">
+                                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(originOf(m).url!)"/>
+                            </UTooltip>
+                        </template>
                         <UTooltip v-if="m.config?.schema?.length" :text="t('app.settings.plugins.settings')">
                             <UButton
                                 size="xs"
@@ -224,6 +320,15 @@ const installItems = computed<DropdownMenuItem[]>(() => [
                             </UTooltip>
                         </SettingsRow>
                     </template>
+                    <SettingsRow
+                        v-if="group.id === 'community'"
+                        setting="plugins.checkUpdates"
+                        :label="t('app.settings.plugins.checkAutomatically')"
+                        :description="t('app.settings.plugins.checkAutomaticallyDescription')"
+                        data-plugins-check-automatically
+                    >
+                        <USwitch v-model="checkAutomatically" :aria-label="t('app.settings.plugins.checkAutomatically')"/>
+                    </SettingsRow>
                 </SettingsSection>
             </template>
         </div>

@@ -58,6 +58,11 @@ export interface PluginManifest {
     description?: string
     /** Iconify name (`i-lucide-waypoints`), for its rows and its settings page. */
     icon?: string
+    /**
+     * The plugin's Git repository (`https://github.com/me/my-plugin`): where its updates come from. Shown as what the
+     * plugin says of itself; Vertex records where it actually fetched a plugin from.
+     */
+    repository?: string
     author?: string
     apiVersion: number
     /** The oldest Vertex it runs in (`0.9.2`); an older app keeps it off. */
@@ -88,7 +93,7 @@ export const pluginWindows = (manifest: PluginManifest): WindowKind[] => manifes
 
 export type ManifestResult = { ok: true, manifest: PluginManifest } | { ok: false, errors: string[] }
 
-const KEYS = new Set(['id', 'name', 'version', 'description', 'icon', 'author', 'apiVersion', 'minAppVersion', 'windows', 'requires', 'permissions', 'enabledByDefault', 'config'])
+const KEYS = new Set(['id', 'name', 'version', 'description', 'icon', 'author', 'repository', 'apiVersion', 'minAppVersion', 'windows', 'requires', 'permissions', 'enabledByDefault', 'config'])
 const isString = (v: unknown): v is string => typeof v === 'string'
 const isStringList = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString)
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -185,6 +190,9 @@ export function validateManifest(raw: unknown, appVersion?: string): ManifestRes
     if (m.minAppVersion !== undefined) {
         if (!isString(m.minAppVersion) || !/^\d+(?:\.\d+){0,2}$/.test(m.minAppVersion)) errors.push('"minAppVersion" must be a version like 0.9.2')
         else if (appVersion && laterVersion(m.minAppVersion, appVersion)) errors.push(`"minAppVersion" ${m.minAppVersion} is newer than this Vertex (${appVersion})`)
+    }
+    if (m.repository !== undefined && !(isString(m.repository) && /^https:\/\/[^\s/]+\/\S+$/.test(m.repository))) {
+        errors.push('"repository" must be an https URL of a Git repository')
     }
     if (typeof m.apiVersion !== 'number' || !Number.isInteger(m.apiVersion) || m.apiVersion < 1) {
         errors.push('"apiVersion" must be a positive integer')

@@ -427,6 +427,18 @@
           "markdownDescription": "Denies the plugin_remove command without any pre-configured scope."
         },
         {
+          "description": "Enables the plugin_source_resolve command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-source-resolve",
+          "markdownDescription": "Enables the plugin_source_resolve command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_source_resolve command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-source-resolve",
+          "markdownDescription": "Denies the plugin_source_resolve command without any pre-configured scope."
+        },
+        {
           "description": "Enables the plugin_stage command without any pre-configured scope.",
           "type": "string",
           "const": "allow-plugin-stage",
@@ -437,6 +449,18 @@
           "type": "string",
           "const": "deny-plugin-stage",
           "markdownDescription": "Denies the plugin_stage command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugin_updates command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-updates",
+          "markdownDescription": "Enables the plugin_updates command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_updates command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-updates",
+          "markdownDescription": "Denies the plugin_updates command without any pre-configured scope."
         },
         {
           "description": "Enables the plugins_list command without any pre-configured scope.",

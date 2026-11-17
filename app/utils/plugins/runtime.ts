@@ -148,6 +148,16 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
         await flushSession()
         location.reload()
     })
+    // An automatic check found updates: the main and session windows say so once per check; Settings → Plugins lists them.
+    if (kind !== 'settings') {
+        await listen<{ id: string }[]>('vertex://plugin-updates', ({payload}) => {
+            if (!payload.length || !appSettings.config.value?.plugins.checkUpdates) return
+            const names = payload.map(u => pluginEntries().find(e => e.manifest.id === u.id)?.manifest.name ?? u.id).join(', ')
+            toasts.success(t('app.plugins.updatesWaiting', {count: payload.length}), names, [
+                {label: t('app.plugins.review'), onClick: () => void appSettings.createOrFocusSettingsWindow(workspace(), '/settings/plugins')},
+            ])
+        })
+    }
 }
 
 /** Runs host calls from outside the Nuxt context (the session layout's `onMounted` after an `await`) inside it. */

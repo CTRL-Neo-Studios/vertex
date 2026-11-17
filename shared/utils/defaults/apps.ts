@@ -55,6 +55,7 @@ export function defaultAppPluginsConfig(data?: DeepPartial<AppPluginsConfig>): A
         enabled: Object.fromEntries(entries(data?.enabled).filter((e): e is [string, boolean] => typeof e[1] === 'boolean')),
         config: Object.fromEntries(entries(data?.config).filter(([, c]) => isLoose(c))),
         sources: Object.fromEntries(entries(data?.sources).filter((e): e is [string, string] => typeof e[1] === 'string')),
+        checkUpdates: data?.checkUpdates === true,
     }
 }
 

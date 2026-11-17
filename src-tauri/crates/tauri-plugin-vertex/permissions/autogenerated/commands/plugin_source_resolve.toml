@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugin-source-resolve"
+description = "Enables the plugin_source_resolve command without any pre-configured scope."
+commands.allow = ["plugin_source_resolve"]
+
+[[permission]]
+identifier = "deny-plugin-source-resolve"
+description = "Denies the plugin_source_resolve command without any pre-configured scope."
+commands.deny = ["plugin_source_resolve"]

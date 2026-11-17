@@ -34,12 +34,14 @@ describe('defaultAppPluginsConfig', () => {
             enabled: {git: false, 'not-installed-here': true, broken: 'yes' as never},
             config: {graph: {depth: 2}, broken: 'x' as never} as never,
             sources: {graph: 'https://example.com/graph.zip', broken: 1 as never},
+            checkUpdates: 'yes' as never,
         })).toEqual({
             enabled: {git: false, 'not-installed-here': true},
             config: {graph: {depth: 2}},
             sources: {graph: 'https://example.com/graph.zip'},
+            checkUpdates: false,
         })
-        expect(defaultAppSettings().plugins).toEqual({enabled: {}, config: {}, sources: {}})
+        expect(defaultAppSettings().plugins).toEqual({enabled: {}, config: {}, sources: {}, checkUpdates: false})
     })
 })
 

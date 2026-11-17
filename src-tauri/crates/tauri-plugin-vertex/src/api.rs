@@ -25,6 +25,7 @@ pub fn grant<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, grants: Grant
 pub fn set_plugins<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
     crate::grants::set_catalog(app, manifests)?;
     crate::plugins::sync_watches(app, &settings(app));
+    crate::plugins::start_update_checks(app);
     Ok(())
 }
 

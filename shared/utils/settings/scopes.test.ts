@@ -58,7 +58,7 @@ describe('plugins in a workspace', () => {
 
     it('keeps the config and on/off of plugins it doesn\'t know through a save', () => {
         const saved = defaultAppSettings(JSON.parse(JSON.stringify(withPlugins)))
-        expect(saved.plugins).toEqual({enabled: {git: false, ai: true}, config: {graph: {depth: 1, physics: 'slow', colors: {tags: 'red'}}}, sources: {}})
+        expect(saved.plugins).toEqual({enabled: {git: false, ai: true}, config: {graph: {depth: 1, physics: 'slow', colors: {tags: 'red'}}}, sources: {}, checkUpdates: false})
     })
 })
 

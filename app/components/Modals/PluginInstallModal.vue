@@ -1,25 +1,66 @@
 <script setup lang="ts">
 import type {PluginManifest} from '#shared/plugin/manifest'
+import type {InstallRecord} from '~/utils/plugins/catalog'
+import {describeOrigin} from '~/utils/plugins/origin'
 
 /**
- * What installing a community plugin is agreeing to: its name, author and version, the permissions it asks for, and
- * that it runs as Vertex does. With `errors` (its manifest didn't validate) it can only be cancelled.
+ * What installing a community plugin, or updating one, is agreeing to: its name, author and version, where it's from
+ * (and where it says it's from, when that differs), the permissions it asks for, and that it runs as Vertex does. An
+ * update shows what changed. A plugin from elsewhere than the installed one with its id (which would get that one's
+ * settings, data and secrets) needs its own confirmation. With `errors` (its manifest didn't validate) it can only be
+ * cancelled.
  */
 const props = defineProps<{
     manifest: Partial<PluginManifest>
     errors: string[]
-    /** The version installed now, when this replaces it. */
-    replaces?: string
+    /** Where it's from, as staged. */
+    resolved: InstallRecord
+    /** The origin of the repository its manifest names. */
+    claimed: string | null
+    /** The installed plugin with its id, which this replaces, and where that one came from. */
+    current?: Partial<PluginManifest>
+    installed?: InstallRecord | null
 }>()
 const emit = defineEmits<{ close: [boolean] }>()
 const {t} = useI18n()
 const name = computed(() => (typeof props.manifest.name === 'string' && props.manifest.name) || props.manifest.id || '?')
+
+const otherOrigin = computed(() => !!props.current && props.installed?.origin !== props.resolved.origin)
+const confirmedOther = ref(false)
+const claimDiffers = computed(() => !!props.claimed && props.claimed !== props.resolved.origin)
+
+const permission = (p: string) => t(`app.settings.plugins.permission.${p}`)
+/** What an update changes beside its code: permissions, requirements, `apiVersion`. */
+const changes = computed(() => {
+    const before = props.current
+    if (!before) return []
+    const added = (props.manifest.permissions ?? []).filter(p => !(before.permissions ?? []).includes(p))
+    const removed = (before.permissions ?? []).filter(p => !(props.manifest.permissions ?? []).includes(p))
+    const requires = (props.manifest.requires ?? []).join(', ') !== (before.requires ?? []).join(', ')
+    return [
+        ...added.map(p => ({warn: true, text: t('app.settings.plugins.installModal.permissionAdded', {permission: permission(p)})})),
+        ...removed.map(p => ({warn: false, text: t('app.settings.plugins.installModal.permissionRemoved', {permission: permission(p)})})),
+        ...(requires ? [{warn: false, text: t('app.settings.plugins.installModal.requiresChanged', {list: (props.manifest.requires ?? []).join(', ') || '—'})}] : []),
+        ...(before.apiVersion !== props.manifest.apiVersion ? [{warn: false, text: t('app.settings.plugins.installModal.apiChanged', {from: before.apiVersion, to: props.manifest.apiVersion})}] : []),
+    ]
+})
+const versionLine = computed(() => {
+    const from = props.current?.version
+    const to = props.manifest.version
+    if (!from || !to || from === to) return undefined
+    const later = (a: string, b: string) => a.localeCompare(b, undefined, {numeric: true}) > 0
+    return t(later(from, to) ? 'app.settings.plugins.installModal.downgrade' : 'app.settings.plugins.installModal.upgrade', {from, to})
+})
+const title = computed(() => {
+    if (props.errors.length) return t('app.settings.plugins.installModal.invalid')
+    return t(props.current && !otherOrigin.value ? 'app.settings.plugins.installModal.updateTitle' : 'app.settings.plugins.installModal.title', {name: name.value})
+})
 </script>
 
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="errors.length ? t('app.settings.plugins.installModal.invalid') : t('app.settings.plugins.installModal.title', {name})"
+        :title="title"
         :description="[manifest.version && t('app.settings.plugins.version', {version: manifest.version}), manifest.author && t('app.settings.plugins.installModal.by', {author: manifest.author})].filter(Boolean).join(' · ')"
     >
         <template #body>
@@ -40,14 +81,25 @@ const name = computed(() => (typeof props.manifest.name === 'string' && props.ma
                 </UAlert>
                 <template v-else>
                     <p v-if="manifest.description" class="text-muted">{{ manifest.description }}</p>
-                    <p v-if="replaces" class="text-muted">{{ t('app.settings.plugins.installModal.replaces', {version: replaces}) }}</p>
+                    <p data-plugin-install-origin>{{ t('app.settings.plugins.installModal.from', {origin: describeOrigin(resolved, t)}) }}</p>
+                    <p v-if="claimDiffers" class="text-warning" data-plugin-install-claim>{{ t('app.settings.plugins.installModal.claims', {origin: claimed}) }}</p>
+                    <p v-if="versionLine" data-plugin-install-version>{{ versionLine }}</p>
+                    <ul v-if="changes.length" class="list-disc ps-5" data-plugin-install-changes>
+                        <li v-for="c in changes" :key="c.text" :class="c.warn ? 'text-warning' : 'text-muted'">{{ c.text }}</li>
+                    </ul>
                     <div>
                         <p class="font-medium">{{ t('app.settings.plugins.installModal.permissions') }}</p>
                         <ul v-if="manifest.permissions?.length" class="list-disc ps-5 text-muted">
-                            <li v-for="p in manifest.permissions" :key="p">{{ t(`app.settings.plugins.permission.${p}`) }}</li>
+                            <li v-for="p in manifest.permissions" :key="p">{{ permission(p) }}</li>
                         </ul>
                         <p v-else class="text-muted">{{ t('app.settings.plugins.installModal.noPermissions') }}</p>
                     </div>
+                    <UAlert v-if="otherOrigin" color="error" variant="subtle" icon="i-lucide-shield-alert" data-plugin-install-other>
+                        <template #description>
+                            <p>{{ t('app.settings.plugins.installModal.otherOrigin', {id: manifest.id, installed: installed ? describeOrigin(installed, t) : t('app.settings.plugins.origin.unknown')}) }}</p>
+                            <UCheckbox v-model="confirmedOther" class="mt-2" :label="t('app.settings.plugins.installModal.otherOriginConfirm')" data-plugin-install-other-confirm/>
+                        </template>
+                    </UAlert>
                     <UAlert color="warning" variant="subtle" icon="i-lucide-shield-alert" :description="t('app.settings.plugins.installModal.warning')"/>
                 </template>
             </div>
@@ -55,7 +107,14 @@ const name = computed(() => (typeof props.manifest.name === 'string' && props.ma
         <template #footer>
             <div class="w-full inline-flex items-center justify-end gap-2">
                 <UButton size="sm" color="neutral" variant="outline" :label="t('app.settings.plugins.installModal.cancel')" @click="() => emit('close', false)"/>
-                <UButton v-if="!errors.length" size="sm" :label="t('app.settings.plugins.installModal.install')" data-plugin-install-confirm @click="() => emit('close', true)"/>
+                <UButton
+                    v-if="!errors.length"
+                    size="sm"
+                    :disabled="otherOrigin && !confirmedOther"
+                    :label="current && !otherOrigin ? t('app.settings.plugins.update') : t('app.settings.plugins.installModal.install')"
+                    data-plugin-install-confirm
+                    @click="() => emit('close', true)"
+                />
             </div>
         </template>
     </UModal>

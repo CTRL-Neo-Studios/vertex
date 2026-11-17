@@ -44,6 +44,8 @@ const COMMANDS: &[&str] = &[
     "plugin_discard",
     "plugin_install",
     "plugin_remove",
+    "plugin_source_resolve",
+    "plugin_updates",
     "window_open",
 ];
 

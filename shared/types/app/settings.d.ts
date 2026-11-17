@@ -33,8 +33,13 @@ export interface AppPluginsConfig {
      * this device doesn't have. Typed for the plugins that declare `PluginConfigs`.
      */
     config: { [Id in keyof PluginConfigs]?: PluginConfigs[Id] },
-    /** Plugin id → where it was installed from (C phases): a vault that uses it can offer to install it. */
+    /**
+     * Plugin id → where it was installed from: `git+https://host/owner/repo#releases` (or `#branch:<b>`, `#tag:<t>`,
+     * `#commit:<sha>`), an https `.zip` URL, a `.zip` file or a folder (watched). A vault that uses it can offer to install it.
+     */
     sources: Record<string, string>,
+    /** Check the installed plugins' sources for updates at launch and daily; off: only when asked (Settings → Plugins). */
+    checkUpdates: boolean,
 }
 
 export interface AppFileConfig {

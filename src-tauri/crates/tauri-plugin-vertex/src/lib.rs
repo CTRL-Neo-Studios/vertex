@@ -10,6 +10,7 @@ mod grants;
 mod host;
 mod notes;
 mod plugins;
+mod sources;
 mod protocol;
 mod reach;
 mod state;
@@ -279,6 +280,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             plugins::plugin_discard,
             plugins::plugin_install,
             plugins::plugin_remove,
+            plugins::plugin_source_resolve,
+            plugins::plugin_updates,
             windows::window_open,
             dialogs::dialog_open,
             dialogs::dialog_save,
@@ -290,6 +293,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             app.manage(grants::WindowGrants::default());
             app.manage(reach::Reaches::default());
             app.manage(plugins::Watches::default());
+            app.manage(plugins::Updates::default());
             let handle = app.clone();
             app.state::<AppState>().on_settings_change(Box::new(move |_, new| plugins::sync_watches(&handle, new)));
             Ok(())
