@@ -1045,25 +1045,10 @@ Blocked by C2b. Decisions confirmed on 17 Nov: plugins are installed into a work
 
 ## C4: Sample plugins and author docs
 
-Blocked by C3.
-
-### Change
-- Six sample plugins, each built with the SDK only, in `examples/plugins/`:
-  - a relation graph like Obsidian's, the first one built (`d3-force`, `d3-zoom` and `d3-drag`, bundled into its `main.js`; drawn on a canvas):
-    - notes are nodes and links are edges, from `index.links()`; tags, attachments, unresolved links and orphans can be shown or hidden;
-    - a global view and a local one that follows the active tab to a set depth, both `tab: true`, opened by commands;
-    - hovering a node highlights its neighbours, a click opens the note, nodes drag, the view pans and zooms;
-    - it follows the index (`index.on`) and the theme (`ui.theme`);
-    - filters, color groups and forces are its config: global, with per-workspace overrides;
-  - a file browser that can replace Files (a navigator: the kernel's file menu, New items and icons, drags to the editor, chat and Finder, file operations with undo, thumbnails, per-folder data in `ctx.data.workspace`);
-  - a code block widget with a slash item and a piece of Markdown syntax drawn in notes, callouts and table cells (a stat block);
-  - a new file format (viewer, file type, link extractor);
-  - one with schema settings, a custom settings widget, a workspace-overridable key and a secret;
-  - a Bases view registered through Bases' API (a month calendar by a date property; `requires: ["bases"]`): a community plugin on a core plugin's API.
-- Author docs: the manifest, the contract, each contribution point with an example, the two UI tiers and what each promises, config scopes, data and secrets, what trust means, versioning.
+Blocked by C3. Planned apart, in `plans/Sample Plugins Plan.md` (17 Nov): six sample plugins, the author docs, and
+what the contract turns out to lack are too much for one phase, and each sample is a repository of its own beside
+Vertex, as the test plugin is, not a folder of this one (`examples/plugins/` is dropped). That plan holds the samples,
+their order, the gaps found so far and the questions still open.
 
 ### Acceptance
-- [ ] Each sample installs globally and in a workspace, works in en and zh-CN, and survives a relaunch.
-- [ ] The graph: a vault of 5,000 notes lays out and stays responsive while panning; an edit that adds a link shows without reopening the view; open in a pane and in a tab at once, each keeps its own layout.
-- [ ] Each sample was written without reading the kernel's source: whatever it needed and lacked was added to the contract first.
-- [ ] SMOKE rows for the samples; the Concepts doc links the author docs.
+- [ ] The Sample Plugins Plan's last phase (D2) is done: each sample installs globally and in a workspace, works in en and zh-CN, and survives a relaunch; each was written without reading the kernel's source, with what it lacked added to the contract first; SMOKE rows for the samples; the Concepts doc links the author docs.
