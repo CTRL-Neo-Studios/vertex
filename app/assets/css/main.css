@@ -152,7 +152,9 @@
 }
 
 .dark {
-    --color-submuted: oklch(var(--ui-bg-muted));
+    /* The window's background with 2% of the inverted one: opaque, so what's drawn over content (a sticky header, a
+       fade into it) hides what's under it, and `from-submuted` makes a gradient. */
+    --color-submuted: color-mix(in oklab, var(--ui-bg) 98%, var(--ui-bg-inverted));
 
     --ncm-code-bg: var(--ui-bg-muted);
     --ncm-code-bg-hover: var(--ui-bg-elevated);
@@ -161,10 +163,6 @@
     --ncm-text-muted: var(--ui-text-muted);
     --ncm-text-xmuted: var(--ui-text-muted);
     --ncm-overlay-bg: rgba(var(--ui-bg), 0.98);
-
-    .bg-submuted {
-        @apply bg-inverted/2;
-    }
 }
 
 /* The file tree: a row whose name runs under its tag or arrow, pinned at the panel's edge (`data-clip`, set by the tree
