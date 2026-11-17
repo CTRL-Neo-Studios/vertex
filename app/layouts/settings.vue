@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {NavigationMenuItem} from "#ui/components/NavigationMenu.vue";
 import {getCurrentWebviewWindow} from "@tauri-apps/api/webviewWindow";
+import {SplitterGroup, SplitterPanel, SplitterResizeHandle} from "reka-ui";
 import {Routes} from "#shared/constants/app";
 import {fileNameFromPath} from "#shared/utils/fs/filenames";
 import {useAppSessions} from "~/composables/app/useAppSessions";
@@ -64,35 +65,45 @@ onMounted(async () => {
 
 <template>
     <div class="w-full h-screen max-h-screen overflow-hidden">
-        <div class="w-full h-full grid grid-cols-4">
+        <!-- The sidebar's width is kept (`localStorage`) for every Settings window. -->
+        <SplitterGroup direction="horizontal" auto-save-id="vertex-settings-sidebar" class="w-full h-full">
             <!-- Sidebar -->
-            <div class="col-span-1 bg-submuted border-r border-r-default h-full overflow-hidden flex flex-col" data-tauri-drag-region>
-                <SpaceOnOs detectOs="macos" showOnOs class="h-(--ui-header-height)"/>
+            <SplitterPanel id="settings-sidebar" :order="0" :default-size="25" :min-size="15" :max-size="45" class="bg-submuted h-full overflow-hidden flex flex-col" data-tauri-drag-region>
+                <SpaceOnOs detectOs="macos" showOnOs class="h-(--ui-header-height) shrink-0"/>
 
-                <UContainer class="w-full flex-1 overflow-y-auto space-y-3">
-                    <UFormField :label="t('app.settings.scope.label')" :help="t('app.settings.scope.help')" size="xs">
-                        <USelect
-                            class="w-full"
-                            size="sm"
-                            :items="scopes"
-                            :model-value="scope.root.value ?? USER"
-                            :icon="scope.root.value ? 'i-lucide-folder' : 'i-lucide-user'"
-                            @update:model-value="choose($event as string)"
-                        />
-                    </UFormField>
+                <div class="w-full flex-1 min-h-0 overflow-y-auto px-4 pb-12">
+                    <!-- The scope stays at the top; the nav fades out under it as it scrolls, as a note does under its header. -->
+                    <div class="sticky top-0 z-10 bg-submuted pb-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-6 after:bg-linear-to-b after:from-submuted after:to-transparent">
+                        <UFormField :label="t('app.settings.scope.label')" size="xs">
+                            <UTooltip :text="t('app.settings.scope.help')" :delay-duration="100" :content="{side: 'right'}">
+                                <USelect
+                                    class="w-full"
+                                    size="sm"
+                                    :items="scopes"
+                                    :model-value="scope.root.value ?? USER"
+                                    :icon="scope.root.value ? 'i-lucide-folder' : 'i-lucide-user'"
+                                    @update:model-value="choose($event as string)"
+                                />
+                            </UTooltip>
+                        </UFormField>
+                    </div>
                     <UNavigationMenu
+                        class="mt-3"
                         :items="links"
                         orientation="vertical"
                         tooltip
                         popover
                     />
-                </UContainer>
-            </div>
+                </div>
+            </SplitterPanel>
+            <SplitterResizeHandle
+                class="relative shrink-0 w-px bg-default transition-colors data-[state=hover]:bg-primary data-[state=drag]:bg-primary after:absolute after:inset-y-0 after:-inset-x-1.5 cursor-ew-resize"
+            />
 
             <!-- Content area (non-scrollable container) -->
-            <div class="col-span-3 h-screen">
+            <SplitterPanel id="settings-content" :order="1" :min-size="40" class="h-screen">
                 <slot/>
-            </div>
-        </div>
+            </SplitterPanel>
+        </SplitterGroup>
     </div>
 </template>

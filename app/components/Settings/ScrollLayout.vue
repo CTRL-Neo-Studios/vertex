@@ -14,10 +14,10 @@ const locked = computed(() => props.globalOnly && scope.root.value !== null)
 </script>
 
 <template>
-    <div class="w-full h-screen flex flex-col overflow-hidden">
-        <!-- Fixed Header -->
-        <div class="shrink-0 border-b border-default bg-default/75 backdrop-blur-lg z-10 w-full" data-tauri-drag-region>
-            <div class="px-6 py-4" data-tauri-drag-region>
+    <div class="relative w-full h-screen overflow-hidden">
+        <!-- Header over the content, which fades out under it as a note does under its header. -->
+        <div class="absolute inset-x-0 top-0 z-10 bg-linear-to-b from-default from-60% to-transparent" data-tauri-drag-region>
+            <div class="px-6 pt-4 pb-6" data-tauri-drag-region>
                 <div class="flex items-center justify-between gap-2" data-tauri-drag-region>
                     <div class="flex items-center gap-1 min-w-0" data-tauri-drag-region>
                         <slot name="header-leading"/>
@@ -30,9 +30,9 @@ const locked = computed(() => props.globalOnly && scope.root.value !== null)
             </div>
         </div>
 
-        <!-- Scrollable Content (takes remaining height) -->
-        <div class="flex-1 overflow-hidden">
-            <UScrollArea class="h-full w-full p-6" orientation="vertical">
+        <!-- Scrollable content: under the header, with room at the bottom. -->
+        <UScrollArea class="h-full w-full" orientation="vertical">
+            <div class="px-6 pt-18 pb-24">
                 <UAlert
                     v-if="locked"
                     class="mb-4"
@@ -45,7 +45,7 @@ const locked = computed(() => props.globalOnly && scope.root.value !== null)
                 <fieldset :disabled="locked" :class="locked && 'opacity-60'">
                     <slot/>
                 </fieldset>
-            </UScrollArea>
-        </div>
+            </div>
+        </UScrollArea>
     </div>
 </template>
