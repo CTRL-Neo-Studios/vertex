@@ -140,31 +140,10 @@
         "useDefault": "Use default ({name})",
         "untrusted": "This workspace's AI feature choices don't apply until you trust it.",
         "trustWorkspace": "Trust workspace",
-        "chatStorage": "Chat storage",
-        "chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
-        "chatStorageApp": "App data",
-        "chatStorageWorkspace": "Workspace (encrypted)",
-        "chatMode": "Chat mode",
-        "chatModeDescription": "The mode new chats start in. Read only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply.",
         "masterSection": "Assistive AI",
         "enabled": "All AI features",
         "enabledDescription": "Off turns off every AI feature: the editor assistant, chat and chat titles. Your chats stay where they are.",
-        "chatTitles": "Chat titles",
-        "chatTitlesDescription": "After the first reply, the chat's model names it. Off keeps the first message as the title.",
-        "entry": {
-          "toolbar": "Ask AI in the selection toolbar",
-          "toolbarDescription": "A button beside the formatting buttons when text is selected.",
-          "slash": "AI items in the / menu",
-          "slashDescription": "Ask AI, Continue writing and the other presets among the blocks.",
-          "shortcut": "Shortcut",
-          "shortcutDescription": "⌘J opens the assistant at the cursor or on the selection."
-        },
-        "editProfile": "Edit profile",
-        "chatModes": {
-          "read": "Read",
-          "suggest": "Suggest",
-          "write": "Write"
-        }
+        "editProfile": "Edit profile"
       },
       "off": "Assistive AI is off, so nothing here is used.",
       "turnOn": "Go to its switch",

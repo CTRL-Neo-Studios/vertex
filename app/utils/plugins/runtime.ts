@@ -115,6 +115,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
             }
         },
         services: (id, own) => hostServices(id, workspace(), own, trust),
+        openSettings: path => appSettings.createOrFocusSettingsWindow(workspace(), `/settings/${path}`),
         onFailed(manifest, error) {
             console.error(`[plugins] ${manifest.id} failed:`, error)
             toasts.error(t('app.plugins.failed', {name: manifest.name}), error instanceof Error ? error.message : String(error))

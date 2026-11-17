@@ -36,7 +36,7 @@ const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
 const drafting = ref(false)
 const idle = computed(() => !busy.value && !!status.value && !drafting.value)
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
-const chatsInWorkspace = computed(() => gitContext().use('ai')?.config().chatStorage === 'workspace')
+const chatsInWorkspace = computed(() => !!gitContext().use('chat')?.chatsInWorkspace())
 
 // No git: install it (macOS: Apple's developer tools), or point Vertex at one (`plugins.config.git.path`, global only).
 const $qt = useNotify()

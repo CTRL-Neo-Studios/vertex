@@ -160,9 +160,9 @@ mod tests {
         PluginManifest::parse(&json.to_string()).unwrap()
     }
 
-    /// The app's own plugins: the built-ins and the core layers.
+    /// The app's own plugins: the core layers.
     fn app_plugins() -> Vec<PluginManifest> {
-        super::PLUGINS.iter().flat_map(|json| PluginManifest::parse_all(json).unwrap()).collect()
+        super::PLUGINS.iter().map(|json| PluginManifest::parse(json).unwrap()).collect()
     }
 
     #[test]

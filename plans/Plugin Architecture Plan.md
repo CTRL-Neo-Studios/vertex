@@ -775,14 +775,37 @@ Blocked by X7.
 - Check whether the editor's `/comark` plugin (`ofm()`, 0.5) can replace `app/utils/comarkPlugins.ts`'s wikilinks, so replies render callouts, tags and highlights as notes do; adopt it if the chat's streaming and quoted frontmatter still work.
 - `ai-assistant` (requires `ai`): `useAiEditorExtension` as an editor extension; `aiConfig.editorAssistant` → `plugins.config.ai-assistant`.
 
+### Decisions
+
+- **Two layers:** `layers/chat/` (requires `ai`, `workflows?`; `network`) and `layers/ai-assistant/` (requires `ai`). With them out, `app/builtins/` is empty, so the `builtin` source goes (the catalog, the type, Rust's embedding of `app/builtins/plugins.json`), and the boundary test loses `RESIDENTS`.
+- **No `ai.registerTool`** (the plan's line above): chat is the only one with tools, so they stay chat's. `runWorkflow` is in the tool set only while `workflows` runs (`ctx.use('workflows')`), instead of answering that it's off. A registration point goes on chat's API when a second plugin needs to add a tool.
+- **Settings:**
+  - `plugins.config.ai.{chatStorage, chatMode, chatTitles}` → `plugins.config.chat.{storage, mode, titles}`, and `fileConfig.importToChat` → `plugins.config.chat.importFiles`. Chat's manifest draws them as a schema (Settings → Plugins → Chat, like Workflows), each workspace-overridable as before.
+  - `plugins.config.ai.editorAssistant` → `plugins.config.ai-assistant` (`toolbar`, `slash`, `shortcut`, switches in its schema).
+  - AI's config, manifest and Features page drop them; Features keeps listing the two features, which their plugins register.
+  - A stored `chatMode: "ask"` (Read's old name) reads as the schema's default, Suggest; a chat file's own `mode: "ask"` still reads as Read.
+- **Git asks chat** whether chats are kept in the workspace (`ctx.use('chat')?.chatsInWorkspace()`, git requires `chat?`), instead of reading AI's config.
+- **Kernel additions** for what chat reaches today:
+  - `session.views.show` returns whether a pane shows the view (chat falls back to a tab).
+  - `session.editor.content(tabId)` (a text tab's live buffer) and `session.editor.lastShownNote()`.
+  - `session.index.search(query, options?)` (Rust `search_notes`; the grep options below).
+  - `session.files.outside(source)`: files from a drop, the clipboard or pasted images, as the workspace's own (uuids) and the rest described (name, size, folder), with `import(items)` copying those into the attachments folder. Chat filters and asks before importing, as now.
+  - `ctx.settings.open(path)` (opens Settings on this window's scope); AI's API gains `editProfile(id)`, which chat's context window uses.
+  - `#shared/plugin/files.ts` (the file-name helpers and `IMAGE_TYPES`) and `lineDiff` in `#shared/plugin/text.ts`, re-exported as `vault.ts` is.
+  - Notes are read through `session.files.vault().read`, instead of `read_text_files_batch`.
+- **Moves into the layer:** `ImportToChatModal`; the `.shiki` dark-colour rule (chat replies only) from `main.css`; `comark`, `@comark/vue`, `@ai-sdk/vue`, `@ai-sdk/tool-web-fetch`, `just-bash` to chat's `package.json` when nothing else uses them. `fetchUrl` goes through `ctx.http.fetch`.
+- **Strings:**
+  - `app.chat.*` → `plugins.chat.*`.
+  - `app.aiFeatures.{chat, editorAssistant}*`, `app.commands.newChat`, `app.editor.ui.askInChat`, `app.settings.view.importToChat*` and AI's chat and assistant options → their plugins.
+
 ### New chat tools
 
 Asked for after a chat told to reorganise a workspace wrote copies of the files instead of moving them. The cause, in today's code: no tool moves a file, so the model recreates it (`createNote` at the new path) or runs `mv` in `bash`, where `chatBash.ts` stages a move's destination as a new note and drops the removal (`sandboxWrites`: "deletions are left out"). Either way the original stays.
 
 What exists today, so nothing is built twice: `findFiles` (part of a name, a folder, an extension; lists a folder flat), `searchNotes` (one word or phrase, 20 hits with a snippet, no folder filter, no line numbers), `readNote`, `createNote` / `writeNote` / `editNote`, `bash` (the sandbox's grep, find, sed, awk), `findTools`. Missing: move, copy, glob, regex search, a tree.
 
-- **`moveFiles({moves: [{from, to}]})`** (Write mode): files or folders, moved and/or renamed, missing folders created. One call takes the whole list and asks once (`needsApproval`, as `runWorkflow` does), the row listing each `from → to`. It then runs the kernel's move and rename, so links are rewritten as `fileConfig.updateLinks` says, open tabs follow, and it's one step of Files' undo history with its toast. Applied at once, not staged with the reply's note changes: the tools that follow see the real paths. The kernel gains `session.files.rename(uuid, name)`; `session.files.move` gets a way to answer a name clash without the dialog (the tool returns the clashes for the model to resolve, it never replaces).
-- **`copyFiles({copies: [{from, to}]})`** (Write mode): the same shape and approval; a duplicate is a copy beside the original. The kernel gains `session.files.copyTo(uuid, folder, name)` (from `importItems`, which Duplicate already uses).
+- **`moveFiles({moves: [{from, to}]})`** (Write mode): files or folders, moved and/or renamed, missing folders created. One call takes the whole list and asks once (`needsApproval`, as `runWorkflow` does), the row listing each `from → to`. Applied at once, not staged with the reply's note changes: the tools that follow see the real paths. The kernel gains `session.files.relocate(moves: {uuid, to}[])`: one `relocateFiles` (links rewritten as `fileConfig.updateLinks` says, open tabs follow), one step of Files' undo history with its toast; a target that exists is left alone and returned as a clash for the model to resolve (it never replaces).
+- **`copyFiles({copies: [{from, to}]})`** (Write mode): the same shape and approval; a duplicate is a copy beside the original. The kernel gains `session.files.duplicate(copies: {uuid, to}[])`, one undo step, clashes returned the same way.
 - **`bash` stops faking moves:** a command that moved or removed a workspace file gets a result saying that didn't happen on disk and to use `moveFiles`; a moved file's destination is no longer staged as a new note. The system prompt says the same: move with `moveFiles`, never by recreating a file.
 - **`findFiles` gains `glob`** (`Projects/**/*.md`, `**/*.{png,jpg}`): `*`, `**`, `?` and `{a,b}` over the index's workspace-relative paths, a small matcher of its own with a test (no new dependency). Its description names "glob" so `findTools` finds it.
 - **`searchNotes` becomes the grep:** optional `regex`, `folder` (or `glob`), `caseSensitive`, `context` (lines around a hit) and `limit` (default 20, at most 200); hits carry line numbers, and the result says how many more there were. The kernel's `search_notes` takes them (Rust's `regex` crate, a new direct dependency of the kernel crate: in the webview it would be one IPC read per file). One tool rather than a second `grep` beside it, so the model has one place to search text; its description names "grep".
@@ -793,12 +816,21 @@ What exists today, so nothing is built twice: `findFiles` (part of a name, a fol
 - **Not built until a feedback entry or a user asks:** `trashFiles`, `createFolder` (`moveFiles` and `createNote` make the folders they need).
 
 ### Acceptance
-- [ ] The shared acceptance, for both; SMOKE row 43 and the chat rows pass.
-- [ ] With `workflows` off, chat has no `runWorkflow` tool; with `chat` off, chats stay on disk.
-- [ ] Every list of kernel-internal imports in the boundary test is empty or each entry has a written reason to stay.
-- [ ] "Reorganise this folder" in Write mode (a fixture vault, a real model): the files are moved after one approval, none exists twice, links to them still resolve, and Files' Undo puts them back. The same request through `bash`'s `mv` leaves no copy and tells the model to use `moveFiles`.
-- [ ] `findFiles` with a glob, `searchNotes` with a regex and a folder, and `folderTree` return what the same query gives on the command line for the fixture vault (unit tests for the glob matcher and `search_notes`).
-- [ ] A request no tool can do (e.g. "empty the trash") ends in a `toolFeedback` entry that shows on Settings → Chat and copies as an issue; no request leaves the app for it.
+- [ ] The shared acceptance, for both; SMOKE row 43 and the chat rows pass. (In `tauri dev`, separate app identifiers, a temporary harness and a fixture vault, deleted after: settings written before the move (`aiConfig.chatMode`/`chatTitles`/`chatStorage`/`editorAssistant`, `fileConfig.importToChat`) land in `plugins.config.chat` and `plugins.config.ai-assistant`, drawn on Settings → Plugins → Chat and → AI assistant; AI's Features lists both features without their options; chat, the assistant and AI run; File → New Chat opens a chat whose real model (local Ollama) replied with a tool call. Not run by hand: SMOKE row 43 and the chat rows themselves.)
+- [x] With `workflows` off, chat has no `runWorkflow` tool; with `chat` off, chats stay on disk. (The tool set leaves `runWorkflow` out without the workflows API (`tools.test.ts`); chat's deps pass it only while `ctx.use('workflows')` returns it. Launched with `plugins.enabled.chat: false`: chat off, the assistant on, the chats crate's commands refused, no chat views fetched; nothing in chat off touches the stores.)
+- [x] Every list of kernel-internal imports in the boundary test is empty or each entry has a written reason to stay. (`EXCEPTIONS` is empty; `RESIDENTS` and `KERNEL_EXCEPTIONS` are gone with the last built-ins.)
+- [ ] "Reorganise this folder" in Write mode (a fixture vault, a real model): the files are moved after one approval, none exists twice, links to them still resolve, and Files' Undo puts them back. The same request through `bash`'s `mv` leaves no copy and tells the model to use `moveFiles`. (Run with one file: asked to move `Inbox/a.md` into `Projects`, the model (gemma4:e4b) called `moveFiles`, the row listed `Inbox/a.md → Projects/a.md` with Move / Don't move, and after Move the file existed once at its new path with the note linking to it rewritten. Undo was checked on the kernel's `relocate` (moved with its link, a clash skipped, Undo restored both), not after the chat's move. The `bash` half is unit-tested (`bash.test.ts`), not tried with a model; a many-file reorganisation wasn't run.)
+- [x] `findFiles` with a glob, `searchNotes` with a regex and a folder, and `folderTree` return what the same query gives on the command line for the fixture vault (unit tests for the glob matcher and `search_notes`). (`glob.test.ts`, `notes.rs`'s two tests, `formatTree` and the tools' tests; in the app, `search('KRAKEN')` gave the path and line, a regex in `Inbox` both headings.)
+- [ ] A request no tool can do (e.g. "empty the trash") ends in a `toolFeedback` entry that shows on Settings → Chat and copies as an issue; no request leaves the app for it. (An entry recorded as the tool records it shows on Settings → Chat; the issue text is unit-tested. Not asked of a model.)
+
+### As built
+
+- **Layers:** `layers/chat/` (manifest: windows `session` and `settings`, `requires: ["ai", "workflows?"]`, `network`, a schema for `storage`, `mode`, `titles`, `importFiles`; `package.json` takes `@ai-sdk/vue`, `@ai-sdk/tool-web-fetch`, `@comark/vue`, `comark`, `just-bash`, `rangi` from the root; `nuxt.config.ts` with the `@comark/vue` module, `chat.css` and its `optimizeDeps`; `app/plugin.ts` with `chatContext()`/`chatSession()`, `app/api.ts` (`chatsInWorkspace`), `app/lib/` (`chats`, `actions`, `attach`, `tools`, `transport`, `bash`, `changes`, `forks`, `client`, `comark`, `webPage`, `feedback`, `notify`, with tests), `app/components/` (`View`, `Thread`, `ListPanel`, `SidePanelView`, `ChangeView`, …, `ImportModal`, `Settings`), `shared/` (`types`, `glob`)); `layers/ai-assistant/` (manifest with its three switches; `app/plugin.ts`, `app/lib/extension.ts`).
+- **Kernel:** `app/builtins/`, the `builtin` source and Rust's list manifests are gone; the boundary test is rule 1 without residents. `SessionContext` gains `views.show(): boolean`, `index.search(query, options)`, `files.outside`, `files.relocate`, `files.duplicate`, `files.drag.carries`, `editor.content`, `editor.lastShownNote`; `ctx.settings.open`; `#shared/plugin/files.ts` and `text.ts`; `fileConfig.importToChat` left the kernel (`LEGACY_PATHS` has five X8 rows); the `.shiki` rule left `main.css`. `useActiveWorkspaceTools` has `relocateTo` and `duplicateTo`.
+- **AI:** its config, seed, manifest and Features page drop chat's and the assistant's options; its API gains `editProfile`. **Git** asks chat (`requires: ["ai?", "chat?"]`).
+- **Rust:** `search_notes` takes `{regex, caseSensitive, folder, context, limit}` and returns `{hits: [{path, line?, snippet?}], more}` (the kernel crate depends on `regex`); `build.rs` embeds `layers/*/plugin.json` only.
+- **Chat tools:** `moveFiles`, `copyFiles`, `folderTree`, `toolFeedback`; `findFiles` takes `glob`; `searchNotes` is the grep; `bash` reports moves and removals instead of staging them; replies render through the editor's `ofm()` (`ofmNodes` maps its nodes); Settings → Chat lists tool feedback.
+- **Numbers:** 415 tests (48 files); 50 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## C1: Package format and SDK
 

@@ -3,7 +3,7 @@ import {isPlainTextFile} from '#shared/utils/fs/filenames'
 import {fileViewers} from './contributions'
 import {viewerFor} from './viewers'
 
-// The plugins' viewers as they register them (`layers/`, `app/builtins/`); the kernel's (markdown, code) come with `viewers.ts`.
+// The plugins' viewers as they register them (`layers/`); the kernel's (markdown, code) come with `viewers.ts`.
 const component = async () => ({})
 fileViewers.register({id: 'image', loadsText: false, match: ext => ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext), component})
 fileViewers.register({id: 'yaml', loadsText: true, match: ext => ext === 'yml' || ext === 'yaml', component})

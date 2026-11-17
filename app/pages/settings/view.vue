@@ -24,16 +24,12 @@ const updateLinksItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.updateLinksUpdate'), value: 'update'},
     {label: t('app.settings.view.updateLinksKeep'), value: 'keep'},
 ])
-const importToChatItems = computed<SelectItem[]>(() => [
-    {label: t('app.settings.view.importToChatAsk'), value: 'ask'},
-    {label: t('app.settings.view.importToChatAlways'), value: 'always'},
-])
 const deletedFilesItems = computed<SelectItem[]>(() => [
     {label: t('app.settings.view.deletedFilesTrash'), value: 'trash'},
     {label: t('app.settings.view.deletedFilesWorkspace'), value: 'workspaceTrash'},
     {label: t('app.settings.view.deletedFilesPermanent'), value: 'permanent'},
 ])
-const filePaths = ['fileConfig.updateLinks' as const, 'fileConfig.deletedFiles' as const, 'fileConfig.attachmentsFolder' as const, 'fileConfig.importToChat' as const]
+const filePaths = ['fileConfig.updateLinks' as const, 'fileConfig.deletedFiles' as const, 'fileConfig.attachmentsFolder' as const]
 /** A folder path as typed: no leading or trailing slashes; empty means the top level. */
 const folderPath = (event: Event) => (event.target as HTMLInputElement).value.trim().replace(/^\/+|\/+$/g, '')
 const editorToggles = ['selectionToolbar', 'slashMenu', 'blockHandle'] as const
@@ -89,14 +85,6 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         :placeholder="t('app.settings.view.attachmentsFolderTop')"
                         class="w-52"
                         @change="scope.set({'fileConfig.attachmentsFolder': folderPath($event)})"
-                    />
-                </SettingsRow>
-                <SettingsRow setting="fileConfig.importToChat" :label="t('app.settings.view.importToChat')" :description="t('app.settings.view.importToChatDescription')">
-                    <USelect
-                        :model-value="scope.value('fileConfig.importToChat')"
-                        :items="importToChatItems"
-                        class="w-52"
-                        @update:model-value="scope.set({'fileConfig.importToChat': $event})"
                     />
                 </SettingsRow>
             </SettingsSection>

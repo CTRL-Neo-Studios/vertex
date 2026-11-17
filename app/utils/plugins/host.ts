@@ -17,6 +17,8 @@ export interface PluginHostOptions {
     config(manifest: PluginManifest): PluginConfigAccess<Record<string, unknown>>
     /** A plugin's `ctx.http`, `ctx.secrets` and `ctx.data`; `own` ties a listener to the current scope like a registration. */
     services(id: string, own: (dispose: () => void) => void): HostServices
+    /** `ctx.settings.open`: the Settings window at `/settings/<path>`, on this window's scope. */
+    openSettings(path: string): Promise<void>
     /** A plugin failed to load or start, or one of its callbacks threw. */
     onFailed(manifest: PluginManifest, error: unknown): void
 }
@@ -127,7 +129,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
                 type: def => add('fileType', def),
                 menuItem: def => add('fileMenuItem', def),
             },
-            settings: {page: def => add('settingsPage', def)},
+            settings: {page: def => add('settingsPage', def), open: path => options.openSettings(path)},
             home: {action: def => add('homeAction', def)},
             editor: {
                 extension: (extension, options) => add('editorExtension', {extension, nested: options?.nested}),

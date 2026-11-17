@@ -18,11 +18,6 @@ const ctx = aiContext()
 const ENABLED = 'enabled'
 const DEFAULT_PROFILE = 'defaultModelProfile'
 const FEATURES = 'features'
-const CHAT_STORAGE = 'chatStorage'
-const CHAT_MODE = 'chatMode'
-const CHAT_TITLES = 'chatTitles'
-const ENTRIES = 'editorAssistant'
-const ENTRY_KEYS = ['toolbar', 'slash', 'shortcut'] as const
 const path = (id: string) => `${FEATURES}.${id}`
 /** What each key is when nothing sets it: what Reset puts back in User. */
 const DEFAULTS = aiConfigOf({enabled: true}) as unknown as Record<string, unknown>
@@ -69,19 +64,10 @@ function setFeatureOn(id: string, on: boolean) {
     if (props.config.root && aiConfigOf(ctx.config.value).features[id] === '') return set(path(id), current(DEFAULT_PROFILE))
     return setFeature(id, INHERIT)
 }
-const storageItems = computed(() => [
-    {label: t('plugins.ai.features.chatStorageApp'), value: 'app'},
-    {label: t('plugins.ai.features.chatStorageWorkspace'), value: 'workspace'},
-])
-const modeItems = computed(() => [
-    {label: t('plugins.ai.features.chatModes.read'), value: 'read'},
-    {label: t('plugins.ai.features.chatModes.suggest'), value: 'suggest'},
-    {label: t('plugins.ai.features.chatModes.write'), value: 'write'},
-])
 
 // Mirrors custom CSS: a workspace's AI switch and feature choices apply only once its folder is trusted.
 const untrusted = computed(() => props.config.root !== null && (props.config.overridden(FEATURES) || props.config.overridden(ENABLED)) && !props.config.trusted)
-const featureKeys = [FEATURES, ENTRIES, CHAT_STORAGE, CHAT_MODE, CHAT_TITLES]
+const featureKeys = [FEATURES]
 </script>
 
 <template>
@@ -153,48 +139,6 @@ const featureKeys = [FEATURES, ENTRIES, CHAT_STORAGE, CHAT_MODE, CHAT_TITLES]
                             @update:model-value="setFeatureOn(feature.id, $event)"
                         />
                     </SettingsRow>
-                    <template v-if="feature.id === 'editorAssistant'">
-                        <SettingsRow
-                            v-for="key in ENTRY_KEYS"
-                            :key
-                            :setting="config.path(`${ENTRIES}.${key}`)"
-                            :label="t(`plugins.ai.features.entry.${key}`)"
-                            :description="t(`plugins.ai.features.entry.${key}Description`)"
-                        >
-                            <USwitch
-                                :disabled="!aiOn || !featureOn(feature.id)"
-                                :model-value="current(`${ENTRIES}.${key}`) as boolean"
-                                @update:model-value="set(`${ENTRIES}.${key}`, $event)"
-                            />
-                        </SettingsRow>
-                    </template>
-                    <template v-if="feature.id === 'chat'">
-                        <SettingsRow :setting="config.path(CHAT_TITLES)" :label="t('plugins.ai.features.chatTitles')" :description="t('plugins.ai.features.chatTitlesDescription')">
-                            <USwitch
-                                :disabled="!aiOn || !featureOn(feature.id)"
-                                :model-value="current(CHAT_TITLES) as boolean"
-                                @update:model-value="set(CHAT_TITLES, $event)"
-                            />
-                        </SettingsRow>
-                        <SettingsRow :setting="config.path(CHAT_STORAGE)" :label="t('plugins.ai.features.chatStorage')" :description="t('plugins.ai.features.chatStorageDescription')">
-                            <USelect
-                                class="w-56"
-                                :items="storageItems"
-                                :disabled="!aiOn || !featureOn(feature.id)"
-                                :model-value="current(CHAT_STORAGE) as string"
-                                @update:model-value="set(CHAT_STORAGE, $event)"
-                            />
-                        </SettingsRow>
-                        <SettingsRow :setting="config.path(CHAT_MODE)" :label="t('plugins.ai.features.chatMode')" :description="t('plugins.ai.features.chatModeDescription')">
-                            <USelect
-                                class="w-56"
-                                :items="modeItems"
-                                :disabled="!aiOn || !featureOn(feature.id)"
-                                :model-value="current(CHAT_MODE) as string"
-                                @update:model-value="set(CHAT_MODE, $event)"
-                            />
-                        </SettingsRow>
-                    </template>
                 </template>
             </SettingsSection>
         </div>

@@ -37,6 +37,8 @@ export interface AiApi {
     resolveProfile(id: string): AiModel | null
     /** Changes a model profile (global settings). */
     updateProfile(id: string, patch: Partial<Omit<AiModelProfile, 'id'>>): Promise<void>
+    /** Opens a model profile's page in Settings. */
+    editProfile(id: string): Promise<void>
     /** Lists a feature on Features, in registration order; removed with the caller's scope, or by what it returns. */
     registerFeature(def: AiFeatureDef): () => void
 }

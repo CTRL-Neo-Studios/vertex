@@ -50,7 +50,7 @@ const LAYOUT_PATHS = ['viewConfig.panels.left', 'viewConfig.panels.right', 'view
  */
 export function usePanels(session?: ActiveSession) {
     const nuxtApp = useNuxtApp()
-    // Not `useI18n`: plugins' session code (the chat builtin's sync, through `useChats`) runs outside a component.
+    // Not `useI18n`: plugins' session code (`onSession` callbacks) runs outside a component.
     const {t} = nuxtApp.$i18n
     const settings = useSettingsScope()
     const {config, save: saveSettings} = useAppSettings()

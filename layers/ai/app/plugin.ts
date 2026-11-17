@@ -60,6 +60,7 @@ export default definePlugin({
             async updateProfile(id, patch) {
                 await context.config.set({modelProfiles: config().modelProfiles.map(p => (p.id === id ? {...p, ...patch} : p))})
             },
+            editProfile: id => context.settings.open(`ai/models/${id}`),
             registerFeature,
         } satisfies AiApi)
     },

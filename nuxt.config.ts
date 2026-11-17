@@ -12,7 +12,6 @@ export default defineNuxtConfig({
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
       "@nuxt/eslint",
-      "@comark/vue",
     ],
 
 	i18n: {
@@ -103,25 +102,13 @@ export default defineNuxtConfig({
                 "tailwindcss/colors",
                 "ai",
                 "@ai-sdk/openai-compatible",
-                "@ai-sdk/vue",
-                // Comark: the <Markdown> its Nuxt module auto-imports, and the subpaths the chat imports.
-                "@comark/vue",
-                "@comark/vue/utils",
-                "@comark/vue/plugins/math",
-                "@comark/vue/plugins/rangi",
-                // Loaded by Comark's math plugin (and the editor's math widgets) with a dynamic import.
+                // Loaded by the editor's math widgets with a dynamic import.
                 "katex",
                 "@type32/obsidian-bases-parser",
                 "zod",
                 "@vue-flow/core",
                 // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
-                // The chat's `bash` tool (app/utils/chatBash.ts), imported on its first command; same reason.
-                "just-bash",
-                // fetchUrl (app/utils/webPage.ts); the tool imports linkedom and defuddle on the first HTML page.
-                "@ai-sdk/tool-web-fetch",
-                "linkedom",
-                "defuddle/node",
             ],
         },
     },

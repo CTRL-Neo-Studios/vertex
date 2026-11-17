@@ -7,11 +7,7 @@
   "config": {
     "overridable": {
       "enabled": "trustedWorkspace",
-      "features": "trustedWorkspace",
-      "chatStorage": "workspace",
-      "chatMode": "workspace",
-      "chatTitles": "workspace",
-      "editorAssistant": "workspace"
+      "features": "trustedWorkspace"
     }
   }
 }

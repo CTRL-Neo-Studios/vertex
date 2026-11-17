@@ -20,8 +20,7 @@ export type {ActiveSession, ActiveWorkspaceFileIndex, UITreeNode}
 export type {PluginManifest, WindowKind}
 export type * from './contributions'
 
-/** `builtin`: a feature not extracted into its layer yet (Plugin Architecture Plan, X phases), registered from `app/builtins/`. */
-export type PluginSource = 'core' | 'global' | 'workspace' | 'builtin'
+export type PluginSource = 'core' | 'global' | 'workspace'
 
 export type MenuSection = 'app' | 'file' | 'edit' | 'view' | 'help'
 
@@ -63,8 +62,8 @@ export interface DialogOptions {
 export interface SessionContext {
     session: ActiveSession
     views: {
-        /** Shows a panel view in its pane (out of Hidden, the area expanded), or in a tab when no pane can show it. */
-        show(id: PanelViewId): unknown
+        /** Shows a panel view in its pane (out of Hidden, the area expanded); `false` when no pane can show it. */
+        show(id: PanelViewId): boolean
         /** Opens a `tab: true` view in a tab. */
         openInTab(id: PanelViewId): unknown
     }
@@ -86,6 +85,11 @@ export interface SessionContext {
         unresolved(uuid: string): string[]
         /** Files created, removed, renamed, modified (removed with the session). */
         on(listener: WorkspaceIndexListener): () => void
+        /**
+         * Notes (Markdown and text files) whose path or text matches `query`, in path order (Rust `search_notes`, which
+         * reads them; dot folders are skipped). Plain text, case-insensitive, unless `options` says otherwise.
+         */
+        search(query: string, options?: NoteSearchOptions): Promise<NoteSearch>
     }
     /** The registered commands and palette groups, for a command palette. Reactive. */
     commands: {
@@ -156,11 +160,28 @@ export interface SessionContext {
             start(event: DragEvent, uuids: string[], grab: Element | null, ended: () => void): void
             /** The workspace-relative paths of rows dragged from Files (a folder's ends with `/`); `undefined` for any other drag. */
             rows(transfer: DataTransfer | null): string[] | undefined
+            /** Whether a drag carries files: rows from Files, or the OS's. */
+            carries(transfer: DataTransfer | null): boolean
         }
         /** Opens a workspace file in the app the OS gives its kind. */
         openWithDefaultApp(uuid: string): Promise<void>
         /** Shows workspace files in Finder or Explorer. */
         reveal(uuids: string[]): Promise<void>
+        /**
+         * Files from outside: a drop (call it inside the drop event), the system clipboard's files, or pasted images.
+         * The workspace's own come back as uuids; the rest are described, and copied into the attachments folder
+         * (`fileConfig.attachmentsFolder`) only by `import`, with those of `items` it's given.
+         */
+        outside(source: DataTransfer | 'clipboard' | File[]): Promise<OutsideFiles>
+        /**
+         * Moves and renames workspace items (by uuid) to workspace-relative paths, missing folders created: one step of
+         * Files' undo history with its toast; links to them follow (`fileConfig.updateLinks`). Nothing is replaced: an
+         * item whose target is taken, that would go into itself, or that's inside another item of the list is skipped.
+         * Throws the first failure, after moving the rest.
+         */
+        relocate(items: { uuid: string, to: string }[]): Promise<FileOpResult>
+        /** Copies workspace items (a folder with its contents) to workspace-relative paths, one undo step; skips as `relocate` does. */
+        duplicate(items: { uuid: string, to: string }[]): Promise<FileOpResult>
     }
     /** The vault's property types (Obsidian's `types.json`: key → `text`, `multitext`, `number`…). Reactive. */
     properties: {
@@ -181,12 +202,68 @@ export interface SessionContext {
         viewOf(tabId: string): EditorView | undefined
         /** The embed a plugin registered for files of `extension` (lowercase, no dot): how `![[file]]` draws one. */
         embedFor(extension: string): EmbedDef | undefined
+        /** A text tab's buffer as it is now, saved or not; `undefined` for a tab that holds no text. */
+        content(tabId: string): string | undefined
+        /** The note tab shown last (a chat's edits go to it while a chat tab is shown). */
+        lastShownNote(): string | undefined
     }
     /**
      * Raw watcher events under a workspace-relative folder the index ignores (a dot folder: `.vertex/chats/`), each
      * batch's absolute paths. Removed with the session.
      */
     watch(prefix: string, fn: (paths: string[]) => void): () => void
+}
+
+export interface NoteSearchOptions {
+    /** `query` is a regular expression (Rust's `regex` syntax) instead of plain text. */
+    regex?: boolean
+    caseSensitive?: boolean
+    /** Only notes under this workspace-relative folder. */
+    folder?: string
+    /** Lines kept before and after each matching line, 0 to 5 (default 0: the matching line, trimmed around the match). */
+    context?: number
+    /** At most this many hits, 1 to 200 (default 20). */
+    limit?: number
+}
+
+/** A search hit: a note whose path matches (no `line`), or one matching line of its text with its context. */
+export interface NoteHit {
+    /** Workspace-relative. */
+    path: string
+    /** 1-based; absent when the path matched. */
+    line?: number
+    /** Absent when the path matched. */
+    snippet?: string
+}
+
+export interface NoteSearch {
+    hits: NoteHit[]
+    /** Hits past the limit. */
+    more: number
+}
+
+/** `session.files.outside`'s result. */
+export interface OutsideFiles {
+    /** Uuids of the workspace's own files among them. */
+    own: string[]
+    /** The rest, not yet in the workspace. */
+    items: readonly { name: string, size: number, isFolder: boolean }[]
+    /** The attachments folder `import` copies into, workspace-relative (`''`: the top level). */
+    folder: string
+    /** Copies `chosen` (some of `items`) into the attachments folder; their uuids, `[]` when cancelled. */
+    import(chosen: OutsideFiles['items']): Promise<string[]>
+}
+
+/** What `relocate` or `duplicate` did: each item now at `to` (a copy's own uuid), and what it left alone. */
+export interface FileOpResult {
+    done: { uuid: string, to: string }[]
+    skipped: FileOpSkip[]
+}
+
+/** An item `relocate` or `duplicate` left alone: its file is gone (or the path is bad), its target exists, or it's inside itself or another item of the list. */
+export interface FileOpSkip {
+    to: string
+    reason: 'missing' | 'exists' | 'inside'
 }
 
 /**
@@ -302,6 +379,8 @@ export interface PluginContext<Config = Record<string, unknown>> extends HostSer
     }
     settings: {
         page(def: SettingsPageDef): () => void
+        /** Opens the Settings window (or brings it forward) on this window's scope, at `/settings/<path>`. */
+        open(path: string): Promise<void>
     }
     home: {
         action(def: HomeActionDef): () => void

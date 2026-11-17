@@ -41,7 +41,6 @@ export function defaultAppFileConfig(data?: DeepPartial<AppFileConfig>): AppFile
     return {
         updateLinks: UPDATE_LINKS.includes(data?.updateLinks as AppFileConfig['updateLinks']) ? data!.updateLinks! : 'ask',
         attachmentsFolder: typeof data?.attachmentsFolder === 'string' ? data.attachmentsFolder.replace(/^\/+|\/+$/g, '') : 'Attachments',
-        importToChat: data?.importToChat === 'always' ? 'always' : 'ask',
         deletedFiles: DELETED_FILES.includes(data?.deletedFiles as AppFileConfig['deletedFiles']) ? data!.deletedFiles! : 'trash',
     }
 }

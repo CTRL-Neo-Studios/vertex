@@ -1,4 +1,4 @@
-import type {AiConfig, AiModelInfo, AiModelProfile, AiProviderProfile, ChatMode} from './types'
+import type {AiConfig, AiModelInfo, AiModelProfile, AiProviderProfile} from './types'
 import {sanitizeModelParams} from './params'
 
 type Loose = Record<string, unknown>
@@ -41,14 +41,7 @@ export const AI_SEED: AiConfig = {
     modelProfiles: [{id: 'default', name: 'Default', providerId: 'local-ollama', modelId: '', systemPrompt: ''}],
     defaultModelProfile: 'default',
     features: {},
-    chatStorage: 'app',
-    chatMode: 'suggest',
-    chatTitles: true,
-    editorAssistant: {toolbar: true, slash: true, shortcut: true},
 }
-
-/** A stored chat mode as a mode: `ask` is Read's old name; anything unknown is Suggest. */
-const chatModeOf = (value: unknown): ChatMode => value === 'read' || value === 'ask' ? 'read' : value === 'write' ? 'write' : 'suggest'
 
 /** The stored config (`plugins.config.ai`) checked and defaulted; the seed when there is none. */
 export function aiConfigOf(data?: unknown): AiConfig {
@@ -75,14 +68,9 @@ export function aiConfigOf(data?: unknown): AiConfig {
     const preferred = str(ai.defaultModelProfile)
     const defaultModelProfile = modelProfiles.some(p => p.id === preferred) ? preferred! : modelProfiles[0]?.id ?? 'default'
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
-    const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
-    const entries: Loose = isLoose(ai.editorAssistant) ? ai.editorAssistant : {}
     return {
         enabled: ai.enabled !== false,
-        providers, modelProfiles, defaultModelProfile, features, chatStorage,
-        chatMode: chatModeOf(ai.chatMode),
-        chatTitles: ai.chatTitles !== false,
-        editorAssistant: {toolbar: entries.toolbar !== false, slash: entries.slash !== false, shortcut: entries.shortcut !== false},
+        providers, modelProfiles, defaultModelProfile, features,
     }
 }
 

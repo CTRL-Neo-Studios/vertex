@@ -22,10 +22,10 @@ describe('settings that moved', () => {
         expect(movedPathsIn(withMovedPaths(raw, table), table)).toEqual([])
     })
 
-    it('follows a chain, so a workspace\'s write keeps what moved twice (`aiConfig.commitMessages` → git)', () => {
-        const raw = {aiConfig: {chatMode: 'write', commitMessages: {whenEmpty: false}}}
+    it('follows a chain, so a workspace\'s write keeps what moved twice (`aiConfig` → AI → chat and git)', () => {
+        const raw = {aiConfig: {enabled: false, chatMode: 'write', commitMessages: {whenEmpty: false}}}
         const moved = withMovedPaths(raw)
-        expect(moved).toEqual({plugins: {config: {ai: {chatMode: 'write'}, git: {commitMessages: {whenEmpty: false}}}}})
+        expect(moved).toEqual({plugins: {config: {ai: {enabled: false}, chat: {mode: 'write'}, git: {commitMessages: {whenEmpty: false}}}}})
         // As `useSettingsScope.set` writes: each move's new path from the moved settings, then the old paths go.
         const moves = movedPathsIn(raw)
         const written = [...moves.map(([, to]) => [to, getAt(moved, to)] as const), ...moves.map(([from]) => [from, undefined] as const)]

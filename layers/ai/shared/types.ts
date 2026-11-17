@@ -1,7 +1,3 @@
-/** Chat's options the AI config carries until chat takes them (X8): where its chats are kept, and the mode they start in. */
-export type ChatStorage = 'app' | 'workspace'
-export type ChatMode = 'read' | 'suggest' | 'write'
-
 /** One model a provider serves, with whatever metadata its `/models` list, Ollama or models.dev knew. */
 export interface AiModelInfo {
     id: string,
@@ -60,16 +56,6 @@ export interface AiModelParams {
     extra?: Record<string, unknown>,
 }
 
-/** Where the editor assistant can be opened from. */
-export interface AiEditorAssistantEntries {
-    /** "Ask AI" in the selection toolbar. */
-    toolbar: boolean,
-    /** The AI items in the `/` menu. */
-    slash: boolean,
-    /** ⌘J. */
-    shortcut: boolean,
-}
-
 /** `plugins.config.ai` as the plugin reads it (`aiConfigOf`). */
 export interface AiConfig {
     providers: AiProviderProfile[],
@@ -82,11 +68,4 @@ export interface AiConfig {
      * workspace override of `null` means "remove the override".)
      */
     features: Record<string, string>,
-    /** Where this workspace's chats are kept; switching leaves the existing ones where they are. */
-    chatStorage: ChatStorage,
-    /** The mode new chats start in. */
-    chatMode: ChatMode,
-    /** Chats are named by their model after the first reply. */
-    chatTitles: boolean,
-    editorAssistant: AiEditorAssistantEntries,
 }

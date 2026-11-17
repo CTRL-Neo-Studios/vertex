@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/ai-assistant",
+  "private": true,
+  "type": "module"
+}

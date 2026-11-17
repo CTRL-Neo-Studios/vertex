@@ -4,7 +4,7 @@
   "version": "0",
   "apiVersion": 1,
   "windows": ["main", "session", "settings"],
-  "requires": ["ai?"],
+  "requires": ["ai?", "chat?"],
   "config": {
     "overridable": {
       "autoSync": "trustedWorkspace",

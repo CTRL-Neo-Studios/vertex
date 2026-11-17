@@ -1,0 +1,43 @@
+{
+  "id": "ai-assistant",
+  "name": "AI assistant",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": [
+    "session",
+    "settings"
+  ],
+  "requires": [
+    "ai"
+  ],
+  "config": {
+    "overridable": {
+      "toolbar": "workspace",
+      "slash": "workspace",
+      "shortcut": "workspace"
+    },
+    "schema": [
+      {
+        "key": "toolbar",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.ai-assistant.settings.toolbar",
+        "description": "plugins.ai-assistant.settings.toolbarDescription"
+      },
+      {
+        "key": "slash",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.ai-assistant.settings.slash",
+        "description": "plugins.ai-assistant.settings.slashDescription"
+      },
+      {
+        "key": "shortcut",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.ai-assistant.settings.shortcut",
+        "description": "plugins.ai-assistant.settings.shortcutDescription"
+      }
+    ]
+  }
+}

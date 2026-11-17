@@ -5949,6 +5949,7 @@ dependencies = [
  "objc2-foundation",
  "percent-encoding",
  "rayon",
+ "regex",
  "reqwest",
  "rustls",
  "serde",

@@ -69,20 +69,6 @@ impl PluginManifest {
     pub fn parse(json: &str) -> Result<Self, String> {
         serde_json::from_str(json).map_err(|e| format!("a plugin.json: {e}"))
     }
-
-    /// A `plugin.json`, or a list of them (`app/builtins/plugins.json`).
-    pub fn parse_all(json: &str) -> Result<Vec<Self>, String> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum OneOrMany {
-            One(PluginManifest),
-            Many(Vec<PluginManifest>),
-        }
-        match serde_json::from_str(json).map_err(|e| format!("a plugin manifest: {e}"))? {
-            OneOrMany::One(manifest) => Ok(vec![manifest]),
-            OneOrMany::Many(manifests) => Ok(manifests),
-        }
-    }
 }
 
 /// A manifest's permission names → Tauri permissions. `files-outside-workspace` stands for nothing until W4 holds a
@@ -451,10 +437,7 @@ pub(crate) fn register<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, gra
 }
 
 pub(crate) fn set_catalog<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
-    let mut catalog = Vec::new();
-    for json in manifests {
-        catalog.extend(PluginManifest::parse_all(json)?);
-    }
+    let catalog = manifests.iter().map(|json| PluginManifest::parse(json)).collect::<Result<Vec<_>, _>>()?;
     *lock(&app.state::<WindowGrants>().catalog) = catalog;
     Ok(())
 }
@@ -562,10 +545,10 @@ mod tests {
     fn a_plugins_grant_is_its_permissions_and_its_crates_commands() {
         const GIT: Grants = &[(WindowKind::Session, &["vertex-git:allow-git-status"]), (WindowKind::Main, &["vertex-git:allow-git-clone"])];
         let crates: &[(&str, Grants)] = &[("git", GIT)];
-        let catalog = PluginManifest::parse_all(
-            &json!([{"id": "fetcher", "windows": ["main"], "permissions": ["network", "secrets"]}, {"id": "git", "windows": ["main", "session"]}]).to_string(),
-        )
-        .unwrap();
+        let catalog = [
+            manifest(json!({"id": "fetcher", "windows": ["main"], "permissions": ["network", "secrets"]})),
+            manifest(json!({"id": "git", "windows": ["main", "session"]})),
+        ];
         let on = plugins_on(WindowKind::Main, &catalog, &json!({}), None);
         assert_eq!(on, BTreeSet::from(["fetcher".to_owned(), "git".to_owned()]));
         assert_eq!(capabilities("main", WindowKind::Main, false, None, on.iter().map(String::as_str), &catalog, crates).unwrap().len(), 2);

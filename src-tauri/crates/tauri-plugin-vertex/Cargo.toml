@@ -27,6 +27,8 @@ tauri-plugin-dialog = "2.8.4"
 percent-encoding = "2.3.2"
 # Reveal in Finder or Explorer (`reveal_paths`); the app crate registers the plugin.
 tauri-plugin-opener = "2.7.2"
+# `search_notes`' regular expressions (chat's grep); already in the tree.
+regex = "1.13"
 
 [dev-dependencies]
 uuid = { version = "1.29.0", features = ["v4"] }

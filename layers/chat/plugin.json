@@ -1,0 +1,89 @@
+{
+  "id": "chat",
+  "name": "Chat",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": [
+    "session",
+    "settings"
+  ],
+  "requires": [
+    "ai",
+    "workflows?"
+  ],
+  "permissions": [
+    "network"
+  ],
+  "config": {
+    "overridable": {
+      "storage": "workspace",
+      "mode": "workspace",
+      "titles": "workspace",
+      "importFiles": "workspace"
+    },
+    "schema": [
+      {
+        "key": "storage",
+        "type": "select",
+        "default": "app",
+        "label": "plugins.chat.settings.storage",
+        "description": "plugins.chat.settings.storageDescription",
+        "options": [
+          {
+            "value": "app",
+            "label": "plugins.chat.settings.storageApp"
+          },
+          {
+            "value": "workspace",
+            "label": "plugins.chat.settings.storageWorkspace"
+          }
+        ]
+      },
+      {
+        "key": "mode",
+        "type": "select",
+        "default": "suggest",
+        "label": "plugins.chat.settings.mode",
+        "description": "plugins.chat.settings.modeDescription",
+        "options": [
+          {
+            "value": "read",
+            "label": "plugins.chat.settings.modes.read"
+          },
+          {
+            "value": "suggest",
+            "label": "plugins.chat.settings.modes.suggest"
+          },
+          {
+            "value": "write",
+            "label": "plugins.chat.settings.modes.write"
+          }
+        ]
+      },
+      {
+        "key": "titles",
+        "type": "switch",
+        "default": true,
+        "label": "plugins.chat.settings.titles",
+        "description": "plugins.chat.settings.titlesDescription"
+      },
+      {
+        "key": "importFiles",
+        "type": "select",
+        "default": "ask",
+        "label": "plugins.chat.settings.importFiles",
+        "description": "plugins.chat.settings.importFilesDescription",
+        "options": [
+          {
+            "value": "ask",
+            "label": "plugins.chat.settings.importFilesAsk"
+          },
+          {
+            "value": "always",
+            "label": "plugins.chat.settings.importFilesAlways"
+          }
+        ]
+      }
+    ]
+  }
+}

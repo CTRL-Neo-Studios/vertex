@@ -1,0 +1,72 @@
+import type {ChatChange, VertexChatMessage} from "../../shared/types";
+import {vaultPath} from "#shared/plugin/vault";
+
+/** UTF-8 text as URL-safe base64 without padding. */
+const toBase64Url = (text: string) =>
+    btoa(String.fromCharCode(...new TextEncoder().encode(text))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
+/** The text {@link toBase64Url} encoded; throws on input that isn't. */
+const fromBase64Url = (text: string) =>
+    new TextDecoder().decode(Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0)))
+
+/** Which staged change a diff tab shows: `path` in the changes of `messageId` in `chatId`. */
+export interface ChatChangeRef {
+    chatId: string
+    messageId: string
+    path: string
+}
+
+const TAB_PREFIX = 'chat-change-'
+
+/**
+ * A `chat-change` tab's id (prefixed, as tab ids are unique among all tabs, like git's `diffTabId`): the whole
+ * reference, URL-safe, so the page shows it from the route alone and the same change opens the same tab.
+ */
+export const chatChangeTabId = (ref: ChatChangeRef) => TAB_PREFIX + toBase64Url(JSON.stringify([ref.chatId, ref.messageId, ref.path]))
+
+/** The change a tab id names; `undefined` for any other id. */
+export function chatChangeOf(id: string): ChatChangeRef | undefined {
+    if (!id.startsWith(TAB_PREFIX)) return undefined
+    try {
+        const [chatId, messageId, path] = JSON.parse(fromBase64Url(id.slice(TAB_PREFIX.length))) as unknown[]
+        return typeof chatId === 'string' && typeof messageId === 'string' && typeof path === 'string' ? {chatId, messageId, path} : undefined
+    } catch {
+        return undefined
+    }
+}
+
+/**
+ * The path a model gave for a new note, checked: workspace-relative (leading slashes dropped), nothing under a dot
+ * folder (the index never shows those), `.md` added unless it's there. Throws a reason the model can act on.
+ */
+export function newNotePath(path: string): string {
+    const relative = vaultPath(path.trim().replace(/^\/+/, ''))
+    if (!relative) throw new Error('A new note needs a path, e.g. "Folder/Note.md".')
+    if (relative.split('/').some(s => s.startsWith('.'))) throw new Error(`"${relative}" is inside a hidden folder.`)
+    return /\.md$/i.test(relative) ? relative : `${relative}.md`
+}
+
+/** The one change that turns `from` into `to`: what lies between their common start and end (CodeMirror's shape). */
+export function textChange(from: string, to: string) {
+    let start = 0
+    while (start < from.length && start < to.length && from[start] === to[start]) start++
+    let end = 0
+    while (end < from.length - start && end < to.length - start && from[from.length - 1 - end] === to[to.length - 1 - end]) end++
+    return {from: start, to: from.length - end, insert: to.slice(start, to.length - end)}
+}
+
+const OUTCOMES: Record<ChatChange['state'], string> = {
+    pending: 'not reviewed yet',
+    applied: 'applied by the user',
+    discarded: 'discarded by the user',
+    conflict: 'not applied: the note changed after you staged it',
+    undone: 'applied, then undone',
+}
+
+/** What became of the conversation's staged changes (the latest per note), for the model; '' when there were none. */
+export function changesSummary(messages: VertexChatMessage[]): string {
+    const latest = new Map<string, ChatChange>()
+    for (const change of messages.flatMap(m => m.metadata?.changes ?? [])) latest.set(change.path, change)
+    if (!latest.size) return ''
+    const lines = [...latest.values()].map(c => `- "${c.path}"${c.before === null ? ' (new note)' : ''}: ${OUTCOMES[c.state]}`)
+    return `Your earlier staged changes and what became of them:\n${lines.join('\n')}`
+}

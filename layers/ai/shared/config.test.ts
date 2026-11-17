@@ -6,15 +6,8 @@ describe('aiConfigOf', () => {
         expect(aiConfigOf().providers.map(p => p.id)).toEqual(['local-ollama'])
         expect(aiConfigOf({}).providers.map(p => p.id)).toEqual(['local-ollama'])
         expect(aiConfigOf({providers: [], modelProfiles: []})).toEqual({
-            enabled: true, providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest',
-            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true},
+            enabled: true, providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {},
         })
-        expect(aiConfigOf({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
-        expect(aiConfigOf({chatStorage: 'cloud'}).chatStorage).toBe('app')
-        expect(aiConfigOf({chatMode: 'read'}).chatMode).toBe('read')
-        expect(aiConfigOf({chatMode: 'ask'}).chatMode).toBe('read')
-        expect(aiConfigOf({chatMode: 'write'}).chatMode).toBe('write')
-        expect(aiConfigOf({chatMode: 'yolo'}).chatMode).toBe('suggest')
     })
 
     it('drops malformed entries and falls back to the first profile as default', () => {
@@ -36,10 +29,8 @@ describe('aiConfigOf', () => {
         expect(c.features).toEqual({editorAssistant: ''})
     })
 
-    it('keeps the switches on unless they are explicitly off', () => {
-        const off = aiConfigOf({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}})
-        expect([off.enabled, off.chatTitles, off.editorAssistant]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}])
-        const junk = aiConfigOf({enabled: 0, chatTitles: null, editorAssistant: 'none'})
-        expect([junk.enabled, junk.chatTitles, junk.editorAssistant]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}])
+    it('keeps AI on unless it is explicitly off', () => {
+        expect(aiConfigOf({enabled: false}).enabled).toBe(false)
+        expect(aiConfigOf({enabled: 0}).enabled).toBe(true)
     })
 })

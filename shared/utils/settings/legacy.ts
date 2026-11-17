@@ -22,6 +22,12 @@ export const LEGACY_PATHS: readonly (readonly [from: string, to: string])[] = [
     // X7: git became a plugin, taking its commit-message options from AI's (an `aiConfig` gets there through both rows).
     ['gitConfig', 'plugins.config.git'],
     ['plugins.config.ai.commitMessages', 'plugins.config.git.commitMessages'],
+    // X8: chat and the editor assistant became plugins, taking their options from AI's and the files settings.
+    ['plugins.config.ai.chatStorage', 'plugins.config.chat.storage'],
+    ['plugins.config.ai.chatMode', 'plugins.config.chat.mode'],
+    ['plugins.config.ai.chatTitles', 'plugins.config.chat.titles'],
+    ['fileConfig.importToChat', 'plugins.config.chat.importFiles'],
+    ['plugins.config.ai.editorAssistant', 'plugins.config.ai-assistant'],
 ]
 
 type Table = readonly (readonly [string, string])[]

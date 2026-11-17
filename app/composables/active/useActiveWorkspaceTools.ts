@@ -4,6 +4,7 @@ import {dirname, join} from "@tauri-apps/api/path"
 import {linkExtractorFor, useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
 import type {ActiveSession} from "#shared/types/active/sessions";
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace";
+import type {FileOpSkip} from "#shared/plugin/api";
 import {useActiveTabs} from "~/composables/active/useActiveTabs";
 import {renameTargets, rewriteLinks} from "#shared/utils/index/rewriteLinks";
 import {parentPathOf} from "#shared/utils/index/parse";
@@ -597,5 +598,84 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         return [...own, ...await importItems(outside, folder, {copy: true}) || []]
     }
 
-    return {createFile, renameFile, moveFiles, importItems, importAttachments, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
+    /**
+     * Checks items going to workspace-relative paths: each must exist, its target be free (by another item or one
+     * earlier in the list, ignoring case; a case-only rename is free), and not inside the item itself or inside another
+     * item of the list (it goes along with that one). Returns what may go, with absolute targets, and what can't.
+     */
+    async function targetsOf(items: { uuid: string, to: string }[]) {
+        const root = session!.rootPath!
+        const ok: { file: ActiveWorkspaceFileIndex, rel: string, target: string }[] = []
+        const skipped: FileOpSkip[] = []
+        const claimed = new Set<string>()
+        const files = items.map(i => getFileByUuid(i.uuid))
+        for (const [i, {to}] of items.entries()) {
+            const file = files[i]
+            const rel = to.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+            const target = await join(root, rel)
+            const lower = target.toLowerCase()
+            if (!file || !rel || rel.split('/').some(part => part === '..' || part === '.')) skipped.push({to, reason: 'missing'})
+            else if (files.some(other => other && other !== file && other.isFolder && within(file.fullPath, other.fullPath))) skipped.push({to, reason: 'inside'})
+            else if (within(lower, file.fullPath.toLowerCase())) skipped.push({to, reason: 'inside'})
+            else if (claimed.has(lower) || (lower !== file.fullPath.toLowerCase() && await exists(target))) skipped.push({to, reason: 'exists'})
+            else {
+                claimed.add(lower)
+                ok.push({file, rel, target})
+            }
+        }
+        return {ok, skipped}
+    }
+
+    /**
+     * Moves and renames items to workspace-relative paths (missing folders created), as one undo step with a toast; links
+     * to them follow (`relocateFiles`, as `fileConfig.updateLinks` says). Nothing is replaced: what can't go is skipped
+     * and returned (`targetsOf`). Throws the first failure, after moving the rest.
+     */
+    async function relocateTo(items: { uuid: string, to: string }[]) {
+        const {ok, skipped} = await targetsOf(items)
+        const change = newChange()
+        try {
+            await relocateFiles(ok.map(({file, rel, target}) => ({
+                uuid: file.uuid,
+                relocate: async (from: string) => {
+                    await ensureFolder(rel.split('/').slice(0, -1).join('/'))
+                    return relocatePath(from, target)
+                },
+            })), change)
+        } finally {
+            const count = change.moves.length
+            remember(change, t('app.editor.ui.filetree.stepMove', {count}), t('app.editor.ui.filetree.moved', {count}))
+        }
+        return {done: change.moves.map(m => ({uuid: m.uuid, to: getFileByUuid(m.uuid)?.relativePath ?? m.to})), skipped}
+    }
+
+    /** Copies items to workspace-relative paths (a folder with what's in it), as one undo step with a toast; skips as `relocateTo` does. */
+    async function duplicateTo(items: { uuid: string, to: string }[]) {
+        const root = session!.rootPath!
+        const {ok, skipped} = await targetsOf(items)
+        const change = newChange()
+        const done: { uuid: string, to: string }[] = []
+        const copy = async (from: ActiveWorkspaceFileIndex, path: string) => {
+            markSelfWrite(path)
+            if (from.isFolder) await mkdir(path)
+            else await copyFile(from.fullPath, path)
+            await addFileToIndex(path, root)
+            for (const child of from.isFolder ? from.children.flatMap(p => getFileByPath(p) ?? []) : []) await copy(child, await join(path, child.fileName))
+        }
+        try {
+            for (const {file, rel, target} of ok) {
+                await ensureFolder(rel.split('/').slice(0, -1).join('/'))
+                await copy(file, target)
+                const uuid = getFileByPath(target)?.uuid
+                if (uuid) done.push({uuid, to: rel})
+                change.created.push({path: target, ...await sizeAndTime(target)})
+            }
+        } finally {
+            const count = change.created.length
+            remember(change, t('app.editor.ui.filetree.stepAdd', {count}), t('app.editor.ui.filetree.added', {count}))
+        }
+        return {done, skipped}
+    }
+
+    return {createFile, renameFile, moveFiles, relocateTo, duplicateTo, importItems, importAttachments, indexedMatch, ensureFolder, deleteFiles, deletedFiles, saveContent, editNotes, undo: history.undo, redo: history.redo, undoLabel: history.undoLabel, redoLabel: history.redoLabel}
 }

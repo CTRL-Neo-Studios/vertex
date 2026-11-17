@@ -1,0 +1,18 @@
+{
+  "plugins": {
+    "ai-assistant": {
+      "feature": {
+        "label": "Editor assistant",
+        "description": "Ask AI in the editor: rewrite, fix, continue and more."
+      },
+      "settings": {
+        "toolbar": "Ask AI in the selection toolbar",
+        "toolbarDescription": "A button beside the formatting buttons when text is selected.",
+        "slash": "AI items in the / menu",
+        "slashDescription": "Ask AI, Continue writing and the other presets among the blocks.",
+        "shortcut": "Shortcut",
+        "shortcutDescription": "⌘J opens the assistant at the cursor or on the selection."
+      }
+    }
+  }
+}

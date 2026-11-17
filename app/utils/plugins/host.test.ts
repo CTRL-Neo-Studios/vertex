@@ -6,10 +6,10 @@ import {createPluginHost} from './host'
 
 const SESSION = {
     session: {uuid: 's1', workspaceSession: true, rootPath: '/vault'},
-    views: {show: () => {}, openInTab: () => {}},
+    views: {show: () => false, openInTab: () => {}},
     index: {
         files: () => [], tree: () => [], byPath: () => undefined, byUuid: () => undefined, resolveLink: () => undefined,
-        backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {},
+        backlinks: () => [], forelinks: () => [], links: () => [], unresolved: () => [], on: () => () => {}, search: async () => ({hits: [], more: 0}),
     },
     commands: {list: () => [], paletteGroups: () => []},
     files: {
@@ -17,11 +17,13 @@ const SESSION = {
         undo: async () => {}, redo: async () => {}, importAttachments: async () => [], pick: async () => undefined, vault: () => { throw new Error('none') },
         iconFor: () => undefined, openFolders: ref<string[]>([]), menuFor: () => [], newItems: () => [],
         copy: async () => {}, paste: async () => [], remove: async () => {}, importDrop: async () => [],
-        drag: {start: () => {}, rows: () => undefined}, openWithDefaultApp: async () => {}, reveal: async () => {},
+        drag: {start: () => {}, rows: () => undefined, carries: () => false}, openWithDefaultApp: async () => {}, reveal: async () => {},
+        outside: async () => ({own: [], items: [], folder: '', import: async () => []}),
+        relocate: async () => ({done: [], skipped: []}), duplicate: async () => ({done: [], skipped: []}),
     },
     properties: {types: () => ({}), setType: async () => {}},
     tabs: {open: async () => {}, close: async () => {}, active: () => null, list: () => []},
-    editor: {viewOf: () => undefined, embedFor: () => undefined},
+    editor: {viewOf: () => undefined, embedFor: () => undefined, content: () => undefined, lastShownNote: () => undefined},
     watch: () => () => {},
 }
 
@@ -43,6 +45,7 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
         window: {kind: 'session', label: 'session-s1'},
         config: () => ({value: {}, set: async () => {}, overridden: () => false}),
         services: () => ({}) as HostServices,
+        openSettings: async () => {},
         contribute(point, owner, def) {
             // Commands by their id; other points by `point:owner`, enough to see them come and go.
             const key = point === 'command' ? (def as {id: string}).id : `${point}:${owner}`

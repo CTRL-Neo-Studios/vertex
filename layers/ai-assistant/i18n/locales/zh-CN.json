@@ -1,0 +1,18 @@
+{
+  "plugins": {
+    "ai-assistant": {
+      "feature": {
+        "label": "编辑器助手",
+        "description": "在编辑器中使用 AI：改写、修正、续写等。"
+      },
+      "settings": {
+        "toolbar": "选区工具栏中的“询问 AI”",
+        "toolbarDescription": "选中文本时，在格式按钮旁显示的按钮。",
+        "slash": "/ 菜单中的 AI 项",
+        "slashDescription": "在块列表中显示“询问 AI”“继续写作”等预设。",
+        "shortcut": "快捷键",
+        "shortcutDescription": "⌘J 在光标处或选区上打开助手。"
+      }
+    }
+  }
+}
