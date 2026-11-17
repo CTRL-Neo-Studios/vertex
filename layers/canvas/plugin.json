@@ -1,6 +1,7 @@
 {
   "id": "canvas",
   "name": "Canvas",
+  "icon": "i-lucide-layout-dashboard",
   "version": "0",
   "apiVersion": 1,
   "config": {

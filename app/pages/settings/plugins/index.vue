@@ -12,9 +12,12 @@ import {useTrust} from "~/composables/app/useTrust";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {openUrlInBrowser} from "~/composables/app/useAppOpener";
 import {pickToOpen} from "~/utils/dialogs";
+import {Routes} from "#shared/constants/app";
 import {brokenPlugins, installedOrigin, missingPlugins, pluginEntries, workspacePlugins, type InstallRecord, type WorkspacePlugin} from "~/utils/plugins/catalog";
 import {describeOrigin, originUrl, shareableSource} from "~/utils/plugins/origin";
-import {pluginStates} from "~/utils/plugins/runtime";
+import {contributionPlugin, pluginStates} from "~/utils/plugins/runtime";
+import {settingsPages} from "~/utils/contributions";
+import {PLUGIN_ICON, pluginSettingsRoute} from "~/utils/settingsNav";
 import {stateClient} from "~/utils/stateClient";
 import {vertexInvoke} from "~/utils/vertexInvoke";
 import PluginGitModal from "~/components/Modals/PluginGitModal.vue";
@@ -48,6 +51,9 @@ const manifests = computed(() => pluginEntries().map(e => e.manifest))
 const core = computed(() => pluginEntries().filter(e => e.source === 'core').map(e => e.manifest))
 const community = computed(() => pluginEntries().filter(e => e.source !== 'core').map(e => e.manifest))
 const nameOf = (id: string) => manifests.value.find(m => m.id === id)?.name ?? id
+/** Where a plugin's gear goes: its nav entry (`pluginSettingsRoute`). */
+const settingsOf = (m: PluginManifest) =>
+    pluginSettingsRoute(m.id, [...settingsPages.items.values()].map(def => ({def, owner: contributionPlugin(def)})), m, Routes.settings)
 const enabledPath = (id: string) => `plugins.enabled.${id}` as AppSettingPath
 
 /** The switch: this scope's own choice (a workspace's even before it applies), else the effective one, else the default. */
@@ -320,6 +326,7 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                         :key="m.id"
                         :setting="enabledPath(m.id)"
                         :label="m.name"
+                        :icon="m.icon ?? PLUGIN_ICON"
                         :description="group.id === 'community' ? [describe(m), globalOrigin(m.id).text, globalOrigin(m.id).claim && t('app.settings.plugins.origin.claims', {origin: globalOrigin(m.id).claim})].filter(Boolean).join(' · ') : describe(m)"
                         :error="reasonText(m)"
                         :data-plugin-row="m.id"
@@ -350,14 +357,14 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                                 <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(globalOrigin(m.id).url!)"/>
                             </UTooltip>
                         </template>
-                        <UTooltip v-if="m.config?.schema?.length" :text="t('app.settings.plugins.settings')">
+                        <UTooltip v-if="settingsOf(m)" :text="t('app.settings.plugins.settings')">
                             <UButton
                                 size="xs"
                                 color="neutral"
                                 variant="ghost"
                                 icon="i-lucide-settings-2"
                                 :aria-label="t('app.settings.plugins.settings')"
-                                :to="{path: `/settings/plugins/${m.id}`}"
+                                :to="settingsOf(m)"
                             />
                         </UTooltip>
                         <UTooltip v-if="group.id === 'community'" :text="t('app.settings.plugins.remove')">
@@ -370,6 +377,7 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                             v-for="b in brokenPlugins()"
                             :key="b.id"
                             :label="b.name ?? b.id"
+                            :icon="PLUGIN_ICON"
                             :error="t('app.settings.plugins.broken', {reasons: b.errors.join('; ')})"
                             :data-plugin-broken="b.id"
                         >
@@ -403,6 +411,7 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                     v-for="p in own"
                     :key="p.listed.id"
                     :label="ownRow(p).name"
+                    :icon="p.manifest?.icon ?? PLUGIN_ICON"
                     :description="ownRow(p).description"
                     :error="ownRow(p).state"
                     :data-plugin-own="p.listed.id"
@@ -422,8 +431,8 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                     <UTooltip v-if="ownRow(p).origin.url" :text="t('app.settings.plugins.openOrigin')">
                         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(ownRow(p).origin.url!)"/>
                     </UTooltip>
-                    <UTooltip v-if="p.listed.accepted && p.manifest?.config?.schema?.length" :text="t('app.settings.plugins.settings')">
-                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-settings-2" :aria-label="t('app.settings.plugins.settings')" :to="{path: `/settings/plugins/${p.listed.id}`}"/>
+                    <UTooltip v-if="p.listed.accepted && p.manifest && settingsOf(p.manifest)" :text="t('app.settings.plugins.settings')">
+                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-settings-2" :aria-label="t('app.settings.plugins.settings')" :to="settingsOf(p.manifest)"/>
                     </UTooltip>
                     <UTooltip :text="t('app.settings.plugins.remove')">
                         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" :aria-label="t('app.settings.plugins.remove')" data-plugin-remove @click="remove(p.listed.id, ownRow(p).name, true)"/>
@@ -434,6 +443,7 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                     v-for="id in missing"
                     :key="id"
                     :label="id"
+                    :icon="PLUGIN_ICON"
                     :description="[t('app.settings.plugins.missing'), shareableSource(sourceOf(id)) ? t('app.settings.plugins.missingFrom', {source: sourceOf(id)}) : t('app.settings.plugins.missingNoSource')].join(' · ')"
                     :data-plugin-missing="id"
                 >

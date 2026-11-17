@@ -1,6 +1,7 @@
 {
   "id": "ai",
   "name": "AI",
+  "icon": "i-lucide-sparkles",
   "version": "0",
   "apiVersion": 1,
   "windows": ["session", "settings"],

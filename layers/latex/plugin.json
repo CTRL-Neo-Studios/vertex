@@ -1,6 +1,7 @@
 {
   "id": "latex",
   "name": "LaTeX",
+  "icon": "i-lucide-sigma",
   "version": "0",
   "apiVersion": 1
 }

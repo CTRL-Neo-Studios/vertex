@@ -9,6 +9,7 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifest} from "~/utils/plugins/catalog";
+import {PLUGIN_ICON} from "~/utils/settingsNav";
 import {platform} from "@tauri-apps/plugin-os";
 
 definePageMeta({
@@ -74,6 +75,7 @@ async function pick(field: Extract<ConfigField, {type: 'path'}>) {
                 :aria-label="t('app.settings.plugins.title')"
                 :to="{path: '/settings/plugins'}"
             />
+            <UIcon :name="manifest?.icon ?? PLUGIN_ICON" class="size-5 text-muted"/>
         </template>
         <UEmpty v-if="!manifest" variant="naked" icon="i-lucide-puzzle" :title="t('app.settings.plugins.notFound', {id})"/>
         <div v-else class="space-y-4">

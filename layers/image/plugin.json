@@ -1,6 +1,7 @@
 {
   "id": "image",
   "name": "Image",
+  "icon": "i-lucide-image",
   "version": "0",
   "apiVersion": 1
 }

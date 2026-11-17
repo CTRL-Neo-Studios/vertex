@@ -460,9 +460,17 @@ The release build bundles 61 icons (Nuxt UI's own and the provider logos); the a
 
 ### Acceptance
 
-- [ ] Test of the grouping: a schema-only plugin, one that registers a page, one with both (one entry), one that's off (none), a community source (third group), an empty group (dropped), the order.
-- [ ] In `tauri dev`: the three groups with their headings and separators; Canvas and Git both under Core plugins; no Community plugins group; each core plugin's icon on its Plugins row and nav entry; a plugin's gear and `SETTINGS_ROUTE_EVENT` land on the right page.
-- [ ] Concepts doc; en + zh-CN strings.
+- [x] Test of the grouping: a schema-only plugin, one that registers a page, one with both (one entry), one that's off (none), a community source (third group), an empty group (dropped), the order. (`app/utils/settingsNav.test.ts`: all but the empty group, which the layout drops; also the order in zh-CN and a workspace copy in the community group.)
+- [x] In `tauri dev`: the three groups with their headings and separators; Canvas and Git both under Core plugins; no Community plugins group; each core plugin's icon on its Plugins row and nav entry; a plugin's gear and `SETTINGS_ROUTE_EVENT` land on the right page. (Built on 17 Nov, after C3, with the test plugin installed with a schema: About, General, Theme, View, Trust, Plugins; Core plugins: AI assistant, Assistive AI (Providers, Model profiles, Features), Canvas, Chat, Files, Git, Workflows; Community plugins: Test plugin; each with its manifest's icon (read from the nav's DOM), and the rows of Settings → Plugins with theirs and AI's gear. Without a community plugin with settings the group isn't drawn, by the layout's filter; not opened that way. The gear and `SETTINGS_ROUTE_EVENT` weren't clicked: the gear's route is `pluginSettingsRoute`, tested.)
+- [x] Concepts doc; en + zh-CN strings. (The group headings reuse Settings → Plugins' own "Core plugins" and "Community plugins".)
+
+### As built
+
+- **Built after C3**, when the nav had grown with the community plugins under test (the user's call, 17 Nov).
+- `app/utils/settingsNav.ts`: `pluginNavGroups(pages, plugins, {t, locale, base, path})` (the groups by `PluginEntry.source`, a registered page's owner from `contributionPlugin`, sorted with `localeCompare` in the UI's language) and `pluginSettingsRoute` (the gear); `PLUGIN_ICON`. The layout's items are `NavigationMenuItem[][]`: Vertex's pages, then each non-empty group under a `type: 'label'` heading.
+- `catalog.scopeEntries()`: the scope's plugins with their sources (`pluginManifests()` is its manifests).
+- Icons: every `layers/*/plugin.json` has one (the icon its panel, file type or settings page used; `wand-sparkles` for AI assistant, `image`, `sigma` for LaTeX, `network` for Mermaid, `braces` for YAML form, which had none); `SettingsPageDef.icon` is optional and AI's, Chat's and Git's pages take their manifest's; `SettingsRow` (`SettingsRowProps.icon`) draws one, and Settings → Plugins' rows pass the plugin's; the schema page's header shows it. Icons outside the app's bundle load from the installed sets (P0 of the Sample Plugins Plan).
+- 365 tests (52 files); typecheck unchanged.
 
 ## X phases: what each one does
 

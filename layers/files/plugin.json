@@ -1,6 +1,7 @@
 {
   "id": "files",
   "name": "Files",
+  "icon": "i-lucide-files",
   "version": "0",
   "apiVersion": 1,
   "windows": [

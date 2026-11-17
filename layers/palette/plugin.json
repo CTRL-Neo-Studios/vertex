@@ -1,6 +1,7 @@
 {
   "id": "palette",
   "name": "Command palette",
+  "icon": "i-lucide-search",
   "version": "0",
   "apiVersion": 1,
   "windows": [

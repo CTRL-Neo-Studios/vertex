@@ -34,7 +34,7 @@ export default definePlugin({
             },
             component: () => import('./components/DiffView.vue'),
         })
-        context.settings.page({id: 'git', label: 'plugins.git.nav', icon: 'i-lucide-git-branch', component: () => import('./components/Settings.vue')})
+        context.settings.page({id: 'git', label: 'plugins.git.nav', component: () => import('./components/Settings.vue')})
         // Clicks run outside the Nuxt app's context; `cloneWorkspace` needs it for `useOverlay`.
         const nuxtApp = useNuxtApp()
         context.home.action({id: 'clone-workspace', label: 'plugins.git.cloneWorkspace', icon: 'i-lucide-folder-git-2', run: home => nuxtApp.runWithContext(() => cloneWorkspace(home))})

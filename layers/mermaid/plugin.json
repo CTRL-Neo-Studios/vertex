@@ -1,6 +1,7 @@
 {
   "id": "mermaid",
   "name": "Mermaid",
+  "icon": "i-lucide-network",
   "version": "0",
   "apiVersion": 1
 }

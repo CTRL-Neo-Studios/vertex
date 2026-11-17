@@ -17,6 +17,7 @@ const overridden = computed(() => setting.value !== undefined && scope.overridde
 
 <template>
     <div class="flex items-center gap-4 px-4 py-2.5 min-h-12">
+        <UIcon v-if="icon" :name="icon" class="size-5 shrink-0 text-muted"/>
         <div class="flex-1 min-w-0">
             <div class="text-sm text-default flex items-center gap-1.5">
                 {{ label }}

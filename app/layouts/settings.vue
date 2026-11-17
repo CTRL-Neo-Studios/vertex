@@ -7,38 +7,37 @@ import {useAppSessions} from "~/composables/app/useAppSessions";
 import {SETTINGS_ROUTE_EVENT, SETTINGS_SCOPE_EVENT} from "~/composables/app/useAppSettings";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {pluginEnabled} from "#shared/plugin/resolve";
-import {pluginManifests} from "~/utils/plugins/catalog";
+import {scopeEntries} from "~/utils/plugins/catalog";
+import {contributionPlugin} from "~/utils/plugins/runtime";
 import {settingsPages} from "~/utils/contributions";
+import {pluginNavGroups} from "~/utils/settingsNav";
 
-const {t} = useI18n()
+const {t, locale} = useI18n()
 const $route = useRoute()
 const scope = useSettingsScope()
 const {appSessions} = useAppSessions()
 
-const links = computed(() => [
-    {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings},
-    {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
-    {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
-    {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
-    {label: t('app.settings.nav.trust'), icon: 'i-lucide-shield-check', to: `${Routes.settings}/trust`},
-    // Registered pages, in registration order; one with children is a group, open on its routes.
-    ...[...settingsPages.items.values()].map(page => {
-        const to = `${Routes.settings}/${page.id}`
-        if (!page.children) return {label: t(page.label), icon: page.icon, to}
-        return {
-            label: t(page.label),
-            icon: page.icon,
-            defaultOpen: $route.path.startsWith(to),
-            // `active` by prefix: an item's own page (a provider's, a profile's) keeps its list highlighted.
-            children: page.children.map(child => ({label: t(child.label), icon: child.icon, to: `${to}/${child.path}`, active: $route.path.startsWith(`${to}/${child.path}`)})),
-        }
-    }),
-    {label: t('app.settings.nav.plugins'), icon: 'i-lucide-puzzle', to: `${Routes.settings}/plugins`, active: $route.path === `${Routes.settings}/plugins`},
-    // The settings of the plugins that are on in the scope being edited.
-    ...pluginManifests()
-        .filter(m => m.config?.schema?.length && pluginEnabled(m, scope.effective.value?.plugins.enabled ?? {}))
-        .map(m => ({label: m.name, icon: m.icon ?? 'i-lucide-puzzle', to: `${Routes.settings}/plugins/${m.id}`})),
-] satisfies NavigationMenuItem[])
+/** Vertex's own pages, then Core plugins and Community plugins (`pluginNavGroups`), each group under its heading. */
+const links = computed<NavigationMenuItem[][]>(() => {
+    const {core, community} = pluginNavGroups(
+        [...settingsPages.items.values()].map(def => ({def, owner: contributionPlugin(def)})),
+        scopeEntries().map(entry => ({entry, on: pluginEnabled(entry.manifest, scope.effective.value?.plugins.enabled ?? {})})),
+        {t, locale: locale.value, base: Routes.settings, path: $route.path},
+    )
+    return [
+        [
+            {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings},
+            {label: t('app.settings.nav.general'), icon: 'i-lucide-settings', to: `${Routes.settings}/general`},
+            {label: t('app.settings.nav.theme'), icon: 'i-lucide-palette', to: `${Routes.settings}/theme`},
+            {label: t('app.settings.nav.view'), icon: 'i-lucide-layout-grid', to: `${Routes.settings}/view`},
+            {label: t('app.settings.nav.trust'), icon: 'i-lucide-shield-check', to: `${Routes.settings}/trust`},
+            {label: t('app.settings.nav.plugins'), icon: 'i-lucide-puzzle', to: `${Routes.settings}/plugins`, active: $route.path === `${Routes.settings}/plugins`},
+        ],
+        ...[{label: t('app.settings.plugins.core'), items: core}, {label: t('app.settings.plugins.community'), items: community}]
+            .filter(group => group.items.length)
+            .map(group => [{label: group.label, type: 'label' as const}, ...group.items]),
+    ]
+})
 
 // User, or a workspace this app has opened. Select items need a non-empty value; a root is an absolute path.
 const USER = 'user'

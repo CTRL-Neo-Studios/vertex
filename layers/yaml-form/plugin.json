@@ -1,6 +1,7 @@
 {
   "id": "yaml-form",
   "name": "YAML form",
+  "icon": "i-lucide-braces",
   "version": "0",
   "apiVersion": 1
 }

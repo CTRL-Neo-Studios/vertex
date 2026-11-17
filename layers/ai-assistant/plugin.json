@@ -1,6 +1,7 @@
 {
   "id": "ai-assistant",
   "name": "AI assistant",
+  "icon": "i-lucide-wand-sparkles",
   "version": "0",
   "apiVersion": 1,
   "windows": [

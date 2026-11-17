@@ -36,7 +36,7 @@ export default definePlugin({
         }
 
         context.settings.page({
-            id: 'ai', label: 'plugins.ai.nav.ai', icon: 'i-lucide-sparkles',
+            id: 'ai', label: 'plugins.ai.nav.ai',
             children: [
                 {label: 'plugins.ai.nav.providers', icon: 'i-lucide-server', path: 'providers'},
                 {label: 'plugins.ai.nav.models', icon: 'i-lucide-box', path: 'models'},

@@ -1,6 +1,7 @@
 {
   "id": "workflows",
   "name": "Workflows",
+  "icon": "i-lucide-workflow",
   "version": "0",
   "apiVersion": 1,
   "windows": [

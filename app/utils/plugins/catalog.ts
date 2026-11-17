@@ -98,10 +98,12 @@ export const pluginEntries = (): readonly PluginEntry[] => replaced([...core, ..
 
 /**
  * The plugins a user can turn on and off and configure in this window's scope: the ones it runs, and in the Settings
- * window those of the workspace being edited, accepted. The source for the settings scopes (each manifest's
- * `config.overridable`), the settings nav and the plugins' settings pages. Reactive.
+ * window those of the workspace being edited, accepted. With where each is from, for the Settings nav's groups. Reactive.
  */
-export const pluginManifests = (): PluginManifest[] => replaced([...core, ...global.value], accepted.value).map(e => e.manifest)
+export const scopeEntries = (): readonly PluginEntry[] => replaced([...core, ...global.value], accepted.value)
+
+/** `scopeEntries`' manifests: the source for the settings scopes (each `config.overridable`) and the plugins' settings pages. Reactive. */
+export const pluginManifests = (): PluginManifest[] => scopeEntries().map(e => e.manifest)
 
 export const pluginManifest = (id: string): PluginManifest | undefined => pluginManifests().find(m => m.id === id)
 

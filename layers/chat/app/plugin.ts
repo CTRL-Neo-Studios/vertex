@@ -31,7 +31,7 @@ export default definePlugin<ChatConfig>({
         context.use('ai')?.registerFeature({id: 'chat', label: 'plugins.chat.feature.label', description: 'plugins.chat.feature.description'})
         context.provide({chatsInWorkspace: () => context.config.value.storage === 'workspace'} satisfies ChatApi)
         // Tool feedback (`toolFeedback`), kept on this computer for the user to review.
-        context.settings.page({id: 'chat', label: 'plugins.chat.settings.nav', icon: 'i-lucide-message-square', component: () => import('./components/Settings.vue')})
+        context.settings.page({id: 'chat', label: 'plugins.chat.settings.nav', component: () => import('./components/Settings.vue')})
         context.views.panel({
             id: 'chats', label: 'plugins.chat.chats', icon: 'i-lucide-messages-square', defaultArea: 'left',
             when: chatViewOn,

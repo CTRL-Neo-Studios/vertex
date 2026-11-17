@@ -1,6 +1,7 @@
 {
   "id": "bases-map",
   "name": "Bases map",
+  "icon": "i-lucide-map",
   "version": "0",
   "apiVersion": 1,
   "description": "The map layout for Bases: notes with coordinates as markers.",

@@ -1,6 +1,7 @@
 {
   "id": "backlinks",
   "name": "Backlinks",
+  "icon": "i-lucide-square-arrow-out-down-left",
   "version": "0",
   "apiVersion": 1,
   "windows": ["session", "settings"]

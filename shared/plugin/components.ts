@@ -9,6 +9,8 @@ import type {UiSlot} from './contributions'
 /** One setting: label and description on the left, its control (the default slot) on the right. */
 export interface SettingsRowProps {
     label: string
+    /** An Iconify name, drawn before the label (a plugin's row). */
+    icon?: string
     description?: string
     /** Replaces the description, in the error colour. */
     error?: string

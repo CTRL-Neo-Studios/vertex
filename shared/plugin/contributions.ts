@@ -281,12 +281,13 @@ export interface ScopedConfig {
     path(path: string): `plugins.config.${string}`
 }
 
-/** A page in the Settings window, at `/settings/<id>/…`, listed in its nav after the kernel's. */
+/** A page in the Settings window, at `/settings/<id>/…`, listed in its nav with its plugin's group. */
 export interface SettingsPageDef extends UiSlot<SettingsPageProps> {
     id: string
     /** i18n key. */
     label: string
-    icon: string
+    /** Default: its plugin's manifest's `icon`. */
+    icon?: string
     /** Sub-entries in the nav (`path` below the page); a page with children is a group. */
     children?: { label: string, icon: string, path: string }[]
 }

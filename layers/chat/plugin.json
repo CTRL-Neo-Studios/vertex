@@ -1,6 +1,7 @@
 {
   "id": "chat",
   "name": "Chat",
+  "icon": "i-lucide-message-square",
   "version": "0",
   "apiVersion": 1,
   "windows": [
