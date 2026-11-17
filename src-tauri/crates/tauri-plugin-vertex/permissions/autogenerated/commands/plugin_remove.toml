@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugin-remove"
+description = "Enables the plugin_remove command without any pre-configured scope."
+commands.allow = ["plugin_remove"]
+
+[[permission]]
+identifier = "deny-plugin-remove"
+description = "Denies the plugin_remove command without any pre-configured scope."
+commands.deny = ["plugin_remove"]

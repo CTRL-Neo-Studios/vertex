@@ -19,11 +19,13 @@ pub fn grant<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, grants: Grant
     crate::grants::register(app, plugin, grants);
 }
 
-/// The plugins' manifests (the app crate embeds them at build time: each `plugin.json`, or the built-ins' list),
-/// before [`open_launch_windows`]: which windows each runs in, whether it's on by default, and what its `permissions`
-/// grant there.
+/// The plugins' manifests (the app crate embeds them at build time: each `plugin.json`), before
+/// [`open_launch_windows`]: which windows each runs in, whether it's on by default, and what its `permissions` grant
+/// there. The installed community plugins join them, and those installed from a folder are watched from now on.
 pub fn set_plugins<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
-    crate::grants::set_catalog(app, manifests)
+    crate::grants::set_catalog(app, manifests)?;
+    crate::plugins::sync_watches(app, &settings(app));
+    Ok(())
 }
 
 /// What the app does to each window the kernel builds (its title bar style): set once, before [`open_launch_windows`].

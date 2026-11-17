@@ -19,6 +19,8 @@ export interface PluginHostOptions {
     services(id: string, own: (dispose: () => void) => void): HostServices
     /** `ctx.settings.open`: the Settings window at `/settings/<path>`, on this window's scope. */
     openSettings(path: string): Promise<void>
+    /** `ctx.plugin.assetUrl`: a URL for a file of an installed plugin's folder. */
+    assetUrl(id: string, path: string): string
     /** A plugin failed to load or start, or one of its callbacks threw. */
     onFailed(manifest: PluginManifest, error: unknown): void
 }
@@ -43,18 +45,28 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
 
 export type PluginHost = ReturnType<typeof createPluginHost>
 
-/** One window's plugins: which run, starting them in order, their scopes, their session callbacks and their APIs. */
-export function createPluginHost(entries: readonly PluginEntry[], options: PluginHostOptions) {
+/**
+ * One window's plugins: which run, starting them in order, their scopes, their session callbacks and their APIs.
+ * `setEntries` replaces the plugins it knows (one installed or removed); a running one stays until the app restarts.
+ */
+export function createPluginHost(initial: readonly PluginEntry[], options: PluginHostOptions) {
     /** Every plugin made for this window, by id; reactive, for Settings → Plugins. */
     const states = shallowReactive(new Map<string, PluginState>())
-    const byId = new Map(entries.map(e => [e.manifest.id, e]))
-    const installed = new Set(byId.keys())
-    const forWindow = entries.filter(e => pluginWindows(e.manifest).includes(options.window.kind))
+    let byId = new Map<string, PluginEntry>()
+    let installed = new Set<string>()
+    let forWindow: PluginEntry[] = []
+    function setEntries(entries: readonly PluginEntry[]) {
+        byId = new Map([...[...running.values()].map(r => [r.entry.manifest.id, r.entry] as const), ...entries.map(e => [e.manifest.id, e] as const)])
+        installed = new Set(entries.map(e => e.manifest.id))
+        forWindow = entries.filter(e => pluginWindows(e.manifest).includes(options.window.kind))
+        for (const id of states.keys()) if (!byId.has(id)) states.delete(id)
+    }
     const running = new Map<string, Running>()
     /** Failed while on: not retried until it's turned off and on again. */
     const failed = new Set<string>()
     const waiting = new Map<string, Waiter[]>()
     let session: SessionContext | undefined
+    setEntries(initial)
 
     function fail(id: string, error: unknown) {
         running.get(id)?.scope.stop()
@@ -110,7 +122,7 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
             (states.get(target as string)?.status === 'active' ? running.get(target as string)?.api : undefined) as PluginApis[K] | undefined
 
         return {
-            plugin: {id, version: manifest.version, source},
+            plugin: {id, version: manifest.version, source, assetUrl: path => options.assetUrl(id, path)},
             config: options.config(manifest),
             ...options.services(id, own),
             window: {...options.window},
@@ -217,6 +229,8 @@ export function createPluginHost(entries: readonly PluginEntry[], options: Plugi
 
     return {
         states,
+        /** The plugins this window knows: the core ones and the installed ones, after an install or a removal. */
+        setEntries,
         /** Starts what's newly on, in order; what's turned off runs on until the app restarts. Serialized. */
         apply(isOn: (manifest: PluginManifest) => boolean) {
             queue = queue.then(() => applyNow(isOn))

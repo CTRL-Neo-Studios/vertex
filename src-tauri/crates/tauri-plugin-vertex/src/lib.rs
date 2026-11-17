@@ -1,6 +1,7 @@
 //! Vertex's kernel as a Tauri plugin (`vertex`): the app's windows, the state every window shares (sessions, settings,
-//! trust, workspace settings), files, the Trash, the clipboard's files, fonts, update channels, and the host services
-//! every plugin builds on (`http_fetch`, `search_notes`, secrets, plugin data). Plugin crates use its Rust API, [`api`].
+//! trust, workspace settings), files, the Trash, the clipboard's files, fonts, update channels, the host services
+//! every plugin builds on (`http_fetch`, `search_notes`, secrets, plugin data), and installed community plugins. Plugin
+//! crates use its Rust API, [`api`].
 
 pub mod api;
 mod dialogs;
@@ -8,6 +9,7 @@ mod fonts;
 mod grants;
 mod host;
 mod notes;
+mod plugins;
 mod protocol;
 mod reach;
 mod state;
@@ -271,15 +273,25 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             host::secret_delete,
             host::data_get,
             host::data_set,
+            plugins::plugins_list,
+            plugins::plugin_read,
+            plugins::plugin_stage,
+            plugins::plugin_discard,
+            plugins::plugin_install,
+            plugins::plugin_remove,
             windows::window_open,
             dialogs::dialog_open,
             dialogs::dialog_save,
         ]))
         .register_asynchronous_uri_scheme_protocol(protocol::SCHEME, protocol::handle)
+        .register_asynchronous_uri_scheme_protocol(plugins::SCHEME, plugins::handle)
         .setup(|app, _api| {
             app.manage(AppState::default());
             app.manage(grants::WindowGrants::default());
             app.manage(reach::Reaches::default());
+            app.manage(plugins::Watches::default());
+            let handle = app.clone();
+            app.state::<AppState>().on_settings_change(Box::new(move |_, new| plugins::sync_watches(&handle, new)));
             Ok(())
         })
         .on_event(|app, event| {

@@ -198,7 +198,7 @@ onMounted(async () => {
     // Track changes only after restore, so the restored state is never overwritten by an empty one.
     $persistence?.start()
     // Plugins' `onSession` callbacks: the index is built and the tabs are back.
-    pluginSessions.start(sessionContext(activeSesh))
+    pluginSessions.start(sessionContext(activeSesh), async () => $persistence?.flush())
 })
 
 onBeforeUnmount(async () => {

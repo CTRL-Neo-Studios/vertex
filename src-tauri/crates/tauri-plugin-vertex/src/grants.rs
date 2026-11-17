@@ -45,7 +45,7 @@ impl WindowKind {
 pub type Grants = &'static [(WindowKind, &'static [&'static str])];
 
 /// What the kernel reads of a plugin's `plugin.json` (validated when it's built or installed).
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginManifest {
     pub id: String,
@@ -228,6 +228,8 @@ const KERNEL: Grants = &[
             "vertex:allow-update-token-get",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
+            "vertex:allow-plugins-list",
+            "vertex:allow-plugin-read",
         ],
     ),
     (
@@ -261,6 +263,8 @@ const KERNEL: Grants = &[
             "vertex:allow-search-notes",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
+            "vertex:allow-plugins-list",
+            "vertex:allow-plugin-read",
         ],
     ),
     (
@@ -289,6 +293,12 @@ const KERNEL: Grants = &[
             "vertex:allow-system-fonts",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
+            "vertex:allow-plugins-list",
+            "vertex:allow-plugin-read",
+            "vertex:allow-plugin-stage",
+            "vertex:allow-plugin-discard",
+            "vertex:allow-plugin-install",
+            "vertex:allow-plugin-remove",
         ],
     ),
     (
@@ -419,9 +429,11 @@ pub(crate) fn grant_files<R: Runtime>(app: &AppHandle<R>, label: &str, path: &st
     app.add_capability(capability).map_err(|e| e.to_string())
 }
 
-/// The core plugins' manifests, the core crates' grants, and what each label was granted.
+/// The plugins' manifests (the core ones, then the installed ones), the core crates' grants, and what each label was
+/// granted.
 #[derive(Default)]
 pub(crate) struct WindowGrants {
+    core: Mutex<Vec<PluginManifest>>,
     catalog: Mutex<Vec<PluginManifest>>,
     crates: Mutex<Vec<(&'static str, Grants)>>,
     /// Label → the plugins granted to it. A label is here once its base is granted.
@@ -436,10 +448,31 @@ pub(crate) fn register<R: Runtime>(app: &AppHandle<R>, plugin: &'static str, gra
     lock(&app.state::<WindowGrants>().crates).push((plugin, grants));
 }
 
+/// The core plugins' manifests, then the installed ones (`plugins.rs`).
 pub(crate) fn set_catalog<R: Runtime>(app: &AppHandle<R>, manifests: &[&str]) -> Result<(), String> {
-    let catalog = manifests.iter().map(|json| PluginManifest::parse(json)).collect::<Result<Vec<_>, _>>()?;
-    *lock(&app.state::<WindowGrants>().catalog) = catalog;
+    *lock(&app.state::<WindowGrants>().core) = manifests.iter().map(|json| PluginManifest::parse(json)).collect::<Result<Vec<_>, _>>()?;
+    set_installed(app, crate::plugins::installed_manifests(app));
     Ok(())
+}
+
+/// The catalog becomes the core plugins and `installed`; an installed one with a core plugin's id is left out.
+pub(crate) fn set_installed<R: Runtime>(app: &AppHandle<R>, installed: Vec<PluginManifest>) {
+    let state = app.state::<WindowGrants>();
+    let core = lock(&state.core).clone();
+    let installed = installed.into_iter().filter(|m| !core.iter().any(|c| c.id == m.id));
+    *lock(&state.catalog) = core.iter().cloned().chain(installed).collect();
+}
+
+pub(crate) fn is_core<R: Runtime>(app: &AppHandle<R>, id: &str) -> bool {
+    lock(&app.state::<WindowGrants>().core).iter().any(|m| m.id == id)
+}
+
+/// Every permission `manifest` asks for is one the table knows.
+pub(crate) fn check_permissions(manifest: &PluginManifest) -> Result<(), String> {
+    match manifest.permissions.iter().find(|p| !PERMISSION_TABLE.contains_key(*p)) {
+        Some(p) => Err(format!("it asks for an unknown permission {p:?}")),
+        None => Ok(()),
+    }
 }
 
 /// The plugins on in the window `label` now, from what Rust owns: the settings, a workspace window's

@@ -356,7 +356,16 @@ export interface TrustedFormatDef {
 }
 
 export interface PluginContext<Config = Record<string, unknown>> extends HostServices {
-    plugin: { id: string, version: string, source: PluginSource }
+    plugin: {
+        id: string
+        version: string
+        source: PluginSource
+        /**
+         * A URL for a file of this plugin's installed folder (`assets/icon.png`; nothing outside it): images, `fetch`, or
+         * `import()` of a part loaded later. A core plugin has no folder: its files are bundled.
+         */
+        assetUrl(path: string): string
+    }
     window: { kind: WindowKind, label: string }
     config: PluginConfigAccess<Config>
     commands: {

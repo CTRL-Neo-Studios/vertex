@@ -379,6 +379,78 @@
           "markdownDescription": "Denies the http_fetch command without any pre-configured scope."
         },
         {
+          "description": "Enables the plugin_discard command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-discard",
+          "markdownDescription": "Enables the plugin_discard command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_discard command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-discard",
+          "markdownDescription": "Denies the plugin_discard command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugin_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-install",
+          "markdownDescription": "Enables the plugin_install command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-install",
+          "markdownDescription": "Denies the plugin_install command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugin_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-read",
+          "markdownDescription": "Enables the plugin_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-read",
+          "markdownDescription": "Denies the plugin_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugin_remove command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-remove",
+          "markdownDescription": "Enables the plugin_remove command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_remove command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-remove",
+          "markdownDescription": "Denies the plugin_remove command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugin_stage command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-stage",
+          "markdownDescription": "Enables the plugin_stage command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_stage command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-stage",
+          "markdownDescription": "Denies the plugin_stage command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the plugins_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugins-list",
+          "markdownDescription": "Enables the plugins_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugins_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugins-list",
+          "markdownDescription": "Denies the plugins_list command without any pre-configured scope."
+        },
+        {
           "description": "Enables the plugins_waiting_restart command without any pre-configured scope.",
           "type": "string",
           "const": "allow-plugins-waiting-restart",

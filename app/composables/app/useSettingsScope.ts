@@ -10,8 +10,8 @@ import {useTrust} from "~/composables/app/useTrust";
 import {pluginManifests} from "~/utils/plugins/catalog";
 import {stateClient} from "~/utils/stateClient";
 
-/** The kernel's overridable settings and each plugin's (its manifest's `config.overridable`). The same for every window of a build. */
-const allowlist = settingsAllowlist(pluginManifests())
+/** The kernel's overridable settings and each plugin's (its manifest's `config.overridable`), installed ones included. */
+const allowlist = computed(() => settingsAllowlist(pluginManifests()))
 
 /**
  * This window's settings scope: a workspace window's own workspace, or in the Settings window the scope being
@@ -46,14 +46,14 @@ export function useSettingsScope() {
     }
 
     const trusted = computed(() => root.value !== null && folderTrustedBy(trust.records.value, root.value) !== undefined)
-    const effective = computed(() => config.value && (root.value ? effectiveSettings(config.value, local.value, trusted.value, allowlist) : config.value))
+    const effective = computed(() => config.value && (root.value ? effectiveSettings(config.value, local.value, trusted.value, allowlist.value) : config.value))
     const defaults = defaultAppSettings()
 
     /** What the current scope sets: a workspace's own override (even one it can't apply yet), else the effective value. */
     const value = <P extends AppSettingPath>(path: P) =>
         getAt(overridden(path) ? local.value : effective.value, path) as SettingAt<AppSettings, P>
     /** Whether the current scope can change `path`: always in User, only allowlisted ones in a workspace. */
-    const overridable = (path: AppSettingPath) => root.value === null || overridableAs(path, allowlist) !== undefined
+    const overridable = (path: AppSettingPath) => root.value === null || overridableAs(path, allowlist.value) !== undefined
     function overridden(path: AppSettingPath) {
         return root.value !== null && isOverridden(local.value, path)
     }
@@ -83,7 +83,7 @@ export function useSettingsScope() {
     const reset = (paths: AppSettingPath[]) => set(Object.fromEntries(paths.map(path => [path, root.value ? null : getAt(defaults, path)])))
 
     /** Who may override `path` from a workspace; `undefined` = global only. */
-    const levelOf = (path: AppSettingPath) => overridableAs(path, allowlist)
+    const levelOf = (path: AppSettingPath) => overridableAs(path, allowlist.value)
 
     return {root, local, trusted, effective, open, value, overridable, overridden, levelOf, set, isDirty, reset}
 }

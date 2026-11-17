@@ -88,5 +88,6 @@ export function useAppSessionPersistence(session: ActiveSession) {
         }
     }
 
-    return {start, registerCloseHandlers}
+    /** Writes the latest state now (a window about to reload). */
+    return {start, registerCloseHandlers, flush: persist}
 }

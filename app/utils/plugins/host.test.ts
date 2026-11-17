@@ -46,6 +46,7 @@ function setup(plugins: Record<string, { manifest?: Partial<PluginManifest>, set
         config: () => ({value: {}, set: async () => {}, overridden: () => false}),
         services: () => ({}) as HostServices,
         openSettings: async () => {},
+        assetUrl: (id, path) => `${id}/${path}`,
         contribute(point, owner, def) {
             // Commands by their id; other points by `point:owner`, enough to see them come and go.
             const key = point === 'command' ? (def as {id: string}).id : `${point}:${owner}`
@@ -98,6 +99,24 @@ describe('createPluginHost', () => {
         await host.apply(allOn)
         expect(host.states.get('async')).toMatchObject({status: 'failed', error: expect.stringMatching(/synchronous/)})
         expect(host.states.get('unloadable')).toEqual({status: 'failed', error: 'chunk missing'})
+    })
+
+    it('starts a plugin installed later, and keeps one removed while it runs', async () => {
+        const {host, log} = setup({graph: {}})
+        await host.apply(allOn)
+        const installed: PluginEntry = {
+            manifest: {id: 'calendar', name: 'Calendar', version: '1.0.0', apiVersion: 1},
+            source: 'global',
+            load: async () => ({default: {setup: () => { log.push('calendar') }}}),
+        }
+        host.setEntries([installed])
+        await host.apply(allOn)
+        expect(log).toEqual(['graph', 'calendar'])
+        // `graph` is gone from the list but still running: it stops when the app restarts, not now.
+        expect(host.states.get('graph')).toEqual({status: 'active'})
+        host.setEntries([])
+        await host.apply(allOn)
+        expect(host.states.get('calendar')).toEqual({status: 'active'})
     })
 
     it('stops what the plugin set up when its scope stops: registrations and effects', async () => {

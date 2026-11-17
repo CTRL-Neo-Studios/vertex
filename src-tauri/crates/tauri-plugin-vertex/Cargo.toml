@@ -29,8 +29,11 @@ percent-encoding = "2.3.2"
 tauri-plugin-opener = "2.7.2"
 # `search_notes`' regular expressions (chat's grep); already in the tree.
 regex = "1.13"
-
-[dev-dependencies]
+# Community plugins (`plugins.rs`): installing from a `.zip`, the hash of what runs, watching a folder install.
+zip = { version = "9.2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+notify-debouncer-full = "0.6"
+# Staging folders' names.
 uuid = { version = "1.29.0", features = ["v4"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugins-list"
+description = "Enables the plugins_list command without any pre-configured scope."
+commands.allow = ["plugins_list"]
+
+[[permission]]
+identifier = "deny-plugins-list"
+description = "Denies the plugins_list command without any pre-configured scope."
+commands.deny = ["plugins_list"]

@@ -274,7 +274,46 @@
 				"noSettings": "This plugin has no settings.",
 				"notFound": "There's no plugin \"{id}\".",
 				"pick": "Choose…",
-				"pickOutside": "Choose something inside the workspace."
+				"pickOutside": "Choose something inside the workspace.",
+				"community": "Community plugins",
+				"communityDescription": "Installed by you, for every workspace. A community plugin runs as Vertex does: it can read and change your notes and files.",
+				"noneInstalled": "No community plugins installed.",
+				"install": "Install…",
+				"installFolder": "From a folder… (copied again when it changes)",
+				"installZip": "From a .zip file…",
+				"installUrl": "From a URL…",
+				"pickFolder": "Choose the plugin's folder",
+				"pickZip": "Choose the plugin's .zip",
+				"installed": "{name} installed",
+				"installFailed": "Couldn't install the plugin",
+				"remove": "Remove",
+				"removeFailed": "Couldn't remove {name}",
+				"saveFailed": "The settings couldn't be saved.",
+				"coreId": "\"{id}\" is a core plugin's id.",
+				"broken": "Can't load: {reasons}",
+				"failedHere": "Failed: {error}",
+				"installModal": {
+					"title": "Install {name}?",
+					"invalid": "This plugin can't be installed",
+					"by": "By {author}",
+					"errors": "Its plugin.json has problems:",
+					"replaces": "It replaces the installed version {version}.",
+					"permissions": "It asks for",
+					"noPermissions": "Nothing beyond what every plugin gets.",
+					"warning": "A plugin runs as Vertex does: it can read, change and delete your notes and files. Install it only if you trust where it came from.",
+					"install": "Install",
+					"cancel": "Cancel"
+				},
+				"urlModal": {
+					"title": "Install from a URL",
+					"description": "A link to a .zip of the plugin's folder.",
+					"placeholder": "https://…/plugin.zip",
+					"next": "Continue"
+				},
+				"removeModal": {
+					"title": "Remove {name}?",
+					"description": "Its files are deleted. Its settings and data stay, for if you install it again."
+				}
 			},
 			"scope": {
 				"label": "Editing",

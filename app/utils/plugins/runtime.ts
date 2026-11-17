@@ -1,4 +1,5 @@
 import {computed, shallowRef, watch} from 'vue'
+import {listen} from '@tauri-apps/api/event'
 import {getCurrentWebviewWindow} from '@tauri-apps/api/webviewWindow'
 import {pluginConfig} from '#shared/plugin/config'
 import {sessionUuidFromLabel, WindowLabel} from '#shared/constants/app'
@@ -13,7 +14,8 @@ import {
     noteMenuItems, overlays, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
 } from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
-import {pluginEntries} from '~/utils/plugins/catalog'
+import {loadInstalledPlugins, pluginEntries} from '~/utils/plugins/catalog'
+import {pluginAssetUrl} from '~/utils/fileUrl'
 import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
 import {useTrust} from '~/composables/app/useTrust'
@@ -25,6 +27,8 @@ import {hostServices} from '~/utils/plugins/services'
 let host: PluginHost | undefined
 /** Reactive: tabs and views restored before the session starts draw once it does. */
 const session = shallowRef<SessionContext>()
+/** Writes the session window's pending state, before a reload. */
+let flushSession: () => Promise<unknown> = async () => {}
 /** Which plugin registered a definition, for `PluginMount`'s error message. */
 const owners = new WeakMap<object, string>()
 
@@ -84,6 +88,9 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     const enabled = () => settings.value?.plugins.enabled ?? {}
     /** A session window's workspace, the one a plugin's `workspace` config writes go to. */
     const workspace = () => (kind === 'session' ? scope.root.value : null)
+    const nuxtApp = useNuxtApp()
+    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp).catch(e => console.error('[plugins] the installed plugins:', e))
+    await listInstalled()
 
     host = createPluginHost(pluginEntries(), {
         window: {kind, label},
@@ -116,6 +123,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
         },
         services: (id, own) => hostServices(id, workspace(), own, trust),
         openSettings: path => appSettings.createOrFocusSettingsWindow(workspace(), `/settings/${path}`),
+        assetUrl: pluginAssetUrl,
         onFailed(manifest, error) {
             console.error(`[plugins] ${manifest.id} failed:`, error)
             toasts.error(t('app.plugins.failed', {name: manifest.name}), error instanceof Error ? error.message : String(error))
@@ -123,11 +131,23 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     })
     // Every way into the host runs in the Nuxt app's context, so a plugin's `setup` and `onSession` callbacks may use
     // Nuxt's composables, also when a settings change turns one on later.
-    const nuxtApp = useNuxtApp()
     inApp = fn => nuxtApp.runWithContext(fn)
     const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => pluginEnabled(manifest, enabled())))
     await apply()
     watch(() => JSON.stringify(enabled()), () => void apply())
+    // A plugin installed or removed (in Settings): this window knows it from now on, and may turn it on.
+    await listen('vertex://plugins-changed', async () => {
+        await listInstalled()
+        host!.setEntries(pluginEntries())
+        await apply()
+    })
+    // A plugin installed from a folder was copied again: the windows running it reload, their session written first.
+    await listen<{ id: string }>('vertex://plugin-updated', async ({payload}) => {
+        const status = host!.states.get(payload.id)?.status
+        if (status !== 'active' && status !== 'failed') return
+        await flushSession()
+        location.reload()
+    })
 }
 
 /** Runs host calls from outside the Nuxt context (the session layout's `onMounted` after an `await`) inside it. */
@@ -135,8 +155,10 @@ let inApp: (fn: () => unknown) => unknown = fn => fn()
 
 /** The session layout's side of the host: its session is ready, or ending. */
 export const pluginSessions = {
-    start(context: SessionContext) {
+    /** The session is ready; `flush` writes its pending state (before a plugin's update reloads the window). */
+    start(context: SessionContext, flush: () => Promise<unknown>) {
         session.value = context
+        flushSession = flush
         inApp(() => host?.startSession(context))
     },
     end() {

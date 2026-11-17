@@ -274,7 +274,46 @@
 				"noSettings": "此插件没有设置。",
 				"notFound": "没有插件“{id}”。",
 				"pick": "选择…",
-				"pickOutside": "请选择工作区内的内容。"
+				"pickOutside": "请选择工作区内的内容。",
+				"community": "社区插件",
+				"communityDescription": "由你安装，适用于所有工作区。社区插件以 Vertex 的身份运行：它可以读取和修改你的笔记与文件。",
+				"noneInstalled": "尚未安装社区插件。",
+				"install": "安装…",
+				"installFolder": "从文件夹…（文件夹变化时重新复制）",
+				"installZip": "从 .zip 文件…",
+				"installUrl": "从网址…",
+				"pickFolder": "选择插件的文件夹",
+				"pickZip": "选择插件的 .zip",
+				"installed": "已安装 {name}",
+				"installFailed": "无法安装此插件",
+				"remove": "移除",
+				"removeFailed": "无法移除 {name}",
+				"saveFailed": "无法保存设置。",
+				"coreId": "“{id}”是核心插件的 id。",
+				"broken": "无法加载：{reasons}",
+				"failedHere": "失败：{error}",
+				"installModal": {
+					"title": "安装 {name}？",
+					"invalid": "无法安装此插件",
+					"by": "作者：{author}",
+					"errors": "它的 plugin.json 有问题：",
+					"replaces": "它会替换已安装的版本 {version}。",
+					"permissions": "它请求",
+					"noPermissions": "仅限每个插件都有的权限。",
+					"warning": "插件以 Vertex 的身份运行：它可以读取、修改和删除你的笔记与文件。请只安装你信任其来源的插件。",
+					"install": "安装",
+					"cancel": "取消"
+				},
+				"urlModal": {
+					"title": "从网址安装",
+					"description": "插件文件夹 .zip 的链接。",
+					"placeholder": "https://…/plugin.zip",
+					"next": "继续"
+				},
+				"removeModal": {
+					"title": "移除 {name}？",
+					"description": "它的文件会被删除。它的设置和数据会保留，以便你再次安装。"
+				}
 			},
 			"scope": {
 				"label": "正在编辑",

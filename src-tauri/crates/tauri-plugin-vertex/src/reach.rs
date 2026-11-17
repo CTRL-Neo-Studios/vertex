@@ -175,6 +175,8 @@ pub(crate) fn kernel_path_args(command: &str) -> &'static [&'static str] {
         "trust_move" => &["from", "to"],
         "trust_pin" => &["folder", "path"],
         "search_notes" | "data_get" | "data_set" | "workspace_settings_get" | "workspace_settings_update" | "workspace_settings_reload" => &["root"],
+        // A folder or `.zip` picked in this window's dialog; a URL goes in `url`.
+        "plugin_stage" => &["path"],
         _ => &[],
     }
 }

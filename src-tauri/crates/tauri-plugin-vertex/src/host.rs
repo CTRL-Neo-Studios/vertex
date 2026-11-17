@@ -14,7 +14,7 @@ const PLUGINS_DATA: &str = "plugins-data";
 
 /// `id` as a manifest names a plugin (`PLUGIN_ID` in `shared/plugin/manifest.ts`: `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`, at
 /// most 50), so it can't reach outside its file or keychain namespace.
-fn check_plugin(id: &str) -> Result<(), String> {
+pub(crate) fn check_plugin(id: &str) -> Result<(), String> {
     let b = id.as_bytes();
     let ok = (1..=50).contains(&b.len())
         && b[0].is_ascii_lowercase()

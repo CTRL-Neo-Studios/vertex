@@ -38,6 +38,12 @@ const COMMANDS: &[&str] = &[
     "secret_delete",
     "data_get",
     "data_set",
+    "plugins_list",
+    "plugin_read",
+    "plugin_stage",
+    "plugin_discard",
+    "plugin_install",
+    "plugin_remove",
     "window_open",
 ];
 

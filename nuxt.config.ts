@@ -1,3 +1,5 @@
+import {SHARED_PACKAGES} from './shared/plugin/modules'
+
 export default defineNuxtConfig({
     devtools: {enabled: true},
     $production: {devtools: {enabled: false}},
@@ -109,6 +111,9 @@ export default defineNuxtConfig({
                 "@vue-flow/core",
                 // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
+                // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
+                // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
+                ...SHARED_PACKAGES,
             ],
         },
     },
