@@ -19,3 +19,6 @@ export function describeOrigin(record: Pick<InstallRecord, 'kind' | 'origin' | '
 /** The web page of a record's origin: a repository's, or the `.zip` URL; none for a file or a folder. */
 export const originUrl = (record: Pick<InstallRecord, 'kind' | 'origin'>): string | undefined =>
     record.kind === 'file' || record.kind === 'folder' ? undefined : record.kind === 'zip' ? record.origin : `https://${record.origin}`
+
+/** A source another device can install from (a Git repository or an `https` `.zip`), not a path on this one. */
+export const shareableSource = (source: string | null | undefined): source is string => !!source && /^(git\+)?https:\/\//.test(source)

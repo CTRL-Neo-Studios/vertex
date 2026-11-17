@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {API_VERSION, parseRequirement, pluginWindows, validateManifest} from './manifest'
+import {API_VERSION, checkPluginFolder, parseRequirement, pluginWindows, validateManifest} from './manifest'
 
 const valid = {id: 'graph-view', name: 'Graph view', version: '1.0.0', apiVersion: API_VERSION}
 
@@ -92,5 +92,25 @@ describe('parseRequirement', () => {
     it('reads a trailing ? as optional', () => {
         expect(parseRequirement('ai?')).toEqual({id: 'ai', optional: true})
         expect(parseRequirement('ai')).toEqual({id: 'ai', optional: false})
+    })
+})
+
+describe('checkPluginFolder', () => {
+    const core = new Set(['files', 'bases'])
+    const errors = (folder: string, raw: unknown, readError: string | null = null) => {
+        const result = checkPluginFolder(folder, raw, readError, '1.0.0', core)
+        return result.ok ? [] : result.errors
+    }
+
+    it('takes a folder named by its manifest\'s id, not a core plugin\'s', () => {
+        expect(errors('graph-view', valid)).toEqual([])
+        expect(errors('graph', valid)).toEqual(['"id" is "graph-view" but its folder is "graph"'])
+        expect(errors('files', {...valid, id: 'files'})).toEqual(['"files" is a core plugin\'s id'])
+    })
+
+    it('refuses one that can\'t be read, doesn\'t validate, or needs a later Vertex', () => {
+        expect(errors('graph-view', null, 'plugin.json: not found')).toEqual(['plugin.json: not found'])
+        expect(errors('graph-view', {...valid, apiVersion: API_VERSION + 1})).toHaveLength(1)
+        expect(errors('graph-view', {...valid, minAppVersion: '2.0.0'})).toHaveLength(1)
     })
 })

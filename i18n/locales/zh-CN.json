@@ -305,6 +305,7 @@
 					"file": "文件：{origin}",
 					"folder": "开发中的文件夹：{origin}",
 					"unknown": "安装于 Vertex 记录插件来源之前",
+					"copied": "手动或通过同步放入工作区",
 					"claims": "自称来自 {origin}"
 				},
 				"installFailed": "无法安装此插件",
@@ -314,6 +315,25 @@
 				"coreId": "“{id}”是核心插件的 id。",
 				"broken": "无法加载：{reasons}",
 				"failedHere": "失败：{error}",
+				"ownCopyHere": "此工作区有自己的副本",
+				"workspace": "此工作区（{name}）",
+				"workspaceDescription": "此工作区 .vertex/plugins 文件夹中的插件会随工作区一起同步；这里也列出它启用了、但此设备没有的插件。它们只在此工作区中运行，且需要工作区受信任、每个插件按当前内容被接受。",
+				"noneInWorkspace": "此工作区没有自己的插件。",
+				"notAccepted": "自上次接受后为新插件或已更改：查看后才会运行",
+				"review": "查看（{count}）",
+				"missing": "此工作区启用了它，但此设备没有安装",
+				"missingFrom": "工作区说明它来自 {source}",
+				"missingNoSource": "工作区没有说明它来自哪里",
+				"installMissing": "安装…",
+				"trustModal": {
+					"trustTitle": "信任 {folder}？",
+					"trustDescription": "它的工作区包含插件。信任它会按插件当前的内容运行它们。",
+					"acceptTitle": "运行此工作区的插件？",
+					"acceptDescription": "这些插件是新的，或自上次接受后已被更改（通过同步、Git 或其他应用）。它们会按当前内容运行。",
+					"asks": "请求：{list}",
+					"trust": "信任",
+					"accept": "运行它们"
+				},
 				"installModal": {
 					"title": "安装 {name}？",
 					"updateTitle": "更新 {name}？",
@@ -334,7 +354,9 @@
 					"noPermissions": "仅限每个插件都有的权限。",
 					"warning": "插件以 Vertex 的身份运行：它可以读取、修改和删除你的笔记与文件。请只安装你信任其来源的插件。",
 					"install": "安装",
-					"cancel": "取消"
+					"cancel": "取消",
+					"forEvery": "用于所有工作区",
+					"forWorkspace": "仅用于 {name}"
 				},
 				"urlModal": {
 					"title": "从网址安装",
@@ -582,7 +604,9 @@
 			"failed": "{name} 无法启动",
 			"drawFailed": "{name} 无法绘制此内容",
 			"updatesWaiting": "有插件更新等待处理（{count}）",
-			"review": "查看"
+			"review": "查看",
+			"workspaceChanged": "此工作区的插件是新的或已更改（{count}）",
+			"workspaceMissing": "此工作区使用了此设备没有的插件（{count}）"
 		},
 		"panels": {
 			"moveUp": "上移",

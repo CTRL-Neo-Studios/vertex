@@ -19,12 +19,13 @@ export default function () {
         })
     }
 
-    function warning(title: string, description?: string) {
+    function warning(title: string, description?: string, actions?: { label: string, onClick: () => void }[]) {
         $t.add({
             title: title,
             description: description,
             color: 'warning',
-            icon: 'lucide:triangle-alert'
+            icon: 'lucide:triangle-alert',
+            actions: actions?.map(a => ({...a, color: 'neutral', variant: 'outline', size: 'xs'})),
         })
     }
 

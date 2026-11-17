@@ -305,6 +305,7 @@
 					"file": "A file: {origin}",
 					"folder": "A folder, while developing: {origin}",
 					"unknown": "Installed before Vertex kept where plugins come from",
+					"copied": "Put in the workspace by hand or by sync",
 					"claims": "says it's from {origin}"
 				},
 				"installFailed": "Couldn't install the plugin",
@@ -314,6 +315,25 @@
 				"coreId": "\"{id}\" is a core plugin's id.",
 				"broken": "Can't load: {reasons}",
 				"failedHere": "Failed: {error}",
+				"ownCopyHere": "This workspace has its own copy",
+				"workspace": "This workspace ({name})",
+				"workspaceDescription": "Plugins in this workspace's .vertex/plugins folder, which travel with it, and the ones it turns on that this device doesn't have. They run only in this workspace, once it's trusted and each one is accepted as it is.",
+				"noneInWorkspace": "This workspace has no plugins of its own.",
+				"notAccepted": "New or changed since it was accepted: it runs once you review it",
+				"review": "Review ({count})",
+				"missing": "This workspace turns it on, but this device doesn't have it",
+				"missingFrom": "The workspace says it comes from {source}",
+				"missingNoSource": "The workspace doesn't say where it comes from",
+				"installMissing": "Install…",
+				"trustModal": {
+					"trustTitle": "Trust {folder}?",
+					"trustDescription": "Its workspace has plugins. Trusting it runs them, as they are now.",
+					"acceptTitle": "Run this workspace's plugins?",
+					"acceptDescription": "These are new, or changed since they were accepted (by sync, Git or another app). They run as they are now.",
+					"asks": "Asks for: {list}",
+					"trust": "Trust",
+					"accept": "Run them"
+				},
 				"installModal": {
 					"title": "Install {name}?",
 					"updateTitle": "Update {name}?",
@@ -334,7 +354,9 @@
 					"noPermissions": "Nothing beyond what every plugin gets.",
 					"warning": "A plugin runs as Vertex does: it can read, change and delete your notes and files. Install it only if you trust where it came from.",
 					"install": "Install",
-					"cancel": "Cancel"
+					"cancel": "Cancel",
+					"forEvery": "For every workspace",
+					"forWorkspace": "For {name} only"
 				},
 				"urlModal": {
 					"title": "Install from a URL",
@@ -582,7 +604,9 @@
 			"failed": "{name} couldn't start",
 			"drawFailed": "{name} couldn't draw this",
 			"updatesWaiting": "Plugin updates are waiting ({count})",
-			"review": "Review"
+			"review": "Review",
+			"workspaceChanged": "This workspace's plugins are new or changed ({count})",
+			"workspaceMissing": "This workspace uses plugins this device doesn't have ({count})"
 		},
 		"panels": {
 			"moveUp": "Move up",

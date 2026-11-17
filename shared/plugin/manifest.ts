@@ -222,3 +222,16 @@ export function validateManifest(raw: unknown, appVersion?: string): ManifestRes
 
     return errors.length ? {ok: false, errors} : {ok: true, manifest: m as unknown as PluginManifest}
 }
+
+/**
+ * The id rule for a plugin folder (installed, or in a workspace's `.vertex/plugins/`): its `plugin.json` (`raw`, or
+ * `readError` when it couldn't be read) validates against `appVersion`, names the folder's own name as its `id`, and
+ * that isn't a core plugin's. A workspace's copy may share an installed plugin's id; it replaces that one there.
+ */
+export function checkPluginFolder(folder: string, raw: unknown, readError: string | null, appVersion: string, coreIds: ReadonlySet<string>): ManifestResult {
+    const result = readError ? {ok: false as const, errors: [readError]} : validateManifest(raw, appVersion)
+    if (!result.ok) return result
+    if (result.manifest.id !== folder) return {ok: false, errors: [`"id" is "${result.manifest.id}" but its folder is "${folder}"`]}
+    if (coreIds.has(folder)) return {ok: false, errors: [`"${folder}" is a core plugin's id`]}
+    return result
+}

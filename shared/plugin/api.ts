@@ -338,8 +338,11 @@ export interface HostServices {
          */
         allows(path: string, hash: string): Promise<boolean>
         trustFile(path: string, hash: string): Promise<void>
-        /** With `nested`, its subfolders too; `pin`: the program running now, which may be ahead of the disk. */
-        trustFolder(path: string, nested: boolean, pin?: { file: string, hash: string }): Promise<void>
+        /**
+         * With `nested`, its subfolders too; `pin`: the program running now, which may be ahead of the disk. A folder
+         * whose workspace has plugins not accepted lists them first; resolves to `false` when the user declines.
+         */
+        trustFolder(path: string, nested: boolean, pin?: { file: string, hash: string }): Promise<boolean>
         /** An edit made in Vertex keeps the file's trust with its new program; a new file (`before` undefined) in a trusted folder gets it pinned. */
         followEdit(path: string, before: string | undefined, after: string): Promise<void>
         /** Files whose programs a folder's trust pins (in content mode, each as it is when the folder is trusted). */

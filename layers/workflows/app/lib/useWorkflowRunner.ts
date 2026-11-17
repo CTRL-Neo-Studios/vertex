@@ -144,8 +144,9 @@ export function useWorkflowRunner(session: SessionContext) {
         const answer = await trustModal.open({name, capabilities, plan, file, root}).result
         if (!answer) return false
         if (answer.kind === 'file') await trust.trustFile(file, hash)
-        // What's running may be ahead of the disk (unsaved edits); pin that, the program the user just trusted.
-        else await trust.trustFolder(answer.path, answer.nested, {file, hash})
+        // What's running may be ahead of the disk (unsaved edits); pin that, the program the user just trusted. A
+        // folder whose workspace has plugins asks about them too; declining there trusts nothing.
+        else return trust.trustFolder(answer.path, answer.nested, {file, hash})
         return true
     }
 

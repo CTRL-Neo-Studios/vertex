@@ -42,6 +42,9 @@ export const WORKSPACE_OVERRIDABLE = {
     // Value-aware (`applicableOverrides`): any workspace may turn a plugin off; only a trusted one may turn one on, as
     // that runs its code with the vault.
     'plugins.enabled': 'workspace',
+    // Where the community plugins a workspace uses come from, so another device can install them (Settings → Plugins
+    // writes them; Rust's folder watches read the user's own).
+    'plugins.sources': 'workspace',
 } as const satisfies Partial<Record<AppSettingPath, OverrideLevel>>
 
 /** The kernel's allowlist with each plugin's `config.overridable`, under `plugins.config.<id>`. */

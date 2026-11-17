@@ -14,7 +14,7 @@ import {
     noteMenuItems, overlays, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
 } from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
-import {loadInstalledPlugins, pluginEntries} from '~/utils/plugins/catalog'
+import {loadInstalledPlugins, missingPlugins, pluginEntries, workspacePlugins} from '~/utils/plugins/catalog'
 import {pluginAssetUrl} from '~/utils/fileUrl'
 import {useAppSettings} from '~/composables/app/useAppSettings'
 import {useSettingsScope} from '~/composables/app/useSettingsScope'
@@ -89,7 +89,11 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     /** A session window's workspace, the one a plugin's `workspace` config writes go to. */
     const workspace = () => (kind === 'session' ? scope.root.value : null)
     const nuxtApp = useNuxtApp()
-    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp).catch(e => console.error('[plugins] the installed plugins:', e))
+    // A session window runs its workspace's accepted plugins; the Settings window knows those of the one it edits.
+    const listed = () => (kind === 'settings' ? scope.root.value : workspace())
+    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp, listed(), kind === 'session').catch(e => console.error('[plugins] the installed plugins:', e))
+    // The main window has no workspace, and no trust to read.
+    if (kind !== 'main') await trust.load()
     await listInstalled()
 
     host = createPluginHost(pluginEntries(), {
@@ -135,19 +139,61 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => pluginEnabled(manifest, enabled())))
     await apply()
     watch(() => JSON.stringify(enabled()), () => void apply())
-    // A plugin installed or removed (in Settings): this window knows it from now on, and may turn it on.
-    await listen('vertex://plugins-changed', async () => {
+    const running = (id: string) => ['active', 'failed'].includes(host!.states.get(id)?.status ?? '')
+    const copies = () => new Map(pluginEntries().map(e => [e.manifest.id, e.source]))
+    let started = copies()
+    /**
+     * Lists the plugins again (an install or removal, a trust change, another workspace edited in Settings). A running
+     * plugin whose copy changed (the workspace's accepted, or no longer) reloads the window, its session written first;
+     * else the host knows the list from now on and may turn one on.
+     */
+    async function relist() {
         await listInstalled()
+        const now = copies()
+        if ([...started].some(([id, source]) => running(id) && now.has(id) && now.get(id) !== source)) {
+            await flushSession()
+            location.reload()
+            return
+        }
+        started = now
         host!.setEntries(pluginEntries())
         await apply()
-    })
-    // A plugin installed from a folder was copied again: the windows running it reload, their session written first.
-    await listen<{ id: string }>('vertex://plugin-updated', async ({payload}) => {
-        const status = host!.states.get(payload.id)?.status
-        if (status !== 'active' && status !== 'failed') return
+        askAboutWorkspace()
+    }
+    await listen('vertex://plugins-changed', () => void relist())
+    watch(trust.records, () => void relist())
+    if (kind === 'settings') watch(scope.root, () => void relist())
+    // A plugin's files were replaced (a folder install copied again, an update): the windows running that copy reload,
+    // their session written first.
+    await listen<{ id: string, root?: string | null }>('vertex://plugin-updated', async ({payload}) => {
+        const source = pluginEntries().find(e => e.manifest.id === payload.id)?.source
+        if (!running(payload.id) || (payload.root ? payload.root !== workspace() || source !== 'workspace' : source !== 'global')) return
         await flushSession()
         location.reload()
     })
+
+    /** A session window says once which of its workspace's plugins it would run but can't yet: new or changed ones, and missing ones. */
+    const asked = new Set<string>()
+    function askAboutWorkspace() {
+        const root = workspace()
+        if (!root) return
+        const pending = workspacePlugins().filter(p => p.manifest && !p.listed.accepted && pluginEnabled({...p.manifest, enabledByDefault: false}, enabled())
+            && !asked.has(`${p.listed.id}:${p.listed.hash}`))
+        if (pending.length && scope.trusted.value) {
+            for (const p of pending) asked.add(`${p.listed.id}:${p.listed.hash}`)
+            toasts.warning(t('app.plugins.workspaceChanged', {count: pending.length}), pending.map(p => p.manifest!.name).join(', '), [
+                {label: t('app.plugins.review'), onClick: () => void trust.acceptPlugins(root, pending)},
+            ])
+        }
+        const missing = missingPlugins(scope.local.value.plugins?.enabled).filter(id => !asked.has(`missing:${id}`))
+        if (missing.length) {
+            for (const id of missing) asked.add(`missing:${id}`)
+            toasts.warning(t('app.plugins.workspaceMissing', {count: missing.length}), missing.join(', '), [
+                {label: t('app.plugins.review'), onClick: () => void appSettings.createOrFocusSettingsWindow(root, '/settings/plugins')},
+            ])
+        }
+    }
+    askAboutWorkspace()
     // An automatic check found updates: the main and session windows say so once per check; Settings → Plugins lists them.
     if (kind !== 'settings') {
         await listen<{ id: string }[]>('vertex://plugin-updates', ({payload}) => {

@@ -1,11 +1,14 @@
-//! Community plugins installed for every workspace (Plugin Architecture Plan, C2, C2b): `<app_data>/plugins/<id>/` holds
-//! each one's `plugin.json`, `main.js`, `styles.css`, assets, and `.install.json` (where it was fetched from). Installing
-//! is two steps: [`plugin_stage`] fetches a source (a Git repository's release or ref, a `.zip` URL: `sources.rs`) or
-//! copies a picked folder or `.zip` into `<app_data>/plugins-staging/`, and the Settings window validates its manifest
-//! (the frontend's `validateManifest`, the one validator) and asks before [`plugin_install`] moves it into place. An
-//! update is a stage of the same source; [`plugin_updates`] says which sources have something newer, only when asked
-//! or while `plugins.checkUpdates` is on. A plugin installed from a folder is copied again when that folder changes,
-//! for development. The kernel's catalog of manifests (`grants.rs`) follows every install and removal.
+//! Community plugins (Plugin Architecture Plan, C2, C2b, C3): installed for every workspace in `<app_data>/plugins/<id>/`,
+//! or for one in `<root>/.vertex/plugins/<id>/`. Each folder holds the plugin's `plugin.json`, `main.js`, `styles.css`,
+//! assets, and `.install.json` (where it was fetched from). Installing is two steps: [`plugin_stage`] fetches a source
+//! (a Git repository's release or ref, a `.zip` URL: `sources.rs`) or copies a picked folder or `.zip` into
+//! `<app_data>/plugins-staging/`, and the Settings window validates its manifest (the frontend's `validateManifest`, the
+//! one validator) and asks before [`plugin_install`] moves it into place. An update is a stage of the same source;
+//! [`plugin_updates`] says which sources have something newer, only when asked or while `plugins.checkUpdates` is on. A
+//! plugin installed from a folder is copied again when that folder changes, for development. A workspace's plugin runs
+//! only in its session windows, once its folder is trusted and it's accepted: its files hash to the pin trust keeps
+//! for it ([`bundle_hash`]), checked here whenever its manifest is granted, its code read or its assets served. The
+//! kernel's catalog of manifests (`grants.rs`) follows every install and removal.
 
 use crate::api::blocking;
 use crate::grants::PluginManifest;
@@ -73,16 +76,71 @@ fn plugin_dir<R: Runtime>(app: &AppHandle<R>, id: &str) -> Result<PathBuf, Strin
     Ok(dir(app, PLUGINS)?.join(id))
 }
 
+/// Workspace `root`'s plugins folder, `.vertex/plugins` (which may not exist).
+fn workspace_plugins(root: &str) -> Result<PathBuf, String> {
+    Ok(crate::state::workspace_root(root)?.join(".vertex").join(PLUGINS))
+}
+
+/// Plugin `id`'s folder: in workspace `root`, else the installed one.
+fn folder_of<R: Runtime>(app: &AppHandle<R>, id: &str, root: Option<&str>) -> Result<PathBuf, String> {
+    match root {
+        Some(root) => {
+            check_plugin(id)?;
+            Ok(workspace_plugins(root)?.join(id))
+        }
+        None => plugin_dir(app, id),
+    }
+}
+
+/// What a pin covers, read once: `plugin.json`, `main.js` and `styles.css`, and their hash.
+struct Bundle {
+    code: String,
+    styles: Option<String>,
+    hash: String,
+}
+
+/// SHA-256 over each part's length and bytes, so no part's bytes can pass for another's.
+fn bundle_hash(parts: [&[u8]; 3]) -> String {
+    let mut hash = Sha256::new();
+    for part in parts {
+        hash.update((part.len() as u64).to_le_bytes());
+        hash.update(part);
+    }
+    hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn read_bundle(folder: &Path) -> Result<Bundle, String> {
+    let manifest = std::fs::read(folder.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
+    let code = std::fs::read_to_string(folder.join("main.js")).map_err(|e| format!("main.js: {e}"))?;
+    let styles = std::fs::read_to_string(folder.join("styles.css")).ok();
+    let hash = bundle_hash([&manifest, code.as_bytes(), styles.as_deref().unwrap_or_default().as_bytes()]);
+    Ok(Bundle { code, styles, hash })
+}
+
+/// Workspace `root`'s plugin `id`, when it's accepted: `root` is trusted and the plugin's files hash to its pin now.
+fn accepted<R: Runtime>(app: &AppHandle<R>, root: &str, id: &str) -> Option<PathBuf> {
+    let folder = folder_of(app, id, Some(root)).ok()?;
+    let pin = app.state::<crate::state::AppState>().plugin_pin(app, root, id)?;
+    (read_bundle(&folder).ok()?.hash == pin).then_some(folder)
+}
+
+/// Plugin `id`'s folder for the window `label`: its workspace's copy when that one is accepted, else the installed one.
+fn folder_for<R: Runtime>(app: &AppHandle<R>, label: &str, id: &str) -> Result<PathBuf, String> {
+    match crate::grants::workspace_of(app, label).and_then(|root| accepted(app, &root, id)) {
+        Some(folder) => Ok(folder),
+        None => plugin_dir(app, id),
+    }
+}
+
 fn read_manifest(folder: &Path) -> Result<Value, String> {
     let text = std::fs::read_to_string(folder.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
     serde_json::from_str(&text).map_err(|e| format!("plugin.json: {e}"))
 }
 
-/// The installed plugins' manifests that Rust can grant: a folder named by a valid id, whose `plugin.json` parses and
+/// The manifests Rust can grant in a plugins folder: a folder named by a valid id, whose `plugin.json` parses and
 /// names that id. Off unless turned on (`enabledByDefault` is a core plugin's). The frontend validates them in full;
 /// one that fails there never loads.
-pub(crate) fn installed_manifests<R: Runtime>(app: &AppHandle<R>) -> Vec<PluginManifest> {
-    let Ok(plugins) = dir(app, PLUGINS) else { return Vec::new() };
+fn manifests_in(plugins: &Path) -> Vec<PluginManifest> {
     let mut found: Vec<PluginManifest> = std::fs::read_dir(plugins)
         .into_iter()
         .flatten()
@@ -99,6 +157,17 @@ pub(crate) fn installed_manifests<R: Runtime>(app: &AppHandle<R>) -> Vec<PluginM
     found
 }
 
+/// The installed plugins' manifests ([`manifests_in`]).
+pub(crate) fn installed_manifests<R: Runtime>(app: &AppHandle<R>) -> Vec<PluginManifest> {
+    dir(app, PLUGINS).map(|plugins| manifests_in(&plugins)).unwrap_or_default()
+}
+
+/// Workspace `root`'s accepted plugins' manifests ([`manifests_in`]), none with a core plugin's id.
+pub(crate) fn workspace_manifests<R: Runtime>(app: &AppHandle<R>, root: &str) -> Vec<PluginManifest> {
+    let Ok(plugins) = workspace_plugins(root) else { return Vec::new() };
+    manifests_in(&plugins).into_iter().filter(|m| !crate::grants::is_core(app, &m.id) && accepted(app, root, &m.id).is_some()).collect()
+}
+
 /// Rust's catalog follows the installed plugins, the open windows are granted what's newly on, then every window lists
 /// them again.
 fn changed<R: Runtime>(app: &AppHandle<R>) {
@@ -108,16 +177,24 @@ fn changed<R: Runtime>(app: &AppHandle<R>) {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Installed {
     /// The folder's name.
     id: String,
+    /// `global`, or `workspace`: in the listed workspace's `.vertex/plugins/`.
+    scope: &'static str,
     /// `plugin.json` as it is, `null` when it can't be read.
     manifest: Value,
     error: Option<String>,
-    /// Where it was fetched from; none for one installed before C2b.
+    /// Where it was fetched from; none for one installed before C2b, or copied into a workspace by hand.
     record: Option<Record>,
     /// The origin of the repository its manifest names (`repository`), to compare with the record's.
     claimed: Option<String>,
+    /// A workspace's plugin: the hash of its files now ([`bundle_hash`]), what accepting it pins, and where.
+    hash: Option<String>,
+    pin_path: Option<String>,
+    /// A workspace's plugin: its folder is trusted and it's pinned with `hash`.
+    accepted: bool,
 }
 
 /// The origin of the repository a manifest names: what it says of itself, not where it was fetched from.
@@ -125,24 +202,45 @@ fn claimed(manifest: &Value) -> Option<String> {
     manifest.get("repository")?.as_str().map(crate::sources::origin_of_repo)
 }
 
-/// Every installed plugin, by folder name, with its manifest unchecked (the frontend validates it) and its record.
-#[tauri::command]
-pub fn plugins_list<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Installed>, String> {
-    let mut out: Vec<Installed> = std::fs::read_dir(dir(&app, PLUGINS)?)
-        .map_err(|e| e.to_string())?
+/// The plugins in a plugins folder, by folder name, with their manifests unchecked (the frontend validates them).
+fn list_in<R: Runtime>(app: &AppHandle<R>, plugins: &Path, root: Option<&str>) -> Vec<Installed> {
+    let mut out: Vec<Installed> = std::fs::read_dir(plugins)
+        .into_iter()
+        .flatten()
         .flatten()
         .filter(|entry| entry.path().is_dir())
         .filter_map(|entry| {
             let id = entry.file_name().to_str()?.to_owned();
             check_plugin(&id).ok()?;
-            let record = read_record(&entry.path());
-            Some(match read_manifest(&entry.path()) {
-                Ok(manifest) => Installed { id, claimed: claimed(&manifest), manifest, error: None, record },
-                Err(error) => Installed { id, manifest: Value::Null, error: Some(error), record, claimed: None },
-            })
+            let folder = entry.path();
+            let record = read_record(&folder);
+            let (manifest, error) = match read_manifest(&folder) {
+                Ok(manifest) => (manifest, None),
+                Err(error) => (Value::Null, Some(error)),
+            };
+            let (hash, pin_path, accepted) = match root {
+                Some(root) => {
+                    let hash = read_bundle(&folder).ok().map(|b| b.hash);
+                    let pin = app.state::<crate::state::AppState>().plugin_pin(app, root, &id);
+                    let accepted = hash.is_some() && pin == hash;
+                    (hash, Some(crate::state::plugin_pin_path(root, &id)), accepted)
+                }
+                None => (None, None, false),
+            };
+            Some(Installed { scope: if root.is_some() { "workspace" } else { "global" }, claimed: claimed(&manifest), id, manifest, error, record, hash, pin_path, accepted })
         })
         .collect();
     out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
+}
+
+/// Every installed plugin, and with `root` that workspace's plugins, each with its record (and whether it's accepted).
+#[tauri::command]
+pub fn plugins_list<R: Runtime>(app: AppHandle<R>, root: Option<String>) -> Result<Vec<Installed>, String> {
+    let mut out = list_in(&app, &dir(&app, PLUGINS)?, None);
+    if let Some(root) = root {
+        out.extend(list_in(&app, &workspace_plugins(&root)?, Some(&root)));
+    }
     Ok(out)
 }
 
@@ -150,18 +248,25 @@ pub fn plugins_list<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Installed>, Str
 pub struct PluginCode {
     code: String,
     styles: Option<String>,
-    /// SHA-256 of `code`, hex: what runs is what was hashed.
+    /// [`bundle_hash`] of what was read: what runs is what was hashed.
     hash: String,
 }
 
-/// An installed plugin's `main.js` (with its hash) and `styles.css`.
+/// A plugin's `main.js` and `styles.css` (with the hash of its three files as read): the installed copy, or with
+/// `workspace` the calling window's workspace's, refused unless that one is accepted as read now.
 #[tauri::command]
-pub async fn plugin_read<R: Runtime>(app: AppHandle<R>, id: String) -> Result<PluginCode, String> {
-    let folder = plugin_dir(&app, &id)?;
+pub async fn plugin_read<R: Runtime>(app: AppHandle<R>, window: tauri::Window<R>, id: String, workspace: Option<bool>) -> Result<PluginCode, String> {
+    let root = match workspace {
+        Some(true) => Some(crate::grants::workspace_of(&app, window.label()).ok_or("this window has no workspace")?),
+        _ => None,
+    };
+    let folder = folder_of(&app, &id, root.as_deref())?;
+    let pin = root.as_deref().map(|root| app.state::<crate::state::AppState>().plugin_pin(&app, root, &id));
     blocking(move || {
-        let code = std::fs::read_to_string(folder.join("main.js")).map_err(|e| format!("main.js: {e}"))?;
-        let styles = std::fs::read_to_string(folder.join("styles.css")).ok();
-        let hash = Sha256::digest(code.as_bytes()).iter().map(|b| format!("{b:02x}")).collect();
+        let Bundle { code, styles, hash } = read_bundle(&folder)?;
+        if pin.is_some_and(|pin| pin.as_deref() != Some(hash.as_str())) {
+            return Err(format!("{id} changed since it was accepted in this workspace"));
+        }
         Ok(PluginCode { code, styles, hash })
     })
     .await
@@ -281,8 +386,10 @@ pub struct Staged {
     manifest: Value,
     /// Where it's from and what that resolved to.
     resolved: Record,
-    /// The record of the installed plugin with the same id, which installing replaces.
+    /// The record of the installed plugin with the same id, which installing for every workspace replaces.
     installed: Option<Record>,
+    /// With `root`: the record of that workspace's plugin with the same id, which installing there replaces.
+    workspace_installed: Option<Record>,
     claimed: Option<String>,
 }
 
@@ -326,15 +433,17 @@ async fn stage_into(folder: &Path, path: Option<String>, source: Option<String>)
 }
 
 #[tauri::command]
-pub async fn plugin_stage<R: Runtime>(app: AppHandle<R>, path: Option<String>, source: Option<String>) -> Result<Staged, String> {
+pub async fn plugin_stage<R: Runtime>(app: AppHandle<R>, path: Option<String>, source: Option<String>, root: Option<String>) -> Result<Staged, String> {
     let stage = uuid::Uuid::new_v4().to_string();
     let folder = stage_dir(&app, &stage)?;
     let result = async {
         let resolved = stage_into(&folder, path, source).await?;
         let manifest = read_manifest(&package_root(&folder)?)?;
         std::fs::write(folder.with_extension("json"), serde_json::to_vec(&resolved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-        let installed = manifest.get("id").and_then(Value::as_str).and_then(|id| plugin_dir(&app, id).ok()).and_then(|dir| read_record(&dir));
-        Ok::<_, String>(Staged { stage: stage.clone(), claimed: claimed(&manifest), manifest, resolved, installed })
+        let id = manifest.get("id").and_then(Value::as_str);
+        let record_in = |root: Option<&str>| id.and_then(|id| folder_of(&app, id, root).ok()).and_then(|dir| read_record(&dir));
+        let (installed, workspace_installed) = (record_in(None), root.as_deref().and_then(|root| record_in(Some(root))));
+        Ok::<_, String>(Staged { stage: stage.clone(), claimed: claimed(&manifest), manifest, resolved, installed, workspace_installed })
     }
     .await;
     if result.is_err() {
@@ -353,10 +462,11 @@ pub fn plugin_discard<R: Runtime>(app: AppHandle<R>, stage: String) -> Result<()
     }
 }
 
-/// Moves `root` (a package: `plugin.json`, `main.js`…) to the installed plugin's folder with its `record`, replacing
-/// what was there. Checks what Rust's own work needs: the id rule, not a core plugin, `main.js`, a manifest it can grant.
-fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&str>, mut record: Record) -> Result<String, String> {
-    let text = std::fs::read_to_string(root.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
+/// Moves `package` (`plugin.json`, `main.js`…) to the plugin's folder (in workspace `root`, else the installed one) with
+/// its `record`, replacing what was there. Checks what Rust's own work needs: the id rule, not a core plugin, `main.js`,
+/// a manifest it can grant.
+fn put_in_place<R: Runtime>(app: &AppHandle<R>, package: &Path, expected: Option<&str>, mut record: Record, root: Option<&str>) -> Result<String, String> {
+    let text = std::fs::read_to_string(package.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
     let manifest = PluginManifest::parse(&text)?;
     let id = manifest.id.clone();
     check_plugin(&id)?;
@@ -366,21 +476,24 @@ fn put_in_place<R: Runtime>(app: &AppHandle<R>, root: &Path, expected: Option<&s
     if crate::grants::is_core(app, &id) {
         return Err(format!("{id:?} is a core plugin's id"));
     }
-    if !root.join("main.js").is_file() {
+    if !package.join("main.js").is_file() {
         return Err("there's no main.js".into());
     }
     crate::grants::check_permissions(&manifest)?;
     record.version = serde_json::from_str::<Value>(&text).ok().and_then(|m| m.get("version")?.as_str().map(str::to_owned));
     record.installed_at = SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
-    std::fs::write(root.join(RECORD), serde_json::to_vec_pretty(&record).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    let target = plugin_dir(app, &id)?;
-    // The old copy goes aside first, so a failed move leaves something to put back.
-    let old = dir(app, STAGING)?.join(format!("{}-old", uuid::Uuid::new_v4()));
+    std::fs::write(package.join(RECORD), serde_json::to_vec_pretty(&record).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    let target = folder_of(app, &id, root)?;
+    let parent = target.parent().ok_or("no plugins folder")?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    // The old copy goes aside first (beside it: a workspace may be on another volume), so a failed move leaves
+    // something to put back. A name starting with `.` is no plugin's id.
+    let old = parent.join(format!(".old-{}", uuid::Uuid::new_v4()));
     let had = target.exists();
     if had {
         std::fs::rename(&target, &old).map_err(|e| e.to_string())?;
     }
-    if let Err(e) = std::fs::rename(root, &target).or_else(|_| copy_dir(root, &target).map_err(std::io::Error::other)) {
+    if let Err(e) = std::fs::rename(package, &target).or_else(|_| copy_dir(package, &target).map_err(std::io::Error::other)) {
         if had {
             let _ = std::fs::rename(&old, &target);
         }
@@ -397,33 +510,44 @@ pub struct InstalledFrom {
     source: String,
 }
 
-/// Installs a stage (replacing the plugin's older copy) with its record; returns the plugin's id and source. Replacing
-/// one (an update) reloads the windows running it, as a folder install's copy does.
+/// Installs a stage (replacing the plugin's older copy) with its record, for every workspace or, with `root`, into that
+/// trusted workspace, accepted as installed; returns the plugin's id and source. Replacing one (an update) reloads the
+/// windows running it, as a folder install's copy does.
 #[tauri::command]
-pub async fn plugin_install<R: Runtime>(app: AppHandle<R>, stage: String) -> Result<InstalledFrom, String> {
+pub async fn plugin_install<R: Runtime>(app: AppHandle<R>, stage: String, root: Option<String>) -> Result<InstalledFrom, String> {
+    if let Some(root) = &root {
+        if !app.state::<crate::state::AppState>().folder_trusted(&app, root) {
+            return Err(format!("{root:?} isn't trusted: trust it to install plugins into it"));
+        }
+    }
     let folder = stage_dir(&app, &stage)?;
-    let handle = app.clone();
-    let (installed, replaced) = blocking(move || {
+    let (handle, target) = (app.clone(), root.clone());
+    let (installed, replaced, hash) = blocking(move || {
         let meta = folder.with_extension("json");
         let installed = std::fs::read(&meta)
             .map_err(|_| format!("no stage {stage:?}"))
             .and_then(|bytes| serde_json::from_slice::<Record>(&bytes).map_err(|e| e.to_string()))
             .and_then(|record| {
                 let source = record.source.clone();
-                let root = package_root(&folder)?;
-                let id = read_manifest(&root).ok().and_then(|m| m.get("id")?.as_str().map(str::to_owned));
-                let replaced = id.is_some_and(|id| plugin_dir(&handle, &id).is_ok_and(|dir| dir.exists()));
-                put_in_place(&handle, &root, None, record).map(|id| (InstalledFrom { id, source }, replaced))
+                let package = package_root(&folder)?;
+                let id = read_manifest(&package).ok().and_then(|m| m.get("id")?.as_str().map(str::to_owned));
+                let replaced = id.is_some_and(|id| folder_of(&handle, &id, target.as_deref()).is_ok_and(|dir| dir.exists()));
+                let id = put_in_place(&handle, &package, None, record, target.as_deref())?;
+                let hash = read_bundle(&folder_of(&handle, &id, target.as_deref())?)?.hash;
+                Ok((InstalledFrom { id, source }, replaced, hash))
             });
         let _ = std::fs::remove_dir_all(&folder);
         let _ = std::fs::remove_file(&meta);
         installed
     })
     .await?;
+    if let Some(root) = &root {
+        app.state::<crate::state::AppState>().pin_plugin(&app, root, &installed.id, Some(hash))?;
+    }
     changed(&app);
-    let _ = app.state::<Updates>().0.lock().map(|mut found| found.retain(|u| u.id != installed.id));
+    let _ = app.state::<Updates>().0.lock().map(|mut found| found.retain(|u| u.id != installed.id || u.root != root));
     if replaced {
-        let _ = app.emit(EVENT_PLUGIN_UPDATED, serde_json::json!({ "id": installed.id }));
+        let _ = app.emit(EVENT_PLUGIN_UPDATED, serde_json::json!({ "id": installed.id, "root": root }));
     }
     Ok(installed)
 }
@@ -433,6 +557,8 @@ pub async fn plugin_install<R: Runtime>(app: AppHandle<R>, stage: String) -> Res
 #[serde(rename_all = "camelCase")]
 pub struct Update {
     id: String,
+    /// The workspace whose copy it is; none for one installed for every workspace.
+    root: Option<String>,
     source: String,
     /// The release tag or branch, and commit, installed now and available.
     installed: Record,
@@ -465,20 +591,27 @@ async fn newer(client: &reqwest::Client, record: &Record, staging: &Path) -> Res
     Ok(changed.then(|| Record { source: resolved.source, origin: resolved.origin, kind: resolved.kind.to_owned(), name: resolved.name, commit: resolved.commit, ..Record::default() }))
 }
 
-/// Checks every installed plugin's source, keeps the result and tells the windows (`vertex://plugin-updates`).
-async fn check_updates<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<Update>, String> {
+/// Checks the source of every installed plugin, and of workspace `root`'s plugins, keeps the result and tells the
+/// windows (`vertex://plugin-updates`).
+async fn check_updates<R: Runtime>(app: &AppHandle<R>, root: Option<String>) -> Result<Vec<Update>, String> {
     let client = crate::sources::client()?;
     let staging = dir(app, STAGING)?;
+    let mut folders = vec![(None, dir(app, PLUGINS)?)];
+    if let Some(root) = root {
+        folders.push((Some(root.clone()), workspace_plugins(&root)?));
+    }
     let mut found = Vec::new();
-    for entry in std::fs::read_dir(dir(app, PLUGINS)?).map_err(|e| e.to_string())?.flatten() {
-        let (Some(id), Some(record)) = (entry.file_name().to_str().map(str::to_owned), read_record(&entry.path())) else { continue };
-        match newer(&client, &record, &staging).await {
-            Ok(Some(available)) => found.push(Update { id, source: record.source.clone(), installed: record, available }),
-            Ok(None) => {}
-            Err(e) => eprintln!("[plugins] {id}: couldn't check {}: {e}", record.source),
+    for (root, plugins) in folders {
+        for entry in std::fs::read_dir(plugins).into_iter().flatten().flatten() {
+            let (Some(id), Some(record)) = (entry.file_name().to_str().map(str::to_owned), read_record(&entry.path())) else { continue };
+            match newer(&client, &record, &staging).await {
+                Ok(Some(available)) => found.push(Update { id, root: root.clone(), source: record.source.clone(), installed: record, available }),
+                Ok(None) => {}
+                Err(e) => eprintln!("[plugins] {id}: couldn't check {}: {e}", record.source),
+            }
         }
     }
-    found.sort_by(|a, b| a.id.cmp(&b.id));
+    found.sort_by(|a, b| (&a.root, &a.id).cmp(&(&b.root, &b.id)));
     let state = app.state::<Updates>();
     *state.0.lock().map_err(|e| e.to_string())? = found.clone();
     *state.1.lock().map_err(|e| e.to_string())? = Some(SystemTime::now());
@@ -486,17 +619,18 @@ async fn check_updates<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<Update>, St
     Ok(found)
 }
 
-/// The updates found: with `check`, by asking each installed plugin's source now; without, the last check's (nothing
-/// is sent).
+/// The updates found: with `check`, by asking the source of each installed plugin (and of workspace `root`'s) now;
+/// without, the last check's (nothing is sent).
 #[tauri::command]
-pub async fn plugin_updates<R: Runtime>(app: AppHandle<R>, check: bool) -> Result<Vec<Update>, String> {
+pub async fn plugin_updates<R: Runtime>(app: AppHandle<R>, check: bool, root: Option<String>) -> Result<Vec<Update>, String> {
     if check {
-        return check_updates(&app).await;
+        return check_updates(&app, root).await;
     }
     Ok(app.state::<Updates>().0.lock().map_err(|e| e.to_string())?.clone())
 }
 
-/// While `plugins.checkUpdates` is on: checks a minute after launch, then daily. Off (the default), nothing is sent.
+/// While `plugins.checkUpdates` is on: checks the installed plugins a minute after launch, then daily. Off (the
+/// default), nothing is sent.
 pub(crate) fn start_update_checks<R: Runtime>(app: &AppHandle<R>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -505,7 +639,7 @@ pub(crate) fn start_update_checks<R: Runtime>(app: &AppHandle<R>) {
             let on = crate::api::settings(&app).pointer("/plugins/checkUpdates").and_then(Value::as_bool) == Some(true);
             let last = app.state::<Updates>().1.lock().ok().and_then(|l| *l);
             if on && last.is_none_or(|t| t.elapsed().unwrap_or_default() >= CHECK_EVERY) {
-                if let Err(e) = check_updates(&app).await {
+                if let Err(e) = check_updates(&app, None).await {
                     eprintln!("[plugins] update check: {e}");
                 }
             }
@@ -514,11 +648,16 @@ pub(crate) fn start_update_checks<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
-/// Deletes an installed plugin's folder. Its config and data stay; a window running it runs it until Vertex restarts.
+/// Deletes a plugin's folder (with `root`, that workspace's copy, and its pin). Its config and data stay; a window
+/// running it runs it until Vertex restarts.
 #[tauri::command]
-pub async fn plugin_remove<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
-    let folder = plugin_dir(&app, &id)?;
+pub async fn plugin_remove<R: Runtime>(app: AppHandle<R>, id: String, root: Option<String>) -> Result<(), String> {
+    let folder = folder_of(&app, &id, root.as_deref())?;
     blocking(move || std::fs::remove_dir_all(&folder).map_err(|e| e.to_string())).await?;
+    if let Some(root) = &root {
+        // An untrusted workspace has no pins to forget.
+        let _ = app.state::<crate::state::AppState>().pin_plugin(&app, root, &id, None);
+    }
     changed(&app);
     Ok(())
 }
@@ -532,7 +671,7 @@ fn recopy<R: Runtime>(app: &AppHandle<R>, id: &str, source: &Path) {
     let result = (|| {
         let stage = dir(app, STAGING)?.join(uuid::Uuid::new_v4().to_string());
         let record = Record { source: source.to_string_lossy().into_owned(), origin: source.to_string_lossy().into_owned(), kind: "folder".into(), ..Record::default() };
-        let copied = copy_dir(source, &stage).and_then(|()| package_root(&stage)).and_then(|root| put_in_place(app, &root, Some(id), record));
+        let copied = copy_dir(source, &stage).and_then(|()| package_root(&stage)).and_then(|root| put_in_place(app, &root, Some(id), record, None));
         let _ = std::fs::remove_dir_all(&stage);
         copied
     })();
@@ -624,7 +763,7 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-/// Serves `<id>/<path>` from the installed plugin's folder, nothing outside it.
+/// Serves `<id>/<path>` from the plugin's folder for the requesting window ([`folder_for`]), nothing outside it.
 pub fn handle<R: Runtime>(ctx: UriSchemeContext<'_, R>, request: Request<Vec<u8>>, responder: UriSchemeResponder) {
     let origin = request.headers().get(ORIGIN).and_then(|o| o.to_str().ok()).unwrap_or("null").to_owned();
     let respond = move |code: StatusCode, kind: Option<&str>, body: Vec<u8>| {
@@ -637,7 +776,7 @@ pub fn handle<R: Runtime>(ctx: UriSchemeContext<'_, R>, request: Request<Vec<u8>
     let decoded = percent_encoding::percent_decode_str(request.uri().path().trim_start_matches('/')).decode_utf8_lossy().into_owned();
     let file = decoded.split_once('/').and_then(|(id, path)| {
         let path = Path::new(path);
-        inside(path).then(|| plugin_dir(ctx.app_handle(), id).ok().map(|dir| dir.join(path))).flatten()
+        inside(path).then(|| folder_for(ctx.app_handle(), ctx.webview_label(), id).ok().map(|dir| dir.join(path))).flatten()
     });
     let Some(file) = file else {
         return responder.respond(respond(StatusCode::FORBIDDEN, None, Vec::new()));
@@ -700,6 +839,24 @@ mod tests {
         for dir in [flat, nested, archive] {
             std::fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    #[test]
+    fn a_pin_covers_the_manifest_the_code_and_the_styles_as_read() {
+        let dir = temp("bundle");
+        std::fs::write(dir.join("plugin.json"), r#"{"id":"p"}"#).unwrap();
+        std::fs::write(dir.join("main.js"), "run()").unwrap();
+        let bundle = read_bundle(&dir).unwrap();
+        assert_eq!(bundle.hash, bundle_hash([br#"{"id":"p"}"#, b"run()", b""]), "what's handed over is what's hashed");
+        assert_ne!(bundle_hash([b"a", b"bc", b""]), bundle_hash([b"ab", b"c", b""]), "bytes can't move between parts");
+        for (file, text) in [("styles.css", "p{}"), ("plugin.json", r#"{"id":"p","permissions":["network"]}"#), ("main.js", "run(2)")] {
+            let before = read_bundle(&dir).unwrap().hash;
+            std::fs::write(dir.join(file), text).unwrap();
+            assert_ne!(read_bundle(&dir).unwrap().hash, before, "{file} is covered");
+        }
+        std::fs::write(dir.join("logo.svg"), "<svg/>").unwrap();
+        assert_eq!(read_bundle(&dir).unwrap().hash, bundle_hash([br#"{"id":"p","permissions":["network"]}"#, b"run(2)", b"p{}"]), "assets aren't");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

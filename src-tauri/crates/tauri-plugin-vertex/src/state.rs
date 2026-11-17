@@ -286,29 +286,51 @@ fn under(path: &str, base: &str) -> bool {
     path.strip_prefix(base).is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
-/// Whether `folder` is trusted: its own record, or a parent's that covers its subfolders (`nested`). The frontend's
-/// `folderTrustedBy`, for which plugins a workspace may turn on.
-pub fn folder_trusted(trust: &Value, folder: &str) -> bool {
-    let normalized = folder.replace('\\', "/");
-    let own = match normalized.trim_end_matches('/') {
-        "" => &normalized[..1.min(normalized.len())],
-        trimmed => trimmed,
-    };
+/// The trusted folder whose record covers `folder`: its own, or a parent's that covers its subfolders (`nested`). The
+/// frontend's `folderTrustedBy`.
+pub fn trusted_folder(trust: &Value, folder: &str) -> Option<String> {
+    let normalized = trust_path(folder);
+    let own = normalized.as_str();
     let record = |at: &str| trust.pointer("/folders").and_then(|f| f.get(at)).filter(|r| r.get("trustedAt").is_some_and(Value::is_string));
     let mut at = own;
     loop {
         if record(at).is_some_and(|r| at == own || r.get("nested") == Some(&Value::Bool(true))) {
-            return true;
+            return Some(at.to_owned());
         }
         let parent = match at.rfind('/') {
             Some(0) | None => "/",
             Some(i) => &at[..i],
         };
         if parent == at {
-            return false;
+            return None;
         }
         at = parent;
     }
+}
+
+/// Whether `folder` is trusted, for which plugins a workspace may turn on.
+pub fn folder_trusted(trust: &Value, folder: &str) -> bool {
+    trusted_folder(trust, folder).is_some()
+}
+
+/// A path as trust records key it: `/` separators, no trailing slash (the frontend's `normalizeTrustPath`).
+pub fn trust_path(path: &str) -> String {
+    let normalized = path.replace('\\', "/");
+    match normalized.trim_end_matches('/') {
+        "" => normalized[..1.min(normalized.len())].to_owned(),
+        trimmed => trimmed.to_owned(),
+    }
+}
+
+/// What a workspace plugin's pin is keyed by: its folder, `<root>/.vertex/plugins/<id>`.
+pub fn plugin_pin_path(root: &str, id: &str) -> String {
+    format!("{}/.vertex/plugins/{id}", trust_path(root))
+}
+
+/// The hash workspace `root`'s plugin `id` was accepted with: pinned in the record of the trusted folder covering `root`.
+pub fn plugin_pin(trust: &Value, root: &str, id: &str) -> Option<String> {
+    let folder = trusted_folder(trust, root)?;
+    trust.pointer("/folders")?.get(&folder)?.get("files")?.get(plugin_pin_path(root, id))?.as_str().map(str::to_owned)
 }
 
 fn rename_keys(list: &mut Map<String, Value>, from: &str, to: &str) {
@@ -555,6 +577,23 @@ impl AppState {
     /// Whether the folder `root` is trusted ([`folder_trusted`]).
     pub(crate) fn folder_trusted<R: Runtime>(&self, app: &AppHandle<R>, root: &str) -> bool {
         self.with_trust(app, |t| Ok(folder_trusted(t, root)), false).unwrap_or(false)
+    }
+
+    /// The hash workspace `root`'s plugin `id` was accepted with ([`plugin_pin`]); none when `root` isn't trusted.
+    pub(crate) fn plugin_pin<R: Runtime>(&self, app: &AppHandle<R>, root: &str, id: &str) -> Option<String> {
+        self.with_trust(app, |t| Ok(plugin_pin(t, root, id)), false).ok().flatten()
+    }
+
+    /// Accepts workspace `root`'s plugin `id` as `hash` (`None` forgets it), in the trusted folder covering `root`.
+    pub(crate) fn pin_plugin<R: Runtime>(&self, app: &AppHandle<R>, root: &str, id: &str, hash: Option<String>) -> Result<(), String> {
+        self.with_trust(
+            app,
+            |t| match trusted_folder(t, root) {
+                Some(folder) => pin_trust(t, &folder, &plugin_pin_path(root, id), hash),
+                None => Err(format!("{root:?} isn't trusted")),
+            },
+            true,
+        )
     }
 
     /// Session `uuid`'s root, and whether it's a workspace's (else a single file's).
@@ -1060,5 +1099,30 @@ mod tests {
         assert!(!folder_trusted(&trust, "/v/Broken/a"), "a record needs its trustedAt");
         assert!(!folder_trusted(&trust, "/v"));
         assert!(!folder_trusted(&json!({}), "/"));
+    }
+
+    #[test]
+    fn a_workspace_plugin_is_accepted_by_a_pin_in_the_folder_trusting_its_workspace() {
+        let mut trust = json!({"folders": {
+            "/v/Own": {"trustedAt": "t", "nested": false, "files": {}},
+            "/v/Parent": {"trustedAt": "t", "nested": true, "files": {}},
+        }});
+        assert_eq!(plugin_pin_path("/v/Own/", "graph"), "/v/Own/.vertex/plugins/graph");
+        assert_eq!(plugin_pin(&trust, "/v/Own", "graph"), None, "not accepted yet");
+        pin_trust(&mut trust, "/v/Own", &plugin_pin_path("/v/Own", "graph"), Some("h1".into())).unwrap();
+        assert_eq!(plugin_pin(&trust, "/v/Own/", "graph").as_deref(), Some("h1"));
+        assert_eq!(plugin_pin(&trust, "/v/Own", "other"), None);
+
+        // A workspace under a folder trusted with its subfolders keeps its pins in that folder's record.
+        let root = "/v/Parent/notes";
+        assert_eq!(trusted_folder(&trust, root).as_deref(), Some("/v/Parent"));
+        pin_trust(&mut trust, "/v/Parent", &plugin_pin_path(root, "graph"), Some("h2".into())).unwrap();
+        assert_eq!(plugin_pin(&trust, root, "graph").as_deref(), Some("h2"));
+
+        // Revoking the folder drops what it accepted; a rename carries it.
+        move_trust_paths(&mut trust, "/v/Own", "/v/Renamed");
+        assert_eq!(plugin_pin(&trust, "/v/Renamed", "graph").as_deref(), Some("h1"));
+        set_trust_entry(&mut trust, "folders", "/v/Parent".into(), Value::Null).unwrap();
+        assert_eq!(plugin_pin(&trust, root, "graph"), None);
     }
 }

@@ -477,13 +477,27 @@ pub(crate) fn check_permissions(manifest: &PluginManifest) -> Result<(), String>
     }
 }
 
+/// The workspace a session window `label` has open, if it's a workspace's (not a single file's).
+pub(crate) fn workspace_of<R: Runtime>(app: &AppHandle<R>, label: &str) -> Option<String> {
+    let uuid = label.strip_prefix(SESSION_WINDOW_PREFIX)?;
+    app.state::<AppState>().session_root(app, uuid).filter(|(_, workspace)| *workspace).map(|(root, _)| root)
+}
+
+/// The catalog as the window `label` sees it: a workspace window's accepted workspace plugins replace the installed
+/// ones with their ids, or join them (`plugins.rs`).
+fn catalog_for<R: Runtime>(app: &AppHandle<R>, label: &str, catalog: &[PluginManifest]) -> Vec<PluginManifest> {
+    let own = workspace_of(app, label).map(|root| crate::plugins::workspace_manifests(app, &root)).unwrap_or_default();
+    let mut out: Vec<PluginManifest> = catalog.iter().filter(|m| !own.iter().any(|w| w.id == m.id)).cloned().collect();
+    out.extend(own);
+    out
+}
+
 /// The plugins on in the window `label` now, from what Rust owns: the settings, a workspace window's
 /// `.vertex/settings.json` and whether its folder is trusted.
 fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog: &[PluginManifest]) -> BTreeSet<String> {
     let state = app.state::<AppState>();
     let global = state.read_settings(app, Value::clone);
-    let root = label.strip_prefix(SESSION_WINDOW_PREFIX).and_then(|uuid| state.session_root(app, uuid)).filter(|(_, workspace)| *workspace).map(|(root, _)| root);
-    let workspace = root.map(|root| (crate::state::workspace_settings(&root), state.folder_trusted(app, &root)));
+    let workspace = workspace_of(app, label).map(|root| (crate::state::workspace_settings(&root), state.folder_trusted(app, &root)));
     plugins_on(kind, catalog, &global, workspace.as_ref().map(|(local, trusted)| (local, *trusted)))
 }
 
@@ -491,7 +505,7 @@ fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog
 pub(crate) fn grant_window<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<(), String> {
     let kind = WindowKind::of(label).ok_or_else(|| format!("no grant for a window labelled {label:?}"))?;
     let state = app.state::<WindowGrants>();
-    let catalog = lock(&state.catalog);
+    let catalog = catalog_for(app, label, &lock(&state.catalog));
     let crates = lock(&state.crates);
     // Held throughout, so two callers can't add the same grant twice.
     let mut granted = lock(&state.granted);
@@ -511,7 +525,7 @@ pub(crate) fn grant_window<R: Runtime>(app: &AppHandle<R>, label: &str) -> Resul
 /// Whether a plugin granted to the window `label` asks for `files-outside-workspace`: it reaches every file.
 pub(crate) fn everywhere<R: Runtime>(app: &AppHandle<R>, label: &str) -> bool {
     let state = app.state::<WindowGrants>();
-    let catalog = lock(&state.catalog);
+    let catalog = catalog_for(app, label, &lock(&state.catalog));
     let granted = lock(&state.granted);
     granted.get(label).is_some_and(|ids| {
         catalog.iter().any(|m| ids.contains(&m.id) && m.permissions.iter().any(|p| p == "files-outside-workspace"))
@@ -532,12 +546,12 @@ pub(crate) fn regrant<R: Runtime>(app: &AppHandle<R>) {
 #[tauri::command]
 pub(crate) fn plugins_waiting_restart<R: Runtime>(app: AppHandle<R>) -> Vec<String> {
     let state = app.state::<WindowGrants>();
-    let catalog = lock(&state.catalog);
+    let catalog = lock(&state.catalog).clone();
     let granted = lock(&state.granted).clone();
     let mut waiting = BTreeSet::new();
     for (label, had) in granted {
         let Some(kind) = WindowKind::of(&label) else { continue };
-        let on = on_for(&app, &label, kind, &catalog);
+        let on = on_for(&app, &label, kind, &catalog_for(&app, &label, &catalog));
         waiting.extend(had.into_iter().filter(|id| !on.contains(id)));
     }
     waiting.into_iter().collect()

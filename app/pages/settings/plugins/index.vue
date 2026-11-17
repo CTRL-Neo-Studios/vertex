@@ -12,13 +12,13 @@ import {useTrust} from "~/composables/app/useTrust";
 import useQuickToasts from "~/composables/utility/useQuickToasts";
 import {openUrlInBrowser} from "~/composables/app/useAppOpener";
 import {pickToOpen} from "~/utils/dialogs";
-import {brokenPlugins, installedOrigin, pluginEntries, type InstallRecord} from "~/utils/plugins/catalog";
-import {describeOrigin, originUrl} from "~/utils/plugins/origin";
+import {brokenPlugins, installedOrigin, missingPlugins, pluginEntries, workspacePlugins, type InstallRecord, type WorkspacePlugin} from "~/utils/plugins/catalog";
+import {describeOrigin, originUrl, shareableSource} from "~/utils/plugins/origin";
 import {pluginStates} from "~/utils/plugins/runtime";
 import {stateClient} from "~/utils/stateClient";
 import {vertexInvoke} from "~/utils/vertexInvoke";
 import PluginGitModal from "~/components/Modals/PluginGitModal.vue";
-import PluginInstallModal from "~/components/Modals/PluginInstallModal.vue";
+import PluginInstallModal, {type InstallTarget} from "~/components/Modals/PluginInstallModal.vue";
 import PluginRemoveModal from "~/components/Modals/PluginRemoveModal.vue";
 import PluginUrlModal from "~/components/Modals/PluginUrlModal.vue";
 import RestartModal from "~/components/Modals/RestartModal.vue";
@@ -31,9 +31,11 @@ definePageMeta({
  * Settings → Plugins: every plugin with its switch, in the scope being edited. A workspace may turn any plugin off;
  * one it turns on that's off in the user's settings runs only once the workspace is trusted. A plugin turned off runs
  * on until Vertex restarts (its windows keep their grants till then): switching one off asks to restart, and its row
- * says it waits for one. Community plugins are installed here, for every workspace, from a Git repository (or a `.zip`,
- * or a folder while developing one): Rust stages one, this page validates its manifest and asks. Their updates are
- * checked when asked (or daily, when the user turns that on) and installed only through the same dialog.
+ * says it waits for one. Community plugins are installed here, for every workspace or (editing a trusted one) for that
+ * workspace, from a Git repository (or a `.zip`, or a folder while developing one): Rust stages one, this page
+ * validates its manifest and asks. Their updates are checked when asked (or daily, when the user turns that on) and
+ * installed only through the same dialog. Editing a workspace also lists its own plugins (accepted or not) and those
+ * it turns on that this device lacks.
  */
 const {t} = useI18n()
 const appSettings = useAppSettings()
@@ -63,7 +65,9 @@ async function offerRestart(id: string, name: string) {
 }
 
 async function setOn(m: PluginManifest, on: boolean) {
-    await scope.set({[enabledPath(m.id)]: on})
+    // A workspace that turns a community plugin on says where it came from, for its other devices.
+    const source = on && scope.root.value ? sourceOf(m.id) : undefined
+    await scope.set({[enabledPath(m.id)]: on, ...(shareableSource(source) ? {[sourcePath(m.id)]: source} : {})})
     if (on) waiting.value = await stateClient.pluginsWaitingRestart()
     else await offerRestart(m.id, m.name)
 }
@@ -117,33 +121,59 @@ async function saveGlobal(patch: Record<string, unknown>) {
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const busy = ref(false)
+const sourcePath = (id: string) => `plugins.sources.${id}` as AppSettingPath
+
+/** The edited workspace's own plugins (accepted or not), and what it turns on that this device has nowhere. */
+const own = computed(() => (scope.root.value ? workspacePlugins() : []))
+const ownCopy = (id: string) => own.value.find(p => p.listed.id === id)
+const missing = computed(() => (scope.root.value ? missingPlugins(scope.local.value.plugins?.enabled) : []))
+/** Where a plugin came from: the edited workspace's copy's record, else the installed one's, else what the workspace says. */
+const sourceOf = (id: string) => ownCopy(id)?.listed.record?.source ?? installedOrigin(id)?.record?.source
+    ?? (scope.local.value.plugins?.sources as Record<string, string> | undefined)?.[id]
+const workspaceName = computed(() => scope.root.value?.split(/[\\/]/).filter(Boolean).pop() ?? '')
 
 interface Staged {
     stage: string
     manifest: unknown
     resolved: InstallRecord
     installed: InstallRecord | null
+    workspaceInstalled: InstallRecord | null
     claimed: string | null
 }
 
-/** Stages `what` (a source string, or a picked path), validates its manifest, asks, and installs it on. */
-async function stageAndInstall(what: { source: string } | { path: string }) {
+/**
+ * Stages `what` (a source string, or a picked path), validates its manifest, asks, and installs it on: for every
+ * workspace, or into the edited workspace when it's trusted and the user picks it (`target` preselects).
+ */
+async function stageAndInstall(what: { source: string } | { path: string }, target: InstallTarget = 'global') {
     busy.value = true
+    const root = scope.root.value && scope.trusted.value ? scope.root.value : null
     try {
-        const {stage, manifest, resolved, installed, claimed} = await vertexInvoke<Staged>('plugin_stage', what)
+        const {stage, manifest, resolved, installed, workspaceInstalled, claimed} = await vertexInvoke<Staged>('plugin_stage', {...what, root})
         const result = validateManifest(manifest, await getVersion())
         const errors = !result.ok ? result.errors
             : core.value.some(m => m.id === result.manifest.id) ? [t('app.settings.plugins.coreId', {id: result.manifest.id})] : []
-        const current = result.ok ? community.value.find(m => m.id === result.manifest.id) : undefined
-        const accepted = await installModal.open({manifest: (manifest ?? {}) as Partial<PluginManifest>, errors, resolved, claimed, current, installed})
-        if (!accepted || !result.ok || errors.length) {
+        const id = result.ok ? result.manifest.id : undefined
+        const where = await installModal.open({
+            manifest: (manifest ?? {}) as Partial<PluginManifest>,
+            errors,
+            resolved,
+            claimed,
+            global: {current: community.value.find(m => m.id === id), installed},
+            workspace: root ? {name: workspaceName.value, current: ownCopy(id ?? '')?.manifest, installed: workspaceInstalled} : undefined,
+            target: root ? target : 'global',
+        })
+        if (!where || !result.ok || errors.length) {
             await vertexInvoke('plugin_discard', {stage})
             return
         }
-        const {id, source} = await vertexInvoke<{ id: string, source: string }>('plugin_install', {stage})
-        await saveGlobal({[`plugins.enabled.${id}`]: true, [`plugins.sources.${id}`]: source})
-        updates.value = updates.value.filter(u => u.id !== id)
-        toasts.success(t(current ? 'app.settings.plugins.updated' : 'app.settings.plugins.installed', {name: result.manifest.name}))
+        const inWorkspace = where === 'workspace' && root
+        const replaced = inWorkspace ? !!ownCopy(result.manifest.id) : community.value.some(m => m.id === result.manifest.id)
+        const done = await vertexInvoke<{ id: string, source: string }>('plugin_install', {stage, root: inWorkspace ? root : null})
+        if (inWorkspace) await scope.set({[enabledPath(done.id)]: true, ...(shareableSource(done.source) ? {[sourcePath(done.id)]: done.source} : {})})
+        else await saveGlobal({[enabledPath(done.id)]: true, [sourcePath(done.id)]: done.source})
+        updates.value = updates.value.filter(u => u.id !== done.id || u.root !== (inWorkspace ? root : null))
+        toasts.success(t(replaced ? 'app.settings.plugins.updated' : 'app.settings.plugins.installed', {name: result.manifest.name}))
     } catch (error) {
         toasts.error(t('app.settings.plugins.installFailed'), message(error))
     } finally {
@@ -163,15 +193,22 @@ async function install(from: 'git' | 'folder' | 'zip' | 'url', link?: string) {
     if (path) await stageAndInstall({path})
 }
 
-async function remove(id: string, name: string) {
+/** Removes a plugin: the installed one, or with `inWorkspace` the edited workspace's copy (and that workspace's choice for it). */
+async function remove(id: string, name: string, inWorkspace = false) {
     if (!await removeModal.open({name})) return
     try {
-        await vertexInvoke('plugin_remove', {id})
-        await saveGlobal({[`plugins.enabled.${id}`]: undefined, [`plugins.sources.${id}`]: undefined})
+        await vertexInvoke('plugin_remove', {id, root: inWorkspace ? scope.root.value : null})
+        if (inWorkspace) await scope.set({[enabledPath(id)]: null, [sourcePath(id)]: null})
+        else await saveGlobal({[enabledPath(id)]: undefined, [sourcePath(id)]: undefined})
         await offerRestart(id, name)
     } catch (error) {
         toasts.error(t('app.settings.plugins.removeFailed', {name}), message(error))
     }
+}
+
+/** Accepts the edited workspace's plugins that aren't (new, or changed since), after the trust dialog lists them. */
+async function accept(plugins: readonly WorkspacePlugin[]) {
+    if (scope.root.value) await trust.acceptPlugins(scope.root.value, plugins)
 }
 
 const otherWays = computed<DropdownMenuItem[]>(() => [
@@ -180,9 +217,10 @@ const otherWays = computed<DropdownMenuItem[]>(() => [
     {label: t('app.settings.plugins.installFolder'), icon: 'i-lucide-folder-code', onSelect: () => install('folder')},
 ])
 
-/** An installed plugin whose source has something newer (Rust's `plugin_updates`). */
+/** A plugin whose source has something newer (Rust's `plugin_updates`); `root`: a workspace's copy. */
 interface Update {
     id: string
+    root: string | null
     source: string
     installed: InstallRecord
     available: InstallRecord
@@ -191,7 +229,8 @@ interface Update {
 /** The last check's updates: opening this page asks nobody; Check for updates asks each plugin's source. */
 const updates = ref<Update[]>([])
 const checking = ref(false)
-const updateOf = (id: string) => updates.value.find(u => u.id === id)
+const updateOf = (id: string, root: string | null = null) => updates.value.find(u => u.id === id && u.root === root)
+const updateLabel = (u: Update) => t('app.settings.plugins.updateTo', {to: u.available.name ?? u.available.commit?.slice(0, 7) ?? ''})
 let unlisten: (() => void) | undefined
 onMounted(async () => {
     updates.value = await vertexInvoke<Update[]>('plugin_updates', {check: false})
@@ -202,7 +241,7 @@ onBeforeUnmount(() => unlisten?.())
 async function checkUpdates() {
     checking.value = true
     try {
-        updates.value = await vertexInvoke<Update[]>('plugin_updates', {check: true})
+        updates.value = await vertexInvoke<Update[]>('plugin_updates', {check: true, root: scope.root.value})
         if (!updates.value.length) toasts.success(t('app.settings.plugins.upToDate'))
     } catch (error) {
         toasts.error(t('app.settings.plugins.checkFailed'), message(error))
@@ -216,16 +255,34 @@ const checkAutomatically = computed({
     set: on => void saveGlobal({'plugins.checkUpdates': on}).catch(error => toasts.error(t('app.settings.plugins.saveFailed'), message(error))),
 })
 
-/** A plugin's origin line, and whether to offer its repository as its source (it names one it wasn't fetched from). */
-function originOf(m: PluginManifest) {
-    const origin = installedOrigin(m.id)
+/**
+ * A plugin's origin line, and whether to offer its repository as its source (it names one it wasn't fetched from).
+ * `unknown`: what to say without a record (installed before records; put in a workspace by hand or by sync).
+ */
+function originOf(origin: { record: InstallRecord | null, claimed: string | null } | undefined, unknown = 'app.settings.plugins.origin.unknown') {
     const record = origin?.record
     return {
-        text: record ? describeOrigin(record, t) : t('app.settings.plugins.origin.unknown'),
+        text: record ? describeOrigin(record, t) : t(unknown),
         url: record ? originUrl(record) : undefined,
         claim: origin?.claimed && origin.claimed !== record?.origin ? origin.claimed : undefined,
     }
 }
+const globalOrigin = (id: string) => originOf(installedOrigin(id))
+
+/** The edited workspace's plugin's row: its description and origin, and where it stands. */
+function ownRow(p: WorkspacePlugin) {
+    const origin = originOf(p.listed, 'app.settings.plugins.origin.copied')
+    const state = p.errors.length ? t('app.settings.plugins.broken', {reasons: p.errors.join('; ')})
+        : !scope.trusted.value ? undefined
+            : !p.listed.accepted ? t('app.settings.plugins.notAccepted') : undefined
+    return {
+        name: p.manifest?.name ?? p.listed.id,
+        description: [p.manifest && describe(p.manifest), origin.text, origin.claim && t('app.settings.plugins.origin.claims', {origin: origin.claim})].filter(Boolean).join(' · '),
+        state,
+        origin,
+    }
+}
+const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.accepted))
 </script>
 
 <template>
@@ -263,33 +320,34 @@ function originOf(m: PluginManifest) {
                         :key="m.id"
                         :setting="enabledPath(m.id)"
                         :label="m.name"
-                        :description="group.id === 'community' ? [describe(m), originOf(m).text, originOf(m).claim && t('app.settings.plugins.origin.claims', {origin: originOf(m).claim})].filter(Boolean).join(' · ') : describe(m)"
+                        :description="group.id === 'community' ? [describe(m), globalOrigin(m.id).text, globalOrigin(m.id).claim && t('app.settings.plugins.origin.claims', {origin: globalOrigin(m.id).claim})].filter(Boolean).join(' · ') : describe(m)"
                         :error="reasonText(m)"
                         :data-plugin-row="m.id"
                     >
                         <UBadge v-if="blocked(m)" size="sm" color="warning" variant="subtle" :label="t('app.settings.plugins.waitsForTrust')"/>
                         <UBadge v-if="waiting.includes(m.id)" size="sm" color="info" variant="subtle" :label="t('app.settings.plugins.waitsForRestart')" data-plugin-restart/>
                         <template v-if="group.id === 'community'">
+                            <UBadge v-if="ownCopy(m.id)" size="sm" color="neutral" variant="subtle" :label="t('app.settings.plugins.ownCopyHere')"/>
                             <UButton
                                 v-if="updateOf(m.id)"
                                 size="xs"
                                 icon="i-lucide-arrow-up-circle"
                                 :loading="busy"
-                                :label="t('app.settings.plugins.updateTo', {to: updateOf(m.id)!.available.name ?? updateOf(m.id)!.available.commit?.slice(0, 7) ?? ''})"
+                                :label="updateLabel(updateOf(m.id)!)"
                                 data-plugin-update
                                 @click="stageAndInstall({source: updateOf(m.id)!.source})"
                             />
                             <UButton
-                                v-if="originOf(m).claim"
+                                v-if="globalOrigin(m.id).claim"
                                 size="xs"
                                 color="neutral"
                                 variant="outline"
                                 :label="t('app.settings.plugins.useRepository')"
                                 data-plugin-use-repository
-                                @click="install('git', `https://${originOf(m).claim}`)"
+                                @click="install('git', `https://${globalOrigin(m.id).claim}`)"
                             />
-                            <UTooltip v-if="originOf(m).url" :text="t('app.settings.plugins.openOrigin')">
-                                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(originOf(m).url!)"/>
+                            <UTooltip v-if="globalOrigin(m.id).url" :text="t('app.settings.plugins.openOrigin')">
+                                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(globalOrigin(m.id).url!)"/>
                             </UTooltip>
                         </template>
                         <UTooltip v-if="m.config?.schema?.length" :text="t('app.settings.plugins.settings')">
@@ -331,6 +389,65 @@ function originOf(m: PluginManifest) {
                     </SettingsRow>
                 </SettingsSection>
             </template>
+            <SettingsSection
+                v-if="scope.root.value"
+                :title="t('app.settings.plugins.workspace', {name: workspaceName})"
+                :description="t('app.settings.plugins.workspaceDescription')"
+                data-plugins-section="workspace"
+            >
+                <template v-if="scope.trusted.value && pending.length" #actions>
+                    <UButton size="xs" color="warning" variant="outline" icon="i-lucide-shield-check" :label="t('app.settings.plugins.review', {count: pending.length})" data-plugins-accept @click="accept(pending)"/>
+                </template>
+                <p v-if="!own.length && !missing.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.plugins.noneInWorkspace') }}</p>
+                <SettingsRow
+                    v-for="p in own"
+                    :key="p.listed.id"
+                    :label="ownRow(p).name"
+                    :description="ownRow(p).description"
+                    :error="ownRow(p).state"
+                    :data-plugin-own="p.listed.id"
+                >
+                    <UBadge v-if="!scope.trusted.value" size="sm" color="warning" variant="subtle" :label="t('app.settings.plugins.waitsForTrust')"/>
+                    <UBadge v-if="waiting.includes(p.listed.id)" size="sm" color="info" variant="subtle" :label="t('app.settings.plugins.waitsForRestart')"/>
+                    <UButton
+                        v-if="updateOf(p.listed.id, scope.root.value)"
+                        size="xs"
+                        icon="i-lucide-arrow-up-circle"
+                        :loading="busy"
+                        :disabled="!scope.trusted.value"
+                        :label="updateLabel(updateOf(p.listed.id, scope.root.value)!)"
+                        data-plugin-update
+                        @click="stageAndInstall({source: updateOf(p.listed.id, scope.root.value)!.source}, 'workspace')"
+                    />
+                    <UTooltip v-if="ownRow(p).origin.url" :text="t('app.settings.plugins.openOrigin')">
+                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-external-link" :aria-label="t('app.settings.plugins.openOrigin')" @click="openUrlInBrowser(ownRow(p).origin.url!)"/>
+                    </UTooltip>
+                    <UTooltip v-if="p.listed.accepted && p.manifest?.config?.schema?.length" :text="t('app.settings.plugins.settings')">
+                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-settings-2" :aria-label="t('app.settings.plugins.settings')" :to="{path: `/settings/plugins/${p.listed.id}`}"/>
+                    </UTooltip>
+                    <UTooltip :text="t('app.settings.plugins.remove')">
+                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" :aria-label="t('app.settings.plugins.remove')" data-plugin-remove @click="remove(p.listed.id, ownRow(p).name, true)"/>
+                    </UTooltip>
+                    <USwitch v-if="p.manifest" :model-value="isOn({...p.manifest, enabledByDefault: false})" :aria-label="ownRow(p).name" @update:model-value="setOn(p.manifest, $event)"/>
+                </SettingsRow>
+                <SettingsRow
+                    v-for="id in missing"
+                    :key="id"
+                    :label="id"
+                    :description="[t('app.settings.plugins.missing'), shareableSource(sourceOf(id)) ? t('app.settings.plugins.missingFrom', {source: sourceOf(id)}) : t('app.settings.plugins.missingNoSource')].join(' · ')"
+                    :data-plugin-missing="id"
+                >
+                    <UButton
+                        v-if="shareableSource(sourceOf(id))"
+                        size="xs"
+                        icon="i-lucide-download"
+                        :loading="busy"
+                        :label="t('app.settings.plugins.installMissing')"
+                        data-plugin-install-missing
+                        @click="stageAndInstall({source: sourceOf(id)!})"
+                    />
+                </SettingsRow>
+            </SettingsSection>
         </div>
     </SettingsScrollLayout>
 </template>

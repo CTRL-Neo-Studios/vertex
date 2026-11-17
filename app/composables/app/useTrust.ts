@@ -2,10 +2,21 @@ import {shallowReactive} from "vue"
 import {readTextFile} from "@tauri-apps/plugin-fs"
 import {vertexInvoke} from "~/utils/vertexInvoke"
 import {getFileExtensionFromPath} from "#shared/utils/fs/filenames"
-import {coveringFolder, defaultTrustRecords, normalizeTrustPath, trustedBy, type TrustRecords} from "#shared/utils/trust"
+import {coveringFolder, defaultTrustRecords, folderTrustedBy, normalizeTrustPath, trustedBy, type TrustRecords} from "#shared/utils/trust"
 import type {TrustedFormatDef} from "#shared/plugin/api"
 import {useAppSettings} from "~/composables/app/useAppSettings"
+import type {WorkspacePlugin} from "~/utils/plugins/catalog"
 import {stateClient} from "~/utils/stateClient"
+
+/** A workspace plugin's pin in a folder's record (`<root>/.vertex/plugins/<id>`): kept when the folder is trusted again. */
+const PLUGIN_PIN = /\/\.vertex\/plugins\/[^/]+$/
+
+/** The dialog that lists a workspace's plugins before they're trusted; made once per window, when first needed. */
+let trustModal: ReturnType<ReturnType<typeof useOverlay>['create']> | undefined
+async function askAboutPlugins(plugins: readonly WorkspacePlugin[], folder?: string): Promise<boolean> {
+    trustModal ??= useOverlay().create((await import("~/components/Modals/PluginTrustModal.vue")).default)
+    return (await trustModal.open({plugins, folder})) === true
+}
 
 /** The kinds of file whose content trust pins (`ctx.trust.format`: the workflows plugin's programs). Reactive for Settings → Trust. */
 const trustedFormats = shallowReactive(new Set<TrustedFormatDef>())
@@ -60,13 +71,35 @@ export function useTrust() {
     }
 
     /**
-     * Trusts a folder as its programs are now; again (subfolders switched on, say) pins them afresh. `pin`: a program
-     * running now, which may be ahead of the disk (unsaved edits): the one the user just trusted.
+     * Trusts a folder as its programs are now; again (subfolders switched on, say) pins them afresh, keeping its
+     * plugins' pins. When the folder's own workspace has plugins not accepted, they're listed first: trusting it runs
+     * them (accepted with it), cancelling trusts nothing. `pin`: a program running now, which may be ahead of the disk
+     * (unsaved edits): the one the user just trusted. Resolves to whether it was trusted.
      */
     async function trustFolder(path: string, nested: boolean, {trustedAt = new Date().toISOString(), pin}: {trustedAt?: string, pin?: {file: string, hash: string}} = {}) {
         const folder = normalizeTrustPath(path)
-        await stateClient.setTrust('folders', folder, {trustedAt, nested, files: await pinsUnder(folder, nested)})
+        await load()
+        // Imported here: the catalog reads Nuxt's build, which nothing else here needs.
+        const {listWorkspacePlugins} = await import("~/utils/plugins/catalog")
+        const pending = (await listWorkspacePlugins(folder).catch(() => [])).filter(p => p.manifest && !p.listed.accepted)
+        if (pending.length && !await askAboutPlugins(pending, folder)) return false
+        const kept = Object.entries(records.value.folders[folder]?.files ?? {}).filter(([file]) => PLUGIN_PIN.test(file))
+        const plugins = pending.map(p => [p.listed.pinPath!, p.listed.hash!])
+        await stateClient.setTrust('folders', folder, {trustedAt, nested, files: {...Object.fromEntries([...kept, ...plugins]), ...await pinsUnder(folder, nested)}})
         if (pin) await stateClient.pinTrust(folder, normalizeTrustPath(pin.file), pin.hash)
+        return true
+    }
+
+    /**
+     * Accepts workspace `root`'s plugins as they are now (`hash`), once the user has seen them: each is pinned in the
+     * trusted folder covering `root`. Resolves to whether they were asked about and accepted.
+     */
+    async function acceptPlugins(root: string, plugins: readonly WorkspacePlugin[]) {
+        await load()
+        const folder = folderTrustedBy(records.value, root)
+        if (!folder || !plugins.length || !await askAboutPlugins(plugins)) return false
+        for (const {listed} of plugins) await stateClient.pinTrust(folder, listed.pinPath!, listed.hash!)
+        return true
     }
 
     /**
@@ -111,6 +144,7 @@ export function useTrust() {
         records,
         load,
         trustFolder,
+        acceptPlugins,
         allows,
         followEdit,
         hashOf,

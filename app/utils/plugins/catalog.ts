@@ -2,7 +2,7 @@ import {shallowRef, type App} from 'vue'
 import {getVersion} from '@tauri-apps/api/app'
 import {corePlugins} from '#build/core-plugins.mjs'
 import type {PluginDefinition, PluginEntry} from '#shared/plugin/api'
-import {validateManifest, type PluginManifest} from '#shared/plugin/manifest'
+import {checkPluginFolder, type PluginManifest} from '#shared/plugin/manifest'
 import {vertexInvoke} from '~/utils/vertexInvoke'
 
 /** Nuxt declares every generated template as an untyped module; `modules/core-plugins.ts` writes exactly this shape. */
@@ -35,11 +35,25 @@ export interface InstalledOrigin {
     claimed: string | null
 }
 
-/** What Rust's `plugins_list` returns: each installed folder's manifest as it is, and where it's from. */
-interface Installed extends InstalledOrigin {
+/** What Rust's `plugins_list` returns: each plugin folder's manifest as it is, and where it's from. */
+export interface Listed extends InstalledOrigin {
     id: string
+    /** `workspace`: in the listed workspace's `.vertex/plugins/`. */
+    scope: 'global' | 'workspace'
     manifest: unknown
     error: string | null
+    /** A workspace's plugin: the hash of its files now, and the trust path accepting it pins. */
+    hash: string | null
+    pinPath: string | null
+    /** A workspace's plugin: its folder is trusted and it's pinned with `hash`. */
+    accepted: boolean
+}
+
+/** A workspace's plugin as this window knows it: valid (`manifest`) or not (`errors`), accepted or not. */
+export interface WorkspacePlugin {
+    listed: Listed
+    manifest?: PluginManifest
+    errors: string[]
 }
 
 interface PluginCode {
@@ -48,29 +62,57 @@ interface PluginCode {
     hash: string
 }
 
-const community = shallowRef<readonly PluginEntry[]>([])
+/** A listed plugin checked as at install (`checkPluginFolder`): `errors` is empty when it may load. */
+function checkListed(listed: Listed, appVersion: string, coreIds: ReadonlySet<string>): { manifest?: PluginManifest, errors: string[] } {
+    const result = checkPluginFolder(listed.id, listed.manifest, listed.error, appVersion, coreIds)
+    return result.ok ? {manifest: result.manifest, errors: []} : {errors: result.errors}
+}
+
+const global = shallowRef<readonly PluginEntry[]>([])
 const broken = shallowRef<readonly BrokenPlugin[]>([])
 const origins = shallowRef<Readonly<Record<string, InstalledOrigin>>>({})
+const workspace = shallowRef<readonly WorkspacePlugin[]>([])
+/** The workspace's accepted, valid plugins, as entries. */
+const accepted = shallowRef<readonly PluginEntry[]>([])
+/** Whether this window runs its workspace's plugins (a session window), or only knows them (Settings). */
+const runsWorkspace = shallowRef(false)
 
-/** Every plugin this build and this device run: the core plugins (`layers/*`), then the installed ones. Reactive. */
-export const pluginEntries = (): readonly PluginEntry[] => [...core, ...community.value]
+/** `entries` with `own`'s replacing those of the same id, and the rest of `own` after them. */
+const replaced = (entries: readonly PluginEntry[], own: readonly PluginEntry[]) =>
+    [...entries.filter(e => !own.some(o => o.manifest.id === e.manifest.id)), ...own]
 
 /**
- * The plugins a user can turn on and off and configure. The source for the settings scopes (each manifest's
- * `config.overridable`) and Settings → Plugins. Reactive.
+ * Every plugin this window runs: the core plugins (`layers/*`), the installed ones, and in a session window its
+ * workspace's accepted ones (each replacing an installed one with its id). Reactive.
  */
-export const pluginManifests = (): PluginManifest[] => pluginEntries().map(e => e.manifest)
+export const pluginEntries = (): readonly PluginEntry[] => replaced([...core, ...global.value], runsWorkspace.value ? accepted.value : [])
 
-export const pluginManifest = (id: string): PluginManifest | undefined => pluginEntries().find(e => e.manifest.id === id)?.manifest
+/**
+ * The plugins a user can turn on and off and configure in this window's scope: the ones it runs, and in the Settings
+ * window those of the workspace being edited, accepted. The source for the settings scopes (each manifest's
+ * `config.overridable`), the settings nav and the plugins' settings pages. Reactive.
+ */
+export const pluginManifests = (): PluginManifest[] => replaced([...core, ...global.value], accepted.value).map(e => e.manifest)
+
+export const pluginManifest = (id: string): PluginManifest | undefined => pluginManifests().find(m => m.id === id)
 
 export const brokenPlugins = (): readonly BrokenPlugin[] => broken.value
 
 /** Where an installed plugin is from. Reactive. */
 export const installedOrigin = (id: string): InstalledOrigin | undefined => origins.value[id]
 
-/** Runs an installed plugin: its `styles.css` in a `<style data-plugin>`, then its `main.js` with the app's modules. */
-async function loadInstalled(id: string, app: App) {
-    const {code, styles} = await vertexInvoke<PluginCode>('plugin_read', {id})
+/** The plugins in the listed workspace's `.vertex/plugins/`, accepted or not, valid or not. Reactive. */
+export const workspacePlugins = (): readonly WorkspacePlugin[] => workspace.value
+
+/** The ids of `enabled` turned on that this device has nowhere: no core plugin, no installed one, none in the workspace. */
+export function missingPlugins(enabled: Readonly<Record<string, boolean | undefined>> | undefined): string[] {
+    const known = new Set([...core, ...global.value].map(e => e.manifest.id).concat(broken.value.map(b => b.id), workspace.value.map(p => p.listed.id)))
+    return Object.entries(enabled ?? {}).filter(([id, on]) => on === true && !known.has(id)).map(([id]) => id)
+}
+
+/** Runs a plugin: its `styles.css` in a `<style data-plugin>`, then its `main.js` with the app's modules. */
+async function loadCode(id: string, app: App, inWorkspace: boolean) {
+    const {code, styles} = await vertexInvoke<PluginCode>('plugin_read', {id, workspace: inWorkspace})
     if (styles) {
         const style = document.createElement('style')
         style.dataset.plugin = id
@@ -84,28 +126,44 @@ async function loadInstalled(id: string, app: App) {
 }
 
 /**
- * Lists the installed plugins again (at startup, and when one is installed or removed). Each manifest is checked as
- * at install, against this app's version: one that fails, or whose folder isn't its id, or that takes a core plugin's
- * id, is broken. An installed plugin is off until turned on.
+ * Lists the installed plugins again, and `root`'s (at startup, when one is installed or removed, when trust changes).
+ * Each manifest is checked with `checkListed`; an installed one that fails is broken. An installed plugin is off until
+ * turned on. `runs`: this window runs `root`'s accepted plugins (a session window's workspace).
  */
-export async function loadInstalledPlugins(app: App): Promise<void> {
-    const [installed, appVersion] = await Promise.all([vertexInvoke<Installed[]>('plugins_list'), getVersion()])
+export async function loadInstalledPlugins(app: App, root: string | null, runs: boolean): Promise<void> {
+    const [listed, appVersion] = await Promise.all([vertexInvoke<Listed[]>('plugins_list', {root}), getVersion()])
+    const coreIds = new Set(core.map(e => e.manifest.id))
     const entries: PluginEntry[] = []
     const failed: BrokenPlugin[] = []
-    for (const {id, manifest, error} of installed) {
-        const name = (manifest as { name?: unknown } | null)?.name
-        const result = error ? {ok: false as const, errors: [error]} : validateManifest(manifest, appVersion)
-        const errors = !result.ok ? result.errors
-            : result.manifest.id !== id ? [`"id" is "${result.manifest.id}" but its folder is "${id}"`]
-                : core.some(e => e.manifest.id === id) ? [`"${id}" is a core plugin's id`]
-                    : []
-        if (!result.ok || errors.length) {
-            failed.push({id, name: typeof name === 'string' ? name : undefined, errors})
+    const own: WorkspacePlugin[] = []
+    for (const item of listed) {
+        const {manifest, errors} = checkListed(item, appVersion, coreIds)
+        if (item.scope === 'workspace') {
+            own.push({listed: item, manifest, errors})
             continue
         }
-        entries.push({manifest: {...result.manifest, enabledByDefault: false}, source: 'global', load: () => loadInstalled(id, app)})
+        if (!manifest) {
+            const name = (item.manifest as { name?: unknown } | null)?.name
+            failed.push({id: item.id, name: typeof name === 'string' ? name : undefined, errors})
+            continue
+        }
+        entries.push({manifest: {...manifest, enabledByDefault: false}, source: 'global', load: () => loadCode(item.id, app, false)})
     }
-    community.value = entries
+    runsWorkspace.value = runs
+    global.value = entries
     broken.value = failed
-    origins.value = Object.fromEntries(installed.map(({id, record, claimed}) => [id, {record, claimed}]))
+    workspace.value = own
+    accepted.value = own.filter(p => p.manifest && p.listed.accepted).map(p => ({
+        manifest: {...p.manifest!, enabledByDefault: false},
+        source: 'workspace',
+        load: () => loadCode(p.listed.id, app, true),
+    }))
+    origins.value = Object.fromEntries(listed.filter(i => i.scope === 'global').map(({id, record, claimed}) => [id, {record, claimed}]))
+}
+
+/** Workspace `root`'s plugins as they are now, each checked (`checkListed`): what trusting it, or accepting them, asks about. */
+export async function listWorkspacePlugins(root: string): Promise<WorkspacePlugin[]> {
+    const [listed, appVersion] = await Promise.all([vertexInvoke<Listed[]>('plugins_list', {root}), getVersion()])
+    const coreIds = new Set(core.map(e => e.manifest.id))
+    return listed.filter(i => i.scope === 'workspace').map(item => ({listed: item, ...checkListed(item, appVersion, coreIds)}))
 }
