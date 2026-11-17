@@ -1,6 +1,6 @@
-import type {GitToken} from "#shared/types/app/git";
-import GitSignInModal from "~/components/Git/GitSignInModal.vue";
-import {gitClient} from "~/utils/gitClient";
+import type {GitToken} from "../../shared/types";
+import GitSignInModal from "../components/SignInModal.vue";
+import {gitClient} from "./client";
 
 /**
  * After a remote refused to sign in: asks for a personal access token for its https host (`GitSignInModal`) and

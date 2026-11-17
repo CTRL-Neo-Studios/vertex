@@ -1,16 +1,12 @@
 <script setup lang="ts">
-import type {GitChange, GitCommit} from "#shared/types/app/git";
-import {graphRows, type GraphLine} from "#shared/utils/gitGraph";
-import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useGitRepo} from "~/composables/git/useGitRepo";
-import {gitClient} from "~/utils/gitClient";
-import {diffTabId} from "~/utils/gitDiff";
-import {usePanelActions} from "~/utils/panelViews";
+import type {GitChange, GitCommit} from "../../shared/types";
+import {graphRows, type GraphLine} from "../../shared/graph";
+import {useGitRepo} from "../lib/repo";
+import {gitClient} from "../lib/client";
+import {diffTabId} from "../lib/diff";
 import type {PanelViewProps} from "#shared/plugin/api";
 
-defineProps<PanelViewProps>()
+const props = defineProps<PanelViewProps>()
 
 /**
  * History, the Git map: every branch's, remote branch's and tag's commits as a graph, newest first, paged in while
@@ -18,13 +14,9 @@ defineProps<PanelViewProps>()
  * against the first parent. It reloads when the repository moves (a commit, a pull, a branch switch, a fetch).
  */
 const {t, locale} = useI18n()
-const $route = useRoute()
-const $navi = useAppNavigator()
-const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {openTab} = useActiveTabs(session)
-const git = useGitRepo(session)
+const git = useGitRepo(props.session)
 const {status, problem} = git
-const root = session?.rootPath
+const root = props.session.session.rootPath
 
 const PAGE = 300
 const ROW = 28
@@ -56,9 +48,9 @@ async function load(reset: boolean) {
 watch(() => status.value && [status.value.head, status.value.branch, status.value.upstream, status.value.ahead, status.value.behind].join(' '),
     moved => moved !== undefined && void load(true))
 
-usePanelActions(() => [
-    {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: () => void git.refresh().then(() => load(true))},
-])
+watchEffect(() => props.actions([
+    {id: 'refresh', label: t('plugins.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: () => void git.refresh().then(() => load(true))},
+]))
 
 const rows = computed(() => graphRows(commits.value))
 const lanes = computed(() => Math.min(rows.value.reduce((most, row) => Math.max(most, row.width), 1), MAX_LANES))
@@ -114,9 +106,9 @@ const selectById = (id: string) => (selected.value = commits.value.find(c => c.i
 
 async function openDiff(change: GitChange) {
     const current = status.value
-    if (!current || !selected.value || !session) return
+    if (!current || !selected.value) return
     const spec = {top: current.top, path: change.path, side: selected.value.id, ...(change.origPath ? {origPath: change.origPath} : {})}
-    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'git-diff'))
+    await props.session.tabs.open(diffTabId(spec), 'git-diff')
 }
 
 const box = useTemplateRef<HTMLElement>('box')
@@ -132,7 +124,7 @@ const wide = computed(() => width.value >= 720)
             size="sm"
             icon="i-lucide-git-graph"
             class="flex-1"
-            :title="t(problem === 'missing' ? 'app.git.missing.title' : 'app.git.notRepo.title')"
+            :title="t(problem === 'missing' ? 'plugins.git.missing.title' : 'plugins.git.notRepo.title')"
         />
         <UEmpty
             v-else-if="status && !commits.length && !more"
@@ -140,8 +132,8 @@ const wide = computed(() => width.value >= 720)
             size="sm"
             icon="i-lucide-git-graph"
             class="flex-1"
-            :title="t('app.git.history.empty')"
-            :description="t('app.git.history.emptyHint')"
+            :title="t('plugins.git.history.empty')"
+            :description="t('plugins.git.history.emptyHint')"
         />
         <div v-else :class="['flex-1 min-h-0 flex', wide ? 'flex-row' : 'flex-col']">
             <div v-bind="containerProps" class="flex-1 min-h-0 min-w-0 overflow-y-auto" data-git-history>

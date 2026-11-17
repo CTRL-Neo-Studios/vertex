@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
-import type {GitChange, GitCommit} from "#shared/types/app/git";
-import {gitClient} from "~/utils/gitClient";
-import {GIT_STATES} from "~/utils/gitStates";
+import type {GitChange, GitCommit} from "../../shared/types";
+import {gitClient} from "../lib/client";
+import {GIT_STATES} from "../lib/states";
 
 /**
  * The History view's selected commit: message, author, id, parents and its files. Its own component, so scrolling the
@@ -31,7 +31,7 @@ const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0)
     >
         <div class="flex items-start gap-2 px-3 pt-2.5">
             <p class="flex-1 font-medium text-sm text-highlighted break-words">{{ commit.subject }}</p>
-            <UButton icon="i-lucide-x" color="neutral" variant="ghost" size="xs" :aria-label="t('app.git.history.close')" @click="emit('close')"/>
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" size="xs" :aria-label="t('plugins.git.history.close')" @click="emit('close')"/>
         </div>
         <p v-if="commit.body" class="px-3 pt-1 text-sm text-muted whitespace-pre-wrap break-words">{{ commit.body }}</p>
         <div class="px-3 pt-2 flex flex-col gap-1 text-xs text-muted">
@@ -44,11 +44,11 @@ const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0)
                     variant="soft"
                     size="xs"
                     class="font-mono"
-                    :aria-label="t('app.git.history.copyId')"
+                    :aria-label="t('plugins.git.history.copyId')"
                     @click="writeText(commit.id)"
                 />
                 <template v-if="commit.parents.length">
-                    <span class="ps-1">{{ t('app.git.history.parents') }}</span>
+                    <span class="ps-1">{{ t('plugins.git.history.parents') }}</span>
                     <UButton
                         v-for="parent in commit.parents"
                         :key="parent"
@@ -62,9 +62,9 @@ const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0)
                 </template>
             </span>
         </div>
-        <p class="px-3 pt-3 pb-1 text-xs font-medium text-muted">{{ t('app.git.history.files') }}</p>
+        <p class="px-3 pt-3 pb-1 text-xs font-medium text-muted">{{ t('plugins.git.history.files') }}</p>
         <div class="px-1.5 pb-2">
-            <p v-if="files && !files.length" class="px-1.5 text-xs text-dimmed">{{ t('app.git.history.noFiles') }}</p>
+            <p v-if="files && !files.length" class="px-1.5 text-xs text-dimmed">{{ t('plugins.git.history.noFiles') }}</p>
             <button
                 v-for="change in files"
                 :key="change.path"
@@ -75,7 +75,7 @@ const dirOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0)
             >
                 <span class="truncate shrink-0 max-w-[70%]">{{ nameOf(change.path) }}</span>
                 <span class="truncate text-xs text-dimmed">{{ dirOf(change.path) }}</span>
-                <UTooltip :text="t(`app.git.states.${GIT_STATES[change.status].key}`)">
+                <UTooltip :text="t(`plugins.git.states.${GIT_STATES[change.status].key}`)">
                     <span :class="['ms-auto w-5 text-center font-mono text-xs', GIT_STATES[change.status].color]">{{ change.status }}</span>
                 </UTooltip>
             </button>

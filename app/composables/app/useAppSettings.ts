@@ -54,17 +54,21 @@ export function useAppSettings() {
         if (config.value) config.value = defaultAppSettings({...unref(config), ...data})
     }
 
+    /** Persists and broadcasts; `false` when Rust refused it, the window's copy then back as it was. */
     async function save(data?: DeepPartial<AppSettings>): Promise<boolean> {
         if (!config.value) {
             console.warn("[useAppSettings] save() before load(); skipped")
             return false
         }
+        const before = config.value
         if (data) set(data)
         try {
             await stateClient.setSettings(config.value)
             return true
         } catch (error) {
             console.error("[useAppSettings] failed to save settings:", error)
+            // Kept, a refused value (a program path not picked in a dialog) would go out again with every later save.
+            config.value = before
             return false
         }
     }

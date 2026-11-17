@@ -97,6 +97,12 @@
     "layers/files": {
       "name": "@vertex-plugins/files",
     },
+    "layers/git": {
+      "name": "@vertex-plugins/git",
+      "dependencies": {
+        "ai": "^7.0.170",
+      },
+    },
     "layers/image": {
       "name": "@vertex-plugins/image",
     },
@@ -1131,6 +1137,8 @@
     "@vertex-plugins/canvas": ["@vertex-plugins/canvas@workspace:layers/canvas"],
 
     "@vertex-plugins/files": ["@vertex-plugins/files@workspace:layers/files"],
+
+    "@vertex-plugins/git": ["@vertex-plugins/git@workspace:layers/git"],
 
     "@vertex-plugins/image": ["@vertex-plugins/image@workspace:layers/image"],
 

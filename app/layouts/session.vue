@@ -8,6 +8,7 @@ import {useWorkspaceVault} from "~/composables/active/useWorkspaceVault";
 import {editorViewOf} from "~/composables/active/editor/useActiveEditorExtensions";
 import {usePropertyTypes} from "~/composables/active/editor/usePropertyTypes";
 import {useAppNavigator} from "~/composables/app/useAppNavigator";
+import {useAppOpener} from "~/composables/app/useAppOpener";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSessionRecovery} from "~/composables/app/useAppSessionRecovery";
 import {useAppSessionPersistence} from "~/composables/app/useAppSessionPersistence";
@@ -116,6 +117,14 @@ function sessionContext(session: ActiveSession): SessionContext {
             remove: uuids => $files!.remove(uuids),
             importDrop: (transfer, folder, options) => $files!.importDrop(transfer, folder, options),
             drag: {start: (...args) => $files!.dragStart(...args), rows: draggedRows},
+            async openWithDefaultApp(uuid) {
+                const file = index.getFileByUuid(uuid)
+                if (file) await useAppOpener().openFileWithDefaultApp(file.fullPath)
+            },
+            async reveal(uuids) {
+                const paths = uuids.flatMap(uuid => index.getFileByUuid(uuid)?.fullPath ?? [])
+                if (paths.length) await useAppOpener().revealFilesInFileManager(paths)
+            },
         },
         properties: {
             types: () => propertyTypes?.types.value ?? {},

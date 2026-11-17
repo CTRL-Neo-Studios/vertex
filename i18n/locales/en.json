@@ -68,8 +68,7 @@
 			"recoveryMissing": "{count} window(s) from your last session couldn't be reopened: their folder or file is gone.",
 			"newWorkspaceDialog": "Create a Workspace Folder",
 			"newWorkspaceName": "New Workspace",
-			"folderExists": "Something already exists at that path.",
-			"cloneWorkspace": "Clone Workspace…"
+			"folderExists": "Something already exists at that path."
 		},
 		"settings": {
 			"title": "Settings",
@@ -80,8 +79,7 @@
 				"theme": "Theme",
 				"plugins": "Plugins",
 				"view": "View",
-				"trust": "Trust",
-				"git": "Git"
+				"trust": "Trust"
 			},
 			"about": {
 				"version": "The app's current version.",
@@ -293,28 +291,6 @@
 				"useGlobalAll": "Use global theme",
 				"globalOnlyPage": "A workspace can't change these settings; they apply everywhere.",
 				"editUser": "Edit User settings"
-			},
-			"git": {
-				"title": "Git",
-				"tokens": "Sign-in tokens",
-				"tokensDescription": "Personal access tokens for HTTPS remotes, saved when a remote refused to sign in. They stay in your system keychain; git gets one only while it talks to its host, and your own credential helpers aren't asked then.",
-				"noTokens": "No saved tokens. Vertex asks for one when a remote refuses to sign in.",
-				"username": "Username: {username}",
-				"remove": "Remove",
-				"failed": "Couldn't read or change the saved tokens",
-				"autoSync": {
-					"title": "Auto-sync",
-					"description": "Keeps this computer's workspaces in step without pressing Sync: commits every change, pulls and pushes. It waits during a merge or rebase and pauses after a sign-in failure until a sync from the Git view works. A trusted workspace can have its own.",
-					"interval": "Sync automatically",
-					"intervalDescription": "How often a workspace window syncs while it's open.",
-					"never": "Never",
-					"every": "Every {minutes} min",
-					"onOpen": "Sync when a workspace opens",
-					"onOpenDescription": "Once, when its window opens.",
-					"pullOnFocus": "Pull when the window gets focus",
-					"pullOnFocusDescription": "Brings in the remote's new commits when you come back to the window (at most once a minute).",
-					"untrusted": "This workspace's auto-sync applies once its folder is trusted."
-				}
 			}
 		},
 		"editor": {
@@ -521,9 +497,7 @@
 			"editorAssistant": "Editor assistant",
 			"editorAssistantDescription": "Ask AI in the editor: rewrite, fix, continue and more.",
 			"chat": "Chat",
-			"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat.",
-			"commitMessage": "Commit messages",
-			"commitMessageDescription": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and when you set it below, an empty message box and auto-sync. The diff is sent to the model."
+			"chatDescription": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat."
 		},
 		"chat": {
 			"editProfile": "Edit profile",
@@ -783,268 +757,6 @@
 			"openInTab": "Open in tab",
 			"moveToPanel": "Move to panel",
 			"viewMissing": "This view isn't available."
-		},
-		"git": {
-			"label": "Git",
-			"sync": "Sync",
-			"syncHint": "Commit every change, pull the remote's new commits, then push yours.",
-			"syncMessage": "Update {count} file(s)",
-			"committing": "Committing…",
-			"pulling": "Pulling…",
-			"pushing": "Pushing…",
-			"fetching": "Fetching…",
-			"switching": "Switching branch…",
-			"working": "Working…",
-			"fetch": "Fetch: check the remote for new commits",
-			"pull": "Pull: bring in the remote's new commits",
-			"push": "Push: send your commits to the remote",
-			"pullAction": "Pull",
-			"refresh": "Refresh",
-			"aheadBehind": "{ahead} commit(s) to push, {behind} to pull ({upstream})",
-			"detached": "Detached at {id}",
-			"branches": "Branches",
-			"remoteBranches": "Remote branches",
-			"current": "current",
-			"createBranch": "Create branch “{name}”",
-			"branchPlaceholder": "Switch to or create a branch…",
-			"staged": "Staged",
-			"stagedHint": "Staged changes go into the next commit.",
-			"changes": "Changes",
-			"changesHint": "Changes not staged yet. Stage them to put them in the next commit.",
-			"stage": "Stage",
-			"unstage": "Unstage",
-			"stageAll": "Stage all",
-			"unstageAll": "Unstage all",
-			"discard": "Discard changes",
-			"discardAll": "Discard all changes",
-			"openFile": "Open file",
-			"discardConfirm": {
-				"title": "Discard changes?",
-				"description": "{count} file(s) go back to how they were in the last commit, and new files are deleted. This can't be undone.",
-				"confirm": "Discard"
-			},
-			"clean": "No changes",
-			"cleanHint": "Everything is committed.",
-			"message": "Commit message (optional; ⌘↩ to commit)",
-			"commit": "Commit",
-			"commitHint": "Save the staged changes as a commit: a snapshot in the history.",
-			"commitAllHint": "Nothing is staged, so this commits every change.",
-			"commitPush": "Commit and Push",
-			"commitPushHint": "Commit, then send it to the remote.",
-			"merging": {
-				"title": "Merging",
-				"description": "Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then finish the merge, or abort to go back.",
-				"abort": "Abort merge",
-				"finish": "Finish merge"
-			},
-			"states": {
-				"unchanged": "Unchanged",
-				"modified": "Modified",
-				"added": "Added",
-				"deleted": "Deleted",
-				"renamed": "Renamed",
-				"copied": "Copied",
-				"typeChanged": "Type changed",
-				"conflicted": "Conflicted",
-				"untracked": "Untracked (new)"
-			},
-			"missing": {
-				"title": "Git isn't installed",
-				"description": "Vertex uses git to track and sync this workspace. Install it, then check again.",
-				"macos": "Vertex uses git to track and sync this workspace. Apple's developer tools include it: install them, then check again.",
-				"configured": "Vertex is set to use {path}, which isn't a working git. Locate another, or let Vertex find one.",
-				"installTools": "Install developer tools",
-				"locate": "Locate git…",
-				"locateTitle": "Choose the git program",
-				"automatic": "Find git automatically",
-				"toolsFailed": "Couldn't open the developer tools installer"
-			},
-			"notRepo": {
-				"title": "Not a git repository",
-				"description": "This workspace isn't tracked by git yet. Creating a repository starts tracking its changes, with a .gitignore that leaves out system files and Vertex's trash."
-			},
-			"install": "Install git",
-			"checkAgain": "Check again",
-			"errors": {
-				"failed": "Git failed",
-				"missing": {
-					"title": "Git isn't installed",
-					"description": "Install git, then try again."
-				},
-				"notRepo": {
-					"title": "Not a git repository",
-					"description": "This workspace isn't tracked by git."
-				},
-				"auth": {
-					"title": "Couldn't sign in to the remote",
-					"description": "The remote refused to sign in. For an HTTPS remote, try again and enter a personal access token; for SSH, add your key to the SSH agent."
-				},
-				"conflict": {
-					"title": "Merge conflicts",
-					"description": "Some files changed both here and on the remote. Resolve them in the Git view's Conflicts list, then finish the merge, or abort it."
-				},
-				"rejected": {
-					"title": "The remote has newer commits",
-					"description": "Pull them in first, then push again."
-				},
-				"noRemote": {
-					"title": "No remote to sync with",
-					"description": "This repository isn't connected to a remote yet: connect one to push."
-				},
-				"noUpstream": {
-					"title": "This branch has no remote branch",
-					"description": "It doesn't track a branch on a remote, and there's no `origin` to push it to. Push it once with `git push -u` and the remote's name."
-				},
-				"identity": {
-					"title": "Git needs your name and email",
-					"description": "Commits record who made them. Set your name and email to commit."
-				}
-			},
-			"createRepo": "Create repository",
-			"creating": "Creating repository…",
-			"syncChats": "Sync chats",
-			"syncChatsHint": "Chats kept in this workspace are encrypted files git can't merge: when two devices change the same chat, you pick one version.",
-			"diff": {
-				"openChanges": "Open changes",
-				"worktree": "Working tree",
-				"staged": "Staged",
-				"tabTitle": "{name} ({side})",
-				"againstHead": "Compared with the last commit",
-				"againstParent": "Compared with the commit before it",
-				"added": "New file",
-				"deleted": "Deleted",
-				"renamed": "Renamed from {path}"
-			},
-			"history": {
-				"label": "History",
-				"show": "History: every commit, as a graph",
-				"empty": "No commits yet",
-				"emptyHint": "Commit your changes to start the history.",
-				"files": "Changed files",
-				"noFiles": "No file changes",
-				"parents": "Parents",
-				"copyId": "Copy commit id",
-				"close": "Close"
-			},
-			"signIn": {
-				"title": "Sign in to {host}",
-				"description": "Git couldn't sign in to {host}. A personal access token lets it.",
-				"refused": "{host} refused the saved token. It may have expired or lost access: enter a new one.",
-				"explain": "A personal access token is a password for apps, made in your account settings on the host. Give it read and write access to your repositories.",
-				"create": "Create a token on {host}",
-				"createElsewhere": "Create one in your account settings on {host}.",
-				"host": "Host",
-				"token": "Token",
-				"username": "Username",
-				"optional": "Optional",
-				"usernameHelp": "Only if your host wants your username with tokens.",
-				"kept": "Vertex keeps it in your system keychain and hands it to git only while it talks to {host}. Remove it in Settings → Git.",
-				"save": "Save and try again"
-			},
-			"setup": {
-				"steps": {
-					"create": "Create",
-					"identity": "You",
-					"remote": "Remote",
-					"push": "Push"
-				},
-				"continue": "Continue",
-				"later": "Later",
-				"firstCommit": "First commit",
-				"identityAction": "Set your name",
-				"remoteAction": "Connect a remote",
-				"identity": {
-					"title": "Your name and email",
-					"description": "Every commit records who made it. These are kept in this repository only.",
-					"name": "Name",
-					"email": "Email",
-					"emailHint": "Shown in the history"
-				},
-				"remote": {
-					"title": "Connect a remote",
-					"description": "A remote is a copy of this repository on a server, like GitHub. Your devices sync through it: each pushes its commits there and pulls the others'.",
-					"github": "Create a repository on GitHub",
-					"empty": "Make it private, and leave it empty: no README, .gitignore or license, so the first push goes straight in. Then copy its HTTPS URL here.",
-					"url": "Remote URL",
-					"connect": "Connect"
-				},
-				"push": {
-					"title": "Push your notes",
-					"description": "Vertex commits every file and pushes the commit to the remote. If the remote asks you to sign in, Vertex helps you make a token.",
-					"action": "Commit and push"
-				}
-			},
-			"tour": {
-				"start": "Tour",
-				"sync": {
-					"title": "Sync",
-					"description": "One click keeps your devices in step: it commits every change, pulls the remote's new commits, then pushes yours."
-				},
-				"branch": {
-					"title": "Branch",
-					"description": "A branch is a line of work. Switch branches here, or type a name to start a new one."
-				},
-				"aheadBehind": {
-					"title": "Ahead and behind",
-					"description": "Commits of yours the remote doesn't have yet (up arrow), and commits on the remote you haven't pulled (down arrow)."
-				},
-				"remoteActions": {
-					"title": "Fetch, pull and push",
-					"description": "Fetch checks the remote for new commits, pull brings them into your files, push sends your commits to the remote."
-				},
-				"list": {
-					"title": "Changes and staged",
-					"description": "Changes lists the files you edited since the last commit. Stage (plus) the ones that go into the next commit: they move to Staged. Click a file to see what changed."
-				},
-				"commit": {
-					"title": "Commit",
-					"description": "A commit saves the staged changes (or every change, when nothing is staged) as one step in the history, with a message saying what changed."
-				},
-				"history": {
-					"title": "History",
-					"description": "Every commit, branch by branch: select one to see what it changed."
-				}
-			},
-			"clone": {
-				"title": "Clone a workspace",
-				"description": "Copy a repository from a remote into a new folder and open it as a workspace.",
-				"url": "Repository URL",
-				"parent": "Put it in",
-				"parentTitle": "Choose where the folder goes",
-				"choose": "Choose…",
-				"name": "Folder name",
-				"badName": "A folder name without slashes",
-				"exists": "{path} exists already: choose another name.",
-				"action": "Clone and open",
-				"cloning": "Cloning…"
-			},
-			"ai": {
-				"write": "Write a message with AI",
-				"writing": "Writing message…",
-				"failed": "Couldn't write a commit message"
-			},
-			"conflicts": {
-				"label": "Conflicts",
-				"hint": "Files changed both here and on the remote. Keep one side, or open the file, fix the parts git marked and mark it resolved.",
-				"keepMine": "Keep mine",
-				"keepTheirs": "Keep theirs",
-				"keepAllMine": "Keep all mine",
-				"keepAllTheirs": "Keep all theirs",
-				"markResolved": "Mark resolved",
-				"markAllResolved": "Mark all resolved",
-				"markersConfirm": "{count} file(s) still have conflict markers: {files}. Mark them resolved anyway?"
-			},
-			"autoSync": {
-				"failed": "Auto-sync couldn't sync",
-				"paused": "Auto-sync paused",
-				"open": "Open Git"
-			},
-			"rebasing": {
-				"title": "Rebasing",
-				"description": "Your commits are being replayed onto the remote's. Resolve each conflict: keep yours (this device's) or theirs (the remote's), or fix the file and mark it resolved. Then continue; a later commit may stop again. Or abort to go back.",
-				"finish": "Continue rebase",
-				"abort": "Abort rebase"
-			}
 		},
 		"tour": {
 			"progress": "{step} of {count}",

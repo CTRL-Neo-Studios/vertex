@@ -18,7 +18,6 @@ const EXCEPTIONS: Record<string, Record<string, string>> = {}
  * in `/`. Rule 1 holds the kernel to it as to a layer; each phase deletes its entry.
  */
 const RESIDENTS: Record<string, string[]> = {
-    'git': ['app/components/Git/', 'app/composables/git/', 'app/utils/git', 'app/components/Settings/Git/', 'shared/utils/gitGraph', 'shared/types/app/git'],
     'chat': [
         'app/components/Chat/', 'app/components/Modals/ImportToChatModal', 'app/composables/ai/useChat', 'app/utils/chat',
         'app/utils/comarkPlugins', 'app/utils/webPage', 'shared/types/app/chats',

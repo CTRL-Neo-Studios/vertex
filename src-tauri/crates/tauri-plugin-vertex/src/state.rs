@@ -42,6 +42,8 @@ pub struct AppState {
     quitting: AtomicBool,
     /// [`crate::api::on_settings_change`]'s callbacks, run after each save of the global settings.
     settings_listeners: Mutex<Vec<SettingsListener>>,
+    /// [`crate::api::program_setting`]'s JSON pointers: settings naming a program Rust runs.
+    program_settings: Mutex<Vec<String>>,
 }
 
 type SettingsListener = Box<dyn Fn(&Value, &Value) + Send + Sync>;
@@ -596,6 +598,10 @@ impl AppState {
         self.settings_listeners.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(f);
     }
 
+    pub(crate) fn add_program_setting(&self, pointer: String) {
+        self.program_settings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(pointer);
+    }
+
     /// From now on, a destroyed session window is the app quitting, not the user closing it.
     pub fn set_quitting(&self) {
         self.quitting.store(true, Ordering::SeqCst);
@@ -689,7 +695,8 @@ pub fn settings_get<R: Runtime>(
 
 /// Saves the global settings, then runs the [`crate::api::on_settings_change`] callbacks with the old and new value
 /// before returning, so what they do (the AI plugin deleting stale keys) can't undo a call issued after this resolves.
-/// A new `gitConfig.path` must be a file picked in the saving window's dialog: Rust runs that program.
+/// A new value of a program setting ([`crate::api::program_setting`]) must be a file picked in the saving window's
+/// dialog: Rust runs that program.
 #[tauri::command]
 pub fn settings_set<R: Runtime>(
     app: AppHandle<R>,
@@ -697,10 +704,13 @@ pub fn settings_set<R: Runtime>(
     state: tauri::State<'_, AppState>,
     settings: Value,
 ) -> Result<(), String> {
-    let git = |s: &Value| s.pointer("/gitConfig/path").and_then(Value::as_str).unwrap_or_default().to_owned();
-    let path = git(&settings);
-    if !path.is_empty() && path != state.read_settings(&app, git) && !crate::reach::picked(&app, webview.label(), &path) {
-        return Err(format!("{path:?} wasn't picked in this window: choose git in its dialog"));
+    let pointers = state.program_settings.lock().map_err(|e| e.to_string())?.clone();
+    for pointer in pointers {
+        let at = |s: &Value| s.pointer(&pointer).and_then(Value::as_str).unwrap_or_default().to_owned();
+        let path = at(&settings);
+        if !path.is_empty() && path != state.read_settings(&app, at) && !crate::reach::picked(&app, webview.label(), &path) {
+            return Err(format!("{path:?} wasn't picked in this window: choose the program in its dialog"));
+        }
     }
     let (old, new) = state.with_settings(&app, |s| (std::mem::replace(s, settings), s.clone()), true)?;
     for f in state.settings_listeners.lock().map_err(|e| e.to_string())?.iter() {

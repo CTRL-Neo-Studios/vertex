@@ -140,12 +140,6 @@
         "useDefault": "使用默认（{name}）",
         "untrusted": "在你信任此工作区之前，它的 AI 功能选择不会生效。",
         "trustWorkspace": "信任工作区",
-        "commitMessages": {
-          "whenEmpty": "信息框为空时撰写信息",
-          "whenEmptyDescription": "未输入内容就提交或同步时，请模型撰写信息。关闭时，提交信息为“更新 N 个文件”。",
-          "autoSync": "为自动同步撰写信息",
-          "autoSyncDescription": "自动同步的提交由模型撰写信息（每次同步都会发送差异）。关闭时为“更新 N 个文件”。"
-        },
         "chatStorage": "聊天存储位置",
         "chatStorageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
         "chatStorageApp": "应用数据",

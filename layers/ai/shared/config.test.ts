@@ -7,7 +7,7 @@ describe('aiConfigOf', () => {
         expect(aiConfigOf({}).providers.map(p => p.id)).toEqual(['local-ollama'])
         expect(aiConfigOf({providers: [], modelProfiles: []})).toEqual({
             enabled: true, providers: [], modelProfiles: [], defaultModelProfile: 'default', features: {}, chatStorage: 'app', chatMode: 'suggest',
-            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true}, commitMessages: {autoSync: false, whenEmpty: true},
+            chatTitles: true, editorAssistant: {toolbar: true, slash: true, shortcut: true},
         })
         expect(aiConfigOf({chatStorage: 'workspace'}).chatStorage).toBe('workspace')
         expect(aiConfigOf({chatStorage: 'cloud'}).chatStorage).toBe('app')
@@ -36,11 +36,10 @@ describe('aiConfigOf', () => {
         expect(c.features).toEqual({editorAssistant: ''})
     })
 
-    it('keeps the switches on unless they are explicitly off (AI auto-sync messages: off unless on)', () => {
-        const off = aiConfigOf({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}, commitMessages: {whenEmpty: false}})
-        expect([off.enabled, off.chatTitles, off.editorAssistant, off.commitMessages]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}, {autoSync: false, whenEmpty: false}])
-        const junk = aiConfigOf({enabled: 0, chatTitles: null, editorAssistant: 'none', commitMessages: {autoSync: 'yes'}})
-        expect([junk.enabled, junk.chatTitles, junk.editorAssistant, junk.commitMessages]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}, {autoSync: false, whenEmpty: true}])
-        expect(aiConfigOf({commitMessages: {autoSync: true}}).commitMessages.autoSync).toBe(true)
+    it('keeps the switches on unless they are explicitly off', () => {
+        const off = aiConfigOf({enabled: false, chatTitles: false, editorAssistant: {toolbar: false, slash: 'no', shortcut: false}})
+        expect([off.enabled, off.chatTitles, off.editorAssistant]).toEqual([false, false, {toolbar: false, slash: true, shortcut: false}])
+        const junk = aiConfigOf({enabled: 0, chatTitles: null, editorAssistant: 'none'})
+        expect([junk.enabled, junk.chatTitles, junk.editorAssistant]).toEqual([true, true, {toolbar: true, slash: true, shortcut: true}])
     })
 })

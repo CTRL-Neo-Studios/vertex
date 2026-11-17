@@ -140,12 +140,6 @@
         "useDefault": "Use default ({name})",
         "untrusted": "This workspace's AI feature choices don't apply until you trust it.",
         "trustWorkspace": "Trust workspace",
-        "commitMessages": {
-          "whenEmpty": "Write a message for an empty box",
-          "whenEmptyDescription": "Commit or Sync with nothing typed asks the model for a message. Off, they commit as \"Update N file(s)\".",
-          "autoSync": "Write auto-sync's messages",
-          "autoSyncDescription": "Auto-sync's commits get a message from the model (sending the diff on every sync). Off, they're \"Update N file(s)\"."
-        },
         "chatStorage": "Chat storage",
         "chatStorageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
         "chatStorageApp": "App data",

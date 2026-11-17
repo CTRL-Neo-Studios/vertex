@@ -6,7 +6,7 @@ export interface TourStep {
 }
 
 /**
- * A guided tour over a view, one step at a time, drawn by `TourPopover`. Steps whose target isn't on screen when it
+ * A guided tour over a view, one step at a time, drawn by `GitTourPopover`. Steps whose target isn't on screen when it
  * starts are left out (a section with no files, a branch with no upstream).
  */
 export function useTour(steps: () => TourStep[]) {

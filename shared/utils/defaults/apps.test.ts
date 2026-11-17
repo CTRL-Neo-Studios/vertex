@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultAppGitConfig, defaultAppPluginsConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppTrustConfig } from './apps'
+import { defaultAppPluginsConfig, defaultAppSession, defaultAppSessionContext, defaultAppSettings, defaultAppTrustConfig } from './apps'
 
 describe('defaultAppSettings recovery migration', () => {
     it('maps legacy openLastOpenedWindows=true to workspaces (previous behaviour)', () => {
@@ -88,15 +88,5 @@ describe('defaultAppTrustConfig', () => {
     it('defaults file trust to path and content', () => {
         expect(defaultAppTrustConfig({fileTrust: 'bogus'} as never).fileTrust).toBe('content')
         expect(defaultAppTrustConfig({fileTrust: 'path'}).fileTrust).toBe('path')
-    })
-})
-
-describe('defaultAppGitConfig', () => {
-    it('keeps auto-sync off unless each part is turned on, with a positive interval', () => {
-        expect(defaultAppSettings().gitConfig).toEqual({path: '', autoSync: {interval: 0, onOpen: false, pullOnFocus: false}})
-        expect(defaultAppGitConfig({autoSync: {interval: 15, onOpen: true, pullOnFocus: true}}).autoSync).toEqual({interval: 15, onOpen: true, pullOnFocus: true})
-        for (const interval of [-5, Number.NaN, Infinity, '15'] as never[]) {
-            expect(defaultAppGitConfig({autoSync: {interval, onOpen: 'yes' as never}}).autoSync).toEqual({interval: 0, onOpen: false, pullOnFocus: false})
-        }
     })
 })

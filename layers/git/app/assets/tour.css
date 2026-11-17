@@ -1,0 +1,6 @@
+/* The element a tour step points at (`TourPopover`). */
+.tour-target {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+    border-radius: var(--ui-radius);
+}

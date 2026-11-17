@@ -38,8 +38,6 @@ export const WORKSPACE_OVERRIDABLE = {
     themeConfig: 'workspace',
     viewConfig: 'workspace',
     'advancedThemeConfig.customCss': 'trustedWorkspace',
-    // A shared vault's settings mustn't start committing and pushing a user's edits on their own.
-    'gitConfig.autoSync': 'trustedWorkspace',
     fileConfig: 'workspace',
     // Value-aware (`applicableOverrides`): any workspace may turn a plugin off; only a trusted one may turn one on, as
     // that runs its code with the vault.

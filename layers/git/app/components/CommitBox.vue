@@ -40,7 +40,7 @@ defineExpose({message})
     <div class="px-2 pb-4 pt-2 flex flex-col gap-1.5">
         <UTextarea
             v-model="message"
-            :placeholder="t('app.git.message')"
+            :placeholder="t('plugins.git.message')"
             :rows="2"
             :maxrows="8"
             autoresize
@@ -49,7 +49,7 @@ defineExpose({message})
             @keydown.ctrl.enter.prevent="run(false)"
         />
         <div class="flex gap-1.5">
-            <UTooltip v-if="props.write" :text="t('app.git.ai.write')">
+            <UTooltip v-if="props.write" :text="t('plugins.git.ai.write')">
                 <UButton
                     size="sm"
                     color="neutral"
@@ -57,16 +57,16 @@ defineExpose({message})
                     icon="i-lucide-sparkles"
                     :loading="writing"
                     :disabled="!props.ready"
-                    :aria-label="t('app.git.ai.write')"
+                    :aria-label="t('plugins.git.ai.write')"
                     data-git-ai-message
                     @click="draft"
                 />
             </UTooltip>
-            <UTooltip :text="props.staged ? t('app.git.commitHint') : t('app.git.commitAllHint')">
-                <UButton class="flex-1" block size="sm" :label="t('app.git.commit')" :disabled="!canCommit" @click="run(false)"/>
+            <UTooltip :text="props.staged ? t('plugins.git.commitHint') : t('plugins.git.commitAllHint')">
+                <UButton class="flex-1" block size="sm" :label="t('plugins.git.commit')" :disabled="!canCommit" @click="run(false)"/>
             </UTooltip>
-            <UTooltip :text="t('app.git.commitPushHint')">
-                <UButton size="sm" color="neutral" variant="outline" :label="t('app.git.commitPush')" :disabled="!canCommit" @click="run(true)"/>
+            <UTooltip :text="t('plugins.git.commitPushHint')">
+                <UButton size="sm" color="neutral" variant="outline" :label="t('plugins.git.commitPush')" :disabled="!canCommit" @click="run(true)"/>
             </UTooltip>
         </div>
     </div>

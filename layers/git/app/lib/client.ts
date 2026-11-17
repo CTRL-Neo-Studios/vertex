@@ -1,7 +1,7 @@
-import type {GitBranch, GitChange, GitCommit, GitIdentity, GitRemote, GitStatus, GitToken, GitVersion} from "#shared/types/app/git";
-import {pluginInvoke} from "~/utils/vertexInvoke";
+import type {GitBranch, GitChange, GitCommit, GitIdentity, GitRemote, GitStatus, GitToken, GitVersion} from "../../shared/types";
+import {invoke as tauriInvoke, type InvokeArgs} from "@tauri-apps/api/core";
 
-const invoke = pluginInvoke('vertex-git')
+const invoke = <T>(command: string, args?: InvokeArgs) => tauriInvoke<T>(`plugin:vertex-git|${command}`, args)
 
 /**
  * Thin client for the git backend (the Tauri plugin `vertex-git`), which runs the installed `git`. `root` is the workspace
@@ -42,7 +42,7 @@ export const GitCommand = {
 
 /** Error strings Rust returns for expected failures; anything else is git's own message. */
 export const GitError = {
-    /** No usable git (or `gitConfig.path` isn't one). */
+    /** No usable git (or `plugins.config.git.path` isn't one). */
     missing: 'missing',
     notRepo: 'not-repo',
     /** The remote refused the credentials, or there were none to give (a saved token for its host included). */

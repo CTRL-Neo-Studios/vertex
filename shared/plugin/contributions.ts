@@ -291,13 +291,19 @@ export interface SettingsPageDef extends UiSlot<SettingsPageProps> {
     children?: { label: string, icon: string, path: string }[]
 }
 
+/** What a home action can do from the start page. */
+export interface HomeActionContext {
+    /** Opens a folder as a workspace (in its window, or this one). */
+    openWorkspace(path: string): Promise<unknown>
+}
+
 /** A button on the start page (Clone Workspace…). */
 export interface HomeActionDef {
     id: string
     /** i18n key. */
     label: string
     icon: string
-    run(): unknown
+    run(home: HomeActionContext): unknown
 }
 
 // Editor

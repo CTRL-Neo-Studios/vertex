@@ -740,9 +740,30 @@ Blocked by X6.
 - `crates/tauri-plugin-vertex-git` (moved there in K5): `git_path` from `plugin_config`.
 - Commit messages use `ai` when it's on (`whenPlugin('ai', …)` registers the feature and shows the button).
 
+### Decisions
+
+- **Layer** (`layers/git/`, components prefixed `Git`): the views, diff tab, setup, sign-in, clone, commit box and details, the settings page; `app/lib/` (`client` (calls `plugin:vertex-git|…` itself), `repo` (`useGitRepo`, `isGitRepo`, `watchGitPresence`), `autoSync`, `signIn`, `commitMessage` (`useCommitMessage` with `generateCommitMessage`, `commitPrompt` and `cleanCommitMessage`, which leave `chatTransport.ts`), `diff`, `states`, `tour`); `shared/` (`graph`, `types`, `config`, with their tests). Manifest: windows `main`, `session`, `settings`; `requires: ["ai?"]`.
+- **Settings:** `gitConfig` → `plugins.config.git` (`path`, global only; `autoSync`, `trustedWorkspace`), and X6's `plugins.config.ai.commitMessages` → `plugins.config.git.commitMessages` (`workspace`), a row after `aiConfig`'s, so `aiConfig.commitMessages` reaches git through both. The defaults go to the layer (`gitConfigOf`, was `defaultAppGitConfig`). Commit messages leave the AI config and its Features page for Settings → Git, drawn while AI runs in the window. Settings → Git edits the scope chosen through `SettingsPageProps.config`; Trust workspace through `ctx.trust`.
+- **Chained moves:** `movedPathsIn` follows the table as `withMovedPaths` does (a row's old path may be where an earlier row put it), so a workspace's next write stores `commitMessages` at git's path instead of dropping it.
+- **Rust:** the kernel's check that a new git path was picked in the saving window's dialog becomes generic: `api::program_setting(app, plugin, key)` names a config key holding a program to run, and `settings_set` refuses a new value there not picked in that window. The git crate registers `path` and reads it with `plugin_config`.
+- **Kernel additions:** `session.files.openWithDefaultApp(uuid)` and `session.files.reveal(uuids)` (the Changes view's row menu), workspace files only; `TextDiff` published (chat's change view keeps using it); a home action's `run(home)` gets `home.openWorkspace(path)` (Clone opens what it cloned). The tour (`useTour`, `TourPopover`, `.tour-target`) has no other user: it moves into the layer.
+- **Views** use their `session` (`SessionContext`): `tabs.open`, `index.byPath`, `index.on`, `views.show` (History); toasts through Nuxt UI's `useToast`; Locate git through `ctx.dialogs.open`.
+- **AI:** `ctx.whenPlugin('ai', …)` registers `commitMessage`; models through `ctx.use('ai')`; the Changes view's "chats are in the workspace" still reads AI's `chatStorage` until X8.
+- **Strings:** `app.git.*`, `app.settings.git.*`, `app.settings.nav.git`, `app.home.cloneWorkspace`, `app.aiFeatures.commitMessage*` and AI's commit-message switches → `plugins.git.*`.
+- **Built-ins and boundaries:** git leaves `app/builtins/`; `RESIDENTS` loses `git`; chat's test stops importing git's `diffSpecOf` (its ids are checked by prefix).
+
 ### Acceptance
-- [ ] The shared acceptance; the Git plan's SMOKE rows pass; the real-repository round trip passes in its crate.
-- [ ] With `ai` off, Git works and offers no commit-message button.
+- [ ] The shared acceptance; the Git plan's SMOKE rows pass; the real-repository round trip passes in its crate. (`round_trip_against_a_real_repository` passes. In `tauri dev`, separate app identifiers, a temporary harness and a fixture repository, deleted after: settings written before the move (`gitConfig`, `aiConfig.commitMessages`) land in `plugins.config.git`, shown on Settings → Git (auto-sync, tokens, Commit messages); the Changes view lists the change, a row opens its `git-diff` tab with the change, History shows the commit; the commit box offers an AI message and a local Ollama model writes one; Clone Workspace… is on the start page; setting git's path without a dialog pick is refused, the window's copy rolls back and later saves work; with `git` off its commands are refused, no Git view, its views aren't fetched. Not run by hand: the SMOKE rows themselves (push, pull, conflicts, sign-in, clone against a real remote).)
+- [x] With `ai` off, Git works and offers no commit-message button. (Launched with `plugins.enabled.ai: false`: status, Changes, diff tab and History work; no sparkle button, no AI API; Settings → Git has no Commit messages section.)
+
+### As built
+
+- **Layer** (`layers/git/`): `plugin.json` (windows `main`, `session`, `settings`; `requires: ["ai?"]`; `autoSync` trusted workspaces, `commitMessages` any); `package.json` (`ai`); `nuxt.config.ts` (prefix `Git`, `app/assets/tour.css`); `app/plugin.ts` (`gitContext()`, the two views, the `git-diff` tab kind, Settings → Git, Clone Workspace…, `onSession` with `watchGitPresence` and auto-sync, `commitMessage` through `whenPlugin('ai')`); `app/lib/` (`client`, `repo`, `autoSync`, `signIn`, `commitMessage`, `diff` (+test, base64url inlined), `states`, `tour`, `notify`); `app/components/` (`ChangesView`, `HistoryView`, `DiffView`, `Setup`, `SignInModal`, `CloneModal`, `CommitBox`, `CommitDetails`, `Settings`, `TourPopover`); `shared/` (`config` (`gitConfigOf`), `commitMessage` (prompt and cleanup, from `chatTransport.ts`), `graph`, `types`, with tests).
+- **Kernel:** `AppSettings.gitConfig`, `defaultAppGitConfig` and its scopes row are gone; two `LEGACY_PATHS` rows, and `movedPathsIn` follows chained moves (a test writes a workspace file the way `useSettingsScope.set` does); `session.files.openWithDefaultApp` / `reveal`; `TextDiff` published; `HomeActionContext`; the tour's CSS left `main.css`. `useAppSettings.save` puts the window's copy back when Rust refuses a save (found here: a refused git path stayed in memory and went out again with every later save).
+- **AI:** `commitMessages` left its config, seed, manifest and Features page; its strings moved to git.
+- **Rust:** `api::program_setting(app, plugin, key)` replaces the kernel's `gitConfig.path` check in `settings_set`; the git crate registers `path` and reads it with `plugin_config`.
+- **Boundaries:** `RESIDENTS` loses `git`; git leaves `app/builtins/` (ai-assistant and chat remain).
+- **Numbers:** 391 tests (46 files); 49 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
 ## X8: Chat and the editor assistant
 

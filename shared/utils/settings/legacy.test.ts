@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest'
 import {defaultAppSettings} from '#shared/utils/defaults/apps'
 import {LEGACY_PATHS, movedPathsIn, withMovedPaths} from './legacy'
-import {withoutAt} from './paths'
+import {getAt, withAt, withoutAt} from './paths'
 
 // A move like the X phases add: Canvas's settings leave `viewConfig` for its plugin's config.
 const table = [['viewConfig.canvas.snapToGrid', 'plugins.config.canvas.snapToGrid']] as const
@@ -20,6 +20,17 @@ describe('settings that moved', () => {
         const raw = {themeConfig: {primaryColor: 'rose'}, viewConfig: {canvas: {snapToGrid: false}}}
         expect(movedPathsIn(raw, table)).toEqual([['viewConfig.canvas.snapToGrid', 'plugins.config.canvas.snapToGrid']])
         expect(movedPathsIn(withMovedPaths(raw, table), table)).toEqual([])
+    })
+
+    it('follows a chain, so a workspace\'s write keeps what moved twice (`aiConfig.commitMessages` → git)', () => {
+        const raw = {aiConfig: {chatMode: 'write', commitMessages: {whenEmpty: false}}}
+        const moved = withMovedPaths(raw)
+        expect(moved).toEqual({plugins: {config: {ai: {chatMode: 'write'}, git: {commitMessages: {whenEmpty: false}}}}})
+        // As `useSettingsScope.set` writes: each move's new path from the moved settings, then the old paths go.
+        const moves = movedPathsIn(raw)
+        const written = [...moves.map(([, to]) => [to, getAt(moved, to)] as const), ...moves.map(([from]) => [from, undefined] as const)]
+            .reduce<unknown>((file, [path, value]) => (value === undefined ? withoutAt(file, path) : withAt(file, path, value)), raw)
+        expect(written).toEqual(moved)
     })
 
     it('moves each old path once', () => {

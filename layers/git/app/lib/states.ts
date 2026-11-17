@@ -1,6 +1,6 @@
-import type {GitState} from "#shared/types/app/git";
+import type {GitState} from "../../shared/types";
 
-/** Each status letter's name (`app.git.states.*`) and color, wherever a file's state shows. */
+/** Each status letter's name (`plugins.git.states.*`) and color, wherever a file's state shows. */
 export const GIT_STATES: Record<GitState, { key: string, color: string }> = {
     '.': {key: 'unchanged', color: 'text-muted'},
     'M': {key: 'modified', color: 'text-warning'},

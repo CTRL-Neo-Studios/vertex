@@ -1,50 +1,34 @@
 <script setup lang="ts">
 import {ask} from "@tauri-apps/plugin-dialog";
-import {pickToOpen} from "~/utils/dialogs";
 import {platform} from "@tauri-apps/plugin-os";
 import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import type {CommandPaletteGroup, ContextMenuItem} from "@nuxt/ui";
-import type {GitBranch, GitFile, GitState} from "#shared/types/app/git";
-import {useActiveSessions} from "~/composables/active/useActiveSessions";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {useAppOpener} from "~/composables/app/useAppOpener";
-import {useAppSettings} from "~/composables/app/useAppSettings";
-import {gitUses} from "~/builtins/git";
-import useQuickToasts from "~/composables/utility/useQuickToasts";
-import {useScrollFade} from "~/composables/utility/useScrollFade";
-import {useTour} from "~/composables/utility/useTour";
-import {isStaged, isUnstaged, useGitRepo, type GitSetupStep} from "~/composables/git/useGitRepo";
-import {useCommitMessage} from "~/composables/git/useCommitMessage";
-import {gitClient} from "~/utils/gitClient";
-import {diffTabId} from "~/utils/gitDiff";
-import {GIT_STATES} from "~/utils/gitStates";
-import {usePanelActions} from "~/utils/panelViews";
-import {usePanels} from "~/composables/active/usePanels";
-import type {PanelViewProps} from "#shared/plugin/api";
+import type {GitBranch, GitFile, GitState} from "../../shared/types";
+import {gitConfigOf} from "../../shared/config";
+import {openExternal, useScrollFade} from "~/plugin/ui";
+import {gitContext} from "../plugin";
+import {useNotify} from "../lib/notify";
+import {useTour} from "../lib/tour";
+import {isStaged, isUnstaged, useGitRepo, type GitSetupStep} from "../lib/repo";
+import {useCommitMessage} from "../lib/commitMessage";
+import {gitClient} from "../lib/client";
+import {diffTabId} from "../lib/diff";
+import {GIT_STATES} from "../lib/states";
+import type {PanelViewAction, PanelViewProps} from "#shared/plugin/api";
 
-defineProps<PanelViewProps>()
+const props = defineProps<PanelViewProps>()
 
 /** The Git view: the branch, Sync, what changed (staged and not), and the commit box. */
 const {t} = useI18n()
-const $route = useRoute()
-const $navi = useAppNavigator()
-const {openUrlInBrowser, openFileWithDefaultApp, revealFilesInFileManager} = useAppOpener()
-const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))
-const {getFileByPath} = useActiveWorkspaceIndex(session)
-const {openTab} = useActiveTabs(session)
+const session = props.session.session
 /** The setup wizard while it runs: from Create repository to the first push, or the one step a failure sent the user to. */
 const setup = ref<{step: GitSetupStep, single?: boolean}>()
-const git = useGitRepo(session, {setup: step => void (setup.value = {step, single: true})})
+const git = useGitRepo(props.session, {setup: step => void (setup.value = {step, single: true})})
 const {status, problem, busy} = git
-const panels = usePanels(session)
 const setupStep = computed(() => (problem.value === 'not-repo' ? 'create' : status.value ? setup.value?.step : undefined))
 
 /** History: in its panel (placed there if it was hidden), else in a tab. */
-async function showHistory() {
-    if (!await panels.placeView('gitHistory')) await panels.openInTab('gitHistory')
-}
+const showHistory = () => props.session.views.show('gitHistory')
 
 const staged = computed(() => status.value?.files.filter(isStaged) ?? [])
 const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
@@ -52,29 +36,26 @@ const unstaged = computed(() => status.value?.files.filter(isUnstaged) ?? [])
 const drafting = ref(false)
 const idle = computed(() => !busy.value && !!status.value && !drafting.value)
 // Only chats kept in the workspace end up in its repository; the user decides whether they do.
-const chatsInWorkspace = computed(() => gitUses('ai')?.config().chatStorage === 'workspace')
+const chatsInWorkspace = computed(() => gitContext().use('ai')?.config().chatStorage === 'workspace')
 
-// No git: install it (macOS: Apple's developer tools), or point Vertex at one (`gitConfig.path`, global only).
-const $qt = useQuickToasts()
+// No git: install it (macOS: Apple's developer tools), or point Vertex at one (`plugins.config.git.path`, global only).
+const $qt = useNotify()
 const os = platform()
 const downloadUrl = `https://git-scm.com/downloads/${os === 'macos' ? 'mac' : os === 'windows' ? 'win' : 'linux'}`
-const appSettings = useAppSettings()
-onMounted(appSettings.load)
-const gitPath = computed(() => appSettings.config.value?.gitConfig.path ?? '')
+const gitPath = computed(() => gitConfigOf(gitContext().config.value).path)
 async function setGitPath(path: string) {
-    await appSettings.load()
-    await appSettings.save({gitConfig: {path}})
+    await gitContext().config.set({path})
     await git.refresh()
 }
 async function locateGit() {
-    const path = await pickToOpen({title: t('app.git.missing.locateTitle')})
+    const path = await gitContext().dialogs.open({title: t('plugins.git.missing.locateTitle')})
     if (path) await setGitPath(path)
 }
 async function installTools() {
     try {
         await gitClient.installTools()
     } catch (e) {
-        $qt.error(t('app.git.missing.toolsFailed'), String(e))
+        $qt.error(t('plugins.git.missing.toolsFailed'), String(e))
     }
 }
 
@@ -90,8 +71,8 @@ const tour = useTour(() => (['sync', 'branch', 'aheadBehind', 'remoteActions', '
         commit: '[data-git-commit-box]',
         history: '[data-panel-action="history"]',
     }[id],
-    title: t(`app.git.tour.${id}.title`),
-    description: t(`app.git.tour.${id}.description`),
+    title: t(`plugins.git.tour.${id}.title`),
+    description: t(`plugins.git.tour.${id}.description`),
 })))
 function startTour() {
     tourSeen.value = true
@@ -104,19 +85,20 @@ async function finishSetup() {
     startTour()
 }
 
-usePanelActions(() => {
-    const refresh = {id: 'refresh', label: t('app.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
+const headerActions = computed<PanelViewAction[]>(() => {
+    const refresh = {id: 'refresh', label: t('plugins.git.refresh'), icon: 'i-lucide-rotate-cw', onSelect: git.refresh}
     if (!status.value || setupStep.value) return [refresh]
     const disabled = !idle.value
     return [
-        {id: 'fetch', label: t('app.git.fetch'), icon: 'i-lucide-cloud-download', onSelect: git.fetch, disabled},
-        {id: 'pull', label: t('app.git.pull'), icon: 'i-lucide-arrow-down-to-line', onSelect: git.pull, disabled},
-        {id: 'push', label: t('app.git.push'), icon: 'i-lucide-arrow-up-from-line', onSelect: git.push, disabled},
+        {id: 'fetch', label: t('plugins.git.fetch'), icon: 'i-lucide-cloud-download', onSelect: git.fetch, disabled},
+        {id: 'pull', label: t('plugins.git.pull'), icon: 'i-lucide-arrow-down-to-line', onSelect: git.pull, disabled},
+        {id: 'push', label: t('plugins.git.push'), icon: 'i-lucide-arrow-up-from-line', onSelect: git.push, disabled},
         refresh,
-        {id: 'history', label: t('app.git.history.show'), icon: 'i-lucide-git-graph', onSelect: showHistory},
-        {id: 'tour', label: t('app.git.tour.start'), icon: 'i-lucide-circle-help', onSelect: startTour},
+        {id: 'history', label: t('plugins.git.history.show'), icon: 'i-lucide-git-graph', onSelect: showHistory},
+        {id: 'tour', label: t('plugins.git.tour.start'), icon: 'i-lucide-circle-help', onSelect: startTour},
     ]
 })
+watchEffect(() => props.actions(headerActions.value))
 
 const stateOf = (letter: GitState) => GIT_STATES[letter]
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -127,19 +109,19 @@ function indexed(file: GitFile) {
     const current = status.value
     const root = session?.rootPath
     if (!current || !root || !file.path.startsWith(current.prefix)) return undefined
-    return getFileByPath(`${root}/${file.path.slice(current.prefix.length)}`)
+    return props.session.index.byPath(`${root}/${file.path.slice(current.prefix.length)}`)
 }
 
 async function open(file: GitFile) {
     const node = indexed(file)
-    if (node && session) await $navi.toWorkspaceTab(session.uuid, openTab(node.uuid))
+    if (node) await props.session.tabs.open(node.uuid)
 }
 
 async function discard(files: GitFile[]) {
-    const confirmed = await ask(t('app.git.discardConfirm.description', {count: files.length}), {
-        title: t('app.git.discardConfirm.title'),
+    const confirmed = await ask(t('plugins.git.discardConfirm.description', {count: files.length}), {
+        title: t('plugins.git.discardConfirm.title'),
         kind: 'warning',
-        okLabel: t('app.git.discardConfirm.confirm'),
+        okLabel: t('plugins.git.discardConfirm.confirm'),
         cancelLabel: t('app.generic.cancel'),
     })
     if (confirmed) await git.discard(files)
@@ -150,10 +132,10 @@ const conflicted = computed(() => status.value?.files.filter(f => f.conflicted) 
 /** Stages files whose conflicts were fixed by hand, after asking when some still have conflict markers. */
 async function markResolved(files: GitFile[]) {
     const marked = session?.rootPath ? await gitClient.conflictMarkers(session.rootPath, files.map(f => f.path)).catch(() => []) : []
-    if (marked.length && !await ask(t('app.git.conflicts.markersConfirm', {count: marked.length, files: marked.join(', ')}), {
-        title: t('app.git.conflicts.markResolved'),
+    if (marked.length && !await ask(t('plugins.git.conflicts.markersConfirm', {count: marked.length, files: marked.join(', ')}), {
+        title: t('plugins.git.conflicts.markResolved'),
         kind: 'warning',
-        okLabel: t('app.git.conflicts.markResolved'),
+        okLabel: t('plugins.git.conflicts.markResolved'),
         cancelLabel: t('app.generic.cancel'),
     })) return
     await git.stage(files)
@@ -161,33 +143,33 @@ async function markResolved(files: GitFile[]) {
 
 interface RowAction { id: string, label: string, icon: string, run: (file: GitFile) => unknown }
 const sections = computed(() => {
-    const openAction: RowAction = {id: 'open', label: t('app.git.openFile'), icon: 'i-lucide-file-text', run: open}
+    const openAction: RowAction = {id: 'open', label: t('plugins.git.openFile'), icon: 'i-lucide-file-text', run: open}
     return [
         {
-            id: 'conflicts', label: t('app.git.conflicts.label'), hint: t('app.git.conflicts.hint'), files: conflicted.value,
+            id: 'conflicts', label: t('plugins.git.conflicts.label'), hint: t('plugins.git.conflicts.hint'), files: conflicted.value,
             letter: (): GitState => 'U',
-            bulk: {label: t('app.git.conflicts.markAllResolved'), icon: 'i-lucide-check-check', run: () => markResolved(conflicted.value)},
+            bulk: {label: t('plugins.git.conflicts.markAllResolved'), icon: 'i-lucide-check-check', run: () => markResolved(conflicted.value)},
             actions: [
                 openAction,
-                {id: 'mine', label: t('app.git.conflicts.keepMine'), icon: 'i-lucide-monitor', run: (f: GitFile) => git.resolve([f], false)},
-                {id: 'theirs', label: t('app.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', run: (f: GitFile) => git.resolve([f], true)},
-                {id: 'resolved', label: t('app.git.conflicts.markResolved'), icon: 'i-lucide-check', run: (f: GitFile) => markResolved([f])},
+                {id: 'mine', label: t('plugins.git.conflicts.keepMine'), icon: 'i-lucide-monitor', run: (f: GitFile) => git.resolve([f], false)},
+                {id: 'theirs', label: t('plugins.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', run: (f: GitFile) => git.resolve([f], true)},
+                {id: 'resolved', label: t('plugins.git.conflicts.markResolved'), icon: 'i-lucide-check', run: (f: GitFile) => markResolved([f])},
             ],
         },
         {
-            id: 'staged', label: t('app.git.staged'), hint: t('app.git.stagedHint'), files: staged.value,
+            id: 'staged', label: t('plugins.git.staged'), hint: t('plugins.git.stagedHint'), files: staged.value,
             letter: (f: GitFile) => f.index,
-            bulk: {label: t('app.git.unstageAll'), icon: 'i-lucide-minus', run: () => git.unstage(staged.value)},
-            actions: [openAction, {id: 'unstage', label: t('app.git.unstage'), icon: 'i-lucide-minus', run: (f: GitFile) => git.unstage([f])}],
+            bulk: {label: t('plugins.git.unstageAll'), icon: 'i-lucide-minus', run: () => git.unstage(staged.value)},
+            actions: [openAction, {id: 'unstage', label: t('plugins.git.unstage'), icon: 'i-lucide-minus', run: (f: GitFile) => git.unstage([f])}],
         },
         {
-            id: 'changes', label: t('app.git.changes'), hint: t('app.git.changesHint'), files: unstaged.value,
+            id: 'changes', label: t('plugins.git.changes'), hint: t('plugins.git.changesHint'), files: unstaged.value,
             letter: (f: GitFile): GitState => f.worktree,
-            bulk: {label: t('app.git.stageAll'), icon: 'i-lucide-plus', run: () => git.stage(unstaged.value)},
+            bulk: {label: t('plugins.git.stageAll'), icon: 'i-lucide-plus', run: () => git.stage(unstaged.value)},
             actions: [
                 openAction,
-                {id: 'discard', label: t('app.git.discard'), icon: 'i-lucide-undo-2', run: (f: GitFile) => discard([f])},
-                {id: 'stage', label: t('app.git.stage'), icon: 'i-lucide-plus', run: (f: GitFile) => git.stage([f])},
+                {id: 'discard', label: t('plugins.git.discard'), icon: 'i-lucide-undo-2', run: (f: GitFile) => discard([f])},
+                {id: 'stage', label: t('plugins.git.stage'), icon: 'i-lucide-plus', run: (f: GitFile) => git.stage([f])},
             ],
         },
     ].filter(s => s.files.length)
@@ -210,10 +192,10 @@ const fade = useScrollFade(containerProps.ref, {bottom: true})
 async function openChanges(section: Section, file: GitFile) {
     const current = status.value
     if (file.conflicted) return open(file)
-    if (!current || !session) return
+    if (!current) return
     const side = section.id === 'staged' ? 'staged' : 'worktree'
     const spec = {top: current.top, path: file.path, side, ...(file.origPath ? {origPath: file.origPath} : {})}
-    await $navi.toWorkspaceTab(session.uuid, openTab(diffTabId(spec), 'git-diff'))
+    await props.session.tabs.open(diffTabId(spec), 'git-diff')
 }
 
 /** Gone from the disk: nothing to open or reveal. */
@@ -225,27 +207,27 @@ function fileMenu(section: Section, file: GitFile): ContextMenuItem[][] {
     const disabled = !idle.value
     const changes: ContextMenuItem[] = section.id === 'conflicts'
         ? [
-            {label: t('app.git.conflicts.keepMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve([file], false)},
-            {label: t('app.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve([file], true)},
-            {label: t('app.git.conflicts.markResolved'), icon: 'i-lucide-check', disabled, onSelect: () => void markResolved([file])},
+            {label: t('plugins.git.conflicts.keepMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve([file], false)},
+            {label: t('plugins.git.conflicts.keepTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve([file], true)},
+            {label: t('plugins.git.conflicts.markResolved'), icon: 'i-lucide-check', disabled, onSelect: () => void markResolved([file])},
         ]
         : section.id === 'staged'
-            ? [{label: t('app.git.unstage'), icon: 'i-lucide-minus', disabled, onSelect: () => void git.unstage([file])}]
+            ? [{label: t('plugins.git.unstage'), icon: 'i-lucide-minus', disabled, onSelect: () => void git.unstage([file])}]
             : [
-                {label: t('app.git.stage'), icon: 'i-lucide-plus', disabled, onSelect: () => void git.stage([file])},
-                {label: t('app.git.discard'), icon: 'i-lucide-undo-2', color: 'error', disabled, onSelect: () => void discard([file])},
+                {label: t('plugins.git.stage'), icon: 'i-lucide-plus', disabled, onSelect: () => void git.stage([file])},
+                {label: t('plugins.git.discard'), icon: 'i-lucide-undo-2', color: 'error', disabled, onSelect: () => void discard([file])},
             ]
     return [
         [
-            {label: t('app.git.diff.openChanges'), icon: 'i-lucide-git-compare', onSelect: () => void openChanges(section, file)},
-            {label: t('app.git.openFile'), icon: 'i-lucide-file-text', disabled: !indexed(file), onSelect: () => void open(file)},
-            {label: t('app.editor.ui.openInDefaultApp'), icon: 'i-lucide-square-arrow-out-up-right', disabled: deleted(file), onSelect: () => void openFileWithDefaultApp(fullPathOf(file))},
+            {label: t('plugins.git.diff.openChanges'), icon: 'i-lucide-git-compare', onSelect: () => void openChanges(section, file)},
+            {label: t('plugins.git.openFile'), icon: 'i-lucide-file-text', disabled: !indexed(file), onSelect: () => void open(file)},
+            {label: t('app.editor.ui.openInDefaultApp'), icon: 'i-lucide-square-arrow-out-up-right', disabled: deleted(file) || !indexed(file), onSelect: () => void props.session.files.openWithDefaultApp(indexed(file)!.uuid)},
         ],
         changes,
         [
             {label: t('app.editor.ui.copyRelativePath'), icon: 'i-lucide-copy', onSelect: () => void writeText(file.path)},
             {label: t('app.editor.ui.copyFullPath'), icon: 'i-lucide-copy', onSelect: () => void writeText(fullPathOf(file))},
-            {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-folder-search', disabled: deleted(file), onSelect: () => void revealFilesInFileManager([fullPathOf(file)])},
+            {label: t('app.editor.ui.revealInFileExplorer'), icon: 'i-lucide-folder-search', disabled: deleted(file) || !indexed(file), onSelect: () => void props.session.files.reveal([indexed(file)!.uuid])},
         ],
     ]
 }
@@ -257,12 +239,12 @@ function sectionMenu(section: Section): ContextMenuItem[][] {
         {label: section.bulk.label, icon: section.bulk.icon, disabled, onSelect: () => void section.bulk.run()},
         ...(section.id === 'conflicts'
             ? [
-                {label: t('app.git.conflicts.keepAllMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve(section.files, false)},
-                {label: t('app.git.conflicts.keepAllTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve(section.files, true)},
+                {label: t('plugins.git.conflicts.keepAllMine'), icon: 'i-lucide-monitor', disabled, onSelect: () => void git.resolve(section.files, false)},
+                {label: t('plugins.git.conflicts.keepAllTheirs'), icon: 'i-lucide-cloud', disabled, onSelect: () => void git.resolve(section.files, true)},
             ]
             : []),
         ...(section.id === 'changes'
-            ? [{label: t('app.git.discardAll'), icon: 'i-lucide-undo-2', color: 'error' as const, disabled, onSelect: () => void discard(section.files)}]
+            ? [{label: t('plugins.git.discardAll'), icon: 'i-lucide-undo-2', color: 'error' as const, disabled, onSelect: () => void discard(section.files)}]
             : []),
     ]]
 }
@@ -283,13 +265,13 @@ async function writeMessage(all: boolean) {
     try {
         return await commitMessage.generate(current, all)
     } catch (e) {
-        $qt.error(t('app.git.ai.failed'), String(e))
+        $qt.error(t('plugins.git.ai.failed'), String(e))
         return ''
     }
 }
 const writeForBox = computed(() => (commitMessage.available.value ? () => writeMessage(!staged.value.length) : undefined))
 /**
- * The message for an empty box: the model's when the AI config's `commitMessages.whenEmpty` is on, else (or when it fails)
+ * The message for an empty box: the model's when the git config's `commitMessages.whenEmpty` is on, else (or when it fails)
  * `''`, which `useGitRepo` commits as "Update N file(s)".
  */
 async function emptyBoxMessage(all: boolean) {
@@ -330,24 +312,24 @@ const branchGroups = computed<CommandPaletteGroup[]>(() => {
     const pick = (b: GitBranch) => ({
         label: b.name,
         icon: b.remote ? 'i-lucide-cloud' : 'i-lucide-git-branch',
-        suffix: b.current ? t('app.git.current') : undefined,
+        suffix: b.current ? t('plugins.git.current') : undefined,
         disabled: b.current,
         onSelect: () => void switchTo(b.remote ? b.name.slice(b.name.indexOf('/') + 1) : b.name, false),
     })
     const local = branches.value.filter(b => !b.remote)
     const term = branchTerm.value.trim()
     const create = term && !local.some(b => b.name === term)
-        ? [{id: 'create', label: '', ignoreFilter: true, items: [{label: t('app.git.createBranch', {name: term}), icon: 'i-lucide-plus', onSelect: () => void switchTo(term, true)}]}]
+        ? [{id: 'create', label: '', ignoreFilter: true, items: [{label: t('plugins.git.createBranch', {name: term}), icon: 'i-lucide-plus', onSelect: () => void switchTo(term, true)}]}]
         : []
     return [
         ...create,
-        {id: 'local', label: t('app.git.branches'), items: local.map(pick)},
-        {id: 'remote', label: t('app.git.remoteBranches'), items: branches.value.filter(b => b.remote).map(pick)},
+        {id: 'local', label: t('plugins.git.branches'), items: local.map(pick)},
+        {id: 'remote', label: t('plugins.git.remoteBranches'), items: branches.value.filter(b => b.remote).map(pick)},
     ]
 })
-const branchLabel = computed(() => status.value?.branch ?? t('app.git.detached', {id: status.value?.head?.slice(0, 7) ?? ''}))
+const branchLabel = computed(() => status.value?.branch ?? t('plugins.git.detached', {id: status.value?.head?.slice(0, 7) ?? ''}))
 // Finish (a merge's commit, a rebase's next step) once nothing is left to resolve; Abort is always there.
-const mergeKey = computed(() => (status.value?.rebasing ? 'app.git.rebasing' : 'app.git.merging'))
+const mergeKey = computed(() => (status.value?.rebasing ? 'plugins.git.rebasing' : 'plugins.git.merging'))
 const mergeActions = computed(() => [
     {
         label: t(`${mergeKey.value}.finish`), color: 'primary' as const, size: 'xs' as const,
@@ -368,25 +350,25 @@ const mergeActions = computed(() => [
             size="sm"
             icon="i-lucide-git-branch"
             class="flex-1"
-            :title="t('app.git.missing.title')"
-            :description="gitPath ? t('app.git.missing.configured', {path: gitPath}) : t(`app.git.missing.${os === 'macos' ? 'macos' : 'description'}`)"
+            :title="t('plugins.git.missing.title')"
+            :description="gitPath ? t('plugins.git.missing.configured', {path: gitPath}) : t(`plugins.git.missing.${os === 'macos' ? 'macos' : 'description'}`)"
             data-git-missing
         >
             <template #actions>
                 <div class="flex flex-col items-stretch gap-1.5 w-56">
-                    <UButton v-if="os === 'macos'" block size="sm" icon="i-lucide-download" :label="t('app.git.missing.installTools')" @click="installTools"/>
+                    <UButton v-if="os === 'macos'" block size="sm" icon="i-lucide-download" :label="t('plugins.git.missing.installTools')" @click="installTools"/>
                     <UButton
                         block
                         size="sm"
                         icon="i-lucide-external-link"
                         :color="os === 'macos' ? 'neutral' : 'primary'"
                         :variant="os === 'macos' ? 'outline' : 'solid'"
-                        :label="t('app.git.install')"
-                        @click="openUrlInBrowser(downloadUrl)"
+                        :label="t('plugins.git.install')"
+                        @click="openExternal(downloadUrl)"
                     />
-                    <UButton block size="sm" color="neutral" variant="outline" icon="i-lucide-folder-search" :label="t('app.git.missing.locate')" @click="locateGit"/>
-                    <UButton v-if="gitPath" block size="sm" color="neutral" variant="outline" icon="i-lucide-search" :label="t('app.git.missing.automatic')" @click="setGitPath('')"/>
-                    <UButton block size="sm" color="neutral" variant="ghost" icon="i-lucide-rotate-cw" :label="t('app.git.checkAgain')" @click="git.refresh()"/>
+                    <UButton block size="sm" color="neutral" variant="outline" icon="i-lucide-folder-search" :label="t('plugins.git.missing.locate')" @click="locateGit"/>
+                    <UButton v-if="gitPath" block size="sm" color="neutral" variant="outline" icon="i-lucide-search" :label="t('plugins.git.missing.automatic')" @click="setGitPath('')"/>
+                    <UButton block size="sm" color="neutral" variant="ghost" icon="i-lucide-rotate-cw" :label="t('plugins.git.checkAgain')" @click="git.refresh()"/>
                 </div>
             </template>
         </UEmpty>
@@ -402,13 +384,13 @@ const mergeActions = computed(() => [
         />
         <template v-else-if="status">
             <div class="px-2 pt-2 pb-1 flex flex-col gap-1.5">
-                <UTooltip :text="t('app.git.syncHint')">
+                <UTooltip :text="t('plugins.git.syncHint')">
                     <UButton
                         block
                         size="sm"
                         icon="i-lucide-refresh-cw"
                         :loading="!!busy || drafting"
-                        :label="busy ?? (drafting ? t('app.git.ai.writing') : t('app.git.sync'))"
+                        :label="busy ?? (drafting ? t('plugins.git.ai.writing') : t('plugins.git.sync'))"
                         :disabled="!idle || status.merging"
                         data-git-sync
                         @click="sync"
@@ -426,14 +408,14 @@ const mergeActions = computed(() => [
                             class="min-w-0"
                             :ui="{ label: 'truncate' }"
                             :disabled="!idle"
-                            :aria-label="t('app.git.branches')"
+                            :aria-label="t('plugins.git.branches')"
                             data-git-branch
                         />
                         <template #content>
                             <UCommandPalette
                                 v-model:search-term="branchTerm"
                                 :groups="branchGroups"
-                                :placeholder="t('app.git.branchPlaceholder')"
+                                :placeholder="t('plugins.git.branchPlaceholder')"
                                 class="h-72 w-64"
                                 size="sm"
                             />
@@ -441,7 +423,7 @@ const mergeActions = computed(() => [
                     </UPopover>
                     <UTooltip
                         v-if="status.upstream"
-                        :text="t('app.git.aheadBehind', { ahead: status.ahead, behind: status.behind, upstream: status.upstream })"
+                        :text="t('plugins.git.aheadBehind', { ahead: status.ahead, behind: status.behind, upstream: status.upstream })"
                     >
                         <span class="ms-auto shrink-0 flex items-center gap-2 pe-1.5 text-xs text-muted tabular-nums" data-git-ahead-behind>
                             <span class="flex items-center gap-0.5"><UIcon name="i-lucide-arrow-up" class="size-4"/>{{ status.ahead }}</span>
@@ -465,8 +447,8 @@ const mergeActions = computed(() => [
                     variant="naked"
                     size="sm"
                     icon="i-lucide-circle-check"
-                    :title="t('app.git.clean')"
-                    :description="t('app.git.cleanHint')"
+                    :title="t('plugins.git.clean')"
+                    :description="t('plugins.git.cleanHint')"
                 />
                 <div v-bind="wrapperProps">
                     <template v-for="{data: {key, section, file}} in list" :key="key">
@@ -496,7 +478,7 @@ const mergeActions = computed(() => [
                                             />
                                         </UTooltip>
                                     </div>
-                                    <UTooltip :text="t(`app.git.states.${stateOf(section.letter(file)).key}`)">
+                                    <UTooltip :text="t(`plugins.git.states.${stateOf(section.letter(file)).key}`)">
                                         <span :class="['w-5 text-center font-mono text-xs', stateOf(section.letter(file)).color]">{{ section.letter(file) }}</span>
                                     </UTooltip>
                                 </div>
@@ -529,6 +511,6 @@ const mergeActions = computed(() => [
             </div>
             <GitCommitBox ref="commitBox" :ready="idle && !!status.files.length" :staged="!!staged.length" :commit :write="writeForBox" data-git-commit-box/>
         </template>
-        <TourPopover :tour/>
+        <GitTourPopover :tour/>
     </div>
 </template>

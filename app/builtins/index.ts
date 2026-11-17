@@ -4,7 +4,6 @@ import manifests from './plugins.json'
 
 /** Each built-in's entry, by its id in `plugins.json`. */
 const LOAD: Record<string, PluginEntry['load']> = {
-    'git': () => import('./git'),
     'ai-assistant': () => import('./ai-assistant'),
     'chat': () => import('./chat'),
 }
@@ -13,8 +12,7 @@ const LOAD: Record<string, PluginEntry['load']> = {
  * Features not extracted into their layers yet (Plugin Architecture Plan, X phases): each registers through the same
  * `ctx` a plugin gets, from code that still lives in the kernel's folders. Their manifests are `plugins.json`, which
  * Rust embeds too (what a window where one is on may call); those with panel views run in Settings too, where View →
- * Panels arranges them. They turn off like any plugin. What the kernel still wires to one directly stays until its X
- * phase (git's commit-message button asks AI with `ai` off). Each X phase moves one into `layers/<id>/` and removes it
+ * Panels arranges them. They turn off like any plugin. Each X phase moves one into `layers/<id>/` and removes it
  * here; with this list empty, the `builtin` source goes.
  */
 export const builtinPlugins: readonly PluginEntry[] = manifests.map(raw => {

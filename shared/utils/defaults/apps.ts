@@ -1,4 +1,4 @@
-import type {AppFileConfig, AppGitConfig, AppPluginsConfig, AppSettings, AppTrustConfig, AppViewConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
+import type {AppFileConfig, AppPluginsConfig, AppSettings, AppTrustConfig, AppViewConfig, HeaderToolsPosition, SessionRecoveryMode} from "#shared/types/app/settings";
 import type {AppSession, AppSessionContext, SavedTab} from "#shared/types/app/sessions";
 import {defaultAppAdvancedThemeConfig, defaultAppThemeConfig} from "#shared/utils/defaults/themes";
 import {isPanelViewId, normalizePanelLayout} from "#shared/utils/panelLayout";
@@ -27,7 +27,6 @@ export function defaultAppSettings(raw?: LegacySettings): AppSettings {
         advancedThemeConfig: defaultAppAdvancedThemeConfig(data?.advancedThemeConfig),
         viewConfig: defaultAppViewConfig(data?.viewConfig),
         trustConfig: defaultAppTrustConfig(data?.trustConfig),
-        gitConfig: defaultAppGitConfig(data?.gitConfig),
         fileConfig: defaultAppFileConfig(data?.fileConfig),
         plugins: defaultAppPluginsConfig(data?.plugins),
 		deviceId: data?.deviceId || crypto.randomUUID(),
@@ -65,18 +64,6 @@ const isLoose = (v: unknown): v is Loose => typeof v === 'object' && v !== null 
 
 export function defaultAppTrustConfig(data?: DeepPartial<AppTrustConfig>): AppTrustConfig {
     return {fileTrust: data?.fileTrust === 'path' ? 'path' : 'content'}
-}
-
-export function defaultAppGitConfig(data?: DeepPartial<AppGitConfig>): AppGitConfig {
-    const interval = data?.autoSync?.interval
-    return {
-        path: typeof data?.path === 'string' ? data.path : '',
-        autoSync: {
-            interval: typeof interval === 'number' && Number.isFinite(interval) && interval > 0 ? interval : 0,
-            onOpen: data?.autoSync?.onOpen === true,
-            pullOnFocus: data?.autoSync?.pullOnFocus === true,
-        },
-    }
 }
 
 /** Old sessions kept absolute paths (Rust migrates the rest, see `sanitize_sessions`); read them too. */

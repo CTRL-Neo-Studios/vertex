@@ -13,8 +13,6 @@ export interface AppSettings {
     viewConfig: AppViewConfig,
     /** Global only: what trust remembers (the trusted folders and files themselves are in `trust.json`). */
     trustConfig: AppTrustConfig,
-    /** Global only: a workspace mustn't choose which program runs as git. */
-    gitConfig: AppGitConfig,
     /** Moving and renaming files; workspace-overridable. */
     fileConfig: AppFileConfig,
     /** Plugins: which are on, and their config. Workspace-overridable as their manifests allow (`settingsAllowlist`). */
@@ -55,20 +53,6 @@ export interface AppFileConfig {
      * Files), or nowhere (deleted for good, after a confirmation, and not undoable).
      */
     deletedFiles: 'trash' | 'workspaceTrash' | 'permanent',
-}
-
-export interface AppGitConfig {
-    /** The git executable; `''` finds it (src-tauri/src/git.rs `find_git`). */
-    path: string,
-    /** Keeping workspaces in step without the Sync button (`useGitAutoSync`); everything off by default. */
-    autoSync: {
-        /** Commit, pull and push every this many minutes; 0 is off. */
-        interval: number,
-        /** Sync once when a workspace window opens. */
-        onOpen: boolean,
-        /** Pull when the window gets focus. */
-        pullOnFocus: boolean,
-    },
 }
 
 /** Trusted folders and files aren't settings: they live in `trust.json` (`shared/utils/trust.ts`). */

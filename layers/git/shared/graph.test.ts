@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {graphRows, type GraphRow} from "./gitGraph";
+import {graphRows, type GraphRow} from "./graph";
 
 const c = (id: string, ...parents: string[]) => ({id, parents})
 /** `1: ↘1→1 ↓1→0 │0`: the dot's lane, then its lines: `↘from→to` into the dot, `↓from→to` out of it, `│` through. */

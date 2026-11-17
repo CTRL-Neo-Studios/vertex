@@ -1,4 +1,10 @@
-import {fromBase64Url, toBase64Url} from "#shared/utils/base64url";
+/** UTF-8 text as URL-safe base64 without padding. */
+const toBase64Url = (text: string) =>
+    btoa(String.fromCharCode(...new TextEncoder().encode(text))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
+/** The text {@link toBase64Url} encoded; throws on input that isn't. */
+const fromBase64Url = (text: string) =>
+    new TextDecoder().decode(Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0)))
+
 
 /** What a diff tab shows: `path` in the repository at `top`, on one side. */
 export interface GitDiffSpec {
@@ -39,8 +45,8 @@ type Translate = (key: string, named?: Record<string, unknown>) => string
 
 /** What a side is called: Working tree, Staged, or the commit's short id. */
 export const diffSideLabel = (spec: GitDiffSpec, t: Translate) =>
-    spec.side === 'worktree' ? t('app.git.diff.worktree') : spec.side === 'staged' ? t('app.git.diff.staged') : spec.side.slice(0, 7)
+    spec.side === 'worktree' ? t('plugins.git.diff.worktree') : spec.side === 'staged' ? t('plugins.git.diff.staged') : spec.side.slice(0, 7)
 
 /** The tab's title: `Hub.md (Working tree)`. */
 export const diffTitle = (spec: GitDiffSpec, t: Translate) =>
-    t('app.git.diff.tabTitle', {name: spec.path.slice(spec.path.lastIndexOf('/') + 1), side: diffSideLabel(spec, t)})
+    t('plugins.git.diff.tabTitle', {name: spec.path.slice(spec.path.lastIndexOf('/') + 1), side: diffSideLabel(spec, t)})

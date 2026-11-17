@@ -48,7 +48,7 @@ const openEntry = (entry: RecentEntry) => busy(() => recents.open(entry))
                 <UButton color="neutral" :label="$t('app.home.newFile')" icon="i-lucide-file-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.createNewFileForSinglespace)"/>
                 <UButton color="neutral" :label="$t('app.home.newWorkspace')" icon="i-lucide-folder-plus" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.newWorkspaceAction)"/>
                 <!-- Registered actions (homeActions) between the kernel's New… and Open… buttons. -->
-                <UButton v-for="action in homeActions.items.values()" :key="action.id" color="neutral" :label="$t(action.label)" :icon="action.icon" class="cursor-pointer" variant="ghost" :disabled="openingFile" :data-home-action="action.id" @click="busy(async () => action.run())"/>
+                <UButton v-for="action in homeActions.items.values()" :key="action.id" color="neutral" :label="$t(action.label)" :icon="action.icon" class="cursor-pointer" variant="ghost" :disabled="openingFile" :data-home-action="action.id" @click="busy(async () => action.run({openWorkspace: $act.openWorkspaceFromPath}))"/>
                 <UButton color="neutral" :label="$t('app.home.openFile')" icon="i-lucide-file" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.openSinglespaceAction)"/>
                 <UButton color="neutral" :label="$t('app.home.openFolder')" icon="i-lucide-folder-open" class="cursor-pointer" variant="ghost" :disabled="openingFile" @click="busy($act.openWorkspaceAction)"/>
             </div>

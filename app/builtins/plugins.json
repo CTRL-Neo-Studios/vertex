@@ -1,5 +1,4 @@
 [
-	{"id": "git", "name": "Git", "version": "0", "apiVersion": 1, "windows": ["main", "session", "settings"], "requires": ["ai?"]},
 	{"id": "ai-assistant", "name": "AI assistant", "version": "0", "apiVersion": 1, "windows": ["session", "settings"], "requires": ["ai"]},
 	{"id": "chat", "name": "Chat", "version": "0", "apiVersion": 1, "windows": ["session", "settings"], "requires": ["ai", "workflows?"], "permissions": ["network"]}
 ]

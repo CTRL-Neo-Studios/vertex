@@ -23,8 +23,6 @@ const CHAT_MODE = 'chatMode'
 const CHAT_TITLES = 'chatTitles'
 const ENTRIES = 'editorAssistant'
 const ENTRY_KEYS = ['toolbar', 'slash', 'shortcut'] as const
-const COMMIT_MESSAGES = 'commitMessages'
-const COMMIT_KEYS = ['whenEmpty', 'autoSync'] as const
 const path = (id: string) => `${FEATURES}.${id}`
 /** What each key is when nothing sets it: what Reset puts back in User. */
 const DEFAULTS = aiConfigOf({enabled: true}) as unknown as Record<string, unknown>
@@ -194,21 +192,6 @@ const featureKeys = [FEATURES, ENTRIES, CHAT_STORAGE, CHAT_MODE, CHAT_TITLES]
                                 :disabled="!aiOn || !featureOn(feature.id)"
                                 :model-value="current(CHAT_MODE) as string"
                                 @update:model-value="set(CHAT_MODE, $event)"
-                            />
-                        </SettingsRow>
-                    </template>
-                    <template v-if="feature.id === 'commitMessage'">
-                        <SettingsRow
-                            v-for="key in COMMIT_KEYS"
-                            :key
-                            :setting="config.path(`${COMMIT_MESSAGES}.${key}`)"
-                            :label="t(`plugins.ai.features.commitMessages.${key}`)"
-                            :description="t(`plugins.ai.features.commitMessages.${key}Description`)"
-                        >
-                            <USwitch
-                                :disabled="!aiOn || !featureOn(feature.id)"
-                                :model-value="current(`${COMMIT_MESSAGES}.${key}`) as boolean"
-                                @update:model-value="set(`${COMMIT_MESSAGES}.${key}`, $event)"
                             />
                         </SettingsRow>
                     </template>

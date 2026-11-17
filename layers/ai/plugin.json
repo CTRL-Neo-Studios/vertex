@@ -11,8 +11,7 @@
       "chatStorage": "workspace",
       "chatMode": "workspace",
       "chatTitles": "workspace",
-      "editorAssistant": "workspace",
-      "commitMessages": "workspace"
+      "editorAssistant": "workspace"
     }
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type {Tour} from "~/composables/utility/useTour";
+import type {Tour} from "../lib/tour";
 
 /** Draws a `useTour` tour: a popover at the current step's target, which is outlined (`.tour-target`) meanwhile. */
 const props = defineProps<{ tour: Tour }>()

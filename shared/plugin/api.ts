@@ -157,6 +157,10 @@ export interface SessionContext {
             /** The workspace-relative paths of rows dragged from Files (a folder's ends with `/`); `undefined` for any other drag. */
             rows(transfer: DataTransfer | null): string[] | undefined
         }
+        /** Opens a workspace file in the app the OS gives its kind. */
+        openWithDefaultApp(uuid: string): Promise<void>
+        /** Shows workspace files in Finder or Explorer. */
+        reveal(uuids: string[]): Promise<void>
     }
     /** The vault's property types (Obsidian's `types.json`: key → `text`, `multitext`, `number`…). Reactive. */
     properties: {

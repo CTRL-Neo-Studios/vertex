@@ -1,7 +1,6 @@
 import {describe, expect, it} from "vitest";
 import type {ChatChange, VertexChatMessage} from "#shared/types/app/chats";
 import {changesSummary, chatChangeOf, chatChangeTabId, newNotePath, textChange} from "~/utils/chatChanges";
-import {diffSpecOf} from "~/utils/gitDiff";
 
 describe('newNotePath', () => {
     it('keeps workspace-relative note paths, adding .md where missing', () => {
@@ -47,12 +46,11 @@ describe('changesSummary', () => {
 })
 
 describe('chatChangeTabId', () => {
-    it('round-trips any note path through a URL-safe id that git\'s diff tabs don\'t claim', () => {
+    it('round-trips any note path through a URL-safe id of its own prefix', () => {
         const ref = {chatId: '8e2f8deb-66a4', messageId: 'msg-1', path: '笔记/第一章 [草稿]?#.md'}
         const id = chatChangeTabId(ref)
         expect(id).toMatch(/^chat-change-[A-Za-z0-9_-]+$/)
         expect(chatChangeOf(id)).toEqual(ref)
-        expect(diffSpecOf(id)).toBeUndefined()
     })
 
     it('reads other ids as no change', () => {

@@ -1,8 +1,7 @@
-import type {ActiveSession} from "#shared/types/active/sessions";
-import type {GitFile, GitStatus} from "#shared/types/app/git";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useGitSignIn} from "~/composables/git/useGitSignIn";
-import {GitError, gitClient} from "~/utils/gitClient";
+import type {SessionContext} from "#shared/plugin/api";
+import type {GitFile, GitStatus} from "../../shared/types";
+import {useGitSignIn} from "./signIn";
+import {GitError, gitClient} from "./client";
 
 type GitErrorKey = keyof typeof GitError
 /** Why there's no status to show: no git, or the workspace isn't in a repository. */
@@ -12,7 +11,7 @@ export type GitSetupStep = 'create' | 'identity' | 'remote' | 'push'
 /** Setup steps a failure can send the user back to: the name and email, or a remote. */
 export type GitSetupFix = Extract<GitSetupStep, 'identity' | 'remote'>
 
-/** The `GitError` key of an error (its toast strings are `app.git.errors.<key>`), `undefined` for git's own messages. */
+/** The `GitError` key of an error (its toast strings are `plugins.git.errors.<key>`), `undefined` for git's own messages. */
 export const errorKey = (error: string) => (Object.keys(GitError) as GitErrorKey[]).find(k => GitError[k] === error)
 
 /** What a new repository leaves out: system clutter, Vertex's trash and its temp files. */
@@ -31,14 +30,14 @@ export const autoSyncPaused = reactive(new Set<string>())
  * goes (a known repository's everyday writes there don't count). The Git view's own status keeps it current too. Runs
  * in the git plugin's `onSession` callback; it stops with the session.
  */
-export function watchGitPresence(session: ActiveSession | undefined) {
-    const root = session?.rootPath
+export function watchGitPresence(session: SessionContext) {
+    const root = session.session.rootPath
     if (!root) return
     const check = () => gitClient.status(root).then(() => void repoRoots.add(root), () => void repoRoots.delete(root))
     void check()
     const recheck = useDebounceFn(check, 500)
     const gitDir = `${root}/.git`
-    onScopeDispose(useActiveWorkspaceIndex(session).on(event => {
+    onScopeDispose(session.index.on(event => {
         if (event.type !== 'changed') return
         if (event.paths.some(p => p === gitDir || (!repoRoots.has(root) && p.startsWith(`${gitDir}/`)))) void recheck()
     }))
@@ -49,10 +48,10 @@ export function watchGitPresence(session: ActiveSession | undefined) {
  * `.git/` both), window focus and every operation; the operations, one at a time from here, each failure explained
  * in a toast with the next step.
  */
-export function useGitRepo(session: ActiveSession | undefined, options: { setup?: (step: GitSetupFix) => void } = {}) {
+export function useGitRepo(session: SessionContext, options: { setup?: (step: GitSetupFix) => void } = {}) {
     const {t} = useI18n()
     const toast = useToast()
-    const root = session?.rootPath
+    const root = session.session.rootPath
     const status = shallowRef<GitStatus>()
     const problem = ref<GitProblem>()
     /** What's running (translated), `undefined` when idle. */
@@ -91,7 +90,7 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
 
     // A burst of events (a commit writes dozens of objects) is one refresh.
     const refreshSoon = useDebounceFn(refresh, 250)
-    onBeforeUnmount(useActiveWorkspaceIndex(session).on(event => {
+    onBeforeUnmount(session.index.on(event => {
         if (event.type === 'changed') void refreshSoon()
     }))
     // A commit made in a terminal, or a repository outside the watched folder.
@@ -103,14 +102,14 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
         const key = errorKey(error)
         const action = (label: string, onClick: () => void) => [{label, color: 'neutral' as const, variant: 'outline' as const, onClick}]
         const {setup} = options
-        const actions = key === 'rejected' ? action(t('app.git.pullAction'), () => void pull())
-            : key === 'conflict' && status.value?.merging ? action(t(status.value.rebasing ? 'app.git.rebasing.abort' : 'app.git.merging.abort'), () => void mergeAbort())
-                : key === 'identity' && setup ? action(t('app.git.setup.identityAction'), () => setup('identity'))
-                    : key === 'noRemote' && setup ? action(t('app.git.setup.remoteAction'), () => setup('remote'))
+        const actions = key === 'rejected' ? action(t('plugins.git.pullAction'), () => void pull())
+            : key === 'conflict' && status.value?.merging ? action(t(status.value.rebasing ? 'plugins.git.rebasing.abort' : 'plugins.git.merging.abort'), () => void mergeAbort())
+                : key === 'identity' && setup ? action(t('plugins.git.setup.identityAction'), () => setup('identity'))
+                    : key === 'noRemote' && setup ? action(t('plugins.git.setup.remoteAction'), () => setup('remote'))
                         : undefined
         toast.add({
-            title: key ? t(`app.git.errors.${key}.title`) : t('app.git.errors.failed'),
-            description: key ? t(`app.git.errors.${key}.description`) : error,
+            title: key ? t(`plugins.git.errors.${key}.title`) : t('plugins.git.errors.failed'),
+            description: key ? t(`plugins.git.errors.${key}.description`) : error,
             color: 'error',
             icon: 'i-lucide-circle-alert',
             actions,
@@ -146,30 +145,30 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
     /** A file's paths for git commands: a staged rename's old path goes with it. */
     const pathsOf = (files: readonly GitFile[]) => files.flatMap(f => (f.origPath ? [f.path, f.origPath] : [f.path]))
 
-    const stage = (files: readonly GitFile[]) => run(t('app.git.working'), r => gitClient.stage(r, pathsOf(files)))
-    const unstage = (files: readonly GitFile[]) => run(t('app.git.working'), r => gitClient.unstage(r, pathsOf(files)))
-    const discard = (files: readonly GitFile[]) => run(t('app.git.working'), r => gitClient.discard(r, pathsOf(files)))
-    const fetch = () => run(t('app.git.fetching'), gitClient.fetch)
-    const pull = () => run(t('app.git.pulling'), gitClient.pull)
-    const push = () => run(t('app.git.pushing'), gitClient.push)
-    const mergeAbort = () => run(t('app.git.working'), gitClient.mergeAbort)
-    const switchBranch = (name: string, create: boolean) => run(t('app.git.switching'), r => gitClient.switch(r, name, create))
+    const stage = (files: readonly GitFile[]) => run(t('plugins.git.working'), r => gitClient.stage(r, pathsOf(files)))
+    const unstage = (files: readonly GitFile[]) => run(t('plugins.git.working'), r => gitClient.unstage(r, pathsOf(files)))
+    const discard = (files: readonly GitFile[]) => run(t('plugins.git.working'), r => gitClient.discard(r, pathsOf(files)))
+    const fetch = () => run(t('plugins.git.fetching'), gitClient.fetch)
+    const pull = () => run(t('plugins.git.pulling'), gitClient.pull)
+    const push = () => run(t('plugins.git.pushing'), gitClient.push)
+    const mergeAbort = () => run(t('plugins.git.working'), gitClient.mergeAbort)
+    const switchBranch = (name: string, create: boolean) => run(t('plugins.git.switching'), r => gitClient.switch(r, name, create))
     /** Makes the workspace a repository with a `.gitignore`; `syncChats` keeps workspace-stored chats in it. */
-    const init = (syncChats: boolean) => run(t('app.git.creating'), r => gitClient.init(r, syncChats ? IGNORED : [...IGNORED, CHATS]))
+    const init = (syncChats: boolean) => run(t('plugins.git.creating'), r => gitClient.init(r, syncChats ? IGNORED : [...IGNORED, CHATS]))
     /** Commits what's staged, or every change when nothing is; an empty message is "Update N file(s)". */
     const commit = (message: string) => {
         const all = !status.value?.files.some(isStaged)
         const count = status.value?.files.filter(f => all || isStaged(f)).length ?? 0
-        return run(t('app.git.committing'), r => gitClient.commit(r, message || t('app.git.syncMessage', {count}), all))
+        return run(t('plugins.git.committing'), r => gitClient.commit(r, message || t('plugins.git.syncMessage', {count}), all))
     }
     /** The name and email this repository's commits get. */
-    const setIdentity = (name: string, email: string) => run(t('app.git.working'), r => gitClient.identitySet(r, name, email))
+    const setIdentity = (name: string, email: string) => run(t('plugins.git.working'), r => gitClient.identitySet(r, name, email))
     /** Points `origin` at `url` (adding it when there's none). */
-    const connect = (url: string) => run(t('app.git.working'), r => gitClient.remoteSet(r, 'origin', url))
+    const connect = (url: string) => run(t('plugins.git.working'), r => gitClient.remoteSet(r, 'origin', url))
     /** Takes one side of conflicted files: `remote` (the side being brought in) or this device's. */
-    const resolve = (files: readonly GitFile[], remote: boolean) => run(t('app.git.working'), r => gitClient.resolve(r, files.map(f => f.path), remote))
+    const resolve = (files: readonly GitFile[], remote: boolean) => run(t('plugins.git.working'), r => gitClient.resolve(r, files.map(f => f.path), remote))
     /** Commits the merge, or continues the rebase, once every conflict is resolved. */
-    const finishMerge = () => run(t('app.git.committing'), gitClient.mergeContinue)
+    const finishMerge = () => run(t('plugins.git.committing'), gitClient.mergeContinue)
 
     /** Commit every change (with `message`, or a default), pull, push: the one button for keeping devices in step. */
     async function sync(message: string) {
@@ -181,7 +180,7 @@ export function useGitRepo(session: ActiveSession | undefined, options: { setup?
             return false
         }
         const count = current.files.length
-        if (count && !await run(t('app.git.committing'), r => gitClient.commit(r, message || t('app.git.syncMessage', {count}), true))) return false
+        if (count && !await run(t('plugins.git.committing'), r => gitClient.commit(r, message || t('plugins.git.syncMessage', {count}), true))) return false
         // A branch that tracks nothing yet has nothing to pull; its first push sets the upstream.
         if (current.upstream && !await pull()) return false
         return push()

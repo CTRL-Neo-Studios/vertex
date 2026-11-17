@@ -1,17 +1,18 @@
 import type {SessionContext} from "#shared/plugin/api";
-import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {useCommitMessage} from "~/composables/git/useCommitMessage";
-import {autoSyncPaused, errorKey, isGitRepo} from "~/composables/git/useGitRepo";
-import {GitError, gitClient} from "~/utils/gitClient";
+import {gitConfigOf} from "../../shared/config";
+import {gitContext} from "../plugin";
+import {useCommitMessage} from "./commitMessage";
+import {autoSyncPaused, errorKey, isGitRepo} from "./repo";
+import {GitError, gitClient} from "./client";
 
 // ponytail: fixed gap between focus pulls; make it a setting if switching windows a lot pulls too often.
 const FOCUS_PULL_GAP = 60_000
 
 /**
- * Auto-sync for a workspace window (`gitConfig.autoSync` in its effective settings: global, or the workspace's own
+ * Auto-sync for a workspace window (`plugins.config.git.autoSync` in its effective settings: global, or the workspace's own
  * once its folder is trusted; all off by default): every `interval` minutes and, with `onOpen`, once when the window
  * opens, it commits every change, pulls and pushes, like Sync; with `pullOnFocus`, it pulls when the window gets
- * focus. The commit's message is the model's with the AI config's `commitMessages.autoSync` (falling back quietly), else
+ * focus. The commit's message is the model's with the git config's `commitMessages.autoSync` (falling back quietly), else
  * "Update N file(s)". It runs only in a repository, never during a merge or rebase, and stops after the remote
  * refuses to sign in (`autoSyncPaused`) until an operation from the Git view works. Each kind of failure shows once,
  * until a run succeeds. It runs beside the Git view, which picks its changes up from the watcher. Runs in the git
@@ -22,8 +23,7 @@ export function useGitAutoSync({session, views}: SessionContext) {
     if (!root) return
     const {t} = useNuxtApp().$i18n
     const toast = useToast()
-    const {effective} = useSettingsScope()
-    const auto = computed(() => effective.value?.gitConfig.autoSync)
+    const auto = computed(() => gitConfigOf(gitContext().config.value).autoSync)
     const commitMessage = useCommitMessage(root)
 
     let running = false
@@ -37,11 +37,11 @@ export function useGitAutoSync({session, views}: SessionContext) {
         shown = error
         const key = errorKey(error)
         toast.add({
-            title: t(error === GitError.auth ? 'app.git.autoSync.paused' : 'app.git.autoSync.failed'),
-            description: key ? t(`app.git.errors.${key}.description`) : error,
+            title: t(error === GitError.auth ? 'plugins.git.autoSync.paused' : 'plugins.git.autoSync.failed'),
+            description: key ? t(`plugins.git.errors.${key}.description`) : error,
             color: 'warning',
             icon: 'i-lucide-refresh-cw-off',
-            actions: [{label: t('app.git.autoSync.open'), color: 'neutral', variant: 'outline', onClick: () => void views.show('git')}],
+            actions: [{label: t('plugins.git.autoSync.open'), color: 'neutral', variant: 'outline', onClick: () => void views.show('git')}],
         })
     }
 
@@ -55,7 +55,7 @@ export function useGitAutoSync({session, views}: SessionContext) {
             const count = status.files.length
             if (!pullOnly && count) {
                 const written = commitMessage.onAutoSync.value ? await commitMessage.generate(status, true).catch(() => '') : ''
-                await gitClient.commit(root!, written || t('app.git.syncMessage', {count}), true)
+                await gitClient.commit(root!, written || t('plugins.git.syncMessage', {count}), true)
             }
             if (status.upstream) {
                 lastPull = Date.now()

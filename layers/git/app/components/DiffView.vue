@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type {TabProps} from "#shared/plugin/api";
-import {useActiveTabs} from "~/composables/active/useActiveTabs";
-import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex";
-import {useAppNavigator} from "~/composables/app/useAppNavigator";
-import {diffSideLabel, diffSpecOf} from "~/utils/gitDiff";
-import {gitClient} from "~/utils/gitClient";
-import TextDiff from "~/components/Diff/TextDiff.vue";
+import {TextDiff} from "~/plugin/ui";
+import {diffSideLabel, diffSpecOf} from "../lib/diff";
+import {gitClient} from "../lib/client";
 
 /**
  * A git diff tab (tab kind `git-diff`): one file's two versions from git, drawn by `TextDiff`. The working tree and
@@ -15,10 +12,8 @@ import TextDiff from "~/components/Diff/TextDiff.vue";
 const props = defineProps<TabProps>()
 
 const {t} = useI18n()
-const $navi = useAppNavigator()
 const session = props.session.session
-const index = useActiveWorkspaceIndex(session)
-const {openTab} = useActiveTabs(session)
+const index = props.session.index
 const spec = diffSpecOf(props.id)
 
 /** The two versions; `undefined` for a side the file isn't on (new, deleted). */
@@ -51,17 +46,17 @@ if (spec?.side === 'worktree' || spec?.side === 'staged') {
 const name = spec ? spec.path.slice(spec.path.lastIndexOf('/') + 1) : ''
 const dir = spec ? spec.path.slice(0, Math.max(spec.path.lastIndexOf('/'), 0)) : ''
 const sideLabel = spec ? diffSideLabel(spec, t) : ''
-const against = spec && (spec.side === 'worktree' || spec.side === 'staged') ? t('app.git.diff.againstHead') : t('app.git.diff.againstParent')
+const against = spec && (spec.side === 'worktree' || spec.side === 'staged') ? t('plugins.git.diff.againstHead') : t('plugins.git.diff.againstParent')
 const note = computed(() => {
     if (!sides.value || failed.value) return ''
-    if (sides.value.before === undefined) return t('app.git.diff.added')
-    if (sides.value.after === undefined) return t('app.git.diff.deleted')
-    return spec?.origPath ? t('app.git.diff.renamed', {path: spec.origPath}) : ''
+    if (sides.value.before === undefined) return t('plugins.git.diff.added')
+    if (sides.value.after === undefined) return t('plugins.git.diff.deleted')
+    return spec?.origPath ? t('plugins.git.diff.renamed', {path: spec.origPath}) : ''
 })
-const node = computed(() => (spec ? index.getFileByPath(`${spec.top}/${spec.path}`) : undefined))
+const node = computed(() => (spec ? index.byPath(`${spec.top}/${spec.path}`) : undefined))
 
 async function openFile() {
-    if (node.value) await $navi.toWorkspaceTab(session.uuid, openTab(node.value.uuid))
+    if (node.value) await props.session.tabs.open(node.value.uuid)
 }
 </script>
 
@@ -83,7 +78,7 @@ async function openFile() {
                 </span>
                 <UButton
                     v-if="node"
-                    :label="t('app.git.openFile')"
+                    :label="t('plugins.git.openFile')"
                     icon="i-lucide-file-text"
                     color="neutral"
                     variant="ghost"

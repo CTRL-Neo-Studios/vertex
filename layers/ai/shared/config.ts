@@ -45,7 +45,6 @@ export const AI_SEED: AiConfig = {
     chatMode: 'suggest',
     chatTitles: true,
     editorAssistant: {toolbar: true, slash: true, shortcut: true},
-    commitMessages: {autoSync: false, whenEmpty: true},
 }
 
 /** A stored chat mode as a mode: `ask` is Read's old name; anything unknown is Suggest. */
@@ -78,15 +77,12 @@ export function aiConfigOf(data?: unknown): AiConfig {
     const features = Object.fromEntries(Object.entries(isLoose(ai.features) ? ai.features : {}).filter((e): e is [string, string] => typeof e[1] === 'string'))
     const chatStorage = ai.chatStorage === 'workspace' ? 'workspace' : 'app'
     const entries: Loose = isLoose(ai.editorAssistant) ? ai.editorAssistant : {}
-    const commits: Loose = isLoose(ai.commitMessages) ? ai.commitMessages : {}
     return {
         enabled: ai.enabled !== false,
         providers, modelProfiles, defaultModelProfile, features, chatStorage,
         chatMode: chatModeOf(ai.chatMode),
         chatTitles: ai.chatTitles !== false,
         editorAssistant: {toolbar: entries.toolbar !== false, slash: entries.slash !== false, shortcut: entries.shortcut !== false},
-        // A timer sending diffs to a model is opt-in; an empty box asking for one is G7's default.
-        commitMessages: {autoSync: commits.autoSync === true, whenEmpty: commits.whenEmpty !== false},
     }
 }
 

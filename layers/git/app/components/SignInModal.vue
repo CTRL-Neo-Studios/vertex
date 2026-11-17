@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type {FormError} from "@nuxt/ui";
-import type {GitToken} from "#shared/types/app/git";
-import {useAppOpener} from "~/composables/app/useAppOpener";
-import {gitClient} from "~/utils/gitClient";
+import type {GitToken} from "../../shared/types";
+import {openExternal} from "~/plugin/ui";
+import {gitClient} from "../lib/client";
 
 /**
  * Asks for a personal access token after a remote refused to sign in, and saves it in the keychain for its host;
@@ -16,7 +16,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: [boolean] }>()
 const {t} = useI18n()
-const {openUrlInBrowser} = useAppOpener()
 
 /** Where well-known hosts make tokens, with what git needs already chosen. */
 const TOKEN_PAGES: Record<string, string> = {
@@ -57,33 +56,33 @@ async function onSubmit() {
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
-        :title="t('app.git.signIn.title', {host: state.host})"
-        :description="t(refused ? 'app.git.signIn.refused' : 'app.git.signIn.description', {host: state.host})"
+        :title="t('plugins.git.signIn.title', {host: state.host})"
+        :description="t(refused ? 'plugins.git.signIn.refused' : 'plugins.git.signIn.description', {host: state.host})"
         size="sm"
     >
         <template #body>
             <UForm :validate :state class="p-2 w-full flex flex-col gap-3" data-git-sign-in @submit="onSubmit">
-                <UFormField v-if="props.hosts.length > 1" :label="t('app.git.signIn.host')" name="host">
+                <UFormField v-if="props.hosts.length > 1" :label="t('plugins.git.signIn.host')" name="host">
                     <USelect v-model="state.host" :items="props.hosts.map(h => h.host)" class="w-full"/>
                 </UFormField>
-                <p class="text-sm text-muted">{{ t('app.git.signIn.explain') }}</p>
+                <p class="text-sm text-muted">{{ t('plugins.git.signIn.explain') }}</p>
                 <UButton
                     v-if="tokenPage"
                     color="neutral"
                     variant="outline"
                     icon="i-lucide-external-link"
-                    :label="t('app.git.signIn.create', {host: state.host})"
-                    @click="openUrlInBrowser(tokenPage)"
+                    :label="t('plugins.git.signIn.create', {host: state.host})"
+                    @click="openExternal(tokenPage)"
                 />
-                <p v-else class="text-sm text-muted">{{ t('app.git.signIn.createElsewhere', {host: state.host}) }}</p>
-                <UFormField :label="t('app.git.signIn.token')" name="token" :error="failure || undefined" required>
+                <p v-else class="text-sm text-muted">{{ t('plugins.git.signIn.createElsewhere', {host: state.host}) }}</p>
+                <UFormField :label="t('plugins.git.signIn.token')" name="token" :error="failure || undefined" required>
                     <UInput v-model="state.token" type="password" class="w-full" autocomplete="off" autofocus/>
                 </UFormField>
-                <UFormField :label="t('app.git.signIn.username')" :hint="t('app.git.signIn.optional')" :description="t('app.git.signIn.usernameHelp')" name="username">
+                <UFormField :label="t('plugins.git.signIn.username')" :hint="t('plugins.git.signIn.optional')" :description="t('plugins.git.signIn.usernameHelp')" name="username">
                     <UInput v-model="state.username" class="w-full" autocomplete="off"/>
                 </UFormField>
-                <p class="text-xs text-muted">{{ t('app.git.signIn.kept', {host: state.host}) }}</p>
-                <UButton type="submit" block :loading="busy" icon="i-lucide-key-round" :label="t('app.git.signIn.save')"/>
+                <p class="text-xs text-muted">{{ t('plugins.git.signIn.kept', {host: state.host}) }}</p>
+                <UButton type="submit" block :loading="busy" icon="i-lucide-key-round" :label="t('plugins.git.signIn.save')"/>
             </UForm>
         </template>
     </UModal>

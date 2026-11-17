@@ -98,6 +98,12 @@ pub fn on_settings_change<R: Runtime>(app: &AppHandle<R>, f: impl Fn(&Value, &Va
     app.state::<AppState>().on_settings_change(Box::new(f));
 }
 
+/// Names `plugins.config.<plugin>.<key>` as a program Rust runs (git's `path`): `settings_set` refuses a new value
+/// there that the saving window didn't pick in its dialog, so a script in a webview can't point it elsewhere.
+pub fn program_setting<R: Runtime>(app: &AppHandle<R>, plugin: &str, key: &str) {
+    app.state::<AppState>().add_program_setting(format!("/plugins/config/{plugin}/{key}"));
+}
+
 /// Ensures `trust.json` exists (migrating old settings into it), so it does from launch.
 pub fn ensure_trust<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     app.state::<AppState>().ensure_trust(app)

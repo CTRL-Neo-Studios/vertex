@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type {FormError} from "@nuxt/ui";
 import {documentDir, join} from "@tauri-apps/api/path";
-import {pickToOpen} from "~/utils/dialogs";
 import {exists} from "@tauri-apps/plugin-fs";
-import {errorKey} from "~/composables/git/useGitRepo";
-import {useGitSignIn} from "~/composables/git/useGitSignIn";
-import {GitError, gitClient} from "~/utils/gitClient";
+import {gitContext} from "../plugin";
+import {errorKey} from "../lib/repo";
+import {useGitSignIn} from "../lib/signIn";
+import {GitError, gitClient} from "../lib/client";
 
 /** Clones a repository into a new folder; closes with that folder (to open as a workspace), or `undefined`. */
 const emit = defineEmits<{ close: [string | undefined] }>()
@@ -23,7 +23,7 @@ watch(() => state.url, url => {
 })
 const nameTyped = () => void (named = true)
 async function pickParent() {
-    const path = await pickToOpen({directory: true, title: t('app.git.clone.parentTitle'), defaultPath: state.parent || await documentDir().catch(() => undefined)})
+    const path = await gitContext().dialogs.open({directory: true, title: t('plugins.git.clone.parentTitle'), defaultPath: state.parent || await documentDir().catch(() => undefined)})
     if (path) state.parent = path
 }
 
@@ -31,7 +31,7 @@ function validate(s: typeof state): FormError[] {
     const errors: FormError[] = []
     if (!s.url.trim()) errors.push({name: 'url', message: t('app.generic.required')})
     if (!s.parent) errors.push({name: 'parent', message: t('app.generic.required')})
-    if (!s.name.trim() || /[\\/]/.test(s.name)) errors.push({name: 'name', message: t('app.git.clone.badName')})
+    if (!s.name.trim() || /[\\/]/.test(s.name)) errors.push({name: 'name', message: t('plugins.git.clone.badName')})
     return errors
 }
 
@@ -44,7 +44,7 @@ async function onSubmit() {
         const url = state.url.trim()
         const dest = await join(state.parent, state.name.trim())
         if (await exists(dest)) {
-            failure.value = t('app.git.clone.exists', {path: dest})
+            failure.value = t('plugins.git.clone.exists', {path: dest})
             return
         }
         // A remote that refuses to sign in asks for a token, then clones again.
@@ -56,7 +56,7 @@ async function onSubmit() {
                 const error = String(e)
                 if (error === GitError.auth && await signIn([url])) continue
                 const key = errorKey(error)
-                failure.value = key ? t(`app.git.errors.${key}.description`) : error
+                failure.value = key ? t(`plugins.git.errors.${key}.description`) : error
                 return
             }
         }
@@ -68,22 +68,22 @@ async function onSubmit() {
 </script>
 
 <template>
-    <UModal :close="{ onClick: () => emit('close', undefined) }" :title="t('app.git.clone.title')" :description="t('app.git.clone.description')">
+    <UModal :close="{ onClick: () => emit('close', undefined) }" :title="t('plugins.git.clone.title')" :description="t('plugins.git.clone.description')">
         <template #body>
             <UForm :validate :state class="p-2 w-full flex flex-col gap-3" data-git-clone @submit="onSubmit">
-                <UFormField :label="t('app.git.clone.url')" name="url" required>
+                <UFormField :label="t('plugins.git.clone.url')" name="url" required>
                     <UInput v-model="state.url" class="w-full" placeholder="https://github.com/you/notes.git" autocomplete="off" autofocus/>
                 </UFormField>
-                <UFormField :label="t('app.git.clone.parent')" name="parent" required>
+                <UFormField :label="t('plugins.git.clone.parent')" name="parent" required>
                     <UFieldGroup class="w-full">
                         <UInput :model-value="state.parent" class="flex-1" readonly/>
-                        <UButton color="neutral" variant="outline" icon="i-lucide-folder-open" :label="t('app.git.clone.choose')" @click="pickParent"/>
+                        <UButton color="neutral" variant="outline" icon="i-lucide-folder-open" :label="t('plugins.git.clone.choose')" @click="pickParent"/>
                     </UFieldGroup>
                 </UFormField>
-                <UFormField :label="t('app.git.clone.name')" name="name" :error="failure || undefined" required>
+                <UFormField :label="t('plugins.git.clone.name')" name="name" :error="failure || undefined" required>
                     <UInput v-model="state.name" class="w-full" @update:model-value="nameTyped"/>
                 </UFormField>
-                <UButton type="submit" block :loading="busy" icon="i-lucide-download" :label="busy ? t('app.git.clone.cloning') : t('app.git.clone.action')"/>
+                <UButton type="submit" block :loading="busy" icon="i-lucide-download" :label="busy ? t('plugins.git.clone.cloning') : t('plugins.git.clone.action')"/>
             </UForm>
         </template>
     </UModal>

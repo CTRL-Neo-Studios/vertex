@@ -1,4 +1,4 @@
-//! Git for a workspace (plugin `vertex-git`; see `app/utils/gitClient.ts`). Rust runs the installed `git` rather than
+//! Git for a workspace (plugin `vertex-git`; see `layers/git/app/lib/client.ts`). Rust runs the installed `git` rather than
 //! a library, so the user's config, credential helpers, SSH agent, hooks and LFS apply as in their terminal. Commands
 //! run in the repository's top folder (which may sit above the workspace), and paths are relative to it, `/`-separated.
 
@@ -38,7 +38,7 @@ const TOKEN_USERNAME: &str = "x-access-token";
 
 #[derive(Default)]
 pub struct Git {
-    /// The git found for the configured path (`gitConfig.path`, `""` = look for one), so the search runs once.
+    /// The git found for the configured path (`plugins.config.git.path`, `""` = look for one), so the search runs once.
     bin: Mutex<Option<(String, PathBuf)>>,
     /// One mutating operation at a time per repository (two would trip over `index.lock`); reads don't wait.
     locks: Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>,
@@ -800,10 +800,10 @@ impl Repo {
     }
 }
 
-/// `settings.gitConfig.path`: the git to run, `""` to look for one. Global only: a workspace can't pick an
-/// executable.
+/// The git plugin's `path`: the git to run, `""` to look for one. Global only (a workspace can't pick an executable),
+/// and only a file the user picked in a dialog ([`api::program_setting`]).
 fn git_path<R: Runtime>(app: &AppHandle<R>) -> String {
-    api::settings(app).pointer("/gitConfig/path").and_then(Value::as_str).unwrap_or_default().to_owned()
+    api::plugin_config(app, PLUGIN).get("path").and_then(Value::as_str).unwrap_or_default().to_owned()
 }
 
 fn git_bin<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -1126,6 +1126,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, _api| {
             app.manage(Git::default());
             api::grant(app, PLUGIN, GRANTS);
+            api::program_setting(app, PLUGIN, "path");
             Ok(())
         })
         .build()

@@ -1,5 +1,5 @@
 import {expect, it} from "vitest";
-import {diffSpecOf, diffTabId} from "./gitDiff";
+import {diffSpecOf, diffTabId} from "./diff";
 
 it('round-trips any path through a URL-safe tab id', () => {
     const spec = {top: '/Users/me/My Vault', path: '笔记/第一章 [草稿]?#.md', side: 'staged', origPath: 'old/名.md'}
