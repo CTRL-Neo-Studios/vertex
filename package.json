@@ -20,7 +20,8 @@
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+	"sdk:release": "cd ./packages/vertex-plugin && bun run release"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.90",
