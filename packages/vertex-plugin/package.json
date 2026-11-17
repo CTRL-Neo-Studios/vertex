@@ -1,8 +1,8 @@
 {
   "name": "@type32/vertex-plugin",
   "version": "1.0.0-alpha.0",
-  "private": true,
-  "description": "Types, the host's shared modules and a Vite preset for Vertex community plugins.",
+  "private": false,
+  "description": "Vertex SDK - Types, the host's shared modules and a Vite preset for Vertex community plugins.",
   "type": "module",
   "files": [
     "dist"
@@ -39,7 +39,8 @@
   },
   "scripts": {
     "build": "bun scripts/build.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "release": "bun scripts/release.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
