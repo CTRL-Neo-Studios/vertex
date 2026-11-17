@@ -1,7 +1,9 @@
 /*
- * A plugin's Tailwind: `@import "@type32/vertex-plugin/tailwind.css";` in its CSS. Its classes compile against
- * Vertex's theme (colors, fonts, Nuxt UI's `text-muted`, `bg-elevated`…, the `dark:` variant) to the variables the app
- * already defines; no preflight and no theme variables of its own, so it can't restyle the app.
+ * A plugin's Tailwind: `@import "@type32/vertex-plugin/tailwind.css";` in its CSS. Its classes compile against the
+ * app's theme. Tailwind's and Nuxt UI's values are written into them (`inline`: Nuxt UI's already point at its `--ui-*`
+ * variables); Vertex's own theme (`main.css`, `@theme static`) stays variables, which the app always defines and
+ * changes while it runs (the user's fonts). No preflight and nothing on `:root`: a plugin can't restyle the app.
  */
-@import "./theme.css" reference;
+@import "./theme-libraries.css" reference theme(inline);
+@import "./theme-app.css" reference;
 @import "tailwindcss/utilities.css" layer(utilities);

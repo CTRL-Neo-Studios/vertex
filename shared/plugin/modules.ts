@@ -1,8 +1,8 @@
 /**
- * The modules a community plugin imports and gets the host's copy of, so there is one Vue, one CodeMirror and one
- * editor: the host puts them on `globalThis[SHARED_GLOBAL]` (`app/utils/plugins/community.ts`), and the SDK's preset
- * turns each import of them into a read from there (`packages/vertex-plugin`). A shared package's new major is a new
- * `apiVersion`.
+ * The modules a community plugin imports and gets the host's copy of, so there is one Vue, one CodeMirror, one editor
+ * and one Nuxt UI: the host puts them on `globalThis[SHARED_GLOBAL]` (`app/utils/plugins/community.ts`), and the SDK's
+ * preset turns each import of them into a read from there (`packages/vertex-plugin`). A shared package's new major is a
+ * new `apiVersion`. Nuxt UI's components aren't imported: the host registers every one globally, by name.
  */
 export const SHARED_GLOBAL = '__vertexModules'
 
@@ -24,6 +24,7 @@ export const SHARED_PACKAGES = [
     '@type32/codemirror-rich-obsidian-editor',
     '@type32/codemirror-rich-obsidian-editor/kit',
     '@type32/codemirror-rich-obsidian-editor/ext',
+    '@nuxt/ui/composables',
 ] as const
 
 /**

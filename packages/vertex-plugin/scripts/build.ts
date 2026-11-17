@@ -102,25 +102,57 @@ for (const {fileName} of contract.getSourceFiles()) {
     mkdirSync(dirname(join(typesDir, relative(repo, fileName))), {recursive: true})
     copyFileSync(fileName, join(typesDir, relative(repo, fileName)))
 }
+
+// Nuxt UI's components, by the names the app registers them under for plugins (`modules/nuxt-ui-components.ts`), as
+// global components of a plugin's templates; typed with Nuxt UI's own declarations through its public paths.
+const nuxtUiFiles = JSON.parse(readFileSync(at('.nuxt/nuxt-ui-components.json'), 'utf8')) as Record<string, string>
+const nuxtUiRoot = at('node_modules/@nuxt/ui/')
+const nuxtUiExports = Object.entries(JSON.parse(readFileSync(join(nuxtUiRoot, 'package.json'), 'utf8')).exports as Record<string, unknown>)
+/** The file's public specifier: of the `exports` patterns that reach it, the most specific (`./components/*`, not `./runtime/*`). */
+function nuxtUiPath(file: string): string {
+    const inner = `./${relative(nuxtUiRoot, file)}`
+    let best: { before: string, path: string } | undefined
+    for (const [key, target] of nuxtUiExports) {
+        if (typeof target !== 'string' || !key.includes('*')) continue
+        const [before, after] = target.split('*') as [string, string]
+        if (!inner.startsWith(before) || !inner.endsWith(after) || before.length <= (best?.before.length ?? -1)) continue
+        best = {before, path: `@nuxt/ui${key.slice(1).replace('*', inner.slice(before.length, inner.length - after.length))}`}
+    }
+    return best?.path ?? fail(`${file}: @nuxt/ui's exports don't reach it`)
+}
+write(join(typesDir, 'nuxt-ui.d.ts'), [
+    'export {}',
+    "declare module 'vue' {",
+    '    interface GlobalComponents {',
+    ...Object.entries(nuxtUiFiles).map(([name, file]) => `        ${name}: typeof import('${nuxtUiPath(file)}')['default']`),
+    '    }',
+    '}',
+    '',
+].join('\n'))
+
 write(join(typesDir, 'index.d.ts'), [
     "export * from './shared/plugin/api'",
+    "import './nuxt-ui'",
     ...apis.map(f => `import './${f.replace(/\.ts$/, '')}'`),
     '',
 ].join('\n'))
 
-// The host's theme for `tailwind.css` to reference: Tailwind's, Nuxt UI's (with the app's generated colors) and the
-// app's own `main.css`, without their comments and `@source`s.
+// The host's theme for `tailwind.css` to reference, without comments and `@source`s: the libraries' (Tailwind's, Nuxt
+// UI's with the app's generated colors), whose values plugins write into their classes, and the app's own `main.css`,
+// whose `@theme static` variables the app always defines.
 const read = (path: string) => readFileSync(at(path), 'utf8')
-const theme = [
+const clean = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@source[^;]*;/g, '')
+const libraries = clean([
     '@import "tailwindcss/theme.css" layer(theme);',
     read('node_modules/@nuxt/ui/dist/runtime/index.css')
         .replace('@import "#build/ui.css";', read('.nuxt/ui.css'))
         .replace('@import "./keyframes.css";', read('node_modules/@nuxt/ui/dist/runtime/keyframes.css')),
-    read('app/assets/css/main.css').replace(/@import\s+['"](tailwindcss|@nuxt\/ui)['"][^;]*;/g, ''),
-].join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/@source[^;]*;/g, '')
-const imports = theme.match(/@import[^;]*;/g) ?? []
-if (imports.length !== 1) fail(`theme.css: the host's CSS imports what this build doesn't inline: ${imports.slice(1).join(' ')}`)
-write(join(dist, 'theme.css'), theme)
+].join('\n'))
+const app = clean(read('app/assets/css/main.css').replace(/@import\s+['"](tailwindcss|@nuxt\/ui)['"][^;]*;/g, ''))
+const imports = [...libraries.match(/@import[^;]*;/g) ?? [], ...app.match(/@import[^;]*;/g) ?? []]
+if (imports.length !== 1) fail(`theme: the host's CSS imports what this build doesn't inline: ${imports.slice(1).join(' ')}`)
+write(join(dist, 'theme-libraries.css'), libraries)
+write(join(dist, 'theme-app.css'), app)
 copyFileSync(join(pkg, 'src/tailwind.css'), join(dist, 'tailwind.css'))
 
 // The preset, with the kernel's manifest check bundled in.

@@ -14,13 +14,19 @@ const PREFIX = '\0vertex-shared:'
 
 /**
  * Each import of a shared module (`vue`, `@codemirror/state`…, the SDK's own) becomes a read from the host's copy on
- * `globalThis`. `names` are each one's exports as the host has them, so importing one it lacks fails the build.
+ * `globalThis`. `names` are each one's exports as the host has them, so importing one it lacks fails the build. Any
+ * other part of Nuxt UI fails too: a bundled copy would be a second Nuxt UI beside the app's.
  */
 export function sharedModules(names: Record<string, string[]>): Plugin {
     return {
         name: 'vertex:shared-modules',
         enforce: 'pre',
-        resolveId: id => (Object.hasOwn(names, id) ? PREFIX + id : undefined),
+        resolveId(id) {
+            if (Object.hasOwn(names, id)) return PREFIX + id
+            if (id === '@nuxt/ui' || id.startsWith('@nuxt/ui/')) {
+                this.error(`${id}: Nuxt UI is the app's. Use its components by name (<UButton>, resolveComponent('UButton')) and its composables from '@nuxt/ui/composables'.`)
+            }
+        },
         load(id) {
             if (!id.startsWith(PREFIX)) return
             const name = id.slice(PREFIX.length)

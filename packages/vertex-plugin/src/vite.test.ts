@@ -39,4 +39,8 @@ describe('sharedModules', () => {
     it("fails the build on a name the host's copy lacks", async () => {
         await expect(bundle("import {notInVue} from 'vue'; export {notInVue}")).rejects.toThrow(/notInVue/)
     })
+
+    it("fails the build on a Nuxt UI import it doesn't share, rather than bundle a second Nuxt UI", async () => {
+        await expect(bundle("import UButton from '@nuxt/ui/components/Button.vue'; export {UButton}")).rejects.toThrow(/Nuxt UI is the app's/)
+    })
 })
