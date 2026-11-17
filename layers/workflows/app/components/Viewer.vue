@@ -146,11 +146,12 @@ const status = computed(() => {
         :filePath="filePath"
         :renaming="renaming"
         :showStatusBar="false"
+        :topSpacing="false"
         :bottomSpacing="false"
     >
         <div
             v-if="loadProblems.length"
-            class="w-full p-6"
+            class="w-full p-6 pt-12"
         >
             <UAlert
                 color="error"
@@ -163,9 +164,10 @@ const status = computed(() => {
                 <li v-for="(d, i) in loadProblems" :key="i"><span class="text-error">{{ d.code }}</span> {{ d.message }}</li>
             </ul>
         </div>
+        <!-- Under the header, whose gradient fades the canvas out at the top, as a note fades under it. -->
         <div
             v-else
-            class="workflow-viewer w-full h-full border-t border-default"
+            class="workflow-viewer w-full h-full"
         >
             <WorkflowWorkbench :key="canvasKey" :editor="editor">
                 <template #widget="w">
@@ -245,3 +247,17 @@ const status = computed(() => {
         </div>
     </ViewerLayout>
 </template>
+
+<style scoped>
+/*
+ * The canvas runs under the tab's header (h-10); what the workbench pins to the top (its side panels and the canvas's
+ * banner) starts below it, where it can be clicked. `@type32/workflows` has no top inset (`insets` is left and right).
+ */
+.workflow-viewer :deep(.inset-y-3) {
+    top: calc(2.5rem + 0.75rem);
+}
+
+.workflow-viewer :deep(.top-3.left-1\/2) {
+    top: calc(2.5rem + 0.75rem);
+}
+</style>

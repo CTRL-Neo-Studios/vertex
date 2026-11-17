@@ -1,5 +1,12 @@
 import {SHARED_PACKAGES} from './shared/plugin/modules'
 
+/**
+ * A Nuxt module whose runtime the app imports as source (its aliases, its components). Pre-bundling `/kit` or `/ext`
+ * gives the app a second copy of the kit: the block handle and other widgets then mount without the app
+ * (`vueContextFacet` unset). Chat's layer still pre-bundles `/comark` (`ofm()`, parsing only).
+ */
+const EDITOR = '@type32/codemirror-rich-obsidian-editor'
+
 export default defineNuxtConfig({
     devtools: {enabled: true},
     $production: {devtools: {enabled: false}},
@@ -83,7 +90,6 @@ export default defineNuxtConfig({
                 "@tauri-apps/plugin-os",
                 "@tauri-apps/plugin-notification",
                 "@tauri-apps/plugin-opener",
-                "@type32/codemirror-rich-obsidian-editor",
                 "compromise",
                 "reka-ui",
                 "@tauri-apps/api/menu",
@@ -113,8 +119,10 @@ export default defineNuxtConfig({
                 "diff",
                 // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
                 // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
-                ...SHARED_PACKAGES,
+                ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`)),
             ],
+            // Every entry of the package (`pkgId`), its subpaths included.
+            exclude: [EDITOR],
         },
     },
 });
