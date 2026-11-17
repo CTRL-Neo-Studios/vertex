@@ -63,7 +63,7 @@ use what is there. Each phase ends with `typecheck`, the tests and lint clean, a
 | Core plugins and kernel internals | Core plugins import the public API. What they still take from the kernel's internals is listed per plugin in the boundary test; that list is the API backlog and each X phase shrinks it. |
 | Names | i18n keys `plugins.<id>.*`; state keys `plugin.<id>.*`; commands `<id>:<name>`; Rust plugins `vertex` (kernel) and `vertex-<id>`. |
 | Old settings | Read forever through one table of old path → new path, for the global file and every workspace's; written at the new paths. A workspace file is rewritten only when it is next changed. |
-| Not in this plan | A plugin directory and automatic updates; a sandboxed plugin tier; native community code (WASM host, sidecars); a process-spawning API; a hotkey editor. None is blocked by what's built here. |
+| Not in this plan | A plugin directory (a self-hostable catalog of public plugins, planned apart: C2b leaves it a place); a sandboxed plugin tier; native community code (WASM host, sidecars); a process-spawning API; a hotkey editor. None is blocked by what's built here. |
 
 ```mermaid
 flowchart LR
@@ -72,7 +72,7 @@ flowchart LR
   K4 --> X1 --> X2 --> X3 --> X4 --> X5
   X5 --> X6
   K5 --> X6 --> X7 --> X8
-  X8 --> C1 --> C2 --> C3 --> C4
+  X8 --> C1 --> C2 --> C2b --> C3 --> C4
 ```
 
 ## The contract
@@ -911,9 +911,94 @@ Blocked by C1.
 - **Not done:** Windows and Linux (above). A failure in a session window shows as that window's toast; Settings → Plugins only knows the Settings window's own. A dev reload writes the session first, not an editor's unsaved text still waiting for its autosave. `plugins.sources.<id>` is read by Rust to choose what to watch, and any window may write the settings: a window's code could point a folder install at another folder, which is no more than its code can do already (every window is trusted code).
 - **Numbers:** 421 tests (50 files); 53 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
 
+## C2b: Sources and updates
+
+Blocked by C2. Added after C2 was built, as a phase of its own so C2's acceptance stands; before C3, which installs a vault's missing plugins from `plugins.sources` and pins what an update changes. Decisions confirmed on 17 Nov: the release asset is named `plugin.zip`; nothing installs an update by itself; checks are asked for.
+
+C2 installs from a folder, a `.zip` or a URL to one. A `.zip` says nothing about where it came from and can't be asked whether there's a newer one, so C2 has no updates. A Git repository answers both: its refs say what the newest release tag or a branch's head is. So Git becomes the way to install, and updates follow from it.
+
+### Checked (17 Nov, against public repositories, with `curl`, no credentials)
+
+- **Refs without a Git client or a forge's API:** `GET <repo>/info/refs?service=git-upload-pack` (Git's smart HTTP, what `git ls-remote` asks) answered on github.com, gitlab.com, codeberg.org (Forgejo) and git.sr.ht: `HEAD` with `symref=HEAD:refs/heads/<default>`, every branch and tag with its commit. sr.ht refuses the `.git` suffix the others accept, so the URL is tried as given first.
+- **A commit's files as a `.zip`:** `<repo>/archive/<sha>.zip` on GitHub and Forgejo, `<repo>/-/archive/<sha>/x.zip` on GitLab; each refuses the other's form (404, 403), so they can be tried in turn. GitHub's and GitLab's archives have one top folder, which C2's `package_root` already accepts (Forgejo's answered 200 and wasn't unpacked).
+- **A release's files:** `<repo>/releases/download/<tag>/<name>` on GitHub and Forgejo, `<repo>/-/releases/<tag>/downloads/<name>` on GitLab. Their release APIs differ (GitHub and Forgejo share a shape, GitLab has its own) and GitHub's allows 60 calls an hour per address without a token, which a daily check of many plugins behind one address could use up.
+- Vertex's git plugin runs the system's `git`; nothing in the tree speaks the Git protocol itself.
+
+### Decisions
+
+- **HTTPS only, no Git client.** Refs come from `info/refs`, files from the forge's archive or release URL: `reqwest` and C2's unzip, on GitHub, GitLab, Gitea and Forgejo, including self-hosted ones (the URL forms are tried in turn and the one that worked is remembered). No system `git` (many users have none; a URL handed to it needs care: `ext::`, `--upload-pack`), no `gix` (a large dependency for one GET). The price: public repositories only, and no host that offers no `.zip` archive (sr.ht). A token per host (keychain, sent with these requests) can add private ones later.
+- **`https` only** for repositories and `.zip` URLs; `http` only for this computer (`localhost`, `127.0.0.1`), for tests and a local forge. C2 took any `http` URL: over it, anyone on the way can swap the code.
+- **Two ways a repository holds a plugin**, both from one link:
+  - **Releases** (recommended, what a bare link picks first): the newest version tag (`1.2.0` or `v1.2.0`, no pre-release unless asked) whose release has an asset named `plugin.zip`. Found from the refs and the release URL form, without a forge's API.
+  - **A ref:** a branch (followed), a tag or a commit (pinned). The built plugin (`plugin.json` and `main.js` together) is at the repository's top or in `dist/`; a repository holding only the source says so ("install its release, or a branch with the built files").
+- **A source is one string**, `plugins.sources.<id>`, so it stays readable in `settings.json` and travels with a vault (C3). C2's values stay valid.
+
+  | Source | Meaning | Updates |
+  |---|---|---|
+  | `git+https://host/owner/repo#releases` | the newest release | a newer release tag |
+  | `git+https://host/owner/repo#branch:main` | a branch's head | a new commit |
+  | `git+https://host/owner/repo#tag:v1.2.0`, `#commit:<sha>` | pinned | never |
+  | `https://…/plugin.zip` | a `.zip` by URL | when its bytes change (SHA-256) |
+  | `/path/to/folder` | development, watched (C2) | on every change |
+  | `/path/to/plugin.zip` | a file (C2) | never; Install again |
+
+- **Links as people copy them** are read into those: `https://github.com/o/r`, `…/tree/<branch>`, `…/-/tree/<branch>` (GitLab), `…/src/branch/<branch>` (Gitea), `…/releases`, `…/releases/tag/<tag>`, `o/r` (GitHub), and `<link>#<ref>`. One parser, in Rust.
+- **Identity: `id` stays the name, and where a plugin came from is recorded.** The question was whether the plugin's files should carry an identifier. They carry `id` already (a slug: it names settings paths, state keys, keychain entries and Tauri permissions, so it can't become `author/name` or a URL). Two additions make it an identity:
+  - **`repository` in `plugin.json`** (optional, an `https` Git URL): the plugin's stated home. It's what makes a `.zip` less obscure: the consent dialog and the plugin's row show it, and a plugin installed from a `.zip` or a catalog can be switched to it for updates. It's a claim, not proof: a `.zip` can name any repository, so the dialog says "says it's from" for anything not fetched from there.
+  - **An install record**, `<app_data>/plugins/<id>/.install.json`, written by Rust when it puts a plugin in place: the source it was fetched from, what that resolved to (tag, commit, the archive's SHA-256), the version and the time. This is the proven origin, and what an update check compares with.
+  - **An `id` taken by another origin is said, loudly.** Secrets, config and data are kept by `id`, so a different plugin installed under an installed one's `id` inherits its keychain entries. Installing over a plugin whose record names another repository (or none) shows both origins and needs its own confirmation; an update from the same origin doesn't.
+  - A catalog can require ids unique among its entries; Vertex doesn't need them unique in the world.
+- **An update is never installed without its dialog.** A community plugin runs as Vertex does, so an update is new code with full access from whoever can push to that repository. There's no automatic install, and no Update all.
+  - **Update:** stages the new copy as an install does, then the dialog shows the version change, the commit or tag, and what changed in `permissions`, `requires` and `apiVersion`. On accept it's installed and the windows running it reload (C2's `plugin-updated`).
+  - A lower version than the installed one is shown as a downgrade, not refused (a branch may go back).
+- **Checks are asked for, as Vertex's own updates are** (Check for Updates in the menu, About and Settings; Vertex never checks by itself). Check for updates on Settings → Plugins asks each plugin's host for its refs. A switch beside it, off by default, lets Vertex check at launch and then daily (`plugins.checkUpdates`, global only).
+  - **What a check sends:** one HTTPS GET of `<repo>/info/refs` per plugin (a second for `plugin.zip` when there's a newer tag), with a fixed `Vertex` user agent: no cookies, no id, nothing of the settings, the vault or the other plugins. As with any request, that host sees the address it came from and which repository was asked for, so a plugin's host can tell that someone at that address uses it and when; the network in between sees only the host's name. This is a privacy cost, not a hole: installing the plugin asked the same host the same thing. It's why the automatic check is a choice, and the switch says so.
+- **The `.zip` stays**, as the second choice in the menu: offline installs, and the artifact a catalog can host. **A catalog isn't built:** its place is a source `catalog+https://…#<id>` whose entry names one of the sources above (or a `.zip` it hosts, with its SHA-256), so installing from one would go through the same staging, consent and record.
+
+### Change
+
+- **Rust** (`plugins.rs`, with a `sources.rs` for parsing and fetching):
+  - `plugin_source_resolve(link)`: the parsed source, the repository's default branch, branches, tags and newest release, for the dialog's choice.
+  - `plugin_stage` takes `{path}` (a picked folder or file, as now) or `{source}` (any source string; C2's `{url}` becomes one). It returns the manifest, what the source resolved to, and the record of the copy it would replace.
+  - `plugin_install(stage)` writes `.install.json` into the stage before moving it into place.
+  - `plugin_updates({ids?})`: checks, returns `{id, source, installed, available}` per plugin with something newer, and emits `vertex://plugin-updates`. Run by the Settings window's button, and by Rust at launch and daily while `plugins.checkUpdates` is on.
+  - Who may call: all four the Settings window only.
+- **Manifest:** `repository?: string` (`validateManifest`: an `https` URL; the SDK's types follow).
+- **Settings:** `AppSettings.plugins.checkUpdates: boolean` (default `false`).
+- **Settings → Plugins:**
+  - Install… opens "From a Git repository" (a link field; then what it resolved to, with Latest release / a branch / a tag to choose); a menu beside it keeps From a .zip file…, From a .zip URL… and From a folder (development)….
+  - A community row shows its origin (`github.com/o/r · release v1.2.0`, `branch main @ abc1234`, or "From a file · says it's from …") as a link, Update when there is one, and Switch to its repository for a plugin that names one but wasn't fetched from it.
+  - The section has Check for updates and the Check automatically switch, with what a check sends.
+  - With the switch on, a session or main window toasts once per check when updates are waiting, with Review (Settings → Plugins).
+- **SDK:** the preset writes `plugin.zip` beside `dist/` with `vertex({pack: true})`. C4's author docs get the two ways to publish, each with a CI example: a release with `plugin.zip`, or a `dist` branch.
+- **C3 uses this:** a vault's missing plugin installs from its `plugins.sources` string; an accepted update re-pins on this device, and C3's pin check asks the vault's other users.
+
+### Acceptance
+
+- [ ] Tests: the source strings and each link form; the refs of a recorded `info/refs` reply (default branch, branches, tags); which tag is the newest release (`v` or not, pre-releases, non-version tags); the built plugin at the top or in `dist/`, and a source-only repository refused with the reason; the origin comparison.
+- [ ] Against a local server laid out as each forge (GitHub/Forgejo's URLs, GitLab's): install from a release, from a branch, from a tag; a new release and a new commit each show as an update, its dialog shows a permission the new version adds, and accepting it reloads the window running the plugin; a pinned tag never updates.
+- [ ] Against the test repository on GitHub (below): refs, a release's `plugin.zip` and the `dist` branch's archive each install the plugin; a second release shows as an update. GitLab and Codeberg read-only at least (their refs and URL forms, on public repositories).
+- [ ] A plugin with an installed plugin's `id` from another repository gets the second confirmation; the same one from its own repository doesn't.
+- [ ] With Check automatically off (the default), launching Vertex and opening Settings → Plugins contact nothing; Check for updates asks each plugin's host once (twice with a newer tag) and sends no cookie or id; with it on, the launch check does the same (all on the local server's log). No update installs without its dialog.
+- [ ] An `http` repository or `.zip` URL that isn't this computer's is refused with the reason.
+- [ ] Concepts doc; en + zh-CN strings.
+
+### Test repository
+
+`https://github.com/Type-32/test-vertex-plugin` (public), at `../text-vertex-plugin`. Default branch `dev`, pushed on 17 Nov: the plugin's source (id `test-vertex-plugin`, version 0.1.0: a panel view with its version, an asset and one of the app's buttons). Its `package.json` lists what a plugin project needs (`vite`, `@vitejs/plugin-vue`, `vue-tsc`, `typescript`, and the SDK, as `file:../vertex/packages/vertex-plugin` until it's published); `bun install`, the build and the type check pass. C2b adds to it: `repository` in its manifest, a `dist` branch (the built files at its top), and releases `v0.1.0` and `v0.2.0` with `plugin.zip` (the second asking for `network`, for the dialog's permission change).
+
+Found while making it, for C4's author docs: Tailwind skips what a `.gitignore` in a parent folder ignores until the project is a Git repository of its own. This machine's home folder has one that ignores everything (`*`, left by virtualenv), so the plugin built without its classes until `git init`.
+
+### Not in this phase
+
+- The catalog (above). Private repositories. Hosts without `.zip` archives. A subfolder other than `dist/` (a monorepo's plugin).
+- Installing updates automatically, in any form: it would let whoever controls a repository, or takes it over, run new code on every user's machine with nobody looking.
+- Signatures. What's installed is what the host served over TLS for that commit or tag; the record keeps its SHA-256, which nothing outside checks yet. A catalog is where a publisher's hash would come from.
+- A per-plugin update choice beyond pinning: a plugin that must not update is installed at a tag or a commit.
+
 ## C3: Workspace plugins
 
-Blocked by C2.
+Blocked by C2b.
 
 ### Change
 - **Trust:** a workspace's plugins load only when its folder is trusted. Trusting a folder that has plugins lists them, what each needs, and says that they run as Vertex does.
