@@ -1,16 +1,14 @@
 <script setup lang="ts">
+import type {SettingsScrollLayoutProps} from "#shared/plugin/components";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * Settings page scroll layout
  * Provides scrollable content area with sticky header. A `globalOnly` page is read-only while the Settings
- * window edits a workspace: none of its settings can be overridden there.
+ * window edits a workspace: none of its settings can be overridden there. Published to plugins.
  */
 
-const props = defineProps<{
-    title?: string,
-    globalOnly?: boolean,
-}>()
+const props = defineProps<SettingsScrollLayoutProps>()
 const scope = useSettingsScope()
 const locked = computed(() => props.globalOnly && scope.root.value !== null)
 </script>

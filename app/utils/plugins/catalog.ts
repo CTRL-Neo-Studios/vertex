@@ -3,6 +3,7 @@ import {getVersion} from '@tauri-apps/api/app'
 import {corePlugins} from '#build/core-plugins.mjs'
 import type {PluginDefinition, PluginEntry} from '#shared/plugin/api'
 import {checkPluginFolder, type PluginManifest} from '#shared/plugin/manifest'
+import {messagesFor} from '#shared/plugin/messages'
 import {vertexInvoke} from '~/utils/vertexInvoke'
 
 /** Nuxt declares every generated template as an untyped module; `modules/core-plugins.ts` writes exactly this shape. */
@@ -47,6 +48,14 @@ export interface Listed extends InstalledOrigin {
     pinPath: string | null
     /** A workspace's plugin: its folder is trusted and it's pinned with `hash`. */
     accepted: boolean
+    /** Its strings by locale (`locales/<locale>.json`); `null` for a file that doesn't parse. */
+    locales: Record<string, unknown>
+}
+
+/** What merging plugins' strings needs of the app's i18n (Nuxt's `$i18n`). */
+export interface StringsTarget {
+    availableLocales: readonly string[]
+    mergeLocaleMessage(locale: string, messages: Record<string, unknown>): void
 }
 
 /** A workspace's plugin as this window knows it: valid (`manifest`) or not (`errors`), accepted or not. */
@@ -128,9 +137,10 @@ async function loadCode(id: string, app: App, inWorkspace: boolean) {
 /**
  * Lists the installed plugins again, and `root`'s (at startup, when one is installed or removed, when trust changes).
  * Each manifest is checked with `checkListed`; an installed one that fails is broken. An installed plugin is off until
- * turned on. `runs`: this window runs `root`'s accepted plugins (a session window's workspace).
+ * turned on. `runs`: this window runs `root`'s accepted plugins (a session window's workspace). The strings of each
+ * plugin that may load go into `i18n` (`messagesFor`), the workspace's copy's over the installed one's.
  */
-export async function loadInstalledPlugins(app: App, root: string | null, runs: boolean): Promise<void> {
+export async function loadInstalledPlugins(app: App, i18n: StringsTarget, root: string | null, runs: boolean): Promise<void> {
     const [listed, appVersion] = await Promise.all([vertexInvoke<Listed[]>('plugins_list', {root}), getVersion()])
     const coreIds = new Set(core.map(e => e.manifest.id))
     const entries: PluginEntry[] = []
@@ -159,6 +169,10 @@ export async function loadInstalledPlugins(app: App, root: string | null, runs: 
         load: () => loadCode(p.listed.id, app, true),
     }))
     origins.value = Object.fromEntries(listed.filter(i => i.scope === 'global').map(({id, record, claimed}) => [id, {record, claimed}]))
+    const loadable = new Set([...entries, ...accepted.value].map(e => `${e.source}:${e.manifest.id}`))
+    for (const item of listed.filter(i => loadable.has(`${i.scope}:${i.id}`))) {
+        for (const [locale, messages] of Object.entries(messagesFor(item.id, item.locales, i18n.availableLocales))) i18n.mergeLocaleMessage(locale, messages)
+    }
 }
 
 /** Workspace `root`'s plugins as they are now, each checked (`checkListed`): what trusting it, or accepting them, asks about. */

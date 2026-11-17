@@ -1,16 +1,13 @@
 <script setup lang="ts">
+import type {SettingsSectionEmits, SettingsSectionProps} from "#shared/plugin/components";
+
 /**
  * One settings group: a header (with a reset button while the group differs from its defaults) over a
- * stack of `SettingsRow`s. Modelled on Nuxt UI's theme studio sections.
+ * stack of `SettingsRow`s. Modelled on Nuxt UI's theme studio sections. Published to plugins.
  */
-defineProps<{
-    title: string
-    description?: string
-    /** Shows the reset button; the caller decides what "dirty" means. */
-    dirty?: boolean
-}>()
+defineProps<SettingsSectionProps>()
 
-defineEmits<{ reset: [] }>()
+defineEmits<SettingsSectionEmits>()
 </script>
 
 <template>

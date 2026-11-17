@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {EditorView} from "@codemirror/view"
 import type {ExternalLinkClickDetail, InternalLinkClickDetail} from "@type32/codemirror-rich-obsidian-editor"
+import type {NoteEditorEmits, NoteEditorProps} from "#shared/plugin/components"
 import {useNoteEditor} from "~/composables/active/editor/useNoteEditor"
 import {usePropertiesOptions} from "~/composables/active/editor/usePropertiesOptions"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
@@ -13,8 +14,8 @@ import {useAppOpener} from "~/composables/app/useAppOpener"
  * `notePath` is the file it's in (the canvas), `this` for an embedded base. Esc ends editing (`done`); an internal
  * link's click is the caller's (`openLink`).
  */
-const props = defineProps<{ text: string, notePath: string }>()
-const emit = defineEmits<{ update: [text: string], done: [], openLink: [detail: InternalLinkClickDetail] }>()
+const props = defineProps<NoteEditorProps>()
+const emit = defineEmits<NoteEditorEmits>()
 const editor = useTemplateRef<{ view: EditorView | undefined }>('editor')
 const $route = useRoute()
 const session = useActiveSessions().getSession(computed(() => $route.params.sessionId as string))

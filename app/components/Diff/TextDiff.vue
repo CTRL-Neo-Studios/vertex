@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type {TextDiffProps} from "#shared/plugin/components";
 import {diffCounts, isBinaryText, lineDiff, splitRows, type DiffFold, type DiffLine} from "#shared/utils/textDiff";
 
 /**
@@ -7,7 +8,7 @@ import {diffCounts, isBinaryText, lineDiff, splitRows, type DiffFold, type DiffL
  * caller's (git's diff tab, a chat's staged change). `sides` missing = still loading; a side missing = the file isn't
  * on it (new, deleted). `failed` shows instead of the diff. The `header` slot gets the +/− counts.
  */
-const props = defineProps<{ sides?: { before?: string, after?: string }, failed?: boolean }>()
+const props = defineProps<TextDiffProps>()
 defineSlots<{ header?(props: { added: number, removed: number, binary: boolean }): unknown }>()
 const {t} = useI18n()
 

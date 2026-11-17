@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import type {PluginManifest} from '#shared/plugin/manifest'
+import {checkPluginMessages, messageLeaves} from '#shared/plugin/messages'
 import {resolveLocale} from './locale'
 
 // Bundled by Vite at test time, so no Node fs/path types are needed under the app tsconfig.
@@ -7,57 +8,37 @@ const appFiles = import.meta.glob<Record<string, unknown>>('../../i18n/locales/*
 const layerFiles = import.meta.glob<Record<string, unknown>>('../../layers/*/i18n/locales/*.json', {eager: true, import: 'default'})
 const manifests = import.meta.glob<PluginManifest>('../../layers/*/plugin.json', {eager: true, import: 'default'})
 
-/** `app`, and each plugin layer by id → locale file name → messages. */
+/** `app`, and each plugin layer by id → locale → messages. */
 const catalogs = new Map<string, Record<string, Record<string, unknown>>>()
 for (const [path, data] of [...Object.entries(appFiles), ...Object.entries(layerFiles)]) {
     const catalog = /layers\/([^/]+)\//.exec(path)?.[1] ?? 'app'
-    catalogs.set(catalog, {...catalogs.get(catalog), [path.split('/').pop()!]: data})
+    catalogs.set(catalog, {...catalogs.get(catalog), [path.split('/').pop()!.replace(/\.json$/, '')]: data})
 }
 const appLocales = Object.keys(catalogs.get('app')!).sort()
 
-function leaves(obj: Record<string, unknown>, prefix = ''): Map<string, string> {
-    const out = new Map<string, string>()
-    for (const [k, v] of Object.entries(obj)) {
-        const key = prefix ? `${prefix}.${k}` : k
-        if (v && typeof v === 'object') for (const [lk, lv] of leaves(v as Record<string, unknown>, key)) out.set(lk, lv)
-        else out.set(key, String(v))
-    }
-    return out
-}
-
 const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort()
 
-describe.each([...catalogs.keys()])('%s strings', (catalog) => {
-    const files = catalogs.get(catalog)!
-    const en = leaves(files['en.json'] ?? {})
-    const others = Object.keys(files).filter(f => f !== 'en.json')
+describe('app strings', () => {
+    const files = catalogs.get('app')!
+    const en = messageLeaves(files.en)
+    const others = Object.keys(files).filter(f => f !== 'en')
 
-    it('has a file for every locale the app has', () => {
-        expect(Object.keys(files).sort()).toEqual(appLocales)
+    it.each(others)('%s has exactly the same keys as en', (locale) => {
+        expect([...messageLeaves(files[locale]).keys()].sort()).toEqual([...en.keys()].sort())
     })
 
-    it.each(others)('%s has exactly the same keys as en.json', (file) => {
-        expect([...leaves(files[file]!).keys()].sort()).toEqual([...en.keys()].sort())
-    })
-
-    it.each(others)('%s uses the same interpolation params as en.json', (file) => {
-        const other = leaves(files[file]!)
+    it.each(others)('%s uses the same interpolation params as en', (locale) => {
+        const other = messageLeaves(files[locale])
         for (const [key, text] of en) expect(params(other.get(key) ?? ''), key).toEqual(params(text))
     })
+})
 
-    if (catalog !== 'app') {
-        it('keeps its strings under plugins.<id>', () => {
-            for (const key of en.keys()) expect(key.startsWith(`plugins.${catalog}.`), key).toBe(true)
-        })
-
-        it('has every string its settings schema names', () => {
-            const manifest = Object.entries(manifests).find(([path]) => path.includes(`/layers/${catalog}/`))?.[1]
-            for (const field of manifest?.config?.schema ?? []) {
-                const keys = [field.label, field.description, ...(field.type === 'select' ? field.options.map(o => o.label) : [])]
-                for (const key of keys) if (key) expect(en.has(key), key).toBe(true)
-            }
-        })
-    }
+// The rule community plugins' strings are held to when they're built (the SDK's preset), plus every app locale.
+describe.each([...catalogs.keys()].filter(c => c !== 'app'))('%s plugin strings', (id) => {
+    it('has a file per app locale, the same keys and params in each, under plugins.<id>, and what its manifest names', () => {
+        const manifest = Object.entries(manifests).find(([path]) => path.includes(`/layers/${id}/`))?.[1]
+        expect(checkPluginMessages(id, catalogs.get(id)!, manifest, appLocales)).toEqual([])
+    })
 })
 
 describe('resolveLocale', () => {

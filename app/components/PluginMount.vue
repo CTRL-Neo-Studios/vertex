@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {Component} from "vue";
-import type {ComponentLoader, UiSlot} from "#shared/plugin/api";
+import type {ComponentLoader} from "#shared/plugin/api";
+import type {PluginMountProps} from "#shared/plugin/components";
 import {contributionOwner} from "~/utils/plugins/runtime";
 
 /**
@@ -8,10 +9,7 @@ import {contributionOwner} from "~/utils/plugins/runtime";
  * its disposer, when `props` change). Inside an error boundary: what fails draws the plugin's name and the error in
  * its place instead of taking the window down. Attributes (`class`) go to the component or the `div`.
  */
-const props = defineProps<{
-    ui: UiSlot<never>
-    props: object
-}>()
+const props = defineProps<PluginMountProps>()
 
 const {t} = useI18n()
 const error = ref<string>()

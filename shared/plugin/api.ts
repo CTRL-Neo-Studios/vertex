@@ -19,6 +19,7 @@ import type {PluginManifest, WindowKind} from './manifest'
 export type {ActiveSession, ActiveWorkspaceFileIndex, UITreeNode}
 export type {PluginManifest, WindowKind}
 export type * from './contributions'
+export type * from './components'
 
 export type PluginSource = 'core' | 'global' | 'workspace'
 
@@ -326,6 +327,21 @@ export interface HostServices {
     dialogs: {
         open(options?: DialogOptions & { directory?: boolean }): Promise<string | null>
         save(options?: DialogOptions): Promise<string | null>
+    }
+    /** The app's strings and language. A plugin's own are `plugins.<id>.…`, from its `locales/<locale>.json`. */
+    i18n: {
+        /** The string for an i18n key in the window's language, `{params}` filled in; the key itself when there's none. Reactive. */
+        t(key: string, params?: Record<string, unknown>): string
+        /** The window's language (`en`, `zh-CN`). Reactive. */
+        readonly locale: string
+    }
+    ui: {
+        /** The window's theme as the page draws it. Reactive: it follows light and dark, the colours, a workspace's theme. */
+        theme: {
+            readonly dark: boolean
+            /** A CSS custom property as the page resolves it now (`--ui-primary` → a colour), for what CSS can't reach (a canvas). */
+            value(property: string): string
+        }
     }
     /**
      * Trust for programs from a vault (the trusted folders and files, Settings → Trust), so every plugin that runs one

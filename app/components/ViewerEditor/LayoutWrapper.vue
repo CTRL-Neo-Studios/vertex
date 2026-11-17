@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport} from "reka-ui";
+import type {ViewerLayoutEmits, ViewerLayoutProps} from "#shared/plugin/components";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 import {statusItems} from "~/utils/contributions";
 import {SHOWN_VIEWER} from "~/utils/viewers";
@@ -38,36 +39,8 @@ const sideItems = computed(() => items.value.filter(item => item.placement === '
 
 // One header row for both root variants: left slot, breadcrumbs always centered, right slot.
 const [DefineHeaderRow, HeaderRow] = createReusableTemplate()
-    type ScrollMode = 'vertical' | 'both' | 'none'
-type ContentAlignment = 'center' | 'start' | 'stretch'
-
-const props = withDefaults(defineProps<{
-    // Header configuration
-    showHeader?: boolean,
-    showBreadcrumbs?: boolean,
-    renaming?: boolean,
-    filePath?: string,
-
-    // Scroll configuration
-    scrollMode?: ScrollMode,
-    showScrollbar?: boolean,
-
-    // Status bar configuration
-    showStatusBar?: boolean,
-
-    // Content area configuration
-    contentAlignment?: ContentAlignment,
-    contentMaxWidth?: string,
-    contentPadding?: boolean,
-    cursorText?: boolean,
-
-    // Layout spacing
-    topSpacing?: boolean,
-    bottomSpacing?: boolean,
-    ui?: {
-        root?: string,
-    }
-}>(), {
+// Published to plugins as `ViewerLayout` (`ViewerLayoutProps`); `fileName` is its model.
+const props = withDefaults(defineProps<Omit<ViewerLayoutProps, 'fileName'>>(), {
     // Defaults
     showHeader: true,
     showBreadcrumbs: true,
@@ -84,9 +57,7 @@ const props = withDefaults(defineProps<{
     bottomSpacing: true,
 })
 
-const emit = defineEmits<{
-    (e: 'on-rename', oldValue: string, newValue: string): void
-}>()
+const emit = defineEmits<Pick<ViewerLayoutEmits, 'on-rename'>>()
 
 // Compute classes based on props
 const contentClasses = computed(() => {

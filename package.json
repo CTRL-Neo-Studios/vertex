@@ -21,7 +21,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-	"sdk:release": "cd ./packages/vertex-plugin && bun run release"
+    "sdk:release": "cd ./packages/vertex-plugin && bun run release"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.90",
@@ -32,6 +32,8 @@
     "@crabnebula/tauri-plugin-drag": "2.1.0",
     "@iconify-json/lucide": "^1.2.153",
     "@iconify-json/simple-icons": "^1.2.102",
+    "@iconify/utils": "^3.1.7",
+    "@iconify/vue": "^5.0.5",
     "@nuxt/fonts": "1.2.0",
     "@nuxt/icon": "2.6.2",
     "@nuxt/ui": "^4.12.0",

@@ -92,15 +92,16 @@ fn folder_of<R: Runtime>(app: &AppHandle<R>, id: &str, root: Option<&str>) -> Re
     }
 }
 
-/// What a pin covers, read once: `plugin.json`, `main.js` and `styles.css`, and their hash.
+/// What a pin covers, read once: `plugin.json`, `main.js`, `styles.css` and the strings, and their hash.
 struct Bundle {
     code: String,
     styles: Option<String>,
+    locales: Vec<(String, Vec<u8>)>,
     hash: String,
 }
 
 /// SHA-256 over each part's length and bytes, so no part's bytes can pass for another's.
-fn bundle_hash(parts: [&[u8]; 3]) -> String {
+fn bundle_hash<'a>(parts: impl IntoIterator<Item = &'a [u8]>) -> String {
     let mut hash = Sha256::new();
     for part in parts {
         hash.update((part.len() as u64).to_le_bytes());
@@ -109,12 +110,36 @@ fn bundle_hash(parts: [&[u8]; 3]) -> String {
     hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// A plugin's strings, `locales/<locale>.json` (`en`, `zh-CN`), by locale, sorted; other files there are skipped.
+fn read_locales(folder: &Path) -> Vec<(String, Vec<u8>)> {
+    let is_locale = |s: &str| !s.is_empty() && s.split('-').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric()));
+    let mut out: Vec<(String, Vec<u8>)> = std::fs::read_dir(folder.join("locales"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let locale = entry.file_name().to_str()?.strip_suffix(".json")?.to_owned();
+            is_locale(&locale).then_some(())?;
+            Some((locale, std::fs::read(entry.path()).ok()?))
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// Locale → its strings as JSON, for the frontend to merge (`null` for a file that doesn't parse).
+fn parse_locales(locales: &[(String, Vec<u8>)]) -> serde_json::Map<String, Value> {
+    locales.iter().map(|(locale, bytes)| (locale.clone(), serde_json::from_slice(bytes).unwrap_or(Value::Null))).collect()
+}
+
 fn read_bundle(folder: &Path) -> Result<Bundle, String> {
     let manifest = std::fs::read(folder.join("plugin.json")).map_err(|e| format!("plugin.json: {e}"))?;
     let code = std::fs::read_to_string(folder.join("main.js")).map_err(|e| format!("main.js: {e}"))?;
     let styles = std::fs::read_to_string(folder.join("styles.css")).ok();
-    let hash = bundle_hash([&manifest, code.as_bytes(), styles.as_deref().unwrap_or_default().as_bytes()]);
-    Ok(Bundle { code, styles, hash })
+    let locales = read_locales(folder);
+    let fixed = [manifest.as_slice(), code.as_bytes(), styles.as_deref().unwrap_or_default().as_bytes()];
+    let hash = bundle_hash(fixed.into_iter().chain(locales.iter().flat_map(|(locale, bytes)| [locale.as_bytes(), bytes.as_slice()])));
+    Ok(Bundle { code, styles, locales, hash })
 }
 
 /// Workspace `root`'s plugin `id`, when it's accepted: `root` is trusted and the plugin's files hash to its pin now.
@@ -195,6 +220,8 @@ pub struct Installed {
     pin_path: Option<String>,
     /// A workspace's plugin: its folder is trusted and it's pinned with `hash`.
     accepted: bool,
+    /// Its strings by locale (`locales/*.json`), as read with `hash`.
+    locales: serde_json::Map<String, Value>,
 }
 
 /// The origin of the repository a manifest names: what it says of itself, not where it was fetched from.
@@ -218,16 +245,18 @@ fn list_in<R: Runtime>(app: &AppHandle<R>, plugins: &Path, root: Option<&str>) -
                 Ok(manifest) => (manifest, None),
                 Err(error) => (Value::Null, Some(error)),
             };
-            let (hash, pin_path, accepted) = match root {
+            let (hash, pin_path, accepted, locales) = match root {
                 Some(root) => {
-                    let hash = read_bundle(&folder).ok().map(|b| b.hash);
+                    let bundle = read_bundle(&folder).ok();
+                    let hash = bundle.as_ref().map(|b| b.hash.clone());
                     let pin = app.state::<crate::state::AppState>().plugin_pin(app, root, &id);
                     let accepted = hash.is_some() && pin == hash;
-                    (hash, Some(crate::state::plugin_pin_path(root, &id)), accepted)
+                    let locales = bundle.map(|b| parse_locales(&b.locales)).unwrap_or_default();
+                    (hash, Some(crate::state::plugin_pin_path(root, &id)), accepted, locales)
                 }
-                None => (None, None, false),
+                None => (None, None, false, parse_locales(&read_locales(&folder))),
             };
-            Some(Installed { scope: if root.is_some() { "workspace" } else { "global" }, claimed: claimed(&manifest), id, manifest, error, record, hash, pin_path, accepted })
+            Some(Installed { scope: if root.is_some() { "workspace" } else { "global" }, claimed: claimed(&manifest), id, manifest, error, record, hash, pin_path, accepted, locales })
         })
         .collect();
     out.sort_by(|a, b| a.id.cmp(&b.id));
@@ -263,7 +292,7 @@ pub async fn plugin_read<R: Runtime>(app: AppHandle<R>, window: tauri::Window<R>
     let folder = folder_of(&app, &id, root.as_deref())?;
     let pin = root.as_deref().map(|root| app.state::<crate::state::AppState>().plugin_pin(&app, root, &id));
     blocking(move || {
-        let Bundle { code, styles, hash } = read_bundle(&folder)?;
+        let Bundle { code, styles, hash, .. } = read_bundle(&folder)?;
         if pin.is_some_and(|pin| pin.as_deref() != Some(hash.as_str())) {
             return Err(format!("{id} changed since it was accepted in this workspace"));
         }
@@ -842,20 +871,31 @@ mod tests {
     }
 
     #[test]
-    fn a_pin_covers_the_manifest_the_code_and_the_styles_as_read() {
+    fn a_pin_covers_the_manifest_the_code_the_styles_and_the_strings_as_read() {
         let dir = temp("bundle");
+        let parts = |list: &[&str]| bundle_hash(list.iter().map(|s| s.as_bytes()));
         std::fs::write(dir.join("plugin.json"), r#"{"id":"p"}"#).unwrap();
         std::fs::write(dir.join("main.js"), "run()").unwrap();
         let bundle = read_bundle(&dir).unwrap();
-        assert_eq!(bundle.hash, bundle_hash([br#"{"id":"p"}"#, b"run()", b""]), "what's handed over is what's hashed");
-        assert_ne!(bundle_hash([b"a", b"bc", b""]), bundle_hash([b"ab", b"c", b""]), "bytes can't move between parts");
-        for (file, text) in [("styles.css", "p{}"), ("plugin.json", r#"{"id":"p","permissions":["network"]}"#), ("main.js", "run(2)")] {
+        assert_eq!(bundle.hash, parts(&[r#"{"id":"p"}"#, "run()", ""]), "what's handed over is what's hashed");
+        assert_ne!(parts(&["a", "bc", ""]), parts(&["ab", "c", ""]), "bytes can't move between parts");
+        std::fs::create_dir(dir.join("locales")).unwrap();
+        for (file, text) in [
+            ("styles.css", "p{}"),
+            ("plugin.json", r#"{"id":"p","permissions":["network"]}"#),
+            ("main.js", "run(2)"),
+            ("locales/en.json", "{}"),
+            ("locales/en.json", r#"{"plugins":{"p":{"a":"A"}}}"#),
+        ] {
             let before = read_bundle(&dir).unwrap().hash;
             std::fs::write(dir.join(file), text).unwrap();
             assert_ne!(read_bundle(&dir).unwrap().hash, before, "{file} is covered");
         }
         std::fs::write(dir.join("logo.svg"), "<svg/>").unwrap();
-        assert_eq!(read_bundle(&dir).unwrap().hash, bundle_hash([br#"{"id":"p","permissions":["network"]}"#, b"run(2)", b"p{}"]), "assets aren't");
+        std::fs::write(dir.join("locales/notes.txt"), "x").unwrap();
+        let expected = parts(&[r#"{"id":"p","permissions":["network"]}"#, "run(2)", "p{}", "en", r#"{"plugins":{"p":{"a":"A"}}}"#]);
+        assert_eq!(read_bundle(&dir).unwrap().hash, expected, "assets aren't, nor what in locales/ isn't a locale's");
+        assert_eq!(parse_locales(&read_bundle(&dir).unwrap().locales)["en"]["plugins"]["p"]["a"], "A");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

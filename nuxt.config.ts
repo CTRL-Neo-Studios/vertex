@@ -117,6 +117,10 @@ export default defineNuxtConfig({
                 "@vue-flow/core",
                 // Diff views (shared/utils/textDiff.ts); found at runtime otherwise, which reloads the window.
                 "diff",
+                // The installed icon sets' loader (app/plugins/icons.client.ts); found at runtime otherwise, which
+                // reloads the window mid-load ("head.hooks").
+                "@iconify/vue",
+                "@iconify/utils",
                 // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
                 // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
                 ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`)),

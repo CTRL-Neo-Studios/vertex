@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {TreeItem} from "@nuxt/ui"
 import type {UITreeNode} from "#shared/types/active/workspace"
+import type {VaultPickerProps} from "#shared/plugin/components"
 import {extensionOf} from "#shared/utils/vault"
 import {useActiveSessions} from "~/composables/active/useActiveSessions"
 import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIndex"
@@ -9,12 +10,7 @@ import {useActiveWorkspaceIndex} from "~/composables/active/useActiveWorkspaceIn
  * The vault as a tree to pick from: files, folders or either, one or several, optionally only some extensions
  * (comma-separated). Searching lists matches flat. The model is vault-relative paths (`''` = the vault root).
  */
-const props = withDefaults(defineProps<{
-    sessionId: string,
-    kind?: 'file' | 'folder' | 'any',
-    multiple?: boolean,
-    extensions?: string,
-}>(), {kind: 'any', multiple: false, extensions: ''})
+const props = withDefaults(defineProps<Omit<VaultPickerProps, 'modelValue'>>(), {kind: 'any', multiple: false, extensions: ''})
 const model = defineModel<string[]>({default: () => []})
 const {t} = useI18n()
 const {fileTree} = useActiveWorkspaceIndex(useActiveSessions().getSession(props.sessionId))

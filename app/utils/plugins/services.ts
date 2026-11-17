@@ -4,6 +4,7 @@ import {httpFetch} from '~/utils/httpFetch'
 import {pickToOpen, pickToSave} from '~/utils/dialogs'
 import {vertexInvoke} from '~/utils/vertexInvoke'
 import {registerTrustedFormat, type WindowTrust} from '~/composables/app/useTrust'
+import {pageTheme} from '~/utils/plugins/theme'
 
 /** Sent by Rust `data_set` to every window; `root` is `null` for a plugin's global document. */
 export const PLUGIN_DATA_CHANGED = 'vertex://plugin-data-changed'
@@ -43,10 +44,11 @@ export function dataStore<T>(plugin: string, root: string | null, own: (dispose:
 }
 
 /**
- * What `plugin` gets from the kernel; `root` is the window's workspace (`null` without one), `trust` the window's
- * (`useTrust`, made where the Nuxt app's context is).
+ * What `plugin` gets from the kernel; `root` is the window's workspace (`null` without one); `window` what the Nuxt
+ * app's context holds: its trust (`useTrust`) and its strings (`$i18n`).
  */
-export function hostServices(plugin: string, root: string | null, own: (dispose: () => void) => void, trust: WindowTrust): HostServices {
+export function hostServices(plugin: string, root: string | null, own: (dispose: () => void) => void, window: {trust: WindowTrust, i18n: HostServices['i18n']}): HostServices {
+    const {trust} = window
     return {
         http: {fetch: httpFetch},
         secrets: {
@@ -59,6 +61,8 @@ export function hostServices(plugin: string, root: string | null, own: (dispose:
             workspace: root ? dataStore(plugin, root, own) : undefined,
         },
         dialogs: {open: pickToOpen, save: pickToSave},
+        i18n: window.i18n,
+        ui: {theme: pageTheme()},
         trust: {
             allows: trust.allows,
             trustFile: async (path, hash) => { await trust.trustFile(path, hash) },

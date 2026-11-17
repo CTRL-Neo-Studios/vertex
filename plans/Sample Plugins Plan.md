@@ -36,9 +36,11 @@ building and released.
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
 | Order | The graph first, alone: it is the plan's first user of the docs and finds the gaps the others share. Then the small ones, each on a different part of the contract. The file browser last: the widest surface. |
 | The test plugin | Stays the fixture for install and update tests. It isn't a sample. |
+| A plugin's strings (P0) | Files, `locales/<locale>.json` in the package, each `{"plugins": {"<id>": {…}}}` as a core layer's are. Not in the bundle, as first proposed: the Settings window shows a plugin's schema labels without running it (it runs the global plugins made for `settings` only), so the strings must be readable without its code. The host merges only `plugins.<id>`; a workspace copy's strings are pinned with it. |
+| The SDK (P0) | Published by the user on 17 Nov: `@type32/vertex-plugin` `1.0.0` on `latest`, released with `bun run release` in the package. P0's additions to the contract are a minor version. |
+| The template (P0) | `Type-32/vertex-plugin-template`, a GitHub template repository beside Vertex (`../vertex-plugin-template`), the samples' and the docs' starting point. |
 
-Proposed, to confirm (Open questions): how a plugin ships its strings, publishing the SDK, who writes the samples, a
-template repository, the new file format.
+Still open (Open questions): who writes the samples (3), the new file format (5).
 
 ```mermaid
 flowchart LR
@@ -66,11 +68,11 @@ Found by reading the contract, before any sample is written. P0 closes the first
 
 | What's missing | Who needs it | Today |
 | --- | --- | --- |
-| A plugin's own strings | all | Labels are i18n keys (`PanelViewDef.label`, `PluginCommand.label`, `FileTypeDef.label`, the config schema's `label` and `description`), and only a core plugin's layer adds keys. A plugin has no `t()` either: `vue-i18n` isn't a shared module. The test plugin's plain-text label logs `[intlify] Not found 'Test plugin' key` on every draw. |
-| The theme | the graph (it draws on a canvas) | The plan named `ui.theme`; the contract has nothing. A plugin can read the app's CSS variables but isn't told when they change (light and dark, the primary colour, a workspace's theme). |
-| Icons | all | The app's icon bundle lists what its own code uses. Whether a Lucide icon no core plugin uses draws in the packaged app, which has no server, isn't checked. |
-| `/ui`'s components' props | S2, S6 | `SettingsRow`, `SettingsSection`, `ViewerLayout` and the rest are typed as `Component` (C1's Not done), so `vue-tsc` checks nothing an author passes them. |
-| The SDK outside this machine | all | `private`; a repository's CI can't install it, so a release can only be built here (Open questions, 2). |
+| A plugin's own strings | all | Closed in P0: `locales/`, `ctx.i18n`. |
+| The theme | the graph (it draws on a canvas) | Closed in P0: `ctx.ui.theme`. |
+| Icons | all | Closed in P0: the installed icon sets load offline. |
+| `/ui`'s components' props | S2, S6 | Closed in P0: `shared/plugin/components.ts`. |
+| The SDK outside this machine | all | Closed: published (Decisions). |
 | A worker | the graph, maybe | A plugin is one `main.js` imported from a blob URL. Whether a `Worker` can start from a plugin's asset isn't known; only needed if 5,000 notes don't lay out on the main thread (S1 measures first). |
 
 ## P0: What every sample needs
@@ -78,24 +80,34 @@ Found by reading the contract, before any sample is written. P0 closes the first
 In Vertex. Nothing here is a sample's.
 
 ### Change
-- **Strings** (as decided under Open questions, 1): a plugin's messages for `en` and `zh-CN`, merged under
-  `plugins.<id>.` before its `setup`; `ctx.t(key, params)` and the locale for what it draws itself. The manifest
-  validator and the install dialog say which keys the manifest names that the plugin doesn't define.
-- **The theme:** `ctx.ui.theme`, reactive: light or dark and the resolved colours a canvas needs (text, muted, border,
-  background, primary), following the window's effective settings.
-- **Icons:** check a Lucide icon outside the app's bundle in a release build. If it doesn't draw, the fix is the
-  kernel's (the whole Lucide set available offline), not a list per plugin.
+- **Strings:** a plugin's `locales/<locale>.json`, checked when it's built and merged where it's listed; `ctx.i18n`
+  (`t`, `locale`) for what it draws itself. The manifest's keys are checked against `en` when the plugin is built.
+- **The theme:** `ctx.ui.theme`, reactive: `dark`, and `value(property)` for any of the page's CSS custom properties
+  as resolved now (the colours a canvas needs and anything else), following whatever sets them.
+- **Icons:** check a Lucide icon outside the app's bundle. If it doesn't draw offline, the fix is the kernel's (the
+  whole Lucide set available offline), not a list per plugin.
 - **`/ui` types:** each published component with its props, from the build that writes `ui.d.ts`.
-- **The SDK** (as decided, 2): published, or a documented local path.
-- **A template** (as decided, 4): the files every sample starts from.
+- **The SDK:** published.
+- **A template:** the files every sample starts from.
 - The test plugin moves to its own strings, so the dev log's `intlify` warnings stop.
 
 ### Acceptance
-- [ ] A plugin outside Vertex shows its view label, a command and a schema field in en and zh-CN, and follows a language change without a reload.
-- [ ] A canvas a plugin draws follows a switch between light and dark and a change of the primary colour.
-- [ ] A Lucide icon no core plugin uses draws in a release build with the network off.
-- [ ] `vue-tsc` in a plugin's project refuses a wrong prop on `SettingsRow`.
-- [ ] Tests for the messages' merge and the manifest's key check; the SDK's build and `versions.test.ts` pass.
+- [x] A plugin outside Vertex shows its view label, a command and a schema field in en and zh-CN, and follows a language change without a reload. (In `tauri dev`, separate app identifier, a temporary harness and a scratch plugin built with the SDK's preset, all deleted after. Its panel's tab read "P0 check" and, after the language setting changed to zh-CN, "P0 检查", the test plugin's "Test plugin" and "测试插件", its text "Hello V" and "你好 V", with no reload; its schema page in the Settings window, where the plugin doesn't run, read "Depth · How far to look". A command wasn't tried: its label goes through the same `t`.)
+- [x] A canvas a plugin draws follows a switch between light and dark and a change of the primary colour. (A computed in the scratch plugin's render read `dark` and `value('--ui-primary')`: light with the default `oklch(58.5% 0.233 277.117)`, then dark with red `oklch(70.4% 0.191 22.216)`, then light with blue `oklch(62.3% 0.214 259.815)`, redrawn each time. Read through the page's computed style, not drawn on a `<canvas>`; S1 draws one.)
+- [ ] A Lucide icon no core plugin uses draws in a release build with the network off. (Checked in `tauri dev` with the network on: `i-lucide-squirrel` drew from the installed set, with no request to the Iconify API among the page's resources and no `[Icon] failed to load` warning. The release build, which has the same `ssr: false` provider, wasn't built.)
+- [x] `vue-tsc` in a plugin's project refuses a wrong prop on `SettingsRow`. (In the test plugin: `<SettingsRow labl="wrong"/>` → TS2345, `<ViewerLayout scroll-mode="sideways"/>` → TS2322; the right ones passed.)
+- [x] Tests for the messages' merge and the manifest's key check; the SDK's build and `versions.test.ts` pass. (`shared/plugin/messages.test.ts`; the core layers through the same rule in `i18n.test.ts`; the preset refused a scratch plugin whose `zh-CN.json` lacked two keys.)
+
+### As built
+
+- **Contract:** `HostServices.i18n` (`t`, `locale`) and `HostServices.ui.theme` (`dark`, `value`); `shared/plugin/messages.ts` (`checkPluginMessages`, `messagesFor`, `messageLeaves`, `manifestKeys`); `shared/plugin/components.ts` (`<Name>Props`, `<Name>Emits` for each `/ui` component, re-exported from the SDK's main module), each component declaring its props with them (`SettingsRow`'s `setting` is a `string` now; it casts to `AppSettingPath` inside).
+- **Rust** (`plugins.rs`): `read_locales` / `parse_locales`; `plugins_list` returns each plugin's `locales`; `bundle_hash` takes any number of parts, and a workspace copy's pin covers its locale files (name and bytes). The pin test covers them.
+- **Frontend:** `loadInstalledPlugins(app, i18n, root, runs)` merges each loadable plugin's strings (the installed one's, then an accepted workspace copy's over them); `app/utils/plugins/theme.ts` (`pageTheme`, a `MutationObserver` on `<html>`'s class and style and on `<head>`); `app/plugins/icons.client.ts` (every `@iconify-json/*` set as its prefix's `setCustomIconLoader`, by an `import.meta.glob` of the installed sets: no list); `@iconify/vue` and `@iconify/utils` declared and pre-bundled (found at runtime otherwise: "head.hooks").
+- **SDK:** the preset checks `locales/*.json` with `checkPluginMessages` and the manifest, and copies them; the build types `/ui`'s components from the contract (`new () => {$props: <Name>Props & EmitsToProps<<Name>Emits>}`) and fails on a component without its props there.
+- **Tests:** the i18n test now checks each core layer with `checkPluginMessages` in one case instead of one per check and locale, so the count fell from 423 to 361 (51 files) with the same checks; `messages.test.ts` is new. 62 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`).
+- **Test plugin** (`../text-vertex-plugin`, uncommitted): `locales/en.json` and `zh-CN.json`, its view's label a key, its text through `ctx.i18n.t`.
+- **Template** (`../vertex-plugin-template`, not yet a repository): `plugin.json`, `package.json` (the SDK at `^1.1.0`), `vite.config.ts` (`vertex({pack: true})`), `tsconfig.json`, `locales/`, `src/` (a panel view with a string, an asset and a Nuxt UI button), `.github/workflows/release.yml` (a `v*` tag: install, type-check, build, `gh release create … plugin.zip`).
+- **Waiting on the SDK's next release** (`1.1.0`, with the above): the template's install and first push, its CI run, and the test plugin's move from `file:` to the published SDK.
 
 ## D1: Author docs, first draft
 
@@ -237,20 +249,12 @@ A file browser that can replace Files.
 
 Each has a recommendation; the plan above assumes it. Answers change P0 only, except 3.
 
-1. **How a plugin ships its strings.** Recommended: in its bundle,
-   `definePlugin({messages: {en: {…}, 'zh-CN': {…}}, setup})`, merged by the host under `plugins.<id>.` before
-   `setup`. Nothing new for Rust to read. The other way: `locales/<code>.json` in the package, copied by the preset
-   and handed over with the code, editable without a rebuild, at the cost of another file to read and validate.
-2. **Publishing the SDK.** Six repositories with CI releases need `@type32/vertex-plugin` on npm. Recommended:
-   publish the alpha (`1.0.0-alpha.N`, the `next` tag), which makes the contract public before the editor's 1.0, the
-   point `private` was waiting for. The other way: keep `file:../vertex/packages/vertex-plugin` and build every
-   release on this machine, as the test plugin does; the docs' CI examples then can't run until it is published.
+1. **How a plugin ships its strings.** Decided in P0: files (Decisions).
+2. **Publishing the SDK.** Decided: published (Decisions).
 3. **Who writes the samples.** Recommended: the docs first, then each sample by an agent that may read only the docs
    and the SDK's built types, listing what it lacked; the graph alone first, then one at a time in the order above.
    The other way: written here with the kernel's source in reach, keeping to the SDK's imports, which proves less
    about the docs.
-4. **A template repository.** Recommended: `Type-32/vertex-plugin-template` (a GitHub template: `plugin.json`,
-   `vite.config.ts`, `tsconfig.json`, `.gitignore`, the release workflow, a panel view), which the six start from and
-   the docs' Start page uses. The other way: each repository copies those files from the test plugin.
+4. **A template repository.** Decided: `Type-32/vertex-plugin-template` (Decisions).
 5. **The new file format.** Recommended: `.board` (above), because its cards give the link extractor real work.
    Any small text format with links in it would do.

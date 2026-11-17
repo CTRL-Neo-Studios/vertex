@@ -55,15 +55,29 @@ const names = Object.fromEntries(Object.entries(modules).map(([id, module]) =>
     [id, checker.getExportsOfModule(module).filter(s => isValue(checker, s)).map(s => s.name).sort()]))
 write(join(dist, 'modules.json'), `${JSON.stringify(names, null, 2)}\n`)
 
-// `/ui`: its components are Vue's `Component` (the unstable tier); its functions keep their signatures, with the Vue
-// types they name imported. Checked with the contract below, where a name nothing declares fails the build.
+// `/ui`: each component typed by its props and events in the contract (`shared/plugin/components.ts`: `<Name>Props`,
+// and `<Name>Emits` for one that emits), so `vue-tsc` checks a plugin's template; a component without its props there
+// fails the build. Its functions keep their signatures, with the Vue types they name imported. Checked with the
+// contract below, where a name nothing declares fails the build.
+const componentTypes = new Set<string>()
+ts.forEachChild(ts.createSourceFile('components.ts', readFileSync(at('shared/plugin/components.ts'), 'utf8'), ts.ScriptTarget.Latest), node => {
+    if (ts.isInterfaceDeclaration(node)) componentTypes.add(node.name.text)
+})
 const vueTypes = new Set(checker.getExportsOfModule(modules.vue!).map(s => s.name))
 const uiLines: string[] = []
-const uiVue = new Set(['Component'])
+const uiVue = new Set<string>()
+const uiContract = new Set<string>()
 for (const symbol of checker.getExportsOfModule(modules['@type32/vertex-plugin/ui']!)) {
     const from = symbol.declarations?.[0]?.parent.parent
     if (from && ts.isExportDeclaration(from) && from.moduleSpecifier && ts.isStringLiteral(from.moduleSpecifier) && from.moduleSpecifier.text.endsWith('.vue')) {
-        uiLines.push(`export declare const ${symbol.name}: Component`)
+        const [props, emits] = [`${symbol.name}Props`, `${symbol.name}Emits`]
+        if (!componentTypes.has(props)) fail(`/ui: ${symbol.name} has no ${props} in shared/plugin/components.ts`)
+        uiContract.add(props)
+        if (componentTypes.has(emits)) {
+            uiContract.add(emits)
+            uiVue.add('EmitsToProps')
+        }
+        uiLines.push(`export declare const ${symbol.name}: new () => { $props: ${props}${componentTypes.has(emits) ? ` & EmitsToProps<${emits}>` : ''} }`)
         continue
     }
     const type = checker.typeToString(checker.getTypeOfSymbol(checker.getAliasedSymbol(symbol)), undefined, ts.TypeFormatFlags.NoTruncation).replaceAll('globalThis.', '')
@@ -71,7 +85,13 @@ for (const symbol of checker.getExportsOfModule(modules['@type32/vertex-plugin/u
     uiLines.push(`export declare const ${symbol.name}: ${type}`)
 }
 const uiSource = join(dist, 'ui.ts')
-write(uiSource, [`import type {${[...uiVue].sort().join(', ')}} from 'vue'`, '', ...uiLines, ''].join('\n'))
+write(uiSource, [
+    `import type {${[...uiVue].sort().join(', ')}} from 'vue'`,
+    `import type {${[...uiContract].sort().join(', ')}} from '#shared/plugin/components'`,
+    '',
+    ...uiLines,
+    '',
+].join('\n'))
 
 // The contract's types, the core plugins' APIs (their `declare module` augments `PluginApis`), `/ui` and the preset.
 // Their closure compiles on its own: only the contract and packages, nothing of the app's.

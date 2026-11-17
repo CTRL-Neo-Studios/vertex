@@ -91,7 +91,15 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     const nuxtApp = useNuxtApp()
     // A session window runs its workspace's accepted plugins; the Settings window knows those of the one it edits.
     const listed = () => (kind === 'settings' ? scope.root.value : workspace())
-    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp, listed(), kind === 'session').catch(e => console.error('[plugins] the installed plugins:', e))
+    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp, nuxtApp.$i18n, listed(), kind === 'session').catch(e => console.error('[plugins] the installed plugins:', e))
+    const i18n = nuxtApp.$i18n
+    /** `ctx.i18n`: the app's strings, a plugin's own among them (`loadInstalledPlugins` merges them). */
+    const strings = {
+        t: (key: string, params?: Record<string, unknown>) => i18n.t(key, params ?? {}),
+        get locale() {
+            return i18n.locale.value
+        },
+    }
     // The main window has no workspace, and no trust to read.
     if (kind !== 'main') await trust.load()
     await listInstalled()
@@ -125,7 +133,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
                 overridden: path => !!workspace() && scope.overridden(at(path)),
             }
         },
-        services: (id, own) => hostServices(id, workspace(), own, trust),
+        services: (id, own) => hostServices(id, workspace(), own, {trust, i18n: strings}),
         openSettings: path => appSettings.createOrFocusSettingsWindow(workspace(), `/settings/${path}`),
         assetUrl: pluginAssetUrl,
         onFailed(manifest, error) {

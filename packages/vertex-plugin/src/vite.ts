@@ -1,14 +1,15 @@
 /**
  * The Vite preset a community plugin builds with: `plugins: [vertex()]` in its `vite.config.ts` turns `src/main.ts`
  * and `plugin.json` into `dist/`, the folder Vertex installs (`plugin.json`, one `main.js`, `styles.css` when there's
- * CSS, the files of `public/`); with `pack`, also `plugin.zip` for a release.
+ * CSS, the strings of `locales/`, the files of `public/`); with `pack`, also `plugin.zip` for a release.
  */
-import {readdirSync, readFileSync, writeFileSync} from 'node:fs'
+import {existsSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve, sep} from 'node:path'
 import {crc32, deflateRawSync} from 'node:zlib'
 import tailwindcss from '@tailwindcss/vite'
 import type {Plugin, PluginOption} from 'vite'
 import {validateManifest} from '../../../shared/plugin/manifest'
+import {checkPluginMessages} from '../../../shared/plugin/messages'
 import {SHARED_GLOBAL} from '../../../shared/plugin/modules'
 
 const PREFIX = '\0vertex-shared:'
@@ -123,6 +124,16 @@ export function vertex(options: VertexOptions = {}): PluginOption[] {
                 const result = validateManifest(JSON.parse(readFileSync(resolve(root, 'plugin.json'), 'utf8')))
                 if (!result.ok) this.error(`plugin.json:\n  - ${result.errors.join('\n  - ')}`)
                 this.emitFile({type: 'asset', fileName: 'plugin.json', source: `${JSON.stringify(result.manifest, null, 2)}\n`})
+                // `locales/<locale>.json`, each `{"plugins": {"<id>": {…}}}`: checked as a core plugin's are (`en` has every
+                // key the others have, and what the manifest names), then copied as they are.
+                const dir = resolve(root, 'locales')
+                const files = Object.fromEntries((existsSync(dir) ? readdirSync(dir) : []).filter(f => f.endsWith('.json'))
+                    .map(f => [f.slice(0, -'.json'.length), JSON.parse(readFileSync(join(dir, f), 'utf8')) as unknown]))
+                const errors = checkPluginMessages(result.manifest.id, files, result.manifest)
+                if (errors.length) this.error(`locales/:\n  - ${errors.join('\n  - ')}`)
+                for (const [locale, messages] of Object.entries(files)) {
+                    this.emitFile({type: 'asset', fileName: `locales/${locale}.json`, source: `${JSON.stringify(messages, null, 2)}\n`})
+                }
             },
             closeBundle() {
                 if (!options.pack) return

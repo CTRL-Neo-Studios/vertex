@@ -1,22 +1,18 @@
 <script setup lang="ts">
+import type {SettingsRowProps} from "#shared/plugin/components";
 import type {AppSettingPath} from "#shared/utils/settings/scopes";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
 
 /**
  * One setting: label and description on the left, its control on the right. With `setting`, it follows the
  * Settings window's scope: in a workspace, a setting it can't override is disabled ("Global only"), and an
- * overridden one says so with a button back to the global value.
+ * overridden one says so with a button back to the global value. Published to plugins (`SettingsRowProps`).
  */
-const props = defineProps<{
-    label: string
-    description?: string
-    /** Replaces the description, in the error color. */
-    error?: string
-    setting?: AppSettingPath
-}>()
+const props = defineProps<SettingsRowProps>()
 const scope = useSettingsScope()
-const locked = computed(() => props.setting !== undefined && !scope.overridable(props.setting))
-const overridden = computed(() => props.setting !== undefined && scope.overridden(props.setting))
+const setting = computed(() => props.setting as AppSettingPath | undefined)
+const locked = computed(() => setting.value !== undefined && !scope.overridable(setting.value))
+const overridden = computed(() => setting.value !== undefined && scope.overridden(setting.value))
 </script>
 
 <template>
@@ -37,7 +33,7 @@ const overridden = computed(() => props.setting !== undefined && scope.overridde
             variant="ghost"
             icon="i-lucide-undo-2"
             :label="$t('app.settings.scope.useGlobal')"
-            @click="scope.reset([props.setting!])"
+            @click="scope.reset([setting!])"
         />
         <fieldset class="shrink-0 flex items-center gap-2 min-w-0" :disabled="locked">
             <slot/>
