@@ -45,6 +45,11 @@ release with them.
 itself (Files' New, Delete, Rename, moves and their undo), not only other programs, and a rename keeps a file's
 `modifiedTime`. A plugin that relies on any of them sets `minAppVersion` to the first release with them.
 
+1.4.0 also shares `@internationalized/date` (Nuxt UI's date inputs need Vertex's copy), and a plugin may import Nuxt
+UI's components by file (`@nuxt/ui/components/Button.vue`), so a component library built on Nuxt UI works inside one
+([UI](ui.md#nuxt-ui)). Both are the preset's and the host's: a plugin built with them needs a Vertex that has them, so
+it sets `minAppVersion` to the first release with them.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

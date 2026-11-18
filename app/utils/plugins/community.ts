@@ -1,7 +1,8 @@
 /**
  * Community plugins' code: what it imports from the host, and running it. Loaded only where a community plugin runs
  * (by the loader), so its namespace imports keep every shared module whole in its own chunk, not in the app's.
- * Nuxt UI is the app's for them too: its composables are a shared module, its components are registered globally.
+ * Nuxt UI is the app's for them too: its composables are a shared module, its components are registered globally (and
+ * looked up by name for an import of one's file, `NUXT_UI_COMPONENT`).
  */
 import * as autocomplete from '@codemirror/autocomplete'
 import * as commands from '@codemirror/commands'
@@ -12,6 +13,7 @@ import * as lint from '@codemirror/lint'
 import * as search from '@codemirror/search'
 import * as state from '@codemirror/state'
 import * as view from '@codemirror/view'
+import * as internationalizedDate from '@internationalized/date'
 import * as lezerCommon from '@lezer/common'
 import * as lezerHighlight from '@lezer/highlight'
 import * as lezerMarkdown from '@lezer/markdown'
@@ -25,7 +27,7 @@ import {nuxtUiComponents} from '#build/nuxt-ui-components.mjs'
 import * as api from '#shared/plugin/api'
 import * as files from '#shared/plugin/files'
 import * as links from '#shared/plugin/links'
-import {namedIn, SHARED_GLOBAL, type SharedModuleId} from '#shared/plugin/modules'
+import {namedIn, NUXT_UI_COMPONENT, SHARED_GLOBAL, type SharedModuleId} from '#shared/plugin/modules'
 import * as text from '#shared/plugin/text'
 import * as vault from '#shared/plugin/vault'
 import * as ui from '~/plugin/ui'
@@ -44,6 +46,7 @@ const MODULES: Record<SharedModuleId, object> = {
     '@codemirror/search': search,
     '@codemirror/state': state,
     '@codemirror/view': view,
+    '@internationalized/date': internationalizedDate,
     '@lezer/common': lezerCommon,
     '@lezer/highlight': lezerHighlight,
     '@lezer/markdown': lezerMarkdown,
@@ -71,7 +74,7 @@ const lazy = new Map<string, Component & { __asyncLoader(): Promise<unknown> }>(
 export async function importPluginCode(code: string, app: App): Promise<{ default?: unknown }> {
     const g = globalThis as Record<string, unknown>
     if (!g[SHARED_GLOBAL]) {
-        g[SHARED_GLOBAL] = Object.freeze({...MODULES})
+        g[SHARED_GLOBAL] = Object.freeze({...MODULES, [NUXT_UI_COMPONENT]: (name: string) => app.component(name)})
         for (const [name, load] of Object.entries(NUXT_UI_COMPONENTS)) {
             // Nuxt registers some globally itself (the prose components).
             if (app.component(name)) continue

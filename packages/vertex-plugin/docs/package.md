@@ -62,9 +62,12 @@ Nuxt UI in a window, and a plugin's `ref` or toast is the app's:
 - `vue`;
 - `@codemirror/autocomplete`, `commands`, `lang-markdown`, `language`, `language-data`, `lint`, `search`, `state`,
   `view`, and `@lezer/common`, `highlight`, `markdown`;
+- `@internationalized/date`, the dates Nuxt UI's date and time inputs take: they tell a date from a date-time with
+  `instanceof`, so a date made with a copy of the plugin's own would be neither;
 - `@type32/codemirror-rich-obsidian-editor`, `/kit`, `/ext` (Vertex's editor);
-- `@nuxt/ui/composables` (`useToast`, `useOverlay`…). Nuxt UI's components aren't imported: they're there by name.
-  Any other import from `@nuxt/ui` fails the build;
+- `@nuxt/ui/composables` (`useToast`, `useOverlay`…). Nuxt UI's components are there by name; an import of one's
+  file (`@nuxt/ui/components/Button.vue`, as a component library built on Nuxt UI has) is Vertex's component of that
+  name. Any other import from `@nuxt/ui` fails the build;
 - this package: `@type32/vertex-plugin` (`definePlugin`), `/ui` ([Vertex's components](ui.md#vertexs-components)),
   `/vault`, `/links`, `/files`, `/text` (the helpers below).
 

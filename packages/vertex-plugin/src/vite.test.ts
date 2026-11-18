@@ -5,7 +5,7 @@ import * as state from '@codemirror/state'
 import {build} from 'vite'
 import * as vue from 'vue'
 import {afterAll, describe, expect, it} from 'vitest'
-import {SHARED_GLOBAL} from '../../../shared/plugin/modules'
+import {namedIn, NUXT_UI_COMPONENT, SHARED_GLOBAL} from '../../../shared/plugin/modules'
 import {sharedModules} from './vite'
 
 const dir = mkdtempSync(join(tmpdir(), 'vertex-sdk-'))
@@ -20,8 +20,9 @@ async function bundle(code: string): Promise<string> {
         configFile: false,
         logLevel: 'silent',
         root: dir,
-        plugins: [sharedModules({'vue': namesOf(vue), '@codemirror/state': namesOf(state)})],
-        build: {lib: {entry: join(dir, 'main.js'), formats: ['es'], fileName: () => 'out.js'}, outDir: join(dir, 'dist')},
+        plugins: [sharedModules({'vue': namesOf(vue), '@codemirror/state': namesOf(state)}, {'@nuxt/ui/components/Button.vue': 'UButton'})],
+        // Minified, as a plugin may be: the names the host preloads by must survive it.
+        build: {lib: {entry: join(dir, 'main.js'), formats: ['es'], fileName: () => 'out.js'}, outDir: join(dir, 'dist'), minify: true},
     })
     return readFileSync(join(dir, 'dist/out.js'), 'utf8')
 }
@@ -40,7 +41,16 @@ describe('sharedModules', () => {
         await expect(bundle("import {notInVue} from 'vue'; export {notInVue}")).rejects.toThrow(/notInVue/)
     })
 
+    it("gives an import of a Nuxt UI component's file the host's component, named where the host looks", async () => {
+        const code = await bundle("import UButton from '@nuxt/ui/components/Button.vue'; export {UButton}")
+        const button = {name: 'UButton'}
+        ;(globalThis as Record<string, unknown>)[SHARED_GLOBAL] = {[NUXT_UI_COMPONENT]: (name: string) => (name === 'UButton' ? button : undefined)}
+        const plugin = await import(/* @vite-ignore */ `data:text/javascript,${encodeURIComponent(code)}`)
+        expect(plugin.UButton).toBe(button)
+        expect(namedIn(code, ['UButton', 'UCard'])).toEqual(['UButton'])
+    })
+
     it("fails the build on a Nuxt UI import it doesn't share, rather than bundle a second Nuxt UI", async () => {
-        await expect(bundle("import UButton from '@nuxt/ui/components/Button.vue'; export {UButton}")).rejects.toThrow(/Nuxt UI is the app's/)
+        await expect(bundle("import {omit} from '@nuxt/ui/utils'; export {omit}")).rejects.toThrow(/Nuxt UI is the app's/)
     })
 })

@@ -81,8 +81,8 @@ flowchart LR
 
 ## Format 1.1
 
-Done before T0 (18 Nov), in `../tasks`, uncommitted, for the user to publish (a changeset, minor). The answers to
-the plan's first open questions, 2 to 4.
+Done before T0 (18 Nov), in `../tasks`; the user published it as `@type32/tasks` 0.2.0. The answers to the plan's
+first open questions, 2 to 4.
 
 ### As built
 - **Views** (`views`, SPEC "View"): synced records, merged like lists. `groupBy` is `listId`, `starred` or
@@ -105,12 +105,13 @@ the plan's first open questions, 2 to 4.
 
 ## Gaps
 
-Found by reading, before anything is written. T0 closes the first two, which everything else stands on; T6 the others.
+Found by reading, before anything is written. T0 closed the first two (checked: a `CalendarDateTime` of another copy
+of the package is not one to Reka's `isCalendarDateTime`, of Vertex's copy it is); T6 closes the others.
 
 | What's missing | Who needs it | Today |
 | --- | --- | --- |
-| `@internationalized/date` as a shared module | Any plugin with a date or time input | Nuxt UI's inputs (Reka's `isCalendarDateTime`, `isZonedDateTime`) test values with `instanceof`. A plugin that bundles its own copy of the package hands them objects of another class: `UInputDate`, `UInputTime` and `UCalendar` take a date-time for a date. The app already ships the package. |
-| Nuxt UI's components by import | A plugin that uses a component library built on Nuxt UI | The preset refuses every `@nuxt/ui` import but `/composables`: components are the host's, by name. A compiled library imports them by file. The preset has the list of names and files (`nuxt-ui-components.json`): an import of a component's file can become the host's component of that name. |
+| `@internationalized/date` as a shared module | Any plugin with a date or time input | Closed in T0. Nuxt UI's inputs (Reka's `isCalendarDateTime`, `isZonedDateTime`) test values with `instanceof`; a plugin that bundled its own copy handed them objects of another class, and `UInputDate` took a date-time for a date. |
+| Nuxt UI's components by import | A plugin that uses a component library built on Nuxt UI | Closed in T0. The preset refused every `@nuxt/ui` import but `/composables`: components were the host's, by name only. |
 | Reading and writing a file picked in a dialog | Import and export (iCalendar) | `ctx.dialogs.open` and `save` return a path that "is this window's to read or write", and a community plugin has nothing to do either with: the core plugins that export (Canvas, Bases) import Tauri's fs. |
 | Notifications | Alerts | Nothing in the contract. The kernel has the permission and the Tauri plugin. |
 
@@ -132,10 +133,44 @@ The risky part first: a component library on Nuxt UI inside a plugin. Nothing of
 - **Measured:** the plugin's `main.js` with `@type32/tasks` and the library in it, and what loading it costs a window.
 
 ### Acceptance
-- [ ] The component draws and works in the three consumers: the tooltip, the popover, a date and a time picked, the
+- [x] The component draws and works in the three consumers: the tooltip, the popover, a date and a time picked, the
   theme's primary colour followed.
-- [ ] In the plugin, a `CalendarDateTime` made by the plugin is taken as one by `UInputDate` (it shows its time).
-- [ ] The sizes and the load time, in this plan; a decision on splitting if they ask for one.
+- [x] In the plugin, a `CalendarDateTime` made by the plugin is taken as one by `UInputDate` (it shows its time).
+- [x] The sizes and the load time, in this plan; a decision on splitting if they ask for one.
+
+### As built
+- **Vertex** (uncommitted, for the user): `@internationalized/date` in `SHARED_PACKAGES` (`shared/plugin/modules.ts`),
+  the host's copy in `MODULES` (`app/utils/plugins/community.ts`), a dependency of the app and of the SDK (its
+  versions test pins it). An import of a Nuxt UI component's file becomes the host's component: the SDK's build writes
+  `nuxt-ui-components.json` (public path → name, from the list it already types components by), the preset maps each
+  such import to `__vertexModules['@nuxt/ui/components']('UButton')` (`NUXT_UI_COMPONENT`: the host puts
+  `app.component` there). A call with the name as a string, because a minified plugin turns `["UButton"]` into
+  `.UButton` and the host preloads the components it finds named in quotes (`namedIn`). SDK tests: 8 (one new: the
+  import gives the host's component and its name survives minifying, built minified). Docs: `package.md`, `ui.md`
+  (a component library inside a plugin, `shallowRef` for dates), `versions.md` (1.4.0), Concepts and Structures,
+  SMOKE 134. Vertex's typecheck at the 7 baseline errors, 391 tests, lint clean.
+- **The library** (`../tasks-ui-components`, uncommitted, `git init` only, for the user to publish): `TaskProbe`.
+  Code by Vite's library mode (`dist/index.js`, `dist/nuxt.js`; `vue`, `@nuxt/ui`, `@internationalized/date`,
+  `@type32/tasks`, `@nuxt/kit` external), types by `vue-tsc`, the stylesheet by Tailwind's CLI (Vite's library mode
+  won't take a CSS entry, and a CSS import in the code would reach the declarations). `style.css` declares Tailwind's
+  layer order first, so loaded before the consumer's sheet it can't move `utilities` ahead of `base`; it sources
+  `./components` explicitly, so a `.gitignore` changes nothing. The Nuxt module adds the sheet and transpiles the
+  package; checked that it must: without it the production server answers 500 (`Unknown file extension ".vue"` for
+  Nuxt UI's `Button.vue`). `README.md`, MIT `LICENSE` (holder "Type32", for the user to correct).
+- **Consumers**, each from the packed library (`bun pm pack`, as npm would ship it): a Vue app (`@nuxt/ui/vite`),
+  dev and production build; a Nuxt app, dev and production server (the probe's value in the server's HTML, no
+  hydration warning); Vertex (`tauri dev`, the plugin installed from its `dist/`, by a temporary script). In all
+  three: the tooltip, the popover, the date input with hour and minute segments, the value following the inputs, the
+  library's `tk:px-6` beating Nuxt UI's own padding on `UButton` (24 px: its sheet loads after the app's), dark mode,
+  and in Vertex an emerald theme followed.
+- **The plugin** (`../vertex-plugin-tasks`, first commit, local): a `.task` viewer that parses the file
+  (`@type32/tasks` 0.2.0 from npm, the user's release of Format 1.1) and draws the probe. The SDK and the library are
+  `file:` dependencies until their releases. Found: `ref(new CalendarDateTime(…))` doesn't type-check (Vue's
+  `UnwrapRef` drops the class's private fields); `shallowRef`, which a date (immutable) wants anyway.
+- **Measured:** `main.js` 290 KB minified, 77 KB gzipped, almost all `@type32/tasks` (259 KB alone: zod, the
+  Temporal polyfill, `js-yaml`, `smol-toml`); the library adds a few KB. Parsing and running it again in a window:
+  15 to 25 ms (eight runs, dev build, light and dark runs alike). No split: a few frames, once per window that loads
+  the plugin.
 
 ## T1: Files and the list
 

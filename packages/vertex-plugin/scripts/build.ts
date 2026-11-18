@@ -162,6 +162,10 @@ write(join(typesDir, 'nuxt-ui.d.ts'), [
     '',
 ].join('\n'))
 
+// The preset turns an import of a component's file (a component library's) into the host's component of that name.
+write(join(dist, 'nuxt-ui-components.json'), `${JSON.stringify(Object.fromEntries(Object.entries(nuxtUiFiles)
+    .map(([name, file]) => [nuxtUiPath(file), name])), null, 2)}\n`)
+
 write(join(typesDir, 'index.d.ts'), [
     "export * from './shared/plugin/api'",
     "import './nuxt-ui'",

@@ -2,9 +2,14 @@
  * The modules a community plugin imports and gets the host's copy of, so there is one Vue, one CodeMirror, one editor
  * and one Nuxt UI: the host puts them on `globalThis[SHARED_GLOBAL]` (`app/utils/plugins/community.ts`), and the SDK's
  * preset turns each import of them into a read from there (`packages/vertex-plugin`). A shared package's new major is a
- * new `apiVersion`. Nuxt UI's components aren't imported: the host registers every one globally, by name.
+ * new `apiVersion`. Nuxt UI's components aren't imported: the host registers every one globally, by name, and an
+ * import of one's file (`@nuxt/ui/components/Button.vue`, what a component library built on Nuxt UI has) becomes
+ * that one (`NUXT_UI_COMPONENT`).
  */
 export const SHARED_GLOBAL = '__vertexModules'
+
+/** On `globalThis[SHARED_GLOBAL]`: the host's Nuxt UI component of a name (`UButton`), as its templates draw it. */
+export const NUXT_UI_COMPONENT = '@nuxt/ui/components'
 
 /** Packages, by the specifier a plugin imports. */
 export const SHARED_PACKAGES = [
@@ -18,6 +23,8 @@ export const SHARED_PACKAGES = [
     '@codemirror/search',
     '@codemirror/state',
     '@codemirror/view',
+    // Nuxt UI's date inputs tell a date from a date-time with `instanceof`: a plugin's own copy's dates are neither.
+    '@internationalized/date',
     '@lezer/common',
     '@lezer/highlight',
     '@lezer/markdown',

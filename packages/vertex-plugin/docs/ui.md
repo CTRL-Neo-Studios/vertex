@@ -90,6 +90,12 @@ const name = await modal.open({current: 'Hello'}).result // what `emit('close', 
 Nothing else may be imported from `@nuxt/ui`: it would be a second Nuxt UI beside Vertex's, and the build refuses it.
 The SDK types the components, so `vue-tsc` checks their props.
 
+A component library built on Nuxt UI works when it imports Nuxt UI's components by file
+(`import UButton from '@nuxt/ui/components/Button.vue'`): the build makes each one Vertex's component of that name. Its
+stylesheet is imported with the plugin's (`import 'the-library/style.css'` in `main.ts`) and lands in `styles.css`; its
+classes need a prefix of their own, as a plugin's do. Dates for Nuxt UI's date and time inputs are `@internationalized/date`'s,
+which is Vertex's copy too; hold one in a `shallowRef` (`ref` types it as a plain object without its private fields).
+
 ### Icons
 
 An icon is an Iconify name: `i-lucide-hand`, in an `icon` prop or `<UIcon name="i-lucide-hand"/>`. Lucide

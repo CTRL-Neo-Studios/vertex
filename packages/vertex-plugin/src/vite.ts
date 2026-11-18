@@ -10,7 +10,7 @@ import tailwindcss from '@tailwindcss/vite'
 import type {Plugin, PluginOption} from 'vite'
 import {validateManifest} from '../../../shared/plugin/manifest'
 import {checkPluginMessages} from '../../../shared/plugin/messages'
-import {SHARED_GLOBAL} from '../../../shared/plugin/modules'
+import {NUXT_UI_COMPONENT, SHARED_GLOBAL} from '../../../shared/plugin/modules'
 
 /** A manifest's `description`: one line under the plugin's name in Settings. */
 const DESCRIPTION_MAX = 160
@@ -18,25 +18,30 @@ const PREFIX = '\0vertex-shared:'
 
 /**
  * Each import of a shared module (`vue`, `@codemirror/state`…, the SDK's own) becomes a read from the host's copy on
- * `globalThis`. `names` are each one's exports as the host has them, so importing one it lacks fails the build. Any
- * other part of Nuxt UI fails too: a bundled copy would be a second Nuxt UI beside the app's.
+ * `globalThis`. `names` are each one's exports as the host has them, so importing one it lacks fails the build. An
+ * import of a Nuxt UI component's file (`components`: its specifier → the name the host registers it under) becomes
+ * the host's component, so a component library built on Nuxt UI draws with the app's. Any other part of Nuxt UI fails:
+ * a bundled copy would be a second Nuxt UI beside the app's.
  */
-export function sharedModules(names: Record<string, string[]>): Plugin {
+export function sharedModules(names: Record<string, string[]>, components: Record<string, string> = {}): Plugin {
+    const host = (name: string) => `globalThis[${JSON.stringify(SHARED_GLOBAL)}][${JSON.stringify(name)}]`
     return {
         name: 'vertex:shared-modules',
         enforce: 'pre',
         resolveId(id) {
-            if (Object.hasOwn(names, id)) return PREFIX + id
+            if (Object.hasOwn(names, id) || Object.hasOwn(components, id)) return PREFIX + id
             if (id === '@nuxt/ui' || id.startsWith('@nuxt/ui/')) {
-                this.error(`${id}: Nuxt UI is the app's. Use its components by name (<UButton>, resolveComponent('UButton')) and its composables from '@nuxt/ui/composables'.`)
+                this.error(`${id}: Nuxt UI is the app's. Use its components by name (<UButton>, resolveComponent('UButton')) or by their files ('@nuxt/ui/components/Button.vue'), and its composables from '@nuxt/ui/composables'.`)
             }
         },
         load(id) {
             if (!id.startsWith(PREFIX)) return
             const name = id.slice(PREFIX.length)
-            const shared = `globalThis[${JSON.stringify(SHARED_GLOBAL)}][${JSON.stringify(name)}]`
+            // A call with the name as a string, which minifying keeps: the host loads the components a plugin's code
+            // names before running it (`namedIn`).
+            if (Object.hasOwn(components, name)) return `export default /* @__PURE__ */ ${host(NUXT_UI_COMPONENT)}(${JSON.stringify(components[name])});`
             // A pure call per name, so the names a plugin doesn't use leave its bundle.
-            const read = (key: string) => `/* @__PURE__ */ (() => ${shared}[${JSON.stringify(key)}])()`
+            const read = (key: string) => `/* @__PURE__ */ (() => ${host(name)}[${JSON.stringify(key)}])()`
             return names[name]!
                 .map(key => (key === 'default' ? `export default ${read(key)};` : `export const ${key} = ${read(key)};`))
                 .join('\n')
@@ -103,9 +108,9 @@ function zip(files: { name: string, data: Buffer }[]): Buffer {
 export function vertex(options: VertexOptions = {}): PluginOption[] {
     let root = process.cwd()
     let outDir = 'dist'
-    const names = JSON.parse(readFileSync(new URL('./modules.json', import.meta.url), 'utf8')) as Record<string, string[]>
+    const json = (file: string) => JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'))
     return [
-        sharedModules(names),
+        sharedModules(json('./modules.json') as Record<string, string[]>, json('./nuxt-ui-components.json') as Record<string, string>),
         tailwindcss(),
         {
             name: 'vertex:package',
