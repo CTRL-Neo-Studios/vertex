@@ -63,11 +63,20 @@ export interface SettingsListAction<T extends { id: string } = { id: string }> {
     run(items: T[]): unknown
 }
 
+/** One of a `SettingsList`'s filters beside its search (All, On, Off): `test` keeps a row; none keeps all. */
+export interface SettingsListFilter<T extends { id: string } = { id: string }> {
+    id: string
+    /** Already translated. */
+    label: string
+    test?(item: T): boolean
+}
+
 /**
  * A list in a `SettingsSection`: a search over its rows, and with `actions`, a checkbox per row, one for all the rows
  * shown, and the actions for the selection. Rows are the `row` slot (`{item}`), with the `actions` slot (`{item}`) at
  * their end; `group` puts headings between them, in the items' order. Every part is a `SettingsRow`, so it lines up
- * with the section's other rows. `v-model:query` holds the search (in the URL, so a Back link returns to it).
+ * with the section's other rows. `v-model:query` holds the search (in the URL, so a Back link returns to it);
+ * `v-model:filter` the chosen filter's id (default the first).
  */
 export interface SettingsListProps<T extends { id: string } = { id: string }> {
     items: readonly T[]
@@ -81,6 +90,7 @@ export interface SettingsListProps<T extends { id: string } = { id: string }> {
     selectable?(item: T): boolean
     /** A row's heading, already translated: a heading before the first row of each. */
     group?(item: T): string
+    filters?: readonly SettingsListFilter<T>[]
 }
 
 /** A settings page: a sticky header with the title (`header-leading`, `header-trailing`) over the scrolling content. */

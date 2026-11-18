@@ -164,10 +164,21 @@ Reports 1, 3 (the row) and 4.
   concern, so the page is its template.
 
 ### Acceptance
-- [ ] No row says "Version"; a community plugin's version is beside its name.
-- [ ] Typing "gra" leaves the graph; the Updates filter leaves the plugins with one.
-- [ ] Four selected core plugins turned off: four switches off, one restart prompt.
-- [ ] Every row is one line of text at the default window size, with the graph installed.
+- [x] No row says "Version"; a community plugin's version is beside its name. (In `tauri dev` with the graph installed: the list's text has no "Version" (nor "版本"); the graph's row says "0.1.0" beside its name; no core row has a version.)
+- [x] Typing "gra" leaves the graph; the Updates filter leaves the plugins with one. (The graph installed with an older release in its record: Check for updates found v0.1.0; "gra" left `community:graph` alone, and so did Updates.)
+- [x] Four selected core plugins turned off: four switches off, one restart prompt. (AI, AI assistant, Backlinks and Bases selected, "Turn off (4)": four switches off, one dialog, "Restart Vertex to turn off AI, AI assistant, and Backlinks?": Bases ran in no window, so it doesn't wait. Later: three rows say Waits for a restart.)
+- [x] Every row is one line of text at the default window size, with the graph installed. (No name or description line is taller than a line; the graph's description, beside Update and Use its repository, is cut with its whole text as its tooltip.)
+
+### As built
+
+- **`SettingsList`'s filters:** `filters` (`SettingsListFilter`: `{id, label, test?}`, the first the default) in a select beside the search, `v-model:filter`. A contract addition, as the plan's lists are; the SDK types it.
+- **The page** is one section, All plugins (its `info` what Community plugins' and This workspace's said: what a community plugin may do, where a workspace's live), with Install… and Review in its header; a second, Updates, has Check for updates in its header and Check automatically as its row (the plan had Check for updates beside Install…; beside its switch it reads as one thing). The list's groups are the three headings; a group's description and its "none" went (Core plugins never was empty; an empty Community or This workspace group has no heading).
+- **A row:** icon, name, a community or workspace plugin's version, one line (the description, or the error), badges (Changed in this workspace, Waits for trust, Waits for a restart), then Update (its target release in the tooltip), Use its repository (when it names one it wasn't fetched from), Install… (a workspace's missing one), Use global, the gear, the switch. What `describe` joined (version, author, needs, uses) and the origin are the lines of an info button beside the name until U5's dialog; the origin's link went with them (U5 has it). Remove is the selection's action only.
+- **Actions:** Turn on, Turn off (one `scope.set` for all; `offerRestart` names, with `Intl.ListFormat`, those still running), Update (each through the install dialog, in turn; a workspace's only while it's trusted), Remove (`PluginRemoveModal` once with the names; one settings write each for the global and the workspace's; then one restart question).
+- **The script:** `app/composables/plugins/usePluginSwitches.ts` (`isOn`, `setOn(manifests, on)`, `blocked`, `reasonText`, `waiting`, `offerRestart`, `sourceOf`, and `enabledPath`/`sourcePath`), `usePluginUpdates.ts` (`updates`, `checkUpdates`, `checkAutomatically`), `usePluginInstalls.ts` (`stageAndInstall`, `install`, `otherWays`, `remove`). The page's script builds the rows, filters and actions (the page went from 463 lines to 282, its template included).
+- **Strings:** added `all`, `allDescription`, `allInfo`, `search`, `filter.*`, `turnOn`, `turnOff`, `updateSelected`, `removeSelected`, `updates`, and the list's `filter`; removed `coreDescription`, `communityDescription`, `communityInfo`, `workspaceDescription`, `workspaceInfo`, `noneInstalled`, `noneInWorkspace`, `openOrigin`.
+- **Not run in the app:** the This workspace group (a trusted workspace with its own plugins): its rows are built from the same data as before.
+- **Numbers:** 371 tests (54 files); typecheck unchanged; the SDK builds with `SettingsListFilter`.
 
 ## U5: A plugin's details and README
 

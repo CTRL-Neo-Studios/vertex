@@ -3,12 +3,13 @@ import {ask} from "@tauri-apps/plugin-dialog";
 import type {SettingsListAction, SettingsListProps} from "#shared/plugin/components";
 
 /**
- * A list in a settings section (`SettingsListProps`): a search, and with actions a checkbox per row, one for all the
- * rows shown and the actions on the selection; headings by `group`; "nothing yet" and "nothing matches". Every part
- * is a `SettingsRow`, so the section's anatomy holds. Published to plugins.
+ * A list in a settings section (`SettingsListProps`): a search and its filters, and with actions a checkbox per row,
+ * one for all the rows shown and the actions on the selection; headings by `group`; "nothing yet" and "nothing
+ * matches". Every part is a `SettingsRow`, so the section's anatomy holds. Published to plugins.
  */
 const props = defineProps<SettingsListProps<T>>()
 const query = defineModel<string>('query', {default: ''})
+const filter = defineModel<string>('filter')
 defineSlots<{
     row(props: { item: T }): unknown
     actions?(props: { item: T }): unknown
@@ -16,8 +17,9 @@ defineSlots<{
 const {t} = useI18n()
 
 const shown = computed(() => {
+    const test = (props.filters?.find(f => f.id === filter.value) ?? props.filters?.[0])?.test
     const words = query.value.trim().toLowerCase()
-    return words ? props.items.filter(item => props.text(item).toLowerCase().includes(words)) : props.items
+    return props.items.filter(item => (!test || test(item)) && (!words || props.text(item).toLowerCase().includes(words)))
 })
 /** The rows shown, each with the heading it starts, if any. */
 const rows = computed(() => shown.value.map((item, i) => {
@@ -75,6 +77,16 @@ async function run(action: SettingsListAction<T>, targets: T[]) {
                     @update:model-value="on => toggle(selectableShown.map(item => item.id), on === true)"
                 />
                 <UInput v-model="query" class="flex-1 min-w-0" size="sm" icon="i-lucide-search" :placeholder data-settings-list-search/>
+                <USelect
+                    v-if="filters?.length"
+                    :model-value="filter ?? filters[0]!.id"
+                    class="w-32"
+                    size="sm"
+                    :items="filters.map(f => ({label: f.label, value: f.id}))"
+                    :aria-label="t('app.settings.list.filter')"
+                    data-settings-list-filter
+                    @update:model-value="filter = $event"
+                />
                 <UButton
                     v-for="{action, targets} in offered"
                     :key="action.id"
