@@ -395,10 +395,59 @@ In the library, then in the plugin.
   extractor, so backlinks and renames see them); a note's menu: Make this note a task.
 
 ### Acceptance
-- [ ] A note with `task:` shows in the panel and on a `.task` file's calendar set to show the workspace's; checked
+- [x] A note with `task:` shows in the panel and on a `.task` file's calendar set to show the workspace's; checked
   off there, its frontmatter has the new status, its body the same bytes.
-- [ ] Renaming a note a task's notes link to updates the link in the `.task` file.
-- [ ] A workspace of 12,000 notes, 500 of them tasks: the panel opens without a pause over 200 ms.
+- [x] Renaming a note a task's notes link to updates the link in the `.task` file.
+- [x] A workspace of 12,000 notes, 500 of them tasks: the panel opens without a pause over 200 ms.
+
+### As built
+- **No Vertex change.** Everything is the plugin's (local commit), and one addition to the library: `TaskList`
+  exposes `open(id)` (the task's editor open, its row scrolled to, the lists column back to All tasks).
+- **The workspace's tasks** (`workspace.ts`, one store per session, living as long as it): notes from
+  `index.files()` whose `properties.task` is an object, each checked once per version of the note (the index makes a
+  new object when it reads a note again, so a `WeakMap` keys the check); `.task` files read with `vault().read` when
+  their `modifiedTime` changes, parsed, a broken one with no tasks. An edit is written to the file holding the task as
+  one step of Files' undo (`session.files.edit`, which reloads open tabs): a `.task` file parsed, `withRecord`,
+  `stringify` (so validated whole); a note's `task:` with `applyPatch`, checked, then `setFrontmatterProperty`
+  (Vertex's Obsidian writer, Bases' and workflows'), the body sliced off untouched.
+- **"Validated together with the `.task` files' documents" didn't hold up:** a note can't name the document its
+  `listId`, `parentId` or `dependsOn` would point into (the format has no key for it). A note's task is checked as
+  the format checks a task file alone (`checkNoteTask`: shape, times, values against the built-in fields) with those
+  three kept and not checked; one that fails isn't listed.
+- **The panel** (`TasksPanel.vue`, right sidebar by default, workspaces only): open tasks with a Do or Due, Overdue
+  (`isOverdue`), Today (by today) and Upcoming, by day; a native checkbox (`toggleDone`, written to the task's file);
+  the title opens the note, or the `.task` file at that task (`focusRequest`: the file's viewer switches to its first
+  List and calls `open`).
+- **A calendar showing the workspace's tasks:** a view key of Vertex's, `workspaceTasks: true` (a switch in a
+  calendar's options). The other files' tasks are drawn under keys of their own (the file's uuid and the task's id,
+  so ids can't clash), their edits routed to their files; the editor's notes are a link to the file instead (a note's
+  body isn't written from there). Another file's repeating task moves whole, without asking (one time of it would
+  have to become a task in that file).
+- **The file's document and its views** moved out of `TaskViewer` into `TaskFile.vue`, drawn by the viewer (with the
+  views' bar) and by the embed (the first view alone).
+- **The embed** (`![[x.task]]`, 24rem high, a canvas card's box): the text read with `vault().read` when the file
+  changes, each edit written with `files.edit`.
+- **Links:** a link extractor for `.task` (`links.ts`): the targets in live tasks' notes; a rename rewrites them,
+  stamps the tasks it changed, and writes the file back in its own format. A note task's notes are its body, the
+  index's already.
+- **Make this note a task** in Files' menu for one `.md` without a `task:`: `{id, title: the note's name,
+  updatedAt}`.
+- **Checked** in `tauri dev` by script: the panel (Overdue Call the printer, Today Ship invoice from `Invoice.md`,
+  Upcoming two); `Invoice.md` on the plan's calendar, its editor showing Open in Invoice.md; More → Status → Done there
+  wrote `status: done` and a new `updatedAt`, the body's bytes the same (trailing spaces included), and the panel
+  dropped it; the panel's checkbox completed a `.task` task (`completedAt`, `done`); a panel title opened the file's
+  List with that task's editor, its title focused; Forelinks of `plan.task` listed `Brief.md`; renaming `Brief.md`
+  to `Brief 2.md` asked Update links naming `plan.task`, and the notes read `[[Brief 2]]`; `![[plan.task]]` drew its
+  List in the note and its checkbox wrote the file; Make this note a task wrote `task:` (a blank line put between the
+  new frontmatter and the body: `setFrontmatterProperty`'s layout) and left the menu item off after. Not checked:
+  typing in the embed (keys inside a note's editor), undo of these edits, the panel's checkbox since it became a
+  native one (below).
+- **Measured** (12,000 notes, 500 of them tasks, dev build): the main thread blocked 87 ms the first time the panel
+  opened (the store made: 500 notes checked, 500 rows drawn), 45–53 ms after; how long until painted wasn't measured
+  (the window was behind another app and animation frames stopped coming, [INFERENCE] WebKit throttling a hidden
+  window). It was 113–151 ms with Nuxt UI's checkbox on each row; a native one took it to the numbers above.
+- **Noticed:** Vertex's frontmatter writer turns flow lists into block lists (`aliases: [invoice]` became a list of
+  lines), as for Bases' writes; the values are the same. A workspace by a symlinked path is still Open question 2.
 
 ## T6: iCalendar and alerts
 
