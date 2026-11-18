@@ -14,6 +14,8 @@ on the workspace below.
 
 ## Baseline (18 Nov)
 
+Measured during the investigation, before the four fixes; W0 has the same rows after them.
+
 A generated workspace of 13,302 entries (12,000 notes, 29 MB of text, 301 folders), `tauri dev`, Nuxt DevTools off
 (on, it adds about 200 ms to every change of the index, in dev only: it watches `useState` deeply).
 
@@ -80,7 +82,51 @@ Mine, for the user to change.
   undo of a deleted folder of 2,000 notes (how long?).
 
 ### Acceptance
-- [ ] The table above with today's numbers, and those two results, in this plan.
+- [x] The table above with today's numbers, and those two results, in this plan. (Below.)
+
+### Results (18 Nov)
+
+The same workspace, generated again (13,302 entries), `tauri dev`, DevTools off, the four fixes in. The generator, the
+page harness and the scripts are in `/tmp/vertex-watcher-bench` (`setup.sh` makes the workspace and the app's data
+for the identifier `dev.ctrl-neo.vertex.bench`), out of the repository; the harness is copied into `app/plugins` for
+a run and removed after.
+
+| | Before the fixes | Now |
+| --- | --- | --- |
+| Index at startup | 1.7 to 1.9 s | 1.5 s |
+| 500 notes rewritten outside (a property and a link each) | 20.3 s | 0.43 s, no frame over 27 ms |
+| 500 notes created outside | 51.3 s, 41 s blocked | 45.5 s, 35 s blocked |
+| `rm -rf` of a folder of 500 notes | 27 s, one freeze of 14 s | 25.6 s, frozen throughout (one frame of 25.7 s), 427 `remove` events |
+| A folder of 50 notes and a subfolder moved in (`mv`) | not run | one `create`: the folder's entry only. Its 51 files aren't indexed and links to them don't resolve, until a relaunch |
+| That folder moved out | not run | one `remove`, nothing left |
+| A folder of 2,000 notes deleted in Vertex (to `.trash/`) | not run | 185 ms |
+| That delete undone | not run | 181.5 s, the page blocked for 143 s of it |
+
+- **Rewrites are no longer a problem.** They were slow because each changed a property, and any property change
+  rebuilt the tree (the tree read every entry's `properties` for its icon). With the entry's own `icon`, a rewritten
+  note costs under a millisecond, read one at a time as it is. The same three runs with the text unchanged, and with
+  only links changed: 0.43 s each.
+- **What's left is entries added and removed one at a time:** from outside (created, deleted), and by Vertex itself
+  (the undo: 91 ms an entry).
+- **A folder that arrives isn't indexed,** as read in the code.
+- **Files' tree isn't what's slow** (the user's report while these ran: the tree took very long to show entries
+  while scrolling, the app almost unresponsive). With the index idle and the folder of 2,000 notes open: 17 to 18 ms
+  a frame over 120 frames at 300 px a frame and 40 at 1,500 px, none over 41 ms, a row under the middle of the tree
+  in every frame, 26 to 39 rows in the page; opening the folder, 56 ms. The report matches the runs above: for
+  minutes the index gained or lost an entry about every 90 ms, each rebuilding the whole tree. Scrolled by script
+  (`scrollTop`), not by a trackpad.
+
+### What the results change
+
+W1 stands as written, and matters most: it's the undo's three minutes and what any batch needs.
+
+W2 and W3 as written move the watch into Rust. The numbers don't ask for that much: 500 events crossing to the page
+one by one cost 0.43 s all told, reads included. What costs is what the page does per event. A smaller shape gets the
+same result (Open questions, 1): keep the fs plugin's watch, gather its events in the page for 100 ms, describe the
+gathered paths with one new Rust command (what the disk has for each: gone, or file or folder, name as the folder
+has it, size, times), then W1's plan and one pass. One command and its test instead of a watch with a lifetime of
+its own; the fs plugin's pairing of renames stays as it is. What it gives up: the fs plugin's `watch` permission
+stays, and events still cross one message each.
 
 ## W1: One pass in the index
 
@@ -131,7 +177,8 @@ In the kernel's crate only. The page doesn't use it yet.
 - A single-file window: the same, not recursive, adds nothing.
 
 ### Acceptance
-- [ ] The baseline's three rows: the index current within 1 s of the last write, no frame over 200 ms.
+- [ ] The baseline's three rows: the index current within 1 s of the last write, no frame over 200 ms. (The first,
+  rewrites, already is since the four fixes: W0.)
 - [ ] A folder of notes moved in from Finder is indexed with its notes; moved out, gone with them.
 - [ ] A note renamed outside keeps its tab; a rename of case only is seen; a note edited outside reloads its tab; a
   file made and deleted within the same second leaves nothing.
@@ -162,7 +209,10 @@ In the kernel's crate only. The page doesn't use it yet.
 
 ## Open questions
 
-1. **100 ms of quiet** before a batch: long enough to gather a `git checkout`, short enough that an edit in another
+1. **The watch in Rust, or one command?** Raised by W0 (What the results change), to decide before W2. As planned:
+   `watch_start` in Rust, batches made there. Smaller: the fs plugin's watch stays, the page gathers its events, one
+   Rust command describes the gathered paths. Recommended: the smaller one. W1 is the same either way.
+2. **100 ms of quiet** before a batch: long enough to gather a `git checkout`, short enough that an edit in another
    editor shows at once? W3 measures both and may change it.
-2. **`session.index.on` during a burst:** a listener gets 500 `modify` calls in a row after the batch. Is a batch
+3. **`session.index.on` during a burst:** a listener gets 500 `modify` calls in a row after the batch. Is a batch
    event (`{type: 'batch', events}`) wanted for plugins that redraw per event? Not added unless a plugin needs it.
