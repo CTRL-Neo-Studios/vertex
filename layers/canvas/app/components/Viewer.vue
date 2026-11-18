@@ -11,7 +11,9 @@ import {canvasContext} from "../plugin"
 /**
  * A `.canvas` file (JSON Canvas, as Obsidian writes it), edited with `@type32/jsoncanvas-editor` (workspace mode
  * only: cards show the workspace's files). The text is parsed once and written back in Obsidian's format after each
- * edit, which the tab autosaves. A file that isn't a canvas shows why and is never overwritten.
+ * edit, which the tab autosaves. A file that isn't a canvas shows why and is never overwritten. A text card is drawn
+ * by `NoteEditor`, read-only while shown and editable while edited, so it shows what a note would (plugins' code
+ * blocks, syntax and nested extensions); a note's card is the canvas package's own Markdown.
  */
 const fileName = defineModel<string>('fileName')
 const content = defineModel<string>({default: ''})
@@ -160,6 +162,10 @@ onBeforeUnmount(unsubscribe)
                 :file-renderers="fileRenderers"
                 @error="onError"
             >
+                <!-- A text card shown, not edited, as a note draws it: plugins' blocks and syntax included. -->
+                <template #text-display="{text}">
+                    <NoteEditor :text="text" :note-path="filePath" readonly @open-link="openLink"/>
+                </template>
                 <template #text-editor="{text, update, done}">
                     <NoteEditor :text="text" :note-path="filePath" @update="update" @done="done" @open-link="openLink"/>
                 </template>

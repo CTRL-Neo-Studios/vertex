@@ -39,6 +39,8 @@ settings page. The preset copies `README.md` into the build and refuses a `descr
 a line break. A plugin that uses the new components needs a Vertex that has them: set `minAppVersion` to the first
 release with them.
 
+1.3.0 adds `NoteEditor`'s `readonly` (a canvas card shown, not edited, draws through it).
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

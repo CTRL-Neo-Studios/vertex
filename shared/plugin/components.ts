@@ -150,6 +150,8 @@ export interface ViewerLayoutEmits {
 
 /** A Markdown editor inside something else (a card, a form): the note editor's rendering, links and syntax. */
 export interface NoteEditorProps {
+    /** Shown, not edited (a canvas card not being edited): no cursor, no `update`; only links, buttons and widgets take a click. */
+    readonly?: boolean
     text: string
     /** The file it's in, for its links and embeds. */
     notePath: string
