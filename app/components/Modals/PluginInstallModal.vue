@@ -9,6 +9,7 @@ import {describeOrigin} from '~/utils/plugins/origin'
  * update shows what changed. A plugin from elsewhere than the installed one with its id (which would get that one's
  * settings, data and secrets) needs its own confirmation. With `workspace` (Settings edits a trusted workspace) it can
  * go into that workspace instead of every one. With `errors` (its manifest didn't validate) it can only be cancelled.
+ * Its README, when it has one, is under all that, as in its details.
  * Closes with where to install it, or `false`.
  */
 export type InstallTarget = 'global' | 'workspace'
@@ -26,6 +27,7 @@ const props = defineProps<{
     resolved: InstallRecord
     /** The origin of the repository its manifest names. */
     claimed: string | null
+    readme: string | null
     /** For every workspace: what it replaces. */
     global: InstallPlace
     /** The trusted workspace being edited (its name), and what it replaces there. */
@@ -79,6 +81,7 @@ const title = computed(() => {
 <template>
     <UModal
         :close="{ onClick: () => emit('close', false) }"
+        :ui="readme ? {content: 'sm:max-w-2xl'} : undefined"
         :title="title"
         :description="[manifest.version && t('app.settings.plugins.version', {version: manifest.version}), manifest.author && t('app.settings.plugins.installModal.by', {author: manifest.author})].filter(Boolean).join(' · ')"
     >
@@ -121,6 +124,9 @@ const title = computed(() => {
                         </template>
                     </UAlert>
                     <UAlert color="warning" variant="subtle" icon="i-lucide-shield-alert" :description="t('app.settings.plugins.installModal.warning')"/>
+                    <div v-if="readme" class="border-t border-default pt-4" data-plugin-readme>
+                        <MarkdownText :value="readme"/>
+                    </div>
                 </template>
             </div>
         </template>

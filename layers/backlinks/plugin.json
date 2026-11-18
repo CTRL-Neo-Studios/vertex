@@ -1,6 +1,7 @@
 {
   "id": "backlinks",
   "name": "Backlinks",
+  "description": "A panel of the notes that link to the open note.",
   "icon": "i-lucide-square-arrow-out-down-left",
   "version": "0",
   "apiVersion": 1,

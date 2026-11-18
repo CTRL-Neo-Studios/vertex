@@ -1,6 +1,7 @@
 {
   "id": "canvas",
   "name": "Canvas",
+  "description": "Canvas files: notes, files and links laid out on a board.",
   "icon": "i-lucide-layout-dashboard",
   "version": "0",
   "apiVersion": 1,

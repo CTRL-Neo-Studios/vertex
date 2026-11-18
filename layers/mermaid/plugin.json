@@ -1,6 +1,7 @@
 {
   "id": "mermaid",
   "name": "Mermaid",
+  "description": "Draws Mermaid code blocks as diagrams.",
   "icon": "i-lucide-network",
   "version": "0",
   "apiVersion": 1

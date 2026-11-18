@@ -1,6 +1,7 @@
 {
   "id": "outline",
   "name": "Outline",
+  "description": "The open note's headings, to jump between them.",
   "icon": "i-lucide-table-of-contents",
   "version": "0",
   "apiVersion": 1,

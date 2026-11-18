@@ -2,6 +2,7 @@
  * The app's own UI community plugins may import: the Settings building blocks, `ViewerLayout` (a file viewer's header,
  * rename and status bar, with the registered status items), `NoteEditor` (a markdown editor inside something else: a
  * canvas card), `PluginMount` (draws another plugin's contribution, an embed from `session.editor.embedFor`),
+ * `Markdown` (someone else's Markdown, safely: a README),
  * `VaultPicker` (files or folders of the workspace, inline; `session.files.pick` is its dialog), `TextDiff` (two texts
  * side by side or inline, numbered and folded, with a `header` slot), `openExternal` (a web or mail link in the default
  * app; anything else refused) and `useScrollFade` (a scroll area's fading edges, as the panels have). Nuxt UI itself
@@ -18,5 +19,6 @@ export {default as NoteEditor} from '~/components/NoteEditor.vue'
 export {default as PluginMount} from '~/components/PluginMount.vue'
 export {default as VaultPicker} from '~/components/VaultPicker.vue'
 export {default as TextDiff} from '~/components/Diff/TextDiff.vue'
+export {default as Markdown} from '~/components/MarkdownText.vue'
 export {openUrlInBrowser as openExternal} from '~/composables/app/useAppOpener'
 export {useScrollFade} from '~/composables/utility/useScrollFade'

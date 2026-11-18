@@ -10,6 +10,7 @@ A folder named by the plugin's id:
 | `main.js` | One ES module with no imports; its default export is `definePlugin({setup})`. |
 | `styles.css` | Optional. Put in the page when the plugin loads, before its code runs. |
 | `locales/<locale>.json` | Optional. The plugin's strings. |
+| `README.md` | Optional. Shown in the plugin's details in Settings and in the install dialog, as Markdown: no HTML; links open in the browser; images in the plugin's folder draw, others only when the reader asks. Say there what the plugin does, how to use it and what it asks for. |
 | anything else | Assets, read through [`ctx.plugin.assetUrl`](context.md#ctxpluginid-ctxpluginversion-ctxpluginsource-ctxpluginasseturl). |
 
 Vertex keeps it in its data folder (`plugins/<id>/`), or in a workspace's `.vertex/plugins/<id>/` for a workspace's
@@ -24,7 +25,7 @@ Unknown keys are errors; the build lists every problem.
 | `id` | Lowercase letters, digits and inner hyphens, at most 50 characters. The installed folder's name. It names the plugin's strings (`plugins.<id>`), settings (`plugins.config.<id>`), data and secrets, so it's for good. It can't be a core plugin's (`files`, `canvas`, `bases`, `git`, `chat`, `ai`…). |
 | `name` | Shown in Settings and in messages ("Hello couldn't start"). Not translated. |
 | `version` | Shown, compared for updates, and what a release's tag should be (`0.2.0` or `v0.2.0`). |
-| `description` | Optional, one sentence, shown in Settings and the install dialog. |
+| `description` | Optional. One line of at most 160 characters, shown under the plugin's name in Settings and in the install dialog; the build refuses a longer one or a line break. The rest goes in `README.md`. |
 | `icon` | Optional. An Iconify name (`i-lucide-hand`) for the plugin's rows and settings page. |
 | `author` | Optional, shown. |
 | `repository` | Optional. Its Git repository, `https://…`: where it says it lives. Vertex shows it, and records where it actually fetched the plugin from, which it uses for updates ([Publishing](publishing.md)). |
@@ -45,7 +46,8 @@ Unknown keys are errors; the build lists every problem.
   `production`;
 - reads [the modules Vertex shares](#what-the-plugin-shares-with-vertex) from Vertex's own copies;
 - runs Tailwind, and writes the plugin's CSS as `styles.css`;
-- checks `plugin.json` and `locales/*.json` and copies them;
+- checks `plugin.json` (its `description` one line of at most 160 characters too) and `locales/*.json`, and copies them
+  and `README.md`;
 - copies `public/` (Vite's own rule) to the top of `dist/`;
 - with `pack: true`, writes `plugin.zip` beside `dist/`, the asset a release carries ([Publishing](publishing.md)).
 - with `vite build --watch`, builds again on each change of the source, never of its own output.

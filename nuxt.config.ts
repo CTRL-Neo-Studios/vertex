@@ -20,6 +20,8 @@ export default defineNuxtConfig({
       "@type32/codemirror-rich-obsidian-editor/nuxt",
       "@type32/nuxt-predicates",
       "@type32/yaml-editor-form",
+      // `<Markdown>` and Nuxt UI's prose: the kernel's MarkdownText and Chat's replies.
+      "@comark/vue",
       "@nuxt/eslint",
     ],
 
@@ -124,6 +126,12 @@ export default defineNuxtConfig({
                 // Settings → Theme's CSS editor (app/components/Settings/CssEditor.vue).
                 "@codemirror/lang-css",
                 "@catppuccin/codemirror",
+                // A stranger's Markdown (app/components/MarkdownText.vue: a plugin's README).
+                "@comark/vue",
+                "comark/plugins/frontmatter",
+                "comark/plugins/linkify",
+                "comark/plugins/security",
+                "comark/plugins/task-list",
                 // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
                 // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
                 ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`)),

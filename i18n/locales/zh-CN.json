@@ -319,6 +319,7 @@
 				"update": "更新",
 				"updateTo": "更新到 {to}",
 				"useRepository": "改用它的仓库",
+				"openOrigin": "打开它的来源",
 				"checkUpdates": "检查更新",
 				"upToDate": "所有插件都是最新的。",
 				"checkFailed": "无法检查更新",
@@ -601,6 +602,9 @@
 					}
 				}
 			}
+		},
+		"markdown": {
+			"loadImages": "加载图片"
 		},
 		"generic": {
 			"name": "名称",

@@ -101,6 +101,7 @@ From `@type32/vertex-plugin/ui`, so a plugin's UI looks and behaves as Vertex's.
 | `PluginMount` | Draws a contribution's UI with props (another plugin's embed, from `session.editor.embedFor`). |
 | `VaultPicker` | The workspace's files or folders, inline (`v-model`: workspace-relative paths). |
 | `TextDiff` | Two texts line by line, numbered and folded (`sides: {before, after}`). |
+| `Markdown` | Someone else's Markdown, drawn as Vertex draws a plugin's README (`value`): no raw HTML, Vue components or attributes (they show as text); links open in the browser, web and mail ones only; a relative image draws from `assetUrl` (give `ctx.plugin.assetUrl`), a remote one only once the reader clicks Load images. |
 
 And two functions: `openExternal(url)` opens a web or mail link in the default browser or mail app (anything else is
 refused), and `useScrollFade(element)`, the classes that fade a scroll area's edges as Vertex's panels do.

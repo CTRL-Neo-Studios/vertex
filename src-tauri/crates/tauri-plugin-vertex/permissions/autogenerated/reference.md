@@ -270,6 +270,32 @@ Denies the plugin_read command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-plugin-readme`
+
+</td>
+<td>
+
+Enables the plugin_readme command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-plugin-readme`
+
+</td>
+<td>
+
+Denies the plugin_readme command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-plugin-remove`
 
 </td>

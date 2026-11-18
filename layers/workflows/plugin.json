@@ -1,6 +1,7 @@
 {
   "id": "workflows",
   "name": "Workflows",
+  "description": "Workflow files: steps over your notes, built as a graph and run from the palette.",
   "icon": "i-lucide-workflow",
   "version": "0",
   "apiVersion": 1,

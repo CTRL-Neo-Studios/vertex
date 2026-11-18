@@ -1,6 +1,7 @@
 {
   "id": "image",
   "name": "Image",
+  "description": "Opens images, and draws them where a note embeds them.",
   "icon": "i-lucide-image",
   "version": "0",
   "apiVersion": 1

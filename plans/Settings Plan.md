@@ -194,10 +194,21 @@ Report 3.
 - **Docs:** the author docs' package page (the README, the description's limit) and the template's README as its example.
 
 ### Acceptance
-- [ ] The graph's README draws in its details: headings, its table, links (opened in the browser), no remote request until asked.
-- [ ] A README with `<script>` and an `<img onerror>` draws them as text or not at all.
-- [ ] The preset fails a build whose `description` is 200 characters, saying where the rest belongs.
-- [ ] A plugin without a README shows its details without an empty box.
+- [x] The graph's README draws in its details: headings, its table, links (opened in the browser), no remote request until asked. (In `tauri dev`, the graph installed with its README and, appended to that copy, a remote image, an image in its folder, a `<script>` and an `<img onerror>`: its five headings, the table's ten rows and thirteen links drew, each link `https`; the folder's image drew (128 px wide, from `vertex-plugin://`); the remote one was a "remote · Load images" button and no `img` named its URL until that was clicked, then it did. Not clicked: a link, which would open the browser; `MarkdownText/Link.vue` sends web and mail links to `openUrlInBrowser` and makes others text.)
+- [x] A README with `<script>` and an `<img onerror>` draws them as text or not at all. (Both drew as their text; no `script` element in the README, the `onerror` never ran. `app/utils/markdown.test.ts` holds the parse to it, with `::components`, `{onclick}` and `javascript:` links.)
+- [x] The preset fails a build whose `description` is 200 characters, saying where the rest belongs. (A scratch plugin built with the SDK's `dist/vite.js`: 171 characters failed with "plugin.json: "description" is one line of at most 160 characters (this one has 171): … The rest belongs in README.md, which Settings shows in the plugin's details."; a short one built, with `README.md` in `dist/`.)
+- [x] A plugin without a README shows its details without an empty box. (Canvas's details: its title and description, no body.)
+
+### As built
+
+- **The package:** the preset (`packages/vertex-plugin/src/vite.ts`) copies `README.md` into `dist/` (so into `plugin.zip`) and refuses a `description` over 160 characters (`DESCRIPTION_MAX`) or with a line break. The host only cuts it.
+- **Rust:** `plugin_readme({id, root})` (the Settings window's; `None` without one) and `Staged.readme` (the staged package's). Read on request, not listed.
+- **`Markdown`** (`app/components/MarkdownText.vue`, published in `/ui` as `Markdown`; `MarkdownProps {value, assetUrl?(path)}`): Comark's `<Markdown>` with `strangerMarkdown` (no default plugins: raw HTML, components and attributes stay text; frontmatter hidden, linkify, task lists; `security` with the tags Markdown makes; no heading ids, whose anchors would route the window), links and images its own (`MarkdownText/Link.vue`, `Image.vue`). `base`, as first planned, became `assetUrl`: a folder's URL can't be a base, `convertFileSrc` encodes the `/` in `graph/`, so relative paths resolved to the scheme's root (found in the app: the image asked for `vertex-plugin://localhost/shot.png`). The comark module moved from Chat's layer to the kernel's `nuxt.config.ts` (and `@comark/vue`, `comark` to its dependencies, its plugins to `optimizeDeps`); Chat's `<Markdown>` is the same component.
+- **The details dialog** (`Modals/PluginDetailsModal.vue`), opened by a row's name: icon, name, version (not a core one's), description, why it's off, the lines the row leaves out (author, needs, uses, where it's from, what it claims, a workspace's own copy), its README (community and workspace copies; images from the installed folder for an installed one), and Open where it came from, Use its repository, Remove, Update; it closes with the action, which the page runs. The row lost U4's info button and its Use its repository button to it. The install dialog draws the staged README under what it asks, wider when there is one.
+- **Core plugins:** a one-line `description` in each of the 17 manifests without one (Bases map had one).
+- **Docs:** the author docs' package page (`README.md` in the folder's table and the build's list, the description's limit) and UI page (`Markdown`); `Concepts and Structures.md` (published UI, someone else's Markdown, Rust's commands, Settings → Plugins). The template's README as the example is U8's, with the SDK's minor.
+- **Not run in the app:** a workspace copy's details (its README is read from the workspace; its images aren't drawn, as the Settings window's `vertex-plugin` scheme serves the installed copy), and the install dialog's README (`Staged.readme`, typed and passed through).
+- **Numbers:** 374 tests (55 files); 62 Rust tests; typecheck unchanged; the SDK builds with `MarkdownProps`.
 
 ## U6: One settings page per plugin
 

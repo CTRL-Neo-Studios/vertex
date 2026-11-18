@@ -1,6 +1,7 @@
 {
   "id": "git",
   "name": "Git",
+  "description": "Source control for the workspace: changes, commits, branches, pushing and syncing.",
   "icon": "i-lucide-git-branch",
   "version": "0",
   "apiVersion": 1,

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-plugin-readme"
+description = "Enables the plugin_readme command without any pre-configured scope."
+commands.allow = ["plugin_readme"]
+
+[[permission]]
+identifier = "deny-plugin-readme"
+description = "Denies the plugin_readme command without any pre-configured scope."
+commands.deny = ["plugin_readme"]

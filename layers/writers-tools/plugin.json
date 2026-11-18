@@ -1,6 +1,7 @@
 {
   "id": "writers-tools",
   "name": "Writer's tools",
+  "description": "Word, line and paragraph counts for the open file.",
   "icon": "i-lucide-pencil",
   "version": "0",
   "apiVersion": 1,

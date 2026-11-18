@@ -1,6 +1,7 @@
 {
   "id": "chat",
   "name": "Chat",
+  "description": "Ask a model about your notes in a chat, with them as context and tools to work on them.",
   "icon": "i-lucide-message-square",
   "version": "0",
   "apiVersion": 1,

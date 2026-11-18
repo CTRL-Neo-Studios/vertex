@@ -23,6 +23,7 @@ interface Staged {
     installed: InstallRecord | null
     workspaceInstalled: InstallRecord | null
     claimed: string | null
+    readme: string | null
 }
 
 /** A plugin to remove: the installed one, or with `inWorkspace` the edited workspace's copy. */
@@ -71,7 +72,7 @@ export function usePluginInstalls({updates, offerRestart}: {
         busy.value = true
         const root = scope.root.value && scope.trusted.value ? scope.root.value : null
         try {
-            const {stage, manifest, resolved, installed: record, workspaceInstalled, claimed} = await vertexInvoke<Staged>('plugin_stage', {...what, root})
+            const {stage, manifest, resolved, installed: record, workspaceInstalled, claimed, readme} = await vertexInvoke<Staged>('plugin_stage', {...what, root})
             const result = validateManifest(manifest, await getVersion())
             const errors = !result.ok ? result.errors
                 : pluginEntries().some(e => e.source === 'core' && e.manifest.id === result.manifest.id) ? [t('app.settings.plugins.coreId', {id: result.manifest.id})] : []
@@ -81,6 +82,7 @@ export function usePluginInstalls({updates, offerRestart}: {
                 errors,
                 resolved,
                 claimed,
+                readme,
                 global: {current: installed(id), installed: record},
                 workspace: root ? {name: workspaceName.value, current: ownCopy(id)?.manifest, installed: workspaceInstalled} : undefined,
                 target: root ? target : 'global',

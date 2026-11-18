@@ -281,6 +281,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             plugins::plugin_discard,
             plugins::plugin_install,
             plugins::plugin_remove,
+            plugins::plugin_readme,
             plugins::plugin_source_resolve,
             plugins::plugin_updates,
             windows::window_open,

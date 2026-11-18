@@ -1,6 +1,7 @@
 {
   "id": "palette",
   "name": "Command palette",
+  "description": "The command palette and the search panel: commands, files and text across the workspace.",
   "icon": "i-lucide-search",
   "version": "0",
   "apiVersion": 1,

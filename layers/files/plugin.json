@@ -1,6 +1,7 @@
 {
   "id": "files",
   "name": "Files",
+  "description": "The file tree: create, rename, move and delete the workspace's files.",
   "icon": "i-lucide-files",
   "version": "0",
   "apiVersion": 1,

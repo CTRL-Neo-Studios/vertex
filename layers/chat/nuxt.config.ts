@@ -1,8 +1,6 @@
 import {fileURLToPath} from 'node:url'
 
 export default defineNuxtConfig({
-    // Comark draws replies: `<Markdown>` from its Nuxt module.
-    modules: ['@comark/vue'],
     components: [{path: 'components', prefix: 'Chat'}],
     // Highlighted code in replies carries its dark colour in `--shiki-dark`.
     css: [fileURLToPath(new URL('./app/assets/chat.css', import.meta.url))],

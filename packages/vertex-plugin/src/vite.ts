@@ -1,7 +1,7 @@
 /**
  * The Vite preset a community plugin builds with: `plugins: [vertex()]` in its `vite.config.ts` turns `src/main.ts`
  * and `plugin.json` into `dist/`, the folder Vertex installs (`plugin.json`, one `main.js`, `styles.css` when there's
- * CSS, the strings of `locales/`, the files of `public/`); with `pack`, also `plugin.zip` for a release.
+ * CSS, the strings of `locales/`, `README.md`, the files of `public/`); with `pack`, also `plugin.zip` for a release.
  */
 import {existsSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve, sep} from 'node:path'
@@ -12,6 +12,8 @@ import {validateManifest} from '../../../shared/plugin/manifest'
 import {checkPluginMessages} from '../../../shared/plugin/messages'
 import {SHARED_GLOBAL} from '../../../shared/plugin/modules'
 
+/** A manifest's `description`: one line under the plugin's name in Settings. */
+const DESCRIPTION_MAX = 160
 const PREFIX = '\0vertex-shared:'
 
 /**
@@ -129,7 +131,15 @@ export function vertex(options: VertexOptions = {}): PluginOption[] {
             generateBundle() {
                 const result = validateManifest(JSON.parse(readFileSync(resolve(root, 'plugin.json'), 'utf8')))
                 if (!result.ok) this.error(`plugin.json:\n  - ${result.errors.join('\n  - ')}`)
+                // Settings shows it on one line under the name; the host only cuts it, so the build holds it to that.
+                const description = result.manifest.description ?? ''
+                if (description.length > DESCRIPTION_MAX || /[\r\n]/.test(description)) {
+                    this.error(`plugin.json: "description" is one line of at most ${DESCRIPTION_MAX} characters (this one has ${description.length}${/[\r\n]/.test(description) ? ' and a line break' : ''}): what the plugin is, under its name in Settings. The rest belongs in README.md, which Settings shows in the plugin's details.`)
+                }
                 this.emitFile({type: 'asset', fileName: 'plugin.json', source: `${JSON.stringify(result.manifest, null, 2)}\n`})
+                // Its details in Settings and the install dialog draw it.
+                const readme = resolve(root, 'README.md')
+                if (existsSync(readme)) this.emitFile({type: 'asset', fileName: 'README.md', source: readFileSync(readme)})
                 // `locales/<locale>.json`, each `{"plugins": {"<id>": {…}}}`: checked as a core plugin's are (`en` has every
                 // key the others have, and what the manifest names), then copied as they are.
                 const dir = resolve(root, 'locales')

@@ -1,6 +1,7 @@
 {
   "id": "ai-assistant",
   "name": "AI assistant",
+  "description": "Rewrite, fix or continue the text you select in the editor with a model.",
   "icon": "i-lucide-wand-sparkles",
   "version": "0",
   "apiVersion": 1,

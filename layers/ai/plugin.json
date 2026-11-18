@@ -1,6 +1,7 @@
 {
   "id": "ai",
   "name": "AI",
+  "description": "Model providers and profiles, their keys, and the AI features other plugins offer.",
   "icon": "i-lucide-sparkles",
   "version": "0",
   "apiVersion": 1,

@@ -415,6 +415,18 @@
           "markdownDescription": "Denies the plugin_read command without any pre-configured scope."
         },
         {
+          "description": "Enables the plugin_readme command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-plugin-readme",
+          "markdownDescription": "Enables the plugin_readme command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the plugin_readme command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-plugin-readme",
+          "markdownDescription": "Denies the plugin_readme command without any pre-configured scope."
+        },
+        {
           "description": "Enables the plugin_remove command without any pre-configured scope.",
           "type": "string",
           "const": "allow-plugin-remove",

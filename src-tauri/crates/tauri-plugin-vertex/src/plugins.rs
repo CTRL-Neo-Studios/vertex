@@ -32,6 +32,8 @@ const PLUGINS: &str = "plugins";
 const STAGING: &str = "plugins-staging";
 /// Where an installed plugin came from, written into its folder by [`plugin_install`].
 const RECORD: &str = ".install.json";
+/// A plugin's README, beside its `plugin.json`: its details in Settings draw it.
+const README: &str = "README.md";
 /// A plugin's folder as the webview loads it: `vertex-plugin://localhost/<id>/<path>` (`convertFileSrc`).
 pub const SCHEME: &str = "vertex-plugin";
 /// The windows list the installed plugins again (an install, a removal, a development copy).
@@ -420,6 +422,8 @@ pub struct Staged {
     /// With `root`: the record of that workspace's plugin with the same id, which installing there replaces.
     workspace_installed: Option<Record>,
     claimed: Option<String>,
+    /// Its `README.md`, for the install dialog.
+    readme: Option<String>,
 }
 
 /// Fetches a source into `folder`, or copies `path` (a folder or `.zip` this window picked); returns where it's from
@@ -467,12 +471,14 @@ pub async fn plugin_stage<R: Runtime>(app: AppHandle<R>, path: Option<String>, s
     let folder = stage_dir(&app, &stage)?;
     let result = async {
         let resolved = stage_into(&folder, path, source).await?;
-        let manifest = read_manifest(&package_root(&folder)?)?;
+        let package = package_root(&folder)?;
+        let manifest = read_manifest(&package)?;
+        let readme = std::fs::read_to_string(package.join(README)).ok();
         std::fs::write(folder.with_extension("json"), serde_json::to_vec(&resolved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         let id = manifest.get("id").and_then(Value::as_str);
         let record_in = |root: Option<&str>| id.and_then(|id| folder_of(&app, id, root).ok()).and_then(|dir| read_record(&dir));
         let (installed, workspace_installed) = (record_in(None), root.as_deref().and_then(|root| record_in(Some(root))));
-        Ok::<_, String>(Staged { stage: stage.clone(), claimed: claimed(&manifest), manifest, resolved, installed, workspace_installed })
+        Ok::<_, String>(Staged { stage: stage.clone(), claimed: claimed(&manifest), manifest, resolved, installed, workspace_installed, readme })
     }
     .await;
     if result.is_err() {
@@ -675,6 +681,13 @@ pub(crate) fn start_update_checks<R: Runtime>(app: &AppHandle<R>) {
             tokio::time::sleep(Duration::from_secs(60 * 60)).await;
         }
     });
+}
+
+/// A plugin's `README.md` (with `root`, that workspace's copy's), for its details in Settings; none without one.
+#[tauri::command]
+pub async fn plugin_readme<R: Runtime>(app: AppHandle<R>, id: String, root: Option<String>) -> Result<Option<String>, String> {
+    let file = folder_of(&app, &id, root.as_deref())?.join(README);
+    blocking(move || Ok(std::fs::read_to_string(file).ok())).await
 }
 
 /// Deletes a plugin's folder (with `root`, that workspace's copy, and its pin). Its config and data stay; a window

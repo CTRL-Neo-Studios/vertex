@@ -301,6 +301,7 @@ const KERNEL: Grants = &[
             "vertex:allow-plugin-discard",
             "vertex:allow-plugin-install",
             "vertex:allow-plugin-remove",
+            "vertex:allow-plugin-readme",
             "vertex:allow-plugin-source-resolve",
             "vertex:allow-plugin-updates",
         ],

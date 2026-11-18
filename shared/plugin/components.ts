@@ -93,6 +93,17 @@ export interface SettingsListProps<T extends { id: string } = { id: string }> {
     filters?: readonly SettingsListFilter<T>[]
 }
 
+/**
+ * Markdown from someone else (a plugin's README), drawn with Nuxt UI's prose: no raw HTML, no components or
+ * attributes. Links open in the browser (web and mail only; others are text). A relative image draws from
+ * `assetUrl`; a remote one waits for a click, which loads them all.
+ */
+export interface MarkdownProps {
+    value: string
+    /** A relative image's URL (`ctx.plugin.assetUrl`). None: it's its alt text. */
+    assetUrl?(path: string): string
+}
+
 /** A settings page: a sticky header with the title (`header-leading`, `header-trailing`) over the scrolling content. */
 export interface SettingsScrollLayoutProps {
     title?: string

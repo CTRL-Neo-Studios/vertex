@@ -1,6 +1,7 @@
 {
   "id": "bases",
   "name": "Bases",
+  "description": "Base files: notes as tables and cards, filtered and sorted by their properties.",
   "icon": "i-lucide-table",
   "version": "0",
   "apiVersion": 1

@@ -319,6 +319,7 @@
 				"update": "Update",
 				"updateTo": "Update to {to}",
 				"useRepository": "Use its repository",
+				"openOrigin": "Open where it came from",
 				"checkUpdates": "Check for updates",
 				"upToDate": "Every plugin is up to date.",
 				"checkFailed": "Couldn't check for updates",
@@ -601,6 +602,9 @@
 					}
 				}
 			}
+		},
+		"markdown": {
+			"loadImages": "Load images"
 		},
 		"generic": {
 			"name": "Name",
