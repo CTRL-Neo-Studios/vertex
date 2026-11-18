@@ -54,10 +54,24 @@ const off = session.index.on(event => {
 })
 ```
 
-Files created (`create`), removed (`remove`, with every entry removed), renamed (`rename`), by absolute path; and
-modified (`modify`) outside Vertex, or by [`session.files.edit`](#sessionfilesedit). The editor's own saves aren't
-events: they change the entry (its `modifiedTime`, its links). Returns what stops listening; it stops with the
+What other programs do to the workspace's files (an editor, Git, a sync tool), by absolute path: created (`create`),
+removed (`remove`, with every entry removed), renamed (`rename`), modified (`modify`); and
+[`session.files.edit`](#sessionfilesedit)'s edits, as `modify`. Returns what stops listening; it stops with the
 session anyway.
+
+What Vertex does itself isn't an event: Files' New, Delete, Rename and moves, and the editor's saves change the
+entries (a save an entry's `modifiedTime` and links). To follow a rename or a move, whoever made it, watch the
+entries: a file keeps its `uuid` through one.
+
+```ts
+// A uuid whose path changed has been renamed or moved.
+watch(() => new Map(session.index.files().map(file => [file.uuid, file.relativePath])), (now, before) => {
+    for (const [uuid, to] of now) {
+        const from = before.get(uuid)
+        if (from !== undefined && from !== to) console.log(from, '→', to)
+    }
+})
+```
 
 ### `session.index.search`
 
@@ -137,8 +151,19 @@ const paths = await session.files.pick({title: 'Choose notes', kind: 'file', mul
 
 The workspace as a `Vault` (`@type32/vertex-plugin/vault`), over workspace-relative paths: `entries`, `entry`,
 `linksTo`, `linksFrom`, `read`, `write`, `create`, `createFolder`, `move`; what it writes goes through the index as
-Vertex's own edits do. The same module writes frontmatter as Obsidian does (`setFrontmatterProperty`). Throws in a
-single-file window.
+Vertex's own edits do. Throws in a single-file window.
+
+The same module writes frontmatter as Obsidian does. `setFrontmatterProperty` takes the YAML tools
+`obsidianYaml(frontmatterRange)` makes, `frontmatterRange` being the editor's:
+
+```ts
+import {frontmatterRange} from '@type32/codemirror-rich-obsidian-editor'
+import {obsidianYaml, retag, setFrontmatterProperty} from '@type32/vertex-plugin/vault'
+
+const yaml = obsidianYaml(frontmatterRange)
+const change = retag(file.properties, 'draft', true) // undefined when the note has the tag
+if (change) await session.files.edit([{uuid: file.uuid, text: setFrontmatterProperty(text, change.key, change.tags, yaml)}], 'Tag as draft')
+```
 
 ### `session.files.iconFor`
 

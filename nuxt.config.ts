@@ -6,6 +6,12 @@ import {SHARED_PACKAGES} from './shared/plugin/modules'
  * (`vueContextFacet` unset). Chat's layer still pre-bundles `/comark` (`ofm()`, parsing only).
  */
 const EDITOR = '@type32/codemirror-rich-obsidian-editor'
+/**
+ * Nuxt UI's composables, which the app's own code gets as source too (auto-imports). Pre-bundled for community plugins
+ * (`SHARED_PACKAGES`), `useOverlay` was a second copy with its own list of overlays in dev: a plugin's modal opened
+ * into a list nothing draws (Navigator Plan, N4).
+ */
+const NUXT_UI_COMPOSABLES = '@nuxt/ui/composables'
 
 export default defineNuxtConfig({
     devtools: {enabled: true},
@@ -134,10 +140,10 @@ export default defineNuxtConfig({
                 "comark/plugins/task-list",
                 // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
                 // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
-                ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`)),
+                ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`) && p !== NUXT_UI_COMPOSABLES),
             ],
             // Every entry of the package (`pkgId`), its subpaths included.
-            exclude: [EDITOR],
+            exclude: [EDITOR, NUXT_UI_COMPOSABLES],
         },
     },
 });

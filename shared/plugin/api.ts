@@ -89,8 +89,10 @@ export interface SessionContext {
         /** A file's link targets that find no file, as they are now. */
         unresolved(uuid: string): string[]
         /**
-         * Files created, removed and renamed, and modified outside Vertex or by `files.edit` (removed with the session).
-         * The editor's own saves aren't events: they change the file's entry.
+         * What other programs do to the workspace's files (the watcher's events): created, removed, renamed, modified;
+         * and `files.edit`'s edits, as `modify` (removed with the session). What Vertex does itself (Files' New, Delete,
+         * Rename and moves, the editor's saves) isn't an event: it changes the entries, and a file keeps its uuid
+         * through a rename or a move.
          */
         on(listener: WorkspaceIndexListener): () => void
         /**

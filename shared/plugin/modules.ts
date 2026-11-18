@@ -41,3 +41,10 @@ export const SDK_MODULES = {
 } as const
 
 export type SharedModuleId = typeof SHARED_PACKAGES[number] | keyof typeof SDK_MODULES
+
+/**
+ * Those of `names` a plugin's built code names as a string (`resolveComponent("UButton")`, what a template's
+ * `<UButton>` compiles to, in any quotes): the components it can draw, without running it.
+ */
+export const namedIn = (code: string, names: Iterable<string>) =>
+    [...names].filter(name => ['"', '\'', '`'].some(quote => code.includes(`${quote}${name}${quote}`)))

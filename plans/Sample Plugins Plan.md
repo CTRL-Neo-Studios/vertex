@@ -34,7 +34,7 @@ building and released.
 | Contract changes | Additions only, within `apiVersion` 1 (the docs' Versions page). A sample sets `minAppVersion` to the Vertex that has what it uses. |
 | Author docs | In the SDK's package (`packages/vertex-plugin/docs/`, shipped with it), since they version with the contract and reach an author with the types. `Concepts and Structures.md` links them. |
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
-| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). S2 waits for the Settings Plan (`plans/Settings Plan.md`, 17 Nov): its settings sample is written with what that plan builds. |
+| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). S2 waits for the Settings Plan (`plans/Settings Plan.md`, 17 Nov): its settings sample is written with what that plan builds. S5 deferred like S4, after S6 (the user, 18 Nov). |
 | The test plugin | Stays the fixture for install and update tests. It isn't a sample. |
 | A plugin's strings (P0) | Files, `locales/<locale>.json` in the package, each `{"plugins": {"<id>": {…}}}` as a core layer's are. Not in the bundle, as first proposed: the Settings window shows a plugin's schema labels without running it (it runs the global plugins made for `settings` only), so the strings must be readable without its code. The host merges only `plugins.<id>`; a workspace copy's strings are pinned with it. |
 | The SDK (P0) | Published by the user on 17 Nov: `@type32/vertex-plugin` `1.0.0` on `latest`, released with `bun run release` in the package. P0's additions to the contract are a minor version. |
@@ -44,7 +44,7 @@ Still open: S4's plan (the user's).
 
 ```mermaid
 flowchart LR
-  P0 --> D1 --> S1 --> Settings["Settings Plan"] --> S2 --> S3 --> S5 --> S6 --> S4 --> D2
+  P0 --> D1 --> S1 --> Settings["Settings Plan"] --> S2 --> S3 --> S6 --> S5 --> S4 --> D2
 ```
 
 ## Repositories
@@ -56,7 +56,7 @@ flowchart LR
 | S3 | `vertex-plugin-stat-block` | `CTRL-Neo-Studios/vertex-plugin-stat-block` | `stat-block` | a code block widget, a slash item, Markdown syntax, the editor's nested contexts |
 | S4 | (the user's plan) | | | a file type with New, a viewer that loads text, a link extractor (as planned so far) |
 | S5 | `vertex-plugin-bases-calendar` | `CTRL-Neo-Studios/vertex-plugin-bases-calendar` | `bases-calendar` | `requires`, a core plugin's API (`ctx.use('bases')`) |
-| S6 | `vertex-plugin-navigator` | `CTRL-Neo-Studios/vertex-plugin-navigator` | `navigator` | `session.files` whole (menus, New, drags, undo), `data.workspace`, assets |
+| S6 | `vertex-plugin-navigator` | `CTRL-Neo-Studios/vertex-plugin-navigator` | `navigator` | the index (tree, tags, properties, dates), `session.files` whole (menus, New, clipboard, drags, drops, `edit`, undo), `files.menuItem`, `data.workspace` and `data.global`, a dialog (`useOverlay`), a view in a pane and a tab |
 
 None of the ids is a core plugin's (`ai`, `ai-assistant`, `backlinks`, `bases`, `bases-map`, `canvas`, `chat`,
 `files`, `git`, `image`, `latex`, `mermaid`, `outgoing-links`, `outline`, `palette`, `workflows`, `writers-tools`,
@@ -77,6 +77,8 @@ Found by reading the contract, before any sample is written. P0 closes the first
 | A community plugin's API, typed | a community plugin another uses (none of the six) | Found in D1. `ctx.provide` works for any plugin, but `PluginApis` is augmented through `#shared/plugin/api`, which only the SDK's own files resolve, so `ctx.use('<community id>')` doesn't type-check. The docs say so (the package, what can't be done). |
 | The index's reactivity, as documented | the graph | Found in S1; the docs were wrong, the contract is fine. The session page said all of the index was reactive: its entries are (an entry's `forelinks`, `backlinks`, `modifiedTime`), but `links()` and `unresolved()` read the link graph as it is, and the editor's own saves aren't `index.on` events. Closed: the session page says so. |
 | A plugin's Tailwind classes reach Vertex | every plugin that uses Tailwind | Found in S1, by the stray words Tailwind makes classes of (the graph's `resize`, `container`, `hidden`). The real fault was wider: a plugin's stylesheet loads after the app's, and two sheets that both define a class can't be ordered against each other. Nuxt UI's card body is `p-4 sm:p-6`; a plugin's `.p-4`, later, beats `sm:p-6` on every card and modal in the window (measured: 24 px became 16 px). Closed in the SDK with a prefix (the user's choice, 17 Nov, over scoping a plugin's rules to its own UI, which keeps the clash inside it): a plugin writes `tw:flex`, its stylesheet holds only those names. Checked in `tauri dev` with a scratch plugin: its own classes applied (`tw:p-4`, `tw:hidden tw:sm:block`, `tw:text-muted`), `tw:w-full` on a `UButton` filled its row, and a `UCard` beside them kept its 24 px. |
+| A Nuxt UI component inside another's trigger; a plugin's dialog in dev; the frontmatter tools | the navigator (the first sample with a tooltip around a button, and a modal) | Found in S6, closed in Vertex: the Navigator Plan's Gaps. |
+| `session.index.on` for what Vertex does itself; a moved file's `modifiedTime` | the navigator (data kept by path; lists by date) | Found in S6, open: the Navigator Plan's Gaps. The docs say what the events are and how to follow a rename by uuid. |
 
 ## P0: What every sample needs
 
@@ -255,16 +257,15 @@ A community plugin on a core plugin's API.
 
 ## S6: Navigator
 
-A file browser that can replace Files.
+A file browser that can replace Files. Planned apart on 18 Nov (`plans/Navigator Plan.md`, N1 to N5): two panes after
+Obsidian's Notebook Navigator (folders, tags, properties, shortcuts and recent files; the chosen one's notes as rows
+with previews), not the tree first written here. The Change and Acceptance below are that plan's.
 
 ### Change
-- A panel view of the workspace's tree, with the kernel's file menu, New items and icons.
-- Rows drag to the editor, to chat and to Finder; drops from outside import; file operations go through Files' undo.
-- Thumbnails for images; per-folder data (a colour, a sort order) in `ctx.data.workspace`.
+- The Navigator Plan's phases.
 
 ### Acceptance
-- [ ] With Files off and the navigator in its place: create, rename, move, duplicate, delete and undo each; every row of SMOKE's Files section that isn't about Files' own look passes.
-- [ ] A folder's colour survives a relaunch and travels with the vault.
+- [ ] The Navigator Plan's N1 to N5 accepted. (18 Nov: built and released, `v0.1.0`; N1, N2, N4 and N5 accepted, N3 but for the SMOKE rows not run: the Update links prompt on a move, a name clash on a drop, drops from Finder, drags onto a chat and out to Finder.)
 
 ## D2: Close
 

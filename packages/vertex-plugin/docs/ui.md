@@ -76,6 +76,17 @@ import {useToast} from '@nuxt/ui/composables'
 useToast().add({title: ctx.i18n.t('plugins.hello.done'), color: 'success'})
 ```
 
+A dialog of the plugin's opens the same way, from anywhere (a command, a menu item): a component whose root is a
+`UModal`, which emits `close` when it's done.
+
+```ts
+import {useOverlay} from '@nuxt/ui/composables'
+import RenameModal from './RenameModal.vue'
+
+const modal = useOverlay().create(RenameModal, {destroyOnClose: true})
+const name = await modal.open({current: 'Hello'}).result // what `emit('close', value)` gave
+```
+
 Nothing else may be imported from `@nuxt/ui`: it would be a second Nuxt UI beside Vertex's, and the build refuses it.
 The SDK types the components, so `vue-tsc` checks their props.
 
