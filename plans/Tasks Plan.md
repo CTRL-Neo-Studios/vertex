@@ -289,11 +289,41 @@ In the library, then in the plugin.
   and a new task).
 
 ### Acceptance
-- [ ] A weekly meeting in `Europe/Berlin` shows at the right hour in another zone, across a change of clocks.
-- [ ] A task dragged to another day, and one stretched, have the new times in the file, in the form they had (a date
+- [x] A weekly meeting in `Europe/Berlin` shows at the right hour in another zone, across a change of clocks.
+- [x] A task dragged to another day, and one stretched, have the new times in the file, in the form they had (a date
   stays a date).
-- [ ] The library's tests: laying out overlapping spans, a month's weeks, an all-day span over a week's end.
-- [ ] A month of 1,000 tasks draws and drags without a pause over 200 ms.
+- [x] The library's tests: laying out overlapping spans, a month's weeks, an all-day span over a week's end.
+- [x] A month of 1,000 tasks draws and drags without a pause over 200 ms.
+
+### As built
+- **The library** (uncommitted): `calendar.ts`, pure: `calendarItems` (each occurrence of the view's tasks in the
+  viewer's days: a span, a moment at its start, a todo at its due; a time in a task's zone moved to the viewer's, a
+  date as it is; a timed span past midnight drawn across days), `layoutDay` and `layoutLanes` (the template's cluster
+  and lane packing, rewritten on the format's items, minutes and days rather than `Date`s), `monthWeeks`,
+  `weekStart`, `shiftTask` (moves start, end, due and the series' exclusions; stretches an end, or a duration as a
+  duration, never before the start; a date by days alone), `detachOccurrence`, `draftTask`. `drag.ts`: the pointer
+  gestures (a click opens, a drag past 5 px moves or stretches, by the day under the pointer and, in hours, minutes
+  snapped to 15; a drag on empty hours draws). `TaskCalendar` (the toolbar, the small month and the lists beside it,
+  one editor in a popover anchored to what was clicked, a drawn task opened at once), `CalendarMonth` (six weeks,
+  lanes as many as a row has room for, "+N" opening the day), `CalendarWeek` (week and day: dates, a row of what's
+  all day, hours with packed blocks, a line at now, opening at 7). Nothing from the template's data layer or
+  `date-fns`; its licence named where its packing is. 23 tests (8 new: the Berlin meeting in New York across both
+  changes of clocks, the kinds, overlapping spans, a month's weeks, a span over a week's end, the drags' edits, an
+  occurrence detached, a drawn task).
+- **The plugin** (committed locally): the Calendar view type (Add view offers it), `OccurrenceModal` (Only this one,
+  All of them, Cancel; this one: `excludedDates` on the series and a task of its own, in one write), the calendar's
+  scale and lists written to its view. Strings in `en` and `zh-CN`.
+- **Checked** in `tauri dev` by script (pointer events at the elements' places), the time zone set to
+  `America/New_York`: the Berlin standup at 4:00, 5:00 and 4:00 in the weeks of Oct 19, Oct 26 and Nov 2; a date span
+  dragged two days in the month (`2026-11-22` to `2026-11-24`, still dates); a timed span stretched half an hour and
+  dragged a day and an hour on (`15:00` to `16:30` the next day); one occurrence of the standup dragged a day, Only
+  this one (`excludedDates: [2026-11-16T10:00]`, a new task on the 17th in Berlin's zone); a click opening the
+  editor, its title focused; Work switched off (`listIds: [home]`) and on again (no `listIds`). Not checked: a task
+  drawn on empty hours or by a double click (`draftTask` has its test), the day view, a moment or a due dragged.
+- **Measured** (1,000 tasks in a month, dev build): opening it 81 ms, the longest frame after it 18 ms, 90 items
+  drawn (the rest counted); a drag across two days, its worst frame 29 ms. `main.js` 456 KB minified, 119 KB gzipped.
+- **Noticed:** a list switched off hides the tasks without a list too, the format's rule for `listIds`. A "No list"
+  switch would need the format to say how a view shows tasks without one (Open questions, 3).
 
 ## T4: Timeline
 
@@ -383,3 +413,6 @@ In the library, then in the plugin.
 2. **A workspace by a symlinked path** (T1, Found). The fix is the watcher's: compare event paths with the root's
    real path (resolved once when it starts), or open workspaces by their real path. Yours to schedule, in the Watcher
    Plan or here before T5 (which reads the index the most).
+3. **Tasks without a list in a filtered view** (T3, Noticed). The format's `listIds` shows only tasks in those lists,
+   so a calendar with one list switched off hides every task without a list. A view key for them (say
+   `withoutList: true`) would be the format's to add, in a minor.
