@@ -54,7 +54,7 @@ export default defineNuxtConfig({
         ]
     },
 
-    // Model vendor logos (Settings → Assistive AI, `ModelBadges.vue`): picked at runtime, so bundle them.
+    // Model vendor logos (Settings → AI, `ModelBadges.vue`): picked at runtime, so bundle them.
     icon: {
         clientBundle: {
             icons: [

@@ -274,8 +274,17 @@ Report 6.
 - The Sample Plugins Plan's S2 reworded for what exists now (stacked rows, `SettingsList`, one page).
 
 ### Acceptance
-- [ ] The eight reports, each checked against its phase's acceptance on a release build.
-- [ ] The SDK's docs test and build pass with the additions.
+- [x] The eight reports, each checked against its phase's acceptance on a release build. (`tauri build --no-bundle` with its own identifier and a check compiled in, run at the default window size, 900 × 601, with the graph installed with its README. 1: no "Version" on Plugins, no core plugin's version, the graph's "0.1.0" beside its name. 2: no description cut on About, General, Theme, View or Trust; on Plugins only the graph's, beside its badges and buttons, with its tooltip. 3: every row one line; the graph's details with its facts and its README's headings. 4: the search ("gra" left the graph and the three core plugins whose descriptions say "diagrams", "graph", "paragraph": the descriptions U5 gave them), the filter and select-all. 5: Chat's four options and its feedback on one page, no link. 6: "font" found Theme's fonts. 7: View's arrangement row and its content start where the first row and its label do (250 and 266 px). 8: Theme's CSS is a CodeMirror editor, its left edge the row labels'.)
+- [x] The SDK's docs test and build pass with the additions. (`packages/vertex-plugin`: 7 tests, the build, `tsc`.)
+
+### As built
+
+- **`Concepts and Structures.md`:** the Settings bullets were rewritten as each phase landed (a page's anatomy, lists, Settings → Plugins, its details and Markdown, one page per plugin, the nav, search and its index, Trust's `trust_revoke`); this phase took "Settings → Assistive AI" out of its last 2 lines.
+- **`SMOKE.md`:** rows 124 (search), 125 (Plugins' search, filter and a batch Turn off), 126 (a plugin's details and README), 127 (one page per plugin), 128 (the CSS editor); the 9 rows with "Settings → Assistive AI" (10 mentions) say "Settings → AI", and row 64's "Assistive AI is off" says "AI is off". `nuxt.config.ts`'s comment too.
+- **Plans:** K6 points here; S2 is reworded (rows, `SettingsList`, one page, search, a README and a short description) with an acceptance for its one page.
+- **The SDK:** `docs/versions.md` lists 1.2.0's additions beside its `tw:` prefix: the contract's (`stacked`, `info`, `empty`, a field's `info`, `SettingsList` and its types, `Markdown`, the nested layout) and the preset's (`README.md` copied, the description's limit), and that a plugin using them sets `minAppVersion`. The version itself is the user's to release (`bun run release minor` there); nothing is bumped here.
+- **The samples:** the template's README (local, with its `tw:` and `^1.2.0` edits that wait for the release) says it's the plugin's page in Vertex: what goes at its top, where developer notes go, the description's limit. The graph's README already reads well in the dialog (checked on the release build) and is unchanged; its `^1.1.0` takes 1.2.0's README copy with its next build after the release.
+- **Not changed:** `SMOKE.md` row 28 still says "Settings → Workflows → Revoke" (Trust has it since the Plugin Architecture Plan), outside this plan's rows.
 
 ## Not in this plan
 

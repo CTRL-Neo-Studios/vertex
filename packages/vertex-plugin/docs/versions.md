@@ -32,6 +32,13 @@ One change of 1.2.0 isn't an addition: a plugin's Tailwind classes carry the pre
 ([why](ui.md#styles)). A plugin built with an older SDK keeps running; its sources need the prefix when it moves to
 1.2.0, or its classes write nothing.
 
+1.2.0 also adds to `/ui` and the contract (Settings Plan): `SettingsRow`'s `stacked` and `info`, `SettingsSection`'s
+`info` and `empty`, a schema field's `info`, `SettingsList` (with `SettingsListProps`, `SettingsListAction`,
+`SettingsListFilter`) and `Markdown`; and `SettingsScrollLayout` draws inside Vertex's own layout on a plugin's
+settings page. The preset copies `README.md` into the build and refuses a `description` over 160 characters or with
+a line break. A plugin that uses the new components needs a Vertex that has them: set `minAppVersion` to the first
+release with them.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

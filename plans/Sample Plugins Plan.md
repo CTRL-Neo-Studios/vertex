@@ -186,13 +186,16 @@ A relation graph like Obsidian's (`d3-force`, `d3-zoom` and `d3-drag`, bundled i
 ## S2: Settings sample
 
 ### Change
-- Schema fields of every type, on the page Vertex draws from the manifest.
-- A page of its own beside it, with a custom widget, drawn with `/ui`'s settings components.
+Written with what the Settings Plan built (`plans/Settings Plan.md`): rows and sections (`stacked`, `info`, one-line descriptions), `SettingsList`, one page per plugin, search.
+- Schema fields of every type (with `info`), which Settings draws at the top of the plugin's one page.
+- The page it registers below them, drawn with `/ui`'s settings components: a custom widget in a `stacked` row, and a `SettingsList` (search, a filter, an action on a selection with a question), its `SettingsScrollLayout` drawing inside Vertex's (its title and a header button in the page's header).
 - One key a workspace may override, one only a trusted workspace may.
 - A secret (set, shown as set, deleted) and the `secrets` permission; a status item that shows the config it reads.
+- A `README.md` that reads well in its details on Settings → Plugins, and a `description` under 160 characters.
 
 ### Acceptance
 - [ ] Each field type edits, resets and validates; the overridable key shows Changed in this workspace and Use global.
+- [ ] The schema and the page are one page, from the nav, from its gear and from Settings search (its fields and the page found by name; its own rows aren't indexed).
 - [ ] The secret is in the OS keychain under the plugin's name and gone after Delete.
 - [ ] Without the `secrets` permission in its manifest, the same call is refused.
 

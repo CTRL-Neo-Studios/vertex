@@ -427,6 +427,8 @@ Blocked by K0. Independent of K1–K4.
 
 Blocked by K3. No X phase blocks it or waits for it; the community group stays empty until C2.
 
+Since then: the Settings Plan (`plans/Settings Plan.md`) replaced the nav rule below ("a registered page, else the schema page; never both") with one page per plugin (U6: the schema on top of the registered page), added a search over the nav (U7), and made Settings → Plugins one searchable list with batch actions and a details dialog (U4, U5).
+
 The Settings nav today is one flat list: About, General, Theme, View, then the pages plugins register (Workflows, Git, Assistive AI), then Plugins, then the schema pages of plugins that are on (Canvas). So a plugin's settings sit before or after Plugins by how its page is drawn, not by what it is. `PluginManifest.icon` exists (K2) but no manifest sets it, a schema page's nav entry is a puzzle piece, and the rows of Settings → Plugins have no icon.
 
 ### Decisions
