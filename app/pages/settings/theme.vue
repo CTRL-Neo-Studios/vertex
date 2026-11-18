@@ -24,7 +24,7 @@ const fonts = computed(() => FONT_KEYS.map(key => ({
     monospace: key.endsWith('MonoFont'),
 })))
 
-// Saved when the editor loses focus, not per keystroke; follows the scope (and other windows) otherwise.
+// Saved when the editor loses focus or on ⌘S, not per keystroke; follows the scope (and other windows) otherwise.
 const CSS = 'advancedThemeConfig.customCss' as const
 const css = ref('')
 watch(() => scope.value(CSS), value => css.value = value ?? '', {immediate: true})
@@ -94,15 +94,11 @@ const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS)
                     />
                 </SettingsRow>
                 <SettingsRow stacked :setting="CSS" :label="t('app.settings.theme.customCssLabel')" :description="t('app.settings.theme.customCssDescription')">
-                    <UTextarea
+                    <SettingsCssEditor
                         v-model="css"
-                        class="w-full font-mono"
-                        :rows="6"
-                        autoresize
-                        :maxrows="24"
-                        spellcheck="false"
+                        :readonly="cssOff || !scope.overridable(CSS)"
                         :placeholder="t('app.settings.theme.customCssPlaceholder')"
-                        @blur="saveCss"
+                        @save="saveCss"
                     />
                 </SettingsRow>
             </SettingsSection>

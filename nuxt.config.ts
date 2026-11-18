@@ -121,6 +121,9 @@ export default defineNuxtConfig({
                 // reloads the window mid-load ("head.hooks").
                 "@iconify/vue",
                 "@iconify/utils",
+                // Settings → Theme's CSS editor (app/components/Settings/CssEditor.vue).
+                "@codemirror/lang-css",
+                "@catppuccin/codemirror",
                 // What community plugins get from the app (`app/utils/plugins/community.ts`, loaded with the first one);
                 // found at runtime otherwise, which reloads every window, and again with each plugin a window loads.
                 ...SHARED_PACKAGES.filter(p => p !== EDITOR && !p.startsWith(`${EDITOR}/`)),

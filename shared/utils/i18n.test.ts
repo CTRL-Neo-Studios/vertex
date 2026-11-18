@@ -1,3 +1,4 @@
+import {baseCompile} from '@intlify/message-compiler'
 import {describe, expect, it} from 'vitest'
 import type {PluginManifest} from '#shared/plugin/manifest'
 import {checkPluginMessages, messageLeaves} from '#shared/plugin/messages'
@@ -38,6 +39,23 @@ describe.each([...catalogs.keys()].filter(c => c !== 'app'))('%s plugin strings'
     it('has a file per app locale, the same keys and params in each, under plugins.<id>, and what its manifest names', () => {
         const manifest = Object.entries(manifests).find(([path]) => path.includes(`/layers/${id}/`))?.[1]
         expect(checkPluginMessages(id, catalogs.get(id)!, manifest, appLocales)).toEqual([])
+    })
+})
+
+// vue-i18n reads `{`, `}`, `@` and `|` as syntax; one string it can't compile (`{ … }` in an example) left every key of
+// its locale showing as a key in the Settings window. Each string, of the app and every layer, must compile.
+describe('every string', () => {
+    const strings = [...catalogs].flatMap(([catalog, files]) => Object.entries(files)
+        .flatMap(([locale, messages]) => [...messageLeaves(messages)].map(([key, text]) => ({at: `${catalog} ${locale} ${key}`, text}))))
+
+    it('compiles as vue-i18n reads it', () => {
+        const broken = strings.flatMap(({at, text}) => {
+            const errors: string[] = []
+            baseCompile(text, {onError: error => void errors.push(error.message)})
+            return errors.length ? [`${at}: ${errors.join('; ')}`] : []
+        })
+        expect(strings.length).toBeGreaterThan(1000)
+        expect(broken).toEqual([])
     })
 })
 

@@ -169,7 +169,7 @@
 				"customCss": "自定义 CSS",
 				"customCssLabel": "样式表",
 				"customCssDescription": "添加在 Vertex 自身样式之后。离开编辑器时保存。",
-				"customCssPlaceholder": "/* 你的 CSS，例如 .tiptap h1 */",
+				"customCssPlaceholder": "/* 你的 CSS，例如 .cm-heading-1 */",
 				"customCssUntrusted": "在你信任此工作区之前，它的 CSS 不会生效：它可以改变或隐藏任何内容，包括信任提示。",
 				"trustWorkspace": "信任工作区"
 			},

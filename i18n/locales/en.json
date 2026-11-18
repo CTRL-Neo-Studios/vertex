@@ -169,7 +169,7 @@
 				"customCss": "Custom CSS",
 				"customCssLabel": "Style sheet",
 				"customCssDescription": "Added after Vertex's own styles. Saved when you leave the editor.",
-				"customCssPlaceholder": "/* Your CSS, e.g. .tiptap h1 */",
+				"customCssPlaceholder": "/* Your CSS, e.g. .cm-heading-1 */",
 				"customCssUntrusted": "This workspace's CSS is off until you trust the workspace: it could restyle or hide anything, the trust prompt included.",
 				"trustWorkspace": "Trust workspace"
 			},

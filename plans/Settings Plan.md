@@ -112,13 +112,20 @@ Reports 2, 7 and the padding of 8.
 Report 8.
 
 ### Change
-- Theme → Custom CSS is `CodeEditor` (`language="css"`), in a stacked row, 8 lines tall and growing to 24.
+- Theme → Custom CSS is a CSS code editor (planned as the editor package's `CodeEditor`; As built says why not), in a stacked row, 8 lines tall and growing to 24.
 - `@codemirror/lang-css` declared and pre-bundled if the editor package doesn't already bring it to the window.
 - The untrusted-workspace alert stays above it; the editor is read-only while it shows.
 
 ### Acceptance
-- [ ] Properties and values highlight and complete; the editor follows light and dark and the editor's code font.
-- [ ] A rule typed and blurred applies to the window and survives a relaunch; a workspace's override still waits for trust.
+- [x] Properties and values highlight and complete; the editor follows light and dark and the editor's code font. (In `tauri dev`: a typed rule drew in the code viewer's colours, its selector, punctuation, property and number each in their own; completion inside a declaration offered `color`, `color-adjust`, `color-interpolation`…; switching to light changed a token from `rgb(249, 226, 175)` to `rgb(223, 142, 29)`, and the editor with it; the scroller's font was the editor's code font, Geist Mono.)
+- [x] A rule typed and blurred applies to the window and survives a relaunch; a workspace's override still waits for trust. (Leaving the editor saved the rule and the window's computed style had its variable; ⌘S saved a second one without leaving; after a relaunch the main window had the variable before Settings opened. An untrusted workspace with its own CSS: the alert above, the editor read-only (`contenteditable` false) showing the workspace's text, its variable not applied.)
+
+### As built
+
+- **`Settings/CssEditor.vue`**, the kernel's, not the editor package's `CodeEditor`: that one focuses itself when it mounts (`autofocus`), which would happen on every visit to Theme. CodeMirror with `@codemirror/lang-css` (highlighting, completion), the code viewer's Catppuccin themes swapped with the colour mode, line numbers, history, brackets, the editor's code font; 12 em tall, growing to 36 em (8 to 24 lines). `v-model` follows each keystroke; `save` on blur and on ⌘S, so the setting is written once per edit. `readonly` while the workspace's CSS waits for trust, or the scope can't override it.
+- **Packages:** `@codemirror/lang-css`, `@codemirror/language` and `@codemirror/autocomplete` declared (the last two were only there through other packages); `@codemirror/lang-css` and `@catppuccin/codemirror` pre-bundled.
+- **Found:** a placeholder written `.cm-heading-1 { … }` left every string of the app's English showing as its key: vue-i18n reads `{` as a placeholder, and a string it can't compile breaks its locale. The i18n test now compiles every string of the app and the layers with vue-i18n's compiler (`@intlify/message-compiler`, declared for it), and failed on that one before it was fixed. The placeholder names `.cm-heading-1` (the editor's class; `.tiptap`, the old editor's, was stale).
+- **Numbers:** 371 tests (54 files); typecheck unchanged.
 
 ## U3: Lists
 
