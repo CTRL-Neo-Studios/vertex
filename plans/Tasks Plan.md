@@ -247,9 +247,33 @@ The risky part first: a component library on Nuxt UI inside a plugin. Nothing of
 - Statuses added and renamed from the board (options on the built-in field, each with its category).
 
 ### Acceptance
-- [ ] A card dragged to Done has `status: done` in the file, and shows done in the List.
-- [ ] A custom status added on the board is an option under `fields` with its category, and another reader of the
+- [x] A card dragged to Done has `status: done` in the file, and shows done in the List.
+- [x] A custom status added on the board is an option under `fields` with its category, and another reader of the
   format (the library's `statusOf`) reads the task's meaning.
+
+### As built
+- **The library** (uncommitted): `TaskBoard`, `BoardColumn` (header, cards drawn only while on screen, New task at the
+  foot, the drop's place), `TaskCard` (the row's checkbox and description, `TaskCheck` and `TaskMeta`, now shared
+  with `TaskRow`; its editor in a popover). Columns are `taskGroups`, the list's grouping made public: every group,
+  empty or not, a deleted list or option only while a task has it; `NONE` hidden while empty. A board without
+  `groupBy` is by status (`boardGroupBy`). `board.ts`, pure: `moveToGroup` (into a done status, `completeTask` with
+  the dropped option kept, a repeating task moved on as the checkbox does; out of done, `completedAt` removed; a
+  multiSelect swaps the column's value; None clears), `moveTask` (order within a column: the document's, which the
+  format doesn't sync, so no `updatedAt`), `withOption` (a built-in field gets an entry for a renamed option),
+  `optionId` (from the title: `waiting-on-client`, `进行中`). Dragging is HTML's (Vertex's windows have
+  `dragDropEnabled: false`, as Bases' kanban relies on). While the view sorts, cards keep its order and only change
+  column. 15 tests (7 new). The palette is shared with the list (`PALETTE`).
+- **The plugin** (committed locally): the viewer draws a view by its type (`list`, `board`), applying `move`,
+  `changeOption` and `createOption` too; a board's Group by offers no Date. Strings for Add column, its name, Means,
+  Cancel.
+- **Checked** in `tauri dev` by script (drags as `DragEvent`s with a `DataTransfer`): a card to Done (`status: done`,
+  `completedAt`; in the List's Done); a column Shipped added as done (`fields: [{id: status, options: [{id: shipped,
+  category: done, …}]}]`), a card dropped there (`statusOf` of the file read by Node: `done`); a card dropped above
+  another in a column (written before it); To do renamed Backlog (an option `todo` with a title; no Delete offered
+  for a built-in status). Not checked: a card's editor in its popover.
+- **Measured** (5,000 tasks, three statuses, dev build): opening the board 110 ms, the longest frame after it 20 ms,
+  16 cards drawn a column; a drag between columns 46 ms to the frame after it; scrolling a column of 1,667 cards
+  median 17 ms, worst 25 ms. `main.js` 424 KB minified, 111 KB gzipped.
 
 ## T3: Calendar
 
