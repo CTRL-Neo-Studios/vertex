@@ -73,7 +73,7 @@ Findings the surveys missed: typing in the chat prompt is the commit-box bug aga
 - Done: `applyProperties` and `syncLinks` skip the write when the value is equal: a save that changes no property or link triggers nothing (backlinks and forelinks panels included).
 - Done: `FileTreeComponent`: the workflow list is one `computed`, not a scan of the whole index per `.md` row.
 - Done: `ChatLink` resolves through the link graph (`resolveLink` in `useActiveWorkspaceIndex`, reactive to files added, removed or renamed) instead of scanning every file per link.
-- Dropped: batching watcher events. 500 modify events in a row, each changing the note's links, made no long task.
+- Dropped: batching watcher events. 500 modify events in a row, each changing the note's links, made no long task. (Done later, `plans/Watcher Plan.md`: modify events made no long task, but they took 20 s to reach the index, and creates and deletes froze the page; batched, 0.4 to 0.9 s for 500 files.)
 
 ### Acceptance
 - Typing in a note with Files and Backlinks open: no tree or backlinks render after an autosave that changed no link or property.

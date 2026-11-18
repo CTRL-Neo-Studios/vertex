@@ -88,9 +88,9 @@ the smaller shape (Open questions, 1): the watch stays the fs plugin's; Rust des
 ### Results (18 Nov)
 
 The same workspace, generated again (13,302 entries), `tauri dev`, DevTools off, the four fixes in. The generator, the
-page harness and the scripts are in `/tmp/vertex-watcher-bench` (`setup.sh` makes the workspace and the app's data
-for the identifier `dev.ctrl-neo.vertex.bench`), out of the repository; the harness is copied into `app/plugins` for
-a run and removed after.
+page harness and the scripts were kept in `/tmp/vertex-watcher-bench` for the plan's phases, out of the repository,
+and deleted after W4. The workspace: 12 areas of 8 topics of 2 subfolders, 10,000 notes of about 2.9 KB (85% with
+frontmatter, 2 to 9 links, some tags), 1,000 small images, a folder of 2,000 short notes.
 
 | | Before the fixes | Now |
 | --- | --- | --- |
@@ -279,7 +279,31 @@ the batch.
   Performance Plan's O1 line on batching pointed here.
 
 ### Acceptance
-- [ ] The before and after table in this plan.
+- [x] The before and after table in this plan. (Below.)
+
+### Results (18 Nov)
+
+The same generated workspace (13,302 entries, 12,000 notes), `tauri dev`, Nuxt DevTools off. "Before" is the
+investigation's baseline, before the four fixes; the times run from the first write to the index being current.
+
+| | Before | After |
+| --- | --- | --- |
+| Index at startup | 1.7 to 1.9 s | 1.4 to 1.5 s |
+| 500 notes rewritten outside (a `git pull`) | 20.3 s | 0.42 s, longest frame 46 ms |
+| 500 notes created outside in a folder that's there | 41.5 s (measured after W1, which didn't change it) | 0.5 s, longest frame 119 ms |
+| 500 notes created outside in a new folder | 51.3 s, 41 s blocked | 0.43 s, longest frame 125 ms |
+| `rm -rf` of a folder of 500 notes | 27 s, one freeze of 14 s | 0.85 s, longest frame 105 ms |
+| A folder of 50 notes moved in from outside | its folder's entry only (W0) | all 53 entries, links resolving |
+| A deleted folder of 2,000 notes undone in Vertex | 181.5 s (W0) | 0.2 s, longest frame 174 ms |
+| A folder of 26 notes moved in Vertex (the index's part) | 1.9 s | 87 ms until the next frame |
+| A note's save that changes a property other than `icon` | rebuilt the file tree | doesn't |
+
+What did it, in order: the four fixes after the investigation (a folder moved in one pass, the tags pattern, the
+entry's own `icon`, a scan that skips what it can't read), then W1's one-pass adds, W2's `describe_paths`, W3's
+batches. The watch itself stayed the fs plugin's.
+
+Also changed on the way, asked for by the user: `session.index.on` hears Vertex's own creates, removes and renames;
+a rename keeps a file's `modifiedTime`; a file deleted outside soon after it was made leaves the index.
 
 ## Not in this plan
 
@@ -294,7 +318,7 @@ the batch.
 
 ## Open questions
 
-1. **The watch in Rust, or one command?** Raised by W0 (What the results change), to decide before W2. As planned:
+1. **The watch in Rust, or one command?** Decided 18 Nov: one command (the user). Raised by W0 (What the results change), to decide before W2. As planned:
    `watch_start` in Rust, batches made there. Smaller: the fs plugin's watch stays, the page gathers its events, one
    Rust command describes the gathered paths. Recommended: the smaller one. W1 is the same either way.
 2. **100 ms of quiet** before a batch: long enough to gather a `git checkout`, short enough that an edit in another
