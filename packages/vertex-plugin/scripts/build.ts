@@ -58,11 +58,18 @@ write(join(dist, 'modules.json'), `${JSON.stringify(names, null, 2)}\n`)
 
 // `/ui`: each component typed by its props and events in the contract (`shared/plugin/components.ts`: `<Name>Props`,
 // and `<Name>Emits` for one that emits), so `vue-tsc` checks a plugin's template; a component without its props there
-// fails the build. Its functions keep their signatures, with the Vue types they name imported. Checked with the
-// contract below, where a name nothing declares fails the build.
-const componentTypes = new Set<string>()
-ts.forEachChild(ts.createSourceFile('components.ts', readFileSync(at('shared/plugin/components.ts'), 'utf8'), ts.ScriptTarget.Latest), node => {
-    if (ts.isInterfaceDeclaration(node)) componentTypes.add(node.name.text)
+// fails the build. One whose props are generic (`SettingsListProps<T>`) is declared as a generic function, as `vue-tsc`
+// declares a generic component, so `T` is inferred from what the plugin passes. Its functions keep their signatures,
+// with the Vue types they name imported. Checked with the contract below, where a name nothing declares fails the build.
+const source = readFileSync(at('shared/plugin/components.ts'), 'utf8')
+/** Each interface of the contract, with its type parameters as declared (`<T extends …>`) and as arguments (`<T>`). */
+const componentTypes = new Map<string, { params: string, args: string }>()
+ts.forEachChild(ts.createSourceFile('components.ts', source, ts.ScriptTarget.Latest), node => {
+    if (!ts.isInterfaceDeclaration(node)) return
+    const params = node.typeParameters
+    componentTypes.set(node.name.text, params?.length
+        ? {params: `<${params.map(p => source.slice(p.pos, p.end).trim()).join(', ')}>`, args: `<${params.map(p => p.name.text).join(', ')}>`}
+        : {params: '', args: ''})
 })
 const vueTypes = new Set(checker.getExportsOfModule(modules.vue!).map(s => s.name))
 const uiLines: string[] = []
@@ -78,7 +85,11 @@ for (const symbol of checker.getExportsOfModule(modules['@type32/vertex-plugin/u
             uiContract.add(emits)
             uiVue.add('EmitsToProps')
         }
-        uiLines.push(`export declare const ${symbol.name}: new () => { $props: ${props}${componentTypes.has(emits) ? ` & EmitsToProps<${emits}>` : ''} }`)
+        const props$ = `${props}${componentTypes.get(props)!.args}${componentTypes.has(emits) ? ` & EmitsToProps<${emits}>` : ''}`
+        const generic = componentTypes.get(props)!.params
+        uiLines.push(generic
+            ? `export declare const ${symbol.name}: ${generic}(props: ${props$}) => any`
+            : `export declare const ${symbol.name}: new () => { $props: ${props$} }`)
         continue
     }
     const type = checker.typeToString(checker.getTypeOfSymbol(checker.getAliasedSymbol(symbol)), undefined, ts.TypeFormatFlags.NoTruncation).replaceAll('globalThis.', '')
