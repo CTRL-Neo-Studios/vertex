@@ -3,7 +3,7 @@
 Was C4 of the Plugin Architecture Plan (`plans/Plugin Architecture Plan.md`), planned apart on 17 Nov: it is six
 plugins, the author docs and whatever the contract turns out to lack, too much for one phase. Blocked by C3.
 
-Six community plugins, each written as an outside author would write one, and the docs that author reads. They prove
+Five community plugins (six as first planned: S4 and S5 became one on 18 Nov), each written as an outside author would write one, and the docs that author reads. They prove
 the contract: a sample that needs the kernel's source to get written has found a gap, and the gap is closed in the
 contract before the sample goes on. Each sample is a repository of its own beside Vertex, installed the way a user
 installs any plugin (C2b), so Vertex's repository holds none of their code.
@@ -34,17 +34,17 @@ building and released.
 | Contract changes | Additions only, within `apiVersion` 1 (the docs' Versions page). A sample sets `minAppVersion` to the Vertex that has what it uses. |
 | Author docs | In the SDK's package (`packages/vertex-plugin/docs/`, shipped with it), since they version with the contract and reach an author with the types. `Concepts and Structures.md` links them. |
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
-| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). S2 waits for the Settings Plan (`plans/Settings Plan.md`, 17 Nov): its settings sample is written with what that plan builds. S5 deferred like S4, after S6 (the user, 18 Nov). |
+| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). S2 waits for the Settings Plan (`plans/Settings Plan.md`, 17 Nov): its settings sample is written with what that plan builds. S5 deferred like S4, after S6 (the user, 18 Nov). S4 and S5 became one plugin, Tasks, with a plan of its own (`plans/Tasks Plan.md`, the user, 18 Nov). |
 | The test plugin | Stays the fixture for install and update tests. It isn't a sample. |
 | A plugin's strings (P0) | Files, `locales/<locale>.json` in the package, each `{"plugins": {"<id>": {…}}}` as a core layer's are. Not in the bundle, as first proposed: the Settings window shows a plugin's schema labels without running it (it runs the global plugins made for `settings` only), so the strings must be readable without its code. The host merges only `plugins.<id>`; a workspace copy's strings are pinned with it. |
 | The SDK (P0) | Published by the user on 17 Nov: `@type32/vertex-plugin` `1.0.0` on `latest`, released with `bun run release` in the package. P0's additions to the contract are a minor version. |
 | The template (P0) | `Type-32/vertex-plugin-template`, a GitHub template repository beside Vertex (`../vertex-plugin-template`), the samples' and the docs' starting point. |
 
-Still open: S4's plan (the user's).
+S4's plan came on 18 Nov, with S5 in it: `plans/Tasks Plan.md`.
 
 ```mermaid
 flowchart LR
-  P0 --> D1 --> S1 --> Settings["Settings Plan"] --> S2 --> S3 --> S6 --> S5 --> S4 --> D2
+  P0 --> D1 --> S1 --> Settings["Settings Plan"] --> S2 --> S3 --> S6 --> Tasks["S4 and S5: Tasks Plan"] --> D2
 ```
 
 ## Repositories
@@ -54,8 +54,7 @@ flowchart LR
 | S1 | `vertex-plugin-graph` | `CTRL-Neo-Studios/vertex-plugin-graph` | `graph` | panel views in a pane and a tab, commands, the index and its events, the theme, config with workspace overrides, bundled dependencies |
 | S2 | `vertex-plugin-settings-sample` | `CTRL-Neo-Studios/vertex-plugin-settings-sample` | `settings-sample` | schema settings, a settings page of its own, an overridable key, a secret, a permission |
 | S3 | `vertex-plugin-stat-block` | `CTRL-Neo-Studios/vertex-plugin-stat-block` | `stat-block` | a code block widget, a slash item, Markdown syntax, the editor's nested contexts |
-| S4 | (the user's plan) | | | a file type with New, a viewer that loads text, a link extractor (as planned so far) |
-| S5 | `vertex-plugin-bases-calendar` | `CTRL-Neo-Studios/vertex-plugin-bases-calendar` | `bases-calendar` | `requires`, a core plugin's API (`ctx.use('bases')`) |
+| S4, S5 | `vertex-plugin-tasks` (and the library `tasks-ui-components`) | `CTRL-Neo-Studios/vertex-plugin-tasks` | `tasks` | a file type with New, a viewer that loads text, an embed, a link extractor, a panel view, `requires` and a core plugin's API (`ctx.use('bases')`), a component library on Nuxt UI inside a plugin, dialogs' files, notifications |
 | S6 | `vertex-plugin-navigator` | `CTRL-Neo-Studios/vertex-plugin-navigator` | `navigator` | the index (tree, tags, properties, dates), `session.files` whole (menus, New, clipboard, drags, drops, `edit`, undo), `files.menuItem`, `data.workspace` and `data.global`, a dialog (`useOverlay`), a view in a pane and a tab |
 
 None of the ids is a core plugin's (`ai`, `ai-assistant`, `backlinks`, `bases`, `bases-map`, `canvas`, `chat`,
@@ -74,7 +73,7 @@ Found by reading the contract, before any sample is written. P0 closes the first
 | `/ui`'s components' props | S2, S6 | Closed in P0: `shared/plugin/components.ts`. |
 | The SDK outside this machine | all | Closed: published (Decisions). |
 | A worker | the graph, maybe | A plugin is one `main.js` imported from a blob URL. Whether a `Worker` can start from a plugin's asset isn't known; only needed if 5,000 notes don't lay out on the main thread (S1 measures first). |
-| A community plugin's API, typed | a community plugin another uses (none of the six) | Found in D1. `ctx.provide` works for any plugin, but `PluginApis` is augmented through `#shared/plugin/api`, which only the SDK's own files resolve, so `ctx.use('<community id>')` doesn't type-check. The docs say so (the package, what can't be done). |
+| A community plugin's API, typed | a community plugin another uses (none of the samples) | Found in D1. `ctx.provide` works for any plugin, but `PluginApis` is augmented through `#shared/plugin/api`, which only the SDK's own files resolve, so `ctx.use('<community id>')` doesn't type-check. The docs say so (the package, what can't be done). |
 | The index's reactivity, as documented | the graph | Found in S1; the docs were wrong, the contract is fine. The session page said all of the index was reactive: its entries are (an entry's `forelinks`, `backlinks`, `modifiedTime`), but `links()` and `unresolved()` read the link graph as it is, and the editor's own saves aren't `index.on` events. Closed: the session page says so. |
 | A plugin's Tailwind classes reach Vertex | every plugin that uses Tailwind | Found in S1, by the stray words Tailwind makes classes of (the graph's `resize`, `container`, `hidden`). The real fault was wider: a plugin's stylesheet loads after the app's, and two sheets that both define a class can't be ordered against each other. Nuxt UI's card body is `p-4 sm:p-6`; a plugin's `.p-4`, later, beats `sm:p-6` on every card and modal in the window (measured: 24 px became 16 px). Closed in the SDK with a prefix (the user's choice, 17 Nov, over scoping a plugin's rules to its own UI, which keeps the clash inside it): a plugin writes `tw:flex`, its stylesheet holds only those names. Checked in `tauri dev` with a scratch plugin: its own classes applied (`tw:p-4`, `tw:hidden tw:sm:block`, `tw:text-muted`), `tw:w-full` on a `UButton` filled its row, and a `UCard` beside them kept its 24 px. |
 | A Nuxt UI component inside another's trigger; a plugin's dialog in dev; the frontmatter tools | the navigator (the first sample with a tooltip around a button, and a modal) | Found in S6, closed in Vertex: the Navigator Plan's Gaps. |
@@ -229,31 +228,19 @@ Written with what the Settings Plan built (`plans/Settings Plan.md`): rows and s
 - **Found, in the sample:** a roll at the start of a table cell stayed text: a nested editor keeps its selection at 0, which "touched" the roll and unveiled it. Only a focused editor's selection unveils a roll now (and focus changes rebuild).
 - **Found, in Vertex:** a canvas text card that wasn't being edited was drawn by the canvas package's own Markdown (Comark), so no plugin's code block, syntax or extension drew there (nor Mermaid's, nor a base's), only while editing. The user chose to draw it with the note editor (18 Nov): `NoteEditor` has `readonly` now (the contract's `NoteEditorProps.readonly`: no cursor, no `update`, only links, buttons and widgets take the pointer, so a drag and a double-click go to the card), and the canvas gives it to the `text-display` slot. One CodeMirror per text card drawn. A note card shown is still Comark. SDK: 1.3.0's (`docs/versions.md`).
 
-## S4: Board
+## S4 and S5: Tasks
 
-Deferred to the last sample phase: the user has a clearer plan, which replaces this section when it comes. As first
-planned: a new file format, `.board`, a kanban board as JSON whose cards hold Markdown.
-
-### Change
-- A file type with New Board (File → New, Files' menus, the palette) and an icon.
-- A viewer that loads the file's text: columns and cards, dragged between columns, edited in place; saved through the viewer's text, so autosave and undo are the app's.
-- A link extractor: `[[links]]` in cards count as the board's links (backlinks, the graph).
-
-### Acceptance
-- [ ] New Board creates and opens one; edits autosave; an invalid file shows what's wrong instead of a blank view.
-- [ ] A note linked from a card lists the board under Backlinks; renaming the note updates the card.
-
-## S5: Bases calendar
-
-A community plugin on a core plugin's API.
+One plugin with a plan of its own (`plans/Tasks Plan.md`, T0 to T8; the user, 18 Nov): `.task` files in the user's
+Tasks format (`@type32/tasks`) shown as a list, a board, a calendar and a timeline, the workspace's notes that are
+tasks, iCalendar, alerts. It takes S4's place (first planned as a `.board` file: a file type with New, a viewer that
+loads text, a link extractor) and S5's (first planned as a Bases calendar: `requires`, `ctx.use('bases')`), whose
+point it keeps: its calendar and timeline are Bases layouts.
 
 ### Change
-- `requires: ["bases"]`; a Bases view registered with `ctx.use('bases').registerView`: a month calendar by a date property, with the view's options (which property, week start).
-- A click on a day's entry opens the note; a click on an empty day makes a new item with that date.
+- The Tasks Plan's phases.
 
 ### Acceptance
-- [ ] The view is offered in a `.base` file and in a ` ```base ` block; with Bases off, the plugin is off and says why.
-- [ ] Changing a note's date moves it on the calendar without reopening the base.
+- [ ] The Tasks Plan's T0 to T8 accepted.
 
 ## S6: Navigator
 
@@ -277,7 +264,7 @@ with previews), not the tree first written here. The Change and Acceptance below
 
 ### Acceptance
 - [ ] The docs' contract test passes against the final contract.
-- [ ] The six SMOKE rows pass on a release build.
+- [ ] The samples' SMOKE rows pass on a release build.
 
 ## Not in this plan
 
