@@ -60,8 +60,10 @@ of its own. A field's `default` is the config's default, so `ctx.config.value` h
 | `list` | a list of strings | `placeholder` |
 | `path` | a workspace-relative path | `kind`: `file` or `folder` (its picker shows while a workspace's settings are edited) |
 
-Every field has `key` (a path in the config: `depth`, `colors.tags`), `type`, `label` and `default`; `description`
-is optional. `label`, `description` and options' labels are i18n keys of the plugin's, which `en.json` must have.
+Every field has `key` (a path in the config: `depth`, `colors.tags`), `type`, `label` and `default`. `description` is
+optional and one line: Settings cuts a longer one. `info`, optional too, is for what takes more to say (why, what's
+sent, what an option costs): it opens from an info button beside the label. `label`, `description`, `info` and
+options' labels are i18n keys of the plugin's, which `en.json` must have.
 
 ### Workspace overrides
 

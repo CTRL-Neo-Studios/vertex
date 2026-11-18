@@ -30,8 +30,10 @@ interface FieldBase {
     key: string
     /** i18n key, under `plugins.<id>`. */
     label: string
-    /** i18n key. */
+    /** i18n key: one line under the label. */
     description?: string
+    /** i18n key: more than a line of explanation, behind the row's info button. */
+    info?: string
 }
 
 /** A setting the Settings window draws without running the plugin. Its `default` is the plugin's default too. */
@@ -115,11 +117,11 @@ function validateField(f: unknown, at: string, errors: string[]) {
     const type = f.type as ConfigField['type']
     if (!(type in FIELD_KEYS)) return void errors.push(`${at}.type must be one of ${Object.keys(FIELD_KEYS).join(', ')}`)
     for (const key of Object.keys(f)) {
-        if (!['key', 'type', 'label', 'description', 'default', ...FIELD_KEYS[type]].includes(key)) errors.push(`${at} has an unknown key "${key}"`)
+        if (!['key', 'type', 'label', 'description', 'info', 'default', ...FIELD_KEYS[type]].includes(key)) errors.push(`${at} has an unknown key "${key}"`)
     }
     if (!isString(f.key) || !CONFIG_PATH.test(f.key)) errors.push(`${at}.key must be a dotted path of letters, digits, "_" and "-"`)
     if (!isString(f.label) || !f.label) errors.push(`${at}.label must be an i18n key`)
-    if (f.description !== undefined && !isString(f.description)) errors.push(`${at}.description must be an i18n key`)
+    for (const key of ['description', 'info'] as const) if (f[key] !== undefined && !isString(f[key])) errors.push(`${at}.${key} must be an i18n key`)
     if (f.placeholder !== undefined && !isString(f.placeholder)) errors.push(`${at}.placeholder must be a string`)
     const d = f.default
     if (type === 'switch' && typeof d !== 'boolean') errors.push(`${at}.default must be true or false`)

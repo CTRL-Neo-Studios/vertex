@@ -77,7 +77,7 @@ const addFile = () => attempt(async () => {
                 :dirty="config.trustConfig.fileTrust !== 'content'"
                 @reset="setFileTrust('content')"
             >
-                <SettingsRow :label="t('app.settings.trust.fileTrust')" :description="t('app.settings.trust.fileTrustDescription')">
+                <SettingsRow :label="t('app.settings.trust.fileTrust')" :description="t('app.settings.trust.fileTrustDescription')" :info="t('app.settings.trust.fileTrustInfo')">
                     <USelect
                         class="w-56"
                         :items="fileTrustItems"
@@ -87,19 +87,23 @@ const addFile = () => attempt(async () => {
                 </SettingsRow>
             </SettingsSection>
 
-            <SettingsSection :title="t('app.settings.trust.trusted')" :description="t('app.settings.trust.trustedDescription')">
+            <SettingsSection
+                :title="t('app.settings.trust.trusted')"
+                :description="t('app.settings.trust.trustedDescription')"
+                :info="t('app.settings.trust.trustedInfo')"
+                :empty="!folders.length && !files.length ? t(any ? 'app.settings.trust.noMatches' : 'app.settings.trust.noTrusted') : undefined"
+            >
                 <template #actions>
                     <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-folder-plus" :label="t('app.settings.trust.addFolder')" @click="addFolder"/>
                     <UButton v-if="fileExtensions.length" size="xs" color="neutral" variant="ghost" icon="i-lucide-file-plus" :label="t('app.settings.trust.addFile')" @click="addFile"/>
                     <UButton v-if="any" size="xs" color="error" variant="ghost" icon="i-lucide-shield-off" :label="t('app.settings.trust.revokeAll')" @click="attempt(trust.revokeAll)"/>
                 </template>
-                <div v-if="any" class="px-4 py-2.5">
+                <SettingsRow v-if="any" stacked>
                     <UInput v-model="query" class="w-full" size="sm" icon="i-lucide-search" :placeholder="t('app.settings.trust.search')"/>
-                </div>
-                <p v-if="!folders.length && !files.length" class="text-sm text-muted px-4 py-2.5">
-                    {{ t(any ? 'app.settings.trust.noMatches' : 'app.settings.trust.noTrusted') }}
-                </p>
-                <h3 v-if="folders.length" class="px-4 pt-2.5 pb-1 text-xs font-medium text-dimmed">{{ t('app.settings.trust.folders') }}</h3>
+                </SettingsRow>
+                <SettingsRow v-if="folders.length" stacked>
+                    <h3 class="text-xs font-medium text-dimmed">{{ t('app.settings.trust.folders') }}</h3>
+                </SettingsRow>
                 <SettingsRow
                     v-for="record in folders"
                     :key="`folder:${record.path}`"
@@ -113,7 +117,9 @@ const addFile = () => attempt(async () => {
                     />
                     <UButton size="sm" color="error" variant="soft" icon="i-lucide-shield-off" :label="t('app.settings.trust.revoke')" @click="attempt(() => trust.revoke('folders', record.path))"/>
                 </SettingsRow>
-                <h3 v-if="files.length" class="px-4 pt-2.5 pb-1 text-xs font-medium text-dimmed">{{ t('app.settings.trust.files') }}</h3>
+                <SettingsRow v-if="files.length" stacked>
+                    <h3 class="text-xs font-medium text-dimmed">{{ t('app.settings.trust.files') }}</h3>
+                </SettingsRow>
                 <SettingsRow
                     v-for="record in files"
                     :key="`file:${record.path}`"

@@ -6,14 +6,22 @@
 import type {InternalLinkClickDetail} from '@type32/codemirror-rich-obsidian-editor'
 import type {UiSlot} from './contributions'
 
-/** One setting: label and description on the left, its control (the default slot) on the right. */
+/**
+ * One setting: label and description on the left, its control (the default slot) on the right. `stacked`: the control
+ * below them, at the section's full width (an editor, a grid, a list). A stacked row without a `label` is its content
+ * alone, padded as every row is (a notice, a preview). Everything in a section is a row, so nothing pads by hand.
+ */
 export interface SettingsRowProps {
-    label: string
+    label?: string
     /** An Iconify name, drawn before the label (a plugin's row). */
     icon?: string
+    /** One line: a longer one is cut, with the whole of it as its tooltip. What takes more to say goes in `info`. */
     description?: string
+    /** More than a line of explanation (why, what's sent, what it costs), behind an info button beside the label. */
+    info?: string
     /** Replaces the description, in the error colour. */
     error?: string
+    stacked?: boolean
     /**
      * The setting it edits (`plugins.config.<id>.depth`): it then follows the Settings window's scope (Global only,
      * Changed in this workspace, Use global).
@@ -24,7 +32,12 @@ export interface SettingsRowProps {
 /** A group of `SettingsRow`s under a title, with `actions` beside it. */
 export interface SettingsSectionProps {
     title: string
+    /** One line, as a row's. */
     description?: string
+    /** As a row's: behind an info button beside the title. */
+    info?: string
+    /** What to say while the section has no rows ("No tokens saved."). */
+    empty?: string
     /** Shows the reset button, which emits `reset`; what "dirty" means is the caller's. */
     dirty?: boolean
 }

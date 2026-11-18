@@ -229,34 +229,39 @@
       "imagesUnsupported": "模型 {model} 不支持图片。请移除附加的图片，或选择支持图片的模型。",
       "feature": {
         "label": "聊天",
-        "description": "围绕笔记的聊天。单个聊天可以固定自己的配置。关闭后会隐藏聊天相关视图、“在聊天中提问”和“新建聊天”。"
+        "description": "围绕笔记的聊天。",
+        "info": "单个聊天可以固定自己的配置。关闭后会隐藏聊天相关视图、“在聊天中提问”和“新建聊天”。"
       },
       "commandNewChat": "新建聊天",
       "askInChat": "在聊天中提问",
       "settings": {
         "storage": "聊天存储位置",
-        "storageDescription": "此工作区聊天的保存位置。切换后，已有的聊天保留在原处。",
+        "storageDescription": "此工作区聊天的保存位置。",
+        "storageInfo": "切换后，已有的聊天保留在原处。",
         "storageApp": "应用数据",
         "storageWorkspace": "工作区（加密）",
         "mode": "聊天模式",
-        "modeDescription": "新聊天的初始模式。只读仅读取笔记；建议逐条提出修改，由你接受或拒绝；写作会暂存修改和新笔记，在每次回复后由你审阅并应用。",
+        "modeDescription": "新聊天的初始模式。",
+        "modeInfo": "只读仅读取笔记。\n\n建议逐条提出修改，由你接受或拒绝。\n\n写作会暂存修改和新笔记，在每次回复后由你审阅并应用。",
         "modes": {
           "read": "只读",
           "suggest": "建议",
           "write": "写作"
         },
         "titles": "聊天标题",
-        "titlesDescription": "第一次回复后，由聊天的模型为其命名。关闭则保留第一条消息作为标题。",
+        "titlesDescription": "第一次回复后，由聊天的模型为其命名。",
+        "titlesInfo": "关闭则保留第一条消息作为标题。",
         "importFiles": "拖入聊天的外部文件",
-        "importFilesDescription": "从访达或资源管理器拖入或粘贴到聊天的文件会先复制到附件文件夹。默认每次询问；对话框中的“记住”选项会为工作区设置此项。",
+        "importFilesDescription": "是否把来自外部的文件复制到附件文件夹。",
+        "importFilesInfo": "从访达或资源管理器拖入或粘贴到聊天的文件会先复制。默认每次询问；对话框中的“记住”选项会为工作区设置此项。",
         "importFilesAsk": "每次询问",
         "importFilesAlways": "总是复制并附加",
         "nav": "聊天",
         "feedback": {
           "title": "工具反馈",
-          "description": "聊天模型对其工具的报告：任务缺少的工具、出错的工具或误导了它的工具。仅保存在这台电脑上，不会发送到任何地方。",
-          "empty": "暂无反馈",
-          "emptyDescription": "当聊天无法用其工具完成某件事，或某个工具出现异常时，会在这里列出。",
+          "description": "聊天模型对其工具的报告。",
+          "info": "任务缺少的工具、出错的工具或误导了它的工具。仅保存在这台电脑上，不会发送到任何地方。",
+          "empty": "暂无反馈。",
           "kinds": {
             "missing": "缺少工具",
             "bug": "错误",

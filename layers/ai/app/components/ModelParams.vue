@@ -49,6 +49,7 @@ function saveExtra() {
     <SettingsSection
         :title="t('plugins.ai.models.params.title')"
         :description="t('plugins.ai.models.params.description')"
+        :info="t('plugins.ai.models.params.info')"
         :dirty="!!params"
         @reset="emit('save', undefined)"
     >
@@ -56,7 +57,7 @@ function saveExtra() {
         v-for="p in AI_NUMBER_PARAMS"
         :key="p.key"
         :label="t(`plugins.ai.models.params.${p.key}`)"
-        :description="t(`plugins.ai.models.params.${p.key}Description`)"
+        :info="t(`plugins.ai.models.params.${p.key}Description`)"
     >
         <template v-if="current[p.key] !== undefined">
             <USlider
@@ -91,9 +92,13 @@ function saveExtra() {
             @update:model-value="stop => set({stop})"
         />
     </SettingsRow>
-    <div class="px-4 py-2.5 space-y-1.5">
-        <div class="text-sm">{{ t('plugins.ai.models.params.extra') }}</div>
-        <div class="text-xs" :class="extraError ? 'text-error' : 'text-muted'">{{ extraError ?? t('plugins.ai.models.params.extraDescription') }}</div>
+    <SettingsRow
+        stacked
+        :label="t('plugins.ai.models.params.extra')"
+        :description="t('plugins.ai.models.params.extraDescription')"
+        :info="t('plugins.ai.models.params.extraInfo')"
+        :error="extraError"
+    >
         <UTextarea
             v-model="extraDraft"
             class="w-full font-mono"
@@ -103,6 +108,6 @@ function saveExtra() {
             placeholder='{"reasoning_effort": "low"}'
             @blur="saveExtra"
         />
-    </div>
+    </SettingsRow>
     </SettingsSection>
 </template>

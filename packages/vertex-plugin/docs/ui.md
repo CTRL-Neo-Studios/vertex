@@ -93,8 +93,8 @@ From `@type32/vertex-plugin/ui`, so a plugin's UI looks and behaves as Vertex's.
 | Component | |
 | --- | --- |
 | `SettingsScrollLayout` | A settings page: the title (`title`) in a header over the scrolling content. `globalOnly` marks a page none of whose settings a workspace may change. |
-| `SettingsSection` | A group of rows under a title, with a reset button while `dirty` (emits `reset`). |
-| `SettingsRow` | One setting: `label`, `description`, `icon`, `error`; the control is the default slot. `setting` (`config.path('depth')`) makes it follow the scope Settings edits: Global only, Changed in this workspace, Use global. |
+| `SettingsSection` | A group of rows under a title, with a reset button while `dirty` (emits `reset`). `description` is one line; `info` is what takes more, behind an info button; `empty` is what to say while it has no rows. Buttons go in its `actions` slot. |
+| `SettingsRow` | One setting: `label`, `description` (one line: a longer one is cut), `info`, `icon`, `error`; the control is the default slot. `stacked` puts the control below the label at full width (an editor, a list); a stacked row without a `label` is its content alone (a notice). `setting` (`config.path('depth')`) makes it follow the scope Settings edits: Global only, Changed in this workspace, Use global. |
 | `ViewerLayout` | A file viewer's frame: the editable title (`v-model:fileName`, `@on-rename`), the content (the default slot), the status bar with the registered status items. |
 | `NoteEditor` | A Markdown editor inside something else (a card, a form): `text`, `notePath`; emits `update`, `done` (Esc), `openLink`. |
 | `PluginMount` | Draws a contribution's UI with props (another plugin's embed, from `session.editor.embedFor`). |
@@ -104,7 +104,8 @@ From `@type32/vertex-plugin/ui`, so a plugin's UI looks and behaves as Vertex's.
 And two functions: `openExternal(url)` opens a web or mail link in the default browser or mail app (anything else is
 refused), and `useScrollFade(element)`, the classes that fade a scroll area's edges as Vertex's panels do.
 
-A settings page, all three Settings components together:
+A section holds rows and nothing else: a row is what pads, so every page lines up. A settings page, all three Settings
+components together:
 
 ```vue
 <script setup lang="ts">
@@ -118,8 +119,11 @@ const defaults = {depth: 2}
 <template>
     <SettingsScrollLayout title="Hello">
         <SettingsSection title="Graph" :dirty="config.isDirty(['depth'], defaults)" @reset="config.reset(['depth'], defaults)">
-            <SettingsRow label="Depth" :setting="config.path('depth')">
+            <SettingsRow label="Depth" description="How many links away to look." :setting="config.path('depth')">
                 <UInputNumber :model-value="config.value('depth') as number" :min="1" :max="5" @update:model-value="v => config.set({depth: v})"/>
+            </SettingsRow>
+            <SettingsRow stacked label="Notes" info="Kept with the workspace, and shown to nobody else." :setting="config.path('notes')">
+                <UTextarea class="tw:w-full" :model-value="config.value('notes') as string" @update:model-value="v => config.set({notes: v})"/>
             </SettingsRow>
         </SettingsSection>
     </SettingsScrollLayout>

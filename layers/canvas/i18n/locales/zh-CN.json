@@ -114,11 +114,13 @@
 			},
 			"settings": {
 				"wheelBehavior": "滚轮",
-				"wheelBehaviorDescription": "在画布上滚动的作用；按住 {mod} 或空格时则为另一种。",
+				"wheelBehaviorDescription": "在画布上滚动的作用。",
+				"wheelBehaviorInfo": "按住 {mod} 或空格时则为另一种。",
 				"wheelPan": "平移",
 				"wheelZoom": "缩放",
 				"modDragBehavior": "{mod}+拖动",
-				"modDragBehaviorDescription": "按住 {mod} 在空白处拖动时，按绘制的大小创建的内容。",
+				"modDragBehaviorDescription": "按住 {mod} 在空白处拖动时创建的内容。",
+				"modDragBehaviorInfo": "按绘制的大小创建。",
 				"modDrag": {
 					"menu": "询问",
 					"card": "卡片",
@@ -139,7 +141,8 @@
 				"snapToObjects": "对齐对象",
 				"snapToObjectsDescription": "移动和缩放卡片时对齐其他卡片的边缘和中心。",
 				"zoomBreakpoint": "内容缩放阈值",
-				"zoomBreakpointDescription": "缩小到多远时卡片仍显示内容，之后显示占位；数值越大，越远仍显示内容。"
+				"zoomBreakpointDescription": "缩小到多远时卡片仍显示内容，之后显示占位。",
+				"zoomBreakpointInfo": "数值越大，越远仍显示内容。"
 			}
 		}
 	}

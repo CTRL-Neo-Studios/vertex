@@ -264,14 +264,16 @@
       "settings": {
         "title": "版本控制",
         "tokens": "登录令牌",
-        "tokensDescription": "用于 HTTPS 远程的个人访问令牌，在远程拒绝登录时保存。它们保存在系统钥匙串中；git 仅在与对应主机通信时获得令牌，此时不会询问你自己的凭据助手。",
+        "tokensDescription": "用于 HTTPS 远程的个人访问令牌，保存在系统钥匙串中。",
+        "tokensInfo": "在远程拒绝登录时保存。git 仅在与对应主机通信时获得令牌，此时不会询问你自己的凭据助手。",
         "noTokens": "没有已保存的令牌。远程拒绝登录时，Vertex 会请你输入。",
         "username": "用户名：{username}",
         "remove": "移除",
         "failed": "无法读取或更改已保存的令牌",
         "autoSync": {
           "title": "自动同步",
-          "description": "无需按同步即可让本机的工作区保持一致：提交所有更改，然后拉取和推送。合并或变基期间会等待；登录失败后会暂停，直到在 Git 视图中同步成功。受信任的工作区可以有自己的设置。",
+          "description": "无需按同步：提交所有更改，然后拉取和推送。",
+          "info": "让本机的工作区保持一致。合并或变基期间会等待；登录失败后会暂停，直到在 Git 视图中同步成功。受信任的工作区可以有自己的设置。",
           "interval": "自动同步",
           "intervalDescription": "工作区窗口打开时同步的频率。",
           "never": "从不",
@@ -284,9 +286,11 @@
         },
         "commitMessages": {
           "whenEmpty": "信息框为空时撰写信息",
-          "whenEmptyDescription": "未输入内容就提交或同步时，请模型撰写信息。关闭时，提交信息为“更新 N 个文件”。",
+          "whenEmptyDescription": "未输入内容就提交或同步时，请模型撰写信息。",
+          "whenEmptyInfo": "关闭时，提交信息为“更新 N 个文件”。",
           "autoSync": "为自动同步撰写信息",
-          "autoSyncDescription": "自动同步的提交由模型撰写信息（每次同步都会发送差异）。关闭时为“更新 N 个文件”。"
+          "autoSyncDescription": "自动同步的提交由模型撰写信息。",
+          "autoSyncInfo": "每次同步都会发送差异。关闭时为“更新 N 个文件”。"
         },
         "trustWorkspace": "信任工作区"
       },
@@ -294,7 +298,8 @@
       "cloneWorkspace": "克隆工作区…",
       "commitMessageFeature": {
         "label": "提交信息",
-        "description": "根据更改并按仓库近期提交的风格撰写提交信息：Git 视图中的星光按钮，以及在下方开启时，信息框为空时和自动同步。差异会发送给模型。"
+        "description": "为你撰写提交信息。",
+        "info": "根据更改并按仓库近期提交的风格撰写：Git 视图中的星光按钮，以及在 Git 设置中开启时，信息框为空时和自动同步。差异会发送给模型。"
       }
     }
   }

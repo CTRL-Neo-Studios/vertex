@@ -91,16 +91,17 @@ async function pick(field: Extract<ConfigField, {type: 'path'}>) {
             <SettingsSection
                 :title="t('app.settings.plugins.settings')"
                 :description="manifest.description"
+                :empty="fields.length ? undefined : t('app.settings.plugins.noSettings')"
                 :dirty="dirty"
                 @reset="reset"
             >
-                <p v-if="!fields.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.plugins.noSettings') }}</p>
                 <SettingsRow
                     v-for="field in fields"
                     :key="field.key"
                     :setting="at(field)"
                     :label="tField(field.label)"
                     :description="field.description ? tField(field.description) : undefined"
+                    :info="field.info ? tField(field.info) : undefined"
                     :data-plugin-field="field.key"
                 >
                     <USwitch v-if="field.type === 'switch'" :model-value="valueOf(field)" @update:model-value="set(field, $event)"/>

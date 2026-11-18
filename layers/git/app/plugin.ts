@@ -12,7 +12,7 @@ export const gitContext = () => ctx!
 export default definePlugin({
     setup(context) {
         ctx = context
-        context.whenPlugin('ai', ai => ai.registerFeature({id: 'commitMessage', label: 'plugins.git.commitMessageFeature.label', description: 'plugins.git.commitMessageFeature.description'}))
+        context.whenPlugin('ai', ai => ai.registerFeature({id: 'commitMessage', label: 'plugins.git.commitMessageFeature.label', description: 'plugins.git.commitMessageFeature.description', info: 'plugins.git.commitMessageFeature.info'}))
         context.views.panel({
             id: 'git', label: 'plugins.git.label', icon: 'i-lucide-git-branch', defaultArea: 'left',
             when: c => c.isWorkspace,

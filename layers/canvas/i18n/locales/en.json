@@ -114,11 +114,13 @@
 			},
 			"settings": {
 				"wheelBehavior": "Scroll wheel",
-				"wheelBehaviorDescription": "What scrolling does on a canvas; the other happens with {mod} or Space held.",
+				"wheelBehaviorDescription": "What scrolling does on a canvas.",
+				"wheelBehaviorInfo": "The other happens with {mod} or Space held.",
 				"wheelPan": "Pan",
 				"wheelZoom": "Zoom",
 				"modDragBehavior": "{mod}+drag",
-				"modDragBehaviorDescription": "What dragging on empty canvas with {mod} held creates, at the size drawn.",
+				"modDragBehaviorDescription": "What dragging on empty canvas with {mod} held creates.",
+				"modDragBehaviorInfo": "It's created at the size you draw.",
 				"modDrag": {
 					"menu": "Ask",
 					"card": "Card",
@@ -139,7 +141,8 @@
 				"snapToObjects": "Snap to objects",
 				"snapToObjectsDescription": "Moved and resized cards snap to other cards’ edges and centres.",
 				"zoomBreakpoint": "Content zoom threshold",
-				"zoomBreakpointDescription": "How far out cards keep their content before they show placeholders; higher keeps it further out."
+				"zoomBreakpointDescription": "How far out cards keep their content before showing placeholders.",
+				"zoomBreakpointInfo": "Higher keeps it further out."
 			}
 		}
 	}

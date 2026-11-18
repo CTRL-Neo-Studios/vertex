@@ -85,10 +85,12 @@
         "systemPromptDescription": "随使用此配置的每个请求一起发送。",
         "systemPromptPlaceholder": "你是一位乐于助人的写作助手。",
         "tools": "工具",
-        "toolsDescription": "允许聊天搜索和读取你的笔记，并对打开的笔记提议修改。不支持工具调用的模型请关闭。",
+        "toolsDescription": "允许聊天搜索和读取你的笔记，并提议修改。",
+        "toolsInfo": "修改针对当前打开的笔记提出。不支持工具调用的模型请关闭。",
         "params": {
           "title": "参数",
-          "description": "随此配置的聊天回复和编辑器助手请求一起发送（不含聊天标题）。关闭的参数交由提供商决定。提供商会忽略不支持的参数：Ollama 的 OpenAI 兼容接口不支持 Top K、Min P 和重复惩罚。",
+          "description": "随此配置的聊天回复和编辑器助手请求一起发送。",
+          "info": "不含聊天标题。关闭的参数交由提供商决定。提供商会忽略不支持的参数：Ollama 的 OpenAI 兼容接口不支持 Top K、Min P 和重复惩罚。",
           "providerDefault": "提供商默认",
           "temperature": "温度",
           "temperatureDescription": "随机性：越低越集中、可重复，越高越多样。",
@@ -112,7 +114,8 @@
           "stopDescription": "回复会在出现其中任一序列处结束。",
           "stopPlaceholder": "添加序列…",
           "extra": "额外请求字段",
-          "extraDescription": "一个 JSON 对象，原样随每个请求发送，用于提供商特有的选项。请求已设置的字段保持不变。",
+          "extraDescription": "一个 JSON 对象，原样随每个请求发送，用于提供商特有的选项。",
+          "extraInfo": "请求已设置的字段保持不变。",
           "extraInvalid": "不是 JSON 对象，未保存。"
         },
         "noModel": "未选模型",
@@ -136,16 +139,18 @@
         "defaultProfile": "默认模型配置",
         "defaultProfileDescription": "未单独选择配置的功能都会使用它。",
         "section": "功能",
-        "sectionDescription": "开启哪些功能，以及每个功能使用的模型配置。工作区的选择仅在其文件夹受信任时生效。",
+        "sectionDescription": "开启哪些功能，以及每个功能使用的模型配置。",
+        "sectionInfo": "工作区的选择仅在其文件夹受信任时生效。",
         "useDefault": "使用默认（{name}）",
         "untrusted": "在你信任此工作区之前，它的 AI 功能选择不会生效。",
         "trustWorkspace": "信任工作区",
-        "masterSection": "辅助 AI",
+        "masterSection": "AI",
         "enabled": "全部 AI 功能",
-        "enabledDescription": "关闭后所有 AI 功能都会停用：编辑器助手、聊天和聊天标题。已有聊天仍保留在原处。",
+        "enabledDescription": "关闭后，编辑器助手、聊天和聊天标题都会停用。",
+        "enabledInfo": "已有聊天仍保留在原处。",
         "editProfile": "编辑配置"
       },
-      "off": "辅助 AI 已关闭，这里的设置不会被使用。",
+      "off": "AI 已关闭，这里的设置不会被使用。",
       "turnOn": "前往开关",
       "list": {
         "selectAll": "全选显示的项",
@@ -155,7 +160,7 @@
         "remove": "移除"
       },
       "nav": {
-        "ai": "辅助 AI",
+        "ai": "AI",
         "providers": "服务商",
         "models": "模型配置",
         "features": "功能"

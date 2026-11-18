@@ -50,11 +50,12 @@ const untrusted = computed(() => props.config.root !== null && props.config.over
             <SettingsSection
                 :title="t('plugins.git.settings.autoSync.title')"
                 :description="t('plugins.git.settings.autoSync.description')"
+                :info="t('plugins.git.settings.autoSync.info')"
                 :dirty="config.isDirty([AUTO], DEFAULTS)"
                 data-git-auto-sync
                 @reset="config.reset([AUTO], DEFAULTS)"
             >
-                <div v-if="untrusted" class="px-4 py-2.5">
+                <SettingsRow v-if="untrusted" stacked>
                     <UAlert
                         color="warning"
                         variant="subtle"
@@ -62,7 +63,7 @@ const untrusted = computed(() => props.config.root !== null && props.config.over
                         :title="t('plugins.git.settings.autoSync.untrusted')"
                         :actions="[{label: t('plugins.git.settings.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => gitContext().trust.trustFolder(config.root!, true)}]"
                     />
-                </div>
+                </SettingsRow>
                 <SettingsRow :setting="config.path(INTERVAL)" :label="t('plugins.git.settings.autoSync.interval')" :description="t('plugins.git.settings.autoSync.intervalDescription')">
                     <USelect class="w-40" :items="intervals" :model-value="config.value(INTERVAL) as number" @update:model-value="set(INTERVAL, $event)"/>
                 </SettingsRow>
@@ -85,12 +86,18 @@ const untrusted = computed(() => props.config.root !== null && props.config.over
                     :setting="config.path(`${COMMIT_MESSAGES}.${key}`)"
                     :label="t(`plugins.git.settings.commitMessages.${key}`)"
                     :description="t(`plugins.git.settings.commitMessages.${key}Description`)"
+                    :info="t(`plugins.git.settings.commitMessages.${key}Info`)"
                 >
                     <USwitch :model-value="config.value(`${COMMIT_MESSAGES}.${key}`) as boolean" @update:model-value="set(`${COMMIT_MESSAGES}.${key}`, $event)"/>
                 </SettingsRow>
             </SettingsSection>
-            <SettingsSection :title="t('plugins.git.settings.tokens')" :description="t('plugins.git.settings.tokensDescription')" data-git-tokens>
-                <p v-if="!tokens.length" class="text-sm text-muted px-4 py-2.5">{{ t('plugins.git.settings.noTokens') }}</p>
+            <SettingsSection
+                :title="t('plugins.git.settings.tokens')"
+                :description="t('plugins.git.settings.tokensDescription')"
+                :info="t('plugins.git.settings.tokensInfo')"
+                :empty="tokens.length ? undefined : t('plugins.git.settings.noTokens')"
+                data-git-tokens
+            >
                 <SettingsRow
                     v-for="token in tokens"
                     :key="token.host"

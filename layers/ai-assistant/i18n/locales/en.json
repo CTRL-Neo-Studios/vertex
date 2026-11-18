@@ -3,7 +3,7 @@
     "ai-assistant": {
       "feature": {
         "label": "Editor assistant",
-        "description": "Ask AI in the editor: rewrite, fix, continue and more."
+        "description": "Rewrite, fix, continue and more."
       },
       "settings": {
         "toolbar": "Ask AI in the selection toolbar",

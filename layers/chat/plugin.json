@@ -29,6 +29,7 @@
         "default": "app",
         "label": "plugins.chat.settings.storage",
         "description": "plugins.chat.settings.storageDescription",
+        "info": "plugins.chat.settings.storageInfo",
         "options": [
           {
             "value": "app",
@@ -46,6 +47,7 @@
         "default": "suggest",
         "label": "plugins.chat.settings.mode",
         "description": "plugins.chat.settings.modeDescription",
+        "info": "plugins.chat.settings.modeInfo",
         "options": [
           {
             "value": "read",
@@ -66,7 +68,8 @@
         "type": "switch",
         "default": true,
         "label": "plugins.chat.settings.titles",
-        "description": "plugins.chat.settings.titlesDescription"
+        "description": "plugins.chat.settings.titlesDescription",
+        "info": "plugins.chat.settings.titlesInfo"
       },
       {
         "key": "importFiles",
@@ -74,6 +77,7 @@
         "default": "ask",
         "label": "plugins.chat.settings.importFiles",
         "description": "plugins.chat.settings.importFilesDescription",
+        "info": "plugins.chat.settings.importFilesInfo",
         "options": [
           {
             "value": "ask",

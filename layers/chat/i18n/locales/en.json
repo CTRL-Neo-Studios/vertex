@@ -229,34 +229,39 @@
       "imagesUnsupported": "The model {model} doesn’t take images. Remove the attached images or choose a model that does.",
       "feature": {
         "label": "Chat",
-        "description": "Chats about your notes. A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat."
+        "description": "Chats about your notes.",
+        "info": "A chat can pin its own profile. Off hides the Chats and Chat views, Ask in chat and New Chat."
       },
       "commandNewChat": "New Chat",
       "askInChat": "Ask in chat",
       "settings": {
         "storage": "Chat storage",
-        "storageDescription": "Where this workspace's chats are kept. Switching leaves existing chats where they are.",
+        "storageDescription": "Where this workspace's chats are kept.",
+        "storageInfo": "Switching leaves existing chats where they are.",
         "storageApp": "App data",
         "storageWorkspace": "Workspace (encrypted)",
         "mode": "Chat mode",
-        "modeDescription": "The mode new chats start in. Read only reads your notes; Suggest proposes edits you accept or reject one by one; Write stages changes and new notes you review and apply after each reply.",
+        "modeDescription": "The mode new chats start in.",
+        "modeInfo": "Read only reads your notes.\n\nSuggest proposes edits you accept or reject one by one.\n\nWrite stages changes and new notes you review and apply after each reply.",
         "modes": {
           "read": "Read",
           "suggest": "Suggest",
           "write": "Write"
         },
         "titles": "Chat titles",
-        "titlesDescription": "After the first reply, the chat's model names it. Off keeps the first message as the title.",
+        "titlesDescription": "After the first reply, the chat's model names it.",
+        "titlesInfo": "Off keeps the first message as the title.",
         "importFiles": "Files from outside in chat",
-        "importFilesDescription": "Files dropped or pasted into chat from Finder or Explorer are copied into the attachments folder first. Ask is the default; the dialog’s Remember choice sets it for a workspace.",
+        "importFilesDescription": "Whether outside files are copied into the attachments folder.",
+        "importFilesInfo": "Files dropped or pasted into chat from Finder or Explorer are copied first. Ask is the default; the dialog’s Remember choice sets it for a workspace.",
         "importFilesAsk": "Ask each time",
         "importFilesAlways": "Always copy and attach",
         "nav": "Chat",
         "feedback": {
           "title": "Tool feedback",
-          "description": "What the chat's models reported about their tools: one missing for a task, one that failed, or one that misled them. Kept on this computer only; nothing is sent.",
-          "empty": "No feedback yet",
-          "emptyDescription": "When a chat can't do something with its tools, or a tool misbehaves, it's listed here.",
+          "description": "What the chat's models reported about their tools.",
+          "info": "One missing for a task, one that failed, or one that misled them. Kept on this computer only; nothing is sent.",
+          "empty": "No feedback yet.",
           "kinds": {
             "missing": "Missing tool",
             "bug": "Bug",

@@ -28,7 +28,7 @@ const chatViewOn = (c: PanelViewContext) => c.isWorkspace && chatOn()
 export default definePlugin<ChatConfig>({
     setup(context) {
         ctx = context
-        context.use('ai')?.registerFeature({id: 'chat', label: 'plugins.chat.feature.label', description: 'plugins.chat.feature.description'})
+        context.use('ai')?.registerFeature({id: 'chat', label: 'plugins.chat.feature.label', description: 'plugins.chat.feature.description', info: 'plugins.chat.feature.info'})
         context.provide({chatsInWorkspace: () => context.config.value.storage === 'workspace'} satisfies ChatApi)
         // Tool feedback (`toolFeedback`), kept on this computer for the user to review.
         context.settings.page({id: 'chat', label: 'plugins.chat.settings.nav', component: () => import('./components/Settings.vue')})

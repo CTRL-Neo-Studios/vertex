@@ -126,12 +126,10 @@ async function remove() {
             </SettingsSection>
 
             <SettingsSection :title="t('plugins.ai.models.behaviour')">
-                <SettingsRow :label="t('plugins.ai.models.tools')" :description="t('plugins.ai.models.toolsDescription')">
+                <SettingsRow :label="t('plugins.ai.models.tools')" :description="t('plugins.ai.models.toolsDescription')" :info="t('plugins.ai.models.toolsInfo')">
                     <USwitch :model-value="profile.tools !== false" @update:model-value="save({tools: $event ? undefined : false})"/>
                 </SettingsRow>
-                <div class="px-4 py-2.5 space-y-1.5">
-                    <div class="text-sm">{{ t('plugins.ai.models.systemPrompt') }}</div>
-                    <div class="text-xs text-muted">{{ t('plugins.ai.models.systemPromptDescription') }}</div>
+                <SettingsRow stacked :label="t('plugins.ai.models.systemPrompt')" :description="t('plugins.ai.models.systemPromptDescription')">
                     <UTextarea
                         v-model="systemPrompt"
                         class="w-full"
@@ -141,7 +139,7 @@ async function remove() {
                         :placeholder="t('plugins.ai.models.systemPromptPlaceholder')"
                         @blur="systemPrompt !== profile.systemPrompt && save({systemPrompt})"
                     />
-                </div>
+                </SettingsRow>
             </SettingsSection>
 
             <AiModelParams :params="profile.params" :model="modelInfo" @save="params => save({params})"/>

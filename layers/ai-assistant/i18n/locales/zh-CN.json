@@ -3,7 +3,7 @@
     "ai-assistant": {
       "feature": {
         "label": "编辑器助手",
-        "description": "在编辑器中使用 AI：改写、修正、续写等。"
+        "description": "改写、修正、续写等。"
       },
       "settings": {
         "toolbar": "选区工具栏中的“询问 AI”",

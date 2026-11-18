@@ -90,7 +90,7 @@ async function setToken(token: string) {
     <SettingsScrollLayout :title="t('app.settings.general.title')" v-if="config" global-only>
         <div class="space-y-4">
             <SettingsSection :title="t('app.settings.general.startup')">
-                <SettingsRow :label="t('app.settings.general.recovery.label')" :description="t('app.settings.general.recovery.description')">
+                <SettingsRow :label="t('app.settings.general.recovery.label')" :description="t('app.settings.general.recovery.description')" :info="t('app.settings.general.recovery.info')">
                     <USelect
                         :model-value="config.recoverSessions"
                         :items="recoveryItems"
@@ -128,6 +128,7 @@ async function setToken(token: string) {
                 <SettingsRow
                     :label="t('app.settings.updates.token.label')"
                     :description="t(hasToken ? 'app.settings.updates.token.saved' : 'app.settings.updates.token.description')"
+                    :info="t('app.settings.updates.token.info')"
                     :error="tokenError"
                 >
                     <UButton v-if="hasToken" color="neutral" variant="outline" icon="i-lucide-trash-2" @click="setToken('')">

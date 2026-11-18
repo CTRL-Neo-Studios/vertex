@@ -98,7 +98,8 @@ A plugin's strings are files, `locales/<locale>.json`, so Settings can show its 
 - Everything is under `plugins.<id>`; Vertex reads nothing else from the file.
 - `en.json` is required once there are strings. Any other locale has exactly its keys, each with the same `{params}`.
   A language the plugin has no file for shows English.
-- Every i18n key `plugin.json` names (its schema's labels, descriptions and options' labels) must be in `en.json`.
+- Every i18n key `plugin.json` names (its schema's labels, descriptions, info texts and options' labels) must be in
+  `en.json`.
 - The build checks all of it.
 
 Where the contract says "i18n key" (a view's `label`, a command's, a file type's), give a key of the plugin's,

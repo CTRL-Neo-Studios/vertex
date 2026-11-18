@@ -1,0 +1,244 @@
+# Settings Plan
+
+A rethink of the Settings window, asked for on 17 Nov after K6 (the nav's groups) and the layout polish: those moved
+things around without settling how a settings page is built, how a list is searched and acted on, or what a plugin
+looks like in Settings. Before S2 of the Sample Plugins Plan (`plans/Sample Plugins Plan.md`), whose settings sample
+is written with what this plan builds.
+
+Each phase ends reviewable on its own: `typecheck`, the tests and lint clean, checked in `tauri dev`.
+
+## What was reported (17 Nov)
+
+| # | Report | What's behind it | Phase |
+| --- | --- | --- | --- |
+| 1 | "Version 0" on every core plugin | A plugin row's description is one joined line: description · version · author · needs · uses (`describe` in `pages/settings/plugins/index.vue`). Core manifests all say `"version": "0"`; a core plugin's version is Vertex's. | U4 |
+| 2 | A long description under "Check for updates automatically" | 222 characters under a label that already says it. Not the only one: of the 88 descriptions Settings shows (rows, sections, schema fields), 27 run past 90 characters. (First counted as 64, which took in descriptions outside Settings: workflow nodes, Git's dialogs and tour.) | U1 |
+| 3 | A community plugin's row is a paragraph | The same joined line, plus where it came from and what it claims. A plugin has no place for more than its manifest's `description`: nothing reads a README. | U4, U5 |
+| 4 | No search, no batch selection and actions on Plugins | Plugins never had them. They exist for AI's lists (providers, model profiles: `layers/ai/app/components/List.vue`, search and Remove selected) and, as a bare search field, on Trust. The pattern is one plugin's, so no other page has it. | U3, U4 |
+| 5 | Chat's settings page links to another settings page | A plugin with both a schema (drawn by Settings at `/settings/plugins/<id>`) and a page of its own (`ctx.settings.page`, at `/settings/<id>`) has two pages. K6 lists only the second in the nav, so Chat's page carries a row "Options → Open" to reach the first. Chat is the only one today; the contract allows it for any plugin. | U6 |
+| 6 | No settings search | There never was a working one: the sidebar had a `UDashboardSearchButton` wired to nothing, removed on 31 Oct (`f50f005`, "the settings sidebar's dead search button"). Nothing replaced it. | U7 |
+| 7 | View → Arrangement's padding | `SettingsSection` pads nothing: only `SettingsRow` has padding. Anything that isn't a row (the arrangement's grid, a list, an empty state) pads itself by hand, each differently. | U1 |
+| 8 | Custom CSS: the same padding, and a plain textarea | As 7; and it's a `UTextarea`. The editor package's `CodeEditor` (what the code viewer draws with) takes a `language`. | U1, U2 |
+
+## Baseline (17 Nov)
+
+- 368 tests (53 files); 62 Rust tests; typecheck with the 7 errors in `@type32/latex2vue`.
+- **Pages:** About, General (3 sections), Theme (5), View (3), Trust (2), Plugins (`plugins/index.vue`,
+  463 lines), a schema page per plugin (`plugins/[id].vue`), and the plugins' own (`[...path].vue`: AI with three
+  sub-entries and item pages, Chat, Git).
+- **Building blocks** (`app/components/Settings/`, published in `/ui`): `SettingsScrollLayout`, `SettingsSection`,
+  `SettingsRow`.
+- **Plugins with settings:** a schema only: AI assistant (3 fields), Canvas (6), Files (7), Workflows (4), and any
+  community plugin (the graph: 10). A page only: AI, Git. Both: Chat (4 fields and a page).
+
+## Principles
+
+What the phases hold every page to.
+
+1. **A label says what a control does; a description adds one line or isn't there.** Anything longer (why, what's
+   sent, what trust means) is behind an info button beside the label, or in the dialog where the decision is made.
+2. **A section's content is rows.** A control that needs the full width is a row too (stacked: label over control).
+   No page pads by hand.
+3. **A list of things is one component:** search, selection, actions on the selection, an empty state. Wherever
+   Settings lists things (plugins, trusted folders, providers, profiles), it's that one.
+4. **A plugin has one settings page.** What Settings draws from its manifest and what the plugin draws itself are on
+   it together.
+5. **A row is short; details are a click away.** A plugin's row is its name, one line and its state. Its version,
+   author, source, permissions and README are its details.
+6. **Everything in Settings can be found by typing.**
+
+## Decisions
+
+| Question | Decision |
+| --- | --- |
+| A full-width control | `SettingsRow` gets `stacked`: label and description on top, the default slot below at full width, the same padding. The arrangement grid, the CSS editor and lists are stacked rows. |
+| Long explanations | `SettingsRow` and `SettingsSection` get `info` (text): an info button beside the label opens it in a popover. The description stays one line (clamped, with the full text as its tooltip, so a plugin's long one can't break a page). |
+| The list component | AI's `List.vue` moves to the kernel as `SettingsList` (published in `/ui`, `SettingsListProps`), with actions on the selection as data (`{id, label, icon, color?, confirm?, applies?(item)}`) instead of Remove alone, and groups (headings inside one list). AI's lists and Trust move onto it. |
+| The Plugins page | One `SettingsList`: search, a filter (All, On, Off, Updates), groups Core / Community / This workspace. Actions on a selection: Turn on, Turn off, Update, Remove (each only for the rows it applies to). Install… and Check for updates stay in the header; Check automatically becomes a row with one line and its `info`. |
+| A plugin's row | Icon, name, one line (the manifest's `description`), state badges (Update, Waits for restart, Waits for trust, an error), the gear when it has settings, the switch. A community plugin's version beside its name; a core plugin's nowhere. A click opens its details. |
+| A plugin's details | A dialog from its row (the user's choice, 17 Nov): name, version, author, where it came from and what it claims, what it needs and may use, its state, and its README. Update and Remove are there too. |
+| The README | A file: `README.md` beside `plugin.json` in the installed folder. The SDK's preset copies the project's into `dist/`. Read by Rust on request (`plugin_readme`), not listed with every plugin; the install dialog shows the staged one. Not pinned for a workspace copy (it runs nothing, as assets). |
+| Drawing a README | Markdown through `@comark/vue` (what Chat's replies use), in the kernel as `Markdown`, published in `/ui`. A README is a stranger's text: no raw HTML; links open in the browser (`openExternal`); images from the plugin's own folder draw, remote ones don't load until the user clicks "Load images" (confirmed, 17 Nov). |
+| The AI plugin's page | Named "AI", after its plugin, so it no longer sits beside "AI assistant" as "Assistive AI" (confirmed, 17 Nov). With U1's copy pass. |
+| `description`'s length | The SDK's preset refuses one over 160 characters or with a line break ("a README is for the rest"). The host only clamps, so an installed plugin never breaks. |
+| One settings page per plugin | A plugin's page is the host's: its header, then the manifest's schema, then what the plugin registered (`ctx.settings.page`), in one scroll. `SettingsScrollLayout` inside a page the host already laid out draws only its content, so a plugin's page component doesn't change. `/settings/plugins/<id>` and `/settings/<page id>` are one page; the nav has one entry per plugin. A page with `children` (AI) keeps its sub-entries; its schema, if it ever has one, is its first. |
+| Settings search | A field at the sidebar's top; typing replaces the nav with results (pages, sections, rows, plugins), grouped by page. A result opens its page and scrolls to its row. `⌘F` focuses it. |
+| What search knows | Generated, not listed by hand: a Nuxt module reads the kernel's settings pages and the core plugins' page components for their `SettingsSection` and `SettingsRow` labels and descriptions (`#build/settings-index.mjs`, as `core-plugins.mjs` is generated) and fails the build on a row it can't read unless the row opts out. With them: every schema field of every listed plugin (manifest and strings, no code run), every registered page and sub-entry, every plugin by name. A community plugin's own rows aren't indexed (Open questions, 3). |
+| Custom CSS | `CodeEditor` with `language="css"` in a stacked row: highlighting, completion, the app's theme. Saved on blur as now, and on `⌘S`. |
+| Core plugins' versions | Not shown. `version` stays required in the manifest (one rule for every plugin). |
+| The contract | Additions only: `SettingsRowProps.stacked`, `.info`; `SettingsSectionProps.info`; `SettingsListProps`; `MarkdownProps`. A minor of the SDK after U6. |
+| Strings | Every string added or cut in en and zh-CN together; the i18n test already holds the layers to that. |
+
+```mermaid
+flowchart LR
+  U1 --> U2
+  U1 --> U3 --> U4 --> U5
+  U1 --> U6 --> U7 --> U8
+  U5 --> U8
+```
+
+## U1: Page anatomy and copy
+
+Reports 2, 7 and the padding of 8.
+
+### Change
+- `SettingsRow`: `stacked`, `info`; the description clamped to one line with its full text as a tooltip.
+- `SettingsSection`: `info`; `empty`, the text for "nothing here yet".
+- Every page onto them: View's Arrangement, Theme's Custom CSS, Trust's lists, Plugins' empty states, the schema page's
+  path and list fields, Chat's feedback list, Git's and AI's pages. No `px-4` beside a row.
+- The copy pass: each description that doesn't fit its row on one line at the default window size cut to a line, its
+  remainder moved to `info` or dropped where the label says it. Section descriptions too (Core plugins, Community
+  plugins, This workspace).
+- A test over the sources, as `boundaries.test.ts` reads them: a `SettingsSection`'s children in a template are
+  `SettingsRow`, `SettingsList` or its slots.
+
+### Acceptance
+- [x] View → Arrangement and Theme → Custom CSS line up with the rows above them, at the window's smallest width and its widest. (In `tauri dev`, the Settings window sized to 720, 900 and 1400 px: the arrangement's and the CSS field's left and right edges are their row's, to the pixel, at each. No section runs past the window at any of the three.)
+- [x] No settings description wraps past one line at the default window size, in en and zh-CN; each `info` opens with the text that was cut. (A sweep of 16 pages, About to Git, in both languages at 900 px: nothing is cut but one row on Plugins, "Bases map", whose joined line is U4's to replace. At 1400 nothing; at 720, 24 are cut, each with its whole text as its tooltip. An info button on Trust opened the text that was under the label before. Not swept: a model profile's page and a provider's, which need a provider set up; their rows changed the same way.)
+- [x] The sources test fails on a hand-padded `div` in a section. (`app/components/Settings/anatomy.test.ts`: a `div` and a `<template v-if><p>` in a section are named; every template of the app and the layers passes.)
+
+### As built
+
+- **Contract:** `SettingsRowProps.stacked`, `.info`, and `label` now optional (a stacked row without one is its content alone: a notice, a preview, a list's heading); `SettingsSectionProps.info`, `.empty`; a schema field's `info` (`shared/plugin/manifest.ts`, an i18n key the strings check covers); AI's `AiFeatureDef.info`.
+- **Components:** `Settings/Row.vue` (one head, beside the control or over it), `Section.vue`, `Info.vue` (the info button: a popover). Descriptions are `truncate` with the whole text as `title`. `ScrollLayout.vue`'s `fieldset` got `min-w-0`: a fieldset is at least as wide as its content, so with one-line descriptions every page ran past the window (found by the sweep; Plugins' switches were off the edge).
+- **Pages:** 17 hand-padded spots became rows or `empty`: View's arrangement, Theme's preview and CSS field and its trust notice, Trust's search and group headings, the schema page, Plugins' three sections, Git's notice and tokens, AI's notice, system prompt and extra fields, Chat's feedback entries. The arrangement is two lists by two, four across from 48 rem of row (a container query): at the default size four across cut "Writer's Tools" and "Table of Contents".
+- **Copy:** of the 88 descriptions, 35 were cut to a line (en and zh-CN), 31 with their remainder as a new `…Info` string: the kernel's 14 (General's two, View's seven, Trust's two, Plugins' three), Git's 6, AI's 5, Chat's 6, Canvas's 3, the editor assistant's 1. AI's model parameters lost their descriptions for `info` alone (their rows hold a slider, a number and a switch). Chat's empty-state description went.
+- **"AI":** the AI plugin's page, its switch's section and its "is off" notice (`plugins.ai.nav.ai`, `features.masterSection`, `off`), and the layer's comments. `SMOKE.md` (9 rows) and `Concepts and Structures.md` (2 lines) still say "Settings → Assistive AI": U8 rewrites those documents' Settings parts and takes them.
+- **Docs:** the author docs' UI page (the two components, a stacked row in the example) and Config page (`info`); `Concepts and Structures.md` (a settings page's anatomy).
+- **Numbers:** 370 tests (54 files); 62 Rust tests; typecheck unchanged (the 7 errors in `@type32/latex2vue`); the SDK builds with the new props.
+
+## U2: The CSS editor
+
+Report 8.
+
+### Change
+- Theme → Custom CSS is `CodeEditor` (`language="css"`), in a stacked row, 8 lines tall and growing to 24.
+- `@codemirror/lang-css` declared and pre-bundled if the editor package doesn't already bring it to the window.
+- The untrusted-workspace alert stays above it; the editor is read-only while it shows.
+
+### Acceptance
+- [ ] Properties and values highlight and complete; the editor follows light and dark and the editor's code font.
+- [ ] A rule typed and blurred applies to the window and survives a relaunch; a workspace's override still waits for trust.
+
+## U3: Lists
+
+Report 4's groundwork.
+
+### Change
+- `SettingsList` in the kernel, from AI's `List.vue`: search, a checkbox per row and one for all shown, actions on the
+  selection as data, groups, the `empty` state, "no matches". Published (`SettingsListProps`, the SDK's `/ui`).
+- AI's providers, model profiles and a provider's models move onto it (the layer's `List.vue` is deleted).
+- Trust's folders and files move onto it: Revoke for a selection, in place of Revoke all alone.
+
+### Acceptance
+- [ ] AI's three lists behave as before (search kept in the URL, the default profile not selectable, Remove selected asks).
+- [ ] Trust: a search narrows both groups; Revoke on three selected rows revokes those three.
+- [ ] Keyboard: the search field, then rows by Tab; Space toggles a row's checkbox.
+
+## U4: The Plugins page
+
+Reports 1, 3 (the row) and 4.
+
+### Change
+- The page is one `SettingsList` (Decisions): search over name, description and id; the filter; the three groups.
+- Rows as decided. `describe` goes: what it joined moves to the details (U5).
+- Actions on a selection: Turn on, Turn off (in the scope being edited, with its restart prompt once for all),
+  Update (those with one), Remove (community and workspace copies; one question naming them).
+- Check automatically: a row, one line, its `info`.
+- The page's script (463 lines: installing, updating, removing, the workspace's copies) splits into a composable per
+  concern, so the page is its template.
+
+### Acceptance
+- [ ] No row says "Version"; a community plugin's version is beside its name.
+- [ ] Typing "gra" leaves the graph; the Updates filter leaves the plugins with one.
+- [ ] Four selected core plugins turned off: four switches off, one restart prompt.
+- [ ] Every row is one line of text at the default window size, with the graph installed.
+
+## U5: A plugin's details and README
+
+Report 3.
+
+### Change
+- **The package:** the SDK's preset copies `README.md` into `dist/` (so into `plugin.zip`), and refuses a
+  `description` over 160 characters or with a line break.
+- **Rust:** `plugin_readme({id, root})` (the installed copy's, or a workspace's); `plugin_stage` returns the staged one.
+- **`Markdown`** in the kernel (`@comark/vue`), with the rules decided for a stranger's text; published in `/ui`.
+- **The details dialog** (Decisions), opened from a row; the install dialog shows the same body for what's staged.
+- **Core plugins:** a one-line `description` in each manifest (of 18, only Bases map has one today), so every row has its line.
+- **Docs:** the author docs' package page (the README, the description's limit) and the template's README as its example.
+
+### Acceptance
+- [ ] The graph's README draws in its details: headings, its table, links (opened in the browser), no remote request until asked.
+- [ ] A README with `<script>` and an `<img onerror>` draws them as text or not at all.
+- [ ] The preset fails a build whose `description` is 200 characters, saying where the rest belongs.
+- [ ] A plugin without a README shows its details without an empty box.
+
+## U6: One settings page per plugin
+
+Report 5.
+
+### Change
+- `[...path].vue` and `plugins/[id].vue` become one page component: header (icon, name, the switch's state), the
+  schema's section, then the plugin's registered page (through `PluginMount`), in one `SettingsScrollLayout`.
+- `SettingsScrollLayout` nested in it draws its slot only; its `title` and header slots are the host's to place.
+- The nav: one entry per plugin (`pluginNavGroups` loses the "never both" rule: there is no "both").
+- Chat's page loses its "Options → Open" row; `plugins.chat.settings.options.*` go.
+- Docs: the author docs' `ctx.settings.page` and Config pages; the SDK's minor.
+
+### Acceptance
+- [ ] Settings → Chat shows its four options and its feedback list on one page; no link to another settings page.
+- [ ] A community plugin with a schema and a page (a scratch one) shows both on one page, from the nav and from its gear.
+- [ ] AI's sub-entries and item pages, and `ctx.settings.open('ai/models/<id>')`, work as before.
+
+## U7: Settings search
+
+Report 6.
+
+### Change
+- `modules/settings-index.ts`: the generated index (Decisions), each entry `{page, section?, label, description?, anchor}` as i18n keys.
+- `SettingsRow` and `SettingsSection` carry their anchor; a page opened at one scrolls to it and marks it for a moment.
+- The sidebar: the search field above the scope select (sticky with it); results replace the nav while there's a
+  query (`UCommandPalette`'s list and matching, drawn inline); Enter opens the first, Esc clears. `⌘F` focuses it.
+- Matching is over the UI language's strings and English, so a setting is found by either name.
+
+### Acceptance
+- [ ] "font" finds Theme's font rows; "trash" finds Files' deleted-files row; "graph" finds the plugin and its fields; "字体" finds the fonts in zh-CN.
+- [ ] A result opens its page scrolled to its row, in the scope being edited.
+- [ ] The build fails on a `SettingsRow` whose label the module can't read and that doesn't opt out.
+- [ ] A plugin that's off isn't found by its settings, only by its row on Plugins.
+
+## U8: Close
+
+### Change
+- `Concepts and Structures.md`: the Settings section rewritten (anatomy, lists, a plugin's page, search, the index).
+- The Plugin Architecture Plan's K6: a pointer here for what replaced its nav rule.
+- `SMOKE.md`: Settings rows for search, a batch action, a plugin's details, the CSS editor; its 9 rows that say "Settings → Assistive AI" say "Settings → AI" (as `Concepts and Structures.md`'s 2 lines).
+- The SDK's minor (the contract's additions, the preset's README and description rule); the template and the graph
+  get a README that reads well in the details dialog.
+- The Sample Plugins Plan's S2 reworded for what exists now (stacked rows, `SettingsList`, one page).
+
+### Acceptance
+- [ ] The eight reports, each checked against its phase's acceptance on a release build.
+- [ ] The SDK's docs test and build pass with the additions.
+
+## Not in this plan
+
+- A plugin directory to browse and install from (the Plugin Architecture Plan leaves it a place): the details dialog is
+  what its entries would open.
+- Reordering or renaming the kernel's pages (General, Theme, View, Trust). Search makes where a setting lives matter
+  less; a regrouping can follow once it's in use.
+- Translating a plugin's `name` and `description` (they're the manifest's text today, in every language).
+- Indexing the rows a community plugin draws itself (Open questions, 3).
+- A settings editor for `settings.json` as text.
+
+## Open questions
+
+Answered on 17 Nov, except 3.
+
+1. **A plugin's details: a dialog or a page.** A dialog (Decisions).
+2. **Remote images in a README.** Not loaded until asked (Decisions).
+3. **Search inside a community plugin's own page.** Not answered as asked: the user restated what search is for (finding
+   one plugin among many on Plugins; finding one setting among many), which U4 and U7 do. The recommendation stands:
+   a community plugin's page, sub-entries and schema fields are found; the rows it draws itself aren't. If wanted
+   later, `SettingsPageDef` takes a list of entries the plugin names.
+4. **"AI assistant" and "Assistive AI".** The AI plugin's page becomes "AI" (Decisions).

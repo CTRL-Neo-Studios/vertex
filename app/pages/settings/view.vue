@@ -63,7 +63,7 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
     <SettingsScrollLayout :title="t('app.settings.view.title')" v-if="config">
         <div class="space-y-4">
             <SettingsSection :title="t('app.settings.view.files')" :dirty="scope.isDirty(filePaths)" @reset="scope.reset(filePaths)">
-                <SettingsRow setting="fileConfig.updateLinks" :label="t('app.settings.view.updateLinks')" :description="t('app.settings.view.updateLinksDescription')">
+                <SettingsRow setting="fileConfig.updateLinks" :label="t('app.settings.view.updateLinks')" :description="t('app.settings.view.updateLinksDescription')" :info="t('app.settings.view.updateLinksInfo')">
                     <USelect
                         :model-value="scope.value('fileConfig.updateLinks')"
                         :items="updateLinksItems"
@@ -71,7 +71,7 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         @update:model-value="scope.set({'fileConfig.updateLinks': $event})"
                     />
                 </SettingsRow>
-                <SettingsRow setting="fileConfig.deletedFiles" :label="t('app.settings.view.deletedFiles')" :description="t('app.settings.view.deletedFilesDescription')">
+                <SettingsRow setting="fileConfig.deletedFiles" :label="t('app.settings.view.deletedFiles')" :description="t('app.settings.view.deletedFilesDescription')" :info="t('app.settings.view.deletedFilesInfo')">
                     <USelect
                         :model-value="scope.value('fileConfig.deletedFiles')"
                         :items="deletedFilesItems"
@@ -79,7 +79,7 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         @update:model-value="scope.set({'fileConfig.deletedFiles': $event})"
                     />
                 </SettingsRow>
-                <SettingsRow setting="fileConfig.attachmentsFolder" :label="t('app.settings.view.attachmentsFolder')" :description="t('app.settings.view.attachmentsFolderDescription')">
+                <SettingsRow setting="fileConfig.attachmentsFolder" :label="t('app.settings.view.attachmentsFolder')" :description="t('app.settings.view.attachmentsFolderDescription')" :info="t('app.settings.view.attachmentsFolderInfo')">
                     <UInput
                         :model-value="scope.value('fileConfig.attachmentsFolder')"
                         :placeholder="t('app.settings.view.attachmentsFolderTop')"
@@ -133,10 +133,11 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
             <SettingsSection
                 :title="t('app.settings.view.panels')"
                 :description="t('app.settings.view.panelsDescription')"
+                :info="t('app.settings.view.panelsInfo')"
                 :dirty="scope.isDirty(panelPaths)"
                 @reset="scope.reset(panelPaths)"
             >
-                <SettingsRow setting="viewConfig.panels.style" :label="t('app.settings.view.panelStyle')" :description="t('app.settings.view.panelStyleDescription')">
+                <SettingsRow setting="viewConfig.panels.style" :label="t('app.settings.view.panelStyle')" :description="t('app.settings.view.panelStyleDescription')" :info="t('app.settings.view.panelStyleInfo')">
                     <USelect
                         :model-value="scope.value('viewConfig.panels.style')"
                         :items="panelStyleItems"
@@ -144,13 +145,9 @@ const setLayout = (next: PanelLayout) => scope.set({[layoutPaths[0]]: next.left,
                         @update:model-value="scope.set({'viewConfig.panels.style': $event})"
                     />
                 </SettingsRow>
-                <SettingsRow setting="viewConfig.panels.left" :label="t('app.settings.view.panelLayout')" :description="t('app.settings.view.panelLayoutDescription')"/>
-                <PanelArrangement
-                    class="px-4 pb-4"
-                    :layout="panelLayout"
-                    @update="setLayout"
-                    @reset="scope.reset([...layoutPaths])"
-                />
+                <SettingsRow stacked setting="viewConfig.panels.left" :label="t('app.settings.view.panelLayout')" :description="t('app.settings.view.panelLayoutDescription')">
+                    <PanelArrangement :layout="panelLayout" @update="setLayout" @reset="scope.reset([...layoutPaths])"/>
+                </SettingsRow>
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

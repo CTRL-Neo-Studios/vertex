@@ -34,7 +34,7 @@ building and released.
 | Contract changes | Additions only, within `apiVersion` 1 (the docs' Versions page). A sample sets `minAppVersion` to the Vertex that has what it uses. |
 | Author docs | In the SDK's package (`packages/vertex-plugin/docs/`, shipped with it), since they version with the contract and reach an author with the types. `Concepts and Structures.md` links them. |
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
-| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). |
+| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). S2 waits for the Settings Plan (`plans/Settings Plan.md`, 17 Nov): its settings sample is written with what that plan builds. |
 | The test plugin | Stays the fixture for install and update tests. It isn't a sample. |
 | A plugin's strings (P0) | Files, `locales/<locale>.json` in the package, each `{"plugins": {"<id>": {…}}}` as a core layer's are. Not in the bundle, as first proposed: the Settings window shows a plugin's schema labels without running it (it runs the global plugins made for `settings` only), so the strings must be readable without its code. The host merges only `plugins.<id>`; a workspace copy's strings are pinned with it. |
 | The SDK (P0) | Published by the user on 17 Nov: `@type32/vertex-plugin` `1.0.0` on `latest`, released with `bun run release` in the package. P0's additions to the contract are a minor version. |
@@ -44,7 +44,7 @@ Still open: S4's plan (the user's).
 
 ```mermaid
 flowchart LR
-  P0 --> D1 --> S1 --> S2 --> S3 --> S5 --> S6 --> S4 --> D2
+  P0 --> D1 --> S1 --> Settings["Settings Plan"] --> S2 --> S3 --> S5 --> S6 --> S4 --> D2
 ```
 
 ## Repositories

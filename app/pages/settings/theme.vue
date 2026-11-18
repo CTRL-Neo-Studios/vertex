@@ -48,7 +48,9 @@ const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS)
 
         <div class="space-y-4">
             <SettingsSection :title="t('app.settings.theme.preview')">
-                <SettingsThemePreview/>
+                <SettingsRow stacked>
+                    <SettingsThemePreview/>
+                </SettingsRow>
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.colors')" :dirty="isDirty(COLOR_KEYS)" @reset="reset(COLOR_KEYS)">
@@ -82,16 +84,16 @@ const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS)
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.customCss')" :dirty="scope.isDirty([CSS])" @reset="scope.reset([CSS])">
-                <SettingsRow :setting="CSS" :label="t('app.settings.theme.customCssLabel')" :description="t('app.settings.theme.customCssDescription')"/>
-                <div class="px-4 pb-3 space-y-2">
+                <SettingsRow v-if="cssOff" stacked>
                     <UAlert
-                        v-if="cssOff"
                         color="warning"
                         variant="subtle"
                         icon="i-lucide-shield-alert"
                         :title="t('app.settings.theme.customCssUntrusted')"
                         :actions="[{label: t('app.settings.theme.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => trust.trustFolder(scope.root.value!, true)}]"
                     />
+                </SettingsRow>
+                <SettingsRow stacked :setting="CSS" :label="t('app.settings.theme.customCssLabel')" :description="t('app.settings.theme.customCssDescription')">
                     <UTextarea
                         v-model="css"
                         class="w-full font-mono"
@@ -102,7 +104,7 @@ const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS)
                         :placeholder="t('app.settings.theme.customCssPlaceholder')"
                         @blur="saveCss"
                     />
-                </div>
+                </SettingsRow>
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

@@ -21,10 +21,10 @@ export function messageLeaves(messages: unknown, prefix = ''): Map<string, strin
 
 const params = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort()
 
-/** The i18n keys a manifest names: its settings schema's labels, descriptions and options. */
+/** The i18n keys a manifest names: its settings schema's labels, descriptions, info texts and options. */
 export function manifestKeys(manifest: Pick<PluginManifest, 'config'>): string[] {
     return (manifest.config?.schema ?? []).flatMap(field =>
-        [field.label, field.description, ...(field.type === 'select' ? field.options.map(o => o.label) : [])].filter((k): k is string => !!k))
+        [field.label, field.description, field.info, ...(field.type === 'select' ? field.options.map(o => o.label) : [])].filter((k): k is string => !!k))
 }
 
 /**

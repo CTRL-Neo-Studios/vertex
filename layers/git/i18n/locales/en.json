@@ -264,14 +264,16 @@
       "settings": {
         "title": "Git",
         "tokens": "Sign-in tokens",
-        "tokensDescription": "Personal access tokens for HTTPS remotes, saved when a remote refused to sign in. They stay in your system keychain; git gets one only while it talks to its host, and your own credential helpers aren't asked then.",
+        "tokensDescription": "Personal access tokens for HTTPS remotes, kept in your system keychain.",
+        "tokensInfo": "Saved when a remote refused to sign in. git gets one only while it talks to its host, and your own credential helpers aren't asked then.",
         "noTokens": "No saved tokens. Vertex asks for one when a remote refuses to sign in.",
         "username": "Username: {username}",
         "remove": "Remove",
         "failed": "Couldn't read or change the saved tokens",
         "autoSync": {
           "title": "Auto-sync",
-          "description": "Keeps this computer's workspaces in step without pressing Sync: commits every change, pulls and pushes. It waits during a merge or rebase and pauses after a sign-in failure until a sync from the Git view works. A trusted workspace can have its own.",
+          "description": "Commits every change, pulls and pushes, without pressing Sync.",
+          "info": "Keeps this computer's workspaces in step. It waits during a merge or rebase and pauses after a sign-in failure until a sync from the Git view works. A trusted workspace can have its own.",
           "interval": "Sync automatically",
           "intervalDescription": "How often a workspace window syncs while it's open.",
           "never": "Never",
@@ -279,14 +281,16 @@
           "onOpen": "Sync when a workspace opens",
           "onOpenDescription": "Once, when its window opens.",
           "pullOnFocus": "Pull when the window gets focus",
-          "pullOnFocusDescription": "Brings in the remote's new commits when you come back to the window (at most once a minute).",
+          "pullOnFocusDescription": "Pulls new commits when you return to the window, at most once a minute.",
           "untrusted": "This workspace's auto-sync applies once its folder is trusted."
         },
         "commitMessages": {
           "whenEmpty": "Write a message for an empty box",
-          "whenEmptyDescription": "Commit or Sync with nothing typed asks the model for a message. Off, they commit as \"Update N file(s)\".",
+          "whenEmptyDescription": "Commit or Sync with nothing typed asks the model for a message.",
+          "whenEmptyInfo": "Off, they commit as \"Update N file(s)\".",
           "autoSync": "Write auto-sync's messages",
-          "autoSyncDescription": "Auto-sync's commits get a message from the model (sending the diff on every sync). Off, they're \"Update N file(s)\"."
+          "autoSyncDescription": "Auto-sync's commits get a message from the model.",
+          "autoSyncInfo": "The diff is sent on every sync. Off, they're \"Update N file(s)\"."
         },
         "trustWorkspace": "Trust workspace"
       },
@@ -294,7 +298,8 @@
       "cloneWorkspace": "Clone Workspace…",
       "commitMessageFeature": {
         "label": "Commit messages",
-        "description": "Writes commit messages from the changes, in the style of the repository's recent ones: the Git view's sparkle button, and when you set it below, an empty message box and auto-sync. The diff is sent to the model."
+        "description": "Writes commit messages for you.",
+        "info": "From the changes, in the style of the repository's recent ones: the Git view's sparkle button, and when you set it in Git's settings, an empty message box and auto-sync. The diff is sent to the model."
       }
     }
   }

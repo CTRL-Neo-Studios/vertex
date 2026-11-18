@@ -24,7 +24,9 @@ const menu = (list: PanelList) => (index?: number) =>
 </script>
 
 <template>
-    <div class="grid grid-cols-4 gap-3">
+    <!-- Four lists across where a view's name fits in a quarter of the row, else two by two. -->
+    <div class="@container">
+        <div class="grid grid-cols-2 @3xl:grid-cols-4 gap-3">
         <div v-for="list in lists" :key="list" class="flex flex-col gap-1.5 min-w-0">
             <span class="text-xs font-medium text-muted">{{ t(`app.panels.lists.${list}`) }}</span>
             <PanelButtons
@@ -36,6 +38,7 @@ const menu = (list: PanelList) => (index?: number) =>
                 :drag
                 :menu="menu(list)"
             />
+        </div>
         </div>
     </div>
 </template>

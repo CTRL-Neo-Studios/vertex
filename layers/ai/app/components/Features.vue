@@ -6,7 +6,7 @@ import {features} from "../lib/features";
 import {aiContext} from "../plugin";
 
 /**
- * Settings → Assistive AI → Features, in the scope being edited: AI's switch, the default profile, and each registered
+ * Settings → AI → Features, in the scope being edited: AI's switch, the default profile, and each registered
  * feature's profile with its switch. Chat's, the editor assistant's and git's options sit under their features until
  * those plugins take them.
  */
@@ -74,7 +74,7 @@ const featureKeys = [FEATURES]
     <SettingsScrollLayout :title="t('plugins.ai.features.title')">
         <div class="space-y-4">
             <SettingsSection :title="t('plugins.ai.features.masterSection')" :dirty="config.isDirty([ENABLED], DEFAULTS)" @reset="config.reset([ENABLED], DEFAULTS)">
-                <SettingsRow :setting="config.path(ENABLED)" :label="t('plugins.ai.features.enabled')" :description="t('plugins.ai.features.enabledDescription')">
+                <SettingsRow :setting="config.path(ENABLED)" :label="t('plugins.ai.features.enabled')" :description="t('plugins.ai.features.enabledDescription')" :info="t('plugins.ai.features.enabledInfo')">
                     <USwitch :model-value="aiOn" @update:model-value="set(ENABLED, $event)"/>
                 </SettingsRow>
             </SettingsSection>
@@ -101,10 +101,11 @@ const featureKeys = [FEATURES]
                 :class="!aiOn && 'opacity-50'"
                 :title="t('plugins.ai.features.section')"
                 :description="t('plugins.ai.features.sectionDescription')"
+                :info="t('plugins.ai.features.sectionInfo')"
                 :dirty="config.isDirty(featureKeys, DEFAULTS)"
                 @reset="config.reset(featureKeys, DEFAULTS)"
             >
-                <div v-if="untrusted" class="px-4 py-2.5">
+                <SettingsRow v-if="untrusted" stacked>
                     <UAlert
                         color="warning"
                         variant="subtle"
@@ -112,12 +113,13 @@ const featureKeys = [FEATURES]
                         :title="t('plugins.ai.features.untrusted')"
                         :actions="[{label: t('plugins.ai.features.trustWorkspace'), color: 'warning', variant: 'outline', onClick: () => ctx.trust.trustFolder(config.root!, true)}]"
                     />
-                </div>
+                </SettingsRow>
                 <template v-for="feature in features" :key="feature.id">
                     <SettingsRow
                         :setting="config.path(path(feature.id))"
                         :label="t(feature.label)"
                         :description="t(feature.description)"
+                        :info="feature.info ? t(feature.info) : undefined"
                     >
                         <USelectMenu
                             class="w-56"

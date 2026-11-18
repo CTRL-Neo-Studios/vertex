@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {SettingsPageProps} from "#shared/plugin/api";
 
-/** Settings → Assistive AI: Providers, Models (lists, and a page per item) and Features, by the route below `/settings/ai`. */
+/** Settings → AI: Providers, Models (lists, and a page per item) and Features, by the route below `/settings/ai`. */
 const props = defineProps<SettingsPageProps>()
 
 // `/settings/ai` itself opens Providers.

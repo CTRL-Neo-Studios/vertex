@@ -55,7 +55,12 @@ const when = (at: number) => new Date(at).toLocaleString(locale.value)
 <template>
     <SettingsScrollLayout :title="t('plugins.chat.settings.nav')">
         <div class="space-y-4">
-            <SettingsSection :title="t('plugins.chat.settings.feedback.title')" :description="t('plugins.chat.settings.feedback.description')">
+            <SettingsSection
+                :title="t('plugins.chat.settings.feedback.title')"
+                :description="t('plugins.chat.settings.feedback.description')"
+                :info="t('plugins.chat.settings.feedback.info')"
+                :empty="entries.length ? undefined : t('plugins.chat.settings.feedback.empty')"
+            >
                 <template #actions>
                     <template v-if="entries.length">
                         <template v-if="confirming">
@@ -67,9 +72,8 @@ const when = (at: number) => new Date(at).toLocaleString(locale.value)
                                  :label="t('plugins.chat.settings.feedback.clear')" @click="confirming = true"/>
                     </template>
                 </template>
-                <UEmpty v-if="!entries.length" icon="i-lucide-message-square" :title="t('plugins.chat.settings.feedback.empty')"
-                        :description="t('plugins.chat.settings.feedback.emptyDescription')" variant="naked"/>
-                <details v-for="entry in entries" :key="`${entry.at}-${entry.chatId}-${entry.summary}`" class="group px-4 py-2.5">
+                <SettingsRow v-for="entry in entries" :key="`${entry.at}-${entry.chatId}-${entry.summary}`" stacked>
+                    <details class="group">
                     <summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                         <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted transition-transform group-open:rotate-90"/>
                         <UBadge size="sm" variant="subtle" :color="KIND_COLORS[entry.kind] ?? 'neutral'"
@@ -88,7 +92,8 @@ const when = (at: number) => new Date(at).toLocaleString(locale.value)
                                      :label="t('plugins.chat.settings.feedback.remove')" @click="remove(entry)"/>
                         </div>
                     </div>
-                </details>
+                    </details>
+                </SettingsRow>
             </SettingsSection>
             <SettingsSection :title="t('plugins.chat.settings.options.title')">
                 <SettingsRow :label="t('plugins.chat.settings.options.label')" :description="t('plugins.chat.settings.options.description')">

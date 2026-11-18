@@ -307,6 +307,8 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                 <SettingsSection
                     :title="t(`app.settings.plugins.${group.id}`)"
                     :description="t(`app.settings.plugins.${group.id}Description`)"
+                    :info="group.id === 'community' ? t('app.settings.plugins.communityInfo') : undefined"
+                    :empty="!group.list.length && (group.id === 'core' || !brokenPlugins().length) ? t(group.id === 'core' ? 'app.settings.plugins.none' : 'app.settings.plugins.noneInstalled') : undefined"
                     :data-plugins-section="group.id"
                 >
                     <template v-if="group.id === 'community'" #actions>
@@ -318,9 +320,6 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                             </UDropdownMenu>
                         </UFieldGroup>
                     </template>
-                    <p v-if="!group.list.length && (group.id === 'core' || !brokenPlugins().length)" class="text-sm text-muted px-4 py-2.5">
-                        {{ t(group.id === 'core' ? 'app.settings.plugins.none' : 'app.settings.plugins.noneInstalled') }}
-                    </p>
                     <SettingsRow
                         v-for="m in group.list"
                         :key="m.id"
@@ -391,6 +390,7 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                         setting="plugins.checkUpdates"
                         :label="t('app.settings.plugins.checkAutomatically')"
                         :description="t('app.settings.plugins.checkAutomaticallyDescription')"
+                        :info="t('app.settings.plugins.checkAutomaticallyInfo')"
                         data-plugins-check-automatically
                     >
                         <USwitch v-model="checkAutomatically" :aria-label="t('app.settings.plugins.checkAutomatically')"/>
@@ -401,12 +401,13 @@ const pending = computed(() => own.value.filter(p => p.manifest && !p.listed.acc
                 v-if="scope.root.value"
                 :title="t('app.settings.plugins.workspace', {name: workspaceName})"
                 :description="t('app.settings.plugins.workspaceDescription')"
+                :info="t('app.settings.plugins.workspaceInfo')"
+                :empty="!own.length && !missing.length ? t('app.settings.plugins.noneInWorkspace') : undefined"
                 data-plugins-section="workspace"
             >
                 <template v-if="scope.trusted.value && pending.length" #actions>
                     <UButton size="xs" color="warning" variant="outline" icon="i-lucide-shield-check" :label="t('app.settings.plugins.review', {count: pending.length})" data-plugins-accept @click="accept(pending)"/>
                 </template>
-                <p v-if="!own.length && !missing.length" class="text-sm text-muted px-4 py-2.5">{{ t('app.settings.plugins.noneInWorkspace') }}</p>
                 <SettingsRow
                     v-for="p in own"
                     :key="p.listed.id"

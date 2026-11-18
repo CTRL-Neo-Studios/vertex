@@ -1,6 +1,6 @@
 /**
  * The AI plugin's API (`ctx.use('ai')`): which model a feature uses, models to call, and the features listed on
- * Settings → Assistive AI → Features.
+ * Settings → AI → Features.
  */
 import type {LanguageModel} from 'ai'
 import type {AiConfig, AiModelProfile, AiProviderProfile} from '../shared/types'
@@ -17,13 +17,15 @@ export interface AiModel {
     languageModel(options?: { params?: boolean }): LanguageModel
 }
 
-/** A feature that uses a model profile, with its picker on Settings → Assistive AI → Features. */
+/** A feature that uses a model profile, with its picker on Settings → AI → Features. */
 export interface AiFeatureDef {
     /** A setting-path segment (`plugins.config.ai.features.<id>`): no dots. */
     id: string
-    /** i18n keys. */
+    /** i18n keys; the description is one line under the label. */
     label: string
     description: string
+    /** i18n key: more than a line of explanation, behind the row's info button. */
+    info?: string
 }
 
 export interface AiApi {

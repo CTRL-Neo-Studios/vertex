@@ -1,7 +1,7 @@
 import {getCurrentScope, onScopeDispose, shallowRef} from 'vue'
 import type {AiFeatureDef} from '../api'
 
-/** The features plugins registered (`registerFeature`), in order, for Settings → Assistive AI → Features. Reactive. */
+/** The features plugins registered (`registerFeature`), in order, for Settings → AI → Features. Reactive. */
 export const features = shallowRef<readonly AiFeatureDef[]>([])
 
 export function registerFeature(def: AiFeatureDef): () => void {

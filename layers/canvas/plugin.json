@@ -17,6 +17,7 @@
       {
         "key": "wheelBehavior", "type": "select", "default": "pan",
         "label": "plugins.canvas.settings.wheelBehavior", "description": "plugins.canvas.settings.wheelBehaviorDescription",
+        "info": "plugins.canvas.settings.wheelBehaviorInfo",
         "options": [
           {"value": "pan", "label": "plugins.canvas.settings.wheelPan"},
           {"value": "zoom", "label": "plugins.canvas.settings.wheelZoom"}
@@ -25,6 +26,7 @@
       {
         "key": "modDragBehavior", "type": "select", "default": "menu",
         "label": "plugins.canvas.settings.modDragBehavior", "description": "plugins.canvas.settings.modDragBehaviorDescription",
+        "info": "plugins.canvas.settings.modDragBehaviorInfo",
         "options": [
           {"value": "menu", "label": "plugins.canvas.settings.modDrag.menu"},
           {"value": "card", "label": "plugins.canvas.settings.modDrag.card"},
@@ -53,7 +55,8 @@
       },
       {
         "key": "zoomBreakpoint", "type": "number", "default": 0, "min": -2, "max": 2, "step": 0.25,
-        "label": "plugins.canvas.settings.zoomBreakpoint", "description": "plugins.canvas.settings.zoomBreakpointDescription"
+        "label": "plugins.canvas.settings.zoomBreakpoint", "description": "plugins.canvas.settings.zoomBreakpointDescription",
+        "info": "plugins.canvas.settings.zoomBreakpointInfo"
       }
     ]
   }

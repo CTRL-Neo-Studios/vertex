@@ -5,7 +5,7 @@ const toggled = ref(true)
 </script>
 
 <template>
-    <div class="px-4 pb-4 pt-2 space-y-3">
+    <div class="space-y-3">
         <div class="flex flex-wrap items-center gap-2">
             <UButton :label="t('app.settings.theme.previewSolid')" icon="i-lucide-check"/>
             <UButton :label="t('app.settings.theme.previewSoft')" variant="soft"/>

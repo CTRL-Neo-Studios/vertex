@@ -2,7 +2,7 @@
 import {aiConfigOf} from "../../shared/config"
 import {aiContext} from "../plugin"
 
-/** Shown on the Assistive AI pages while AI is off (its config's `enabled`), with the way to its switch. */
+/** Shown on the AI pages while AI is off (its config's `enabled`), with the way to its switch. */
 const enabled = computed(() => aiConfigOf(aiContext().config.value).enabled)
 </script>
 

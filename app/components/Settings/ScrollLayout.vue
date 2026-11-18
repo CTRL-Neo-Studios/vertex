@@ -42,7 +42,8 @@ const locked = computed(() => props.globalOnly && scope.root.value !== null)
                     :title="$t('app.settings.scope.globalOnlyPage')"
                     :actions="[{label: $t('app.settings.scope.editUser'), color: 'neutral', variant: 'outline', onClick: () => scope.open(null)}]"
                 />
-                <fieldset :disabled="locked" :class="locked && 'opacity-60'">
+                <!-- `min-w-0`: a fieldset is as wide as its content at least, and a row's one-line description doesn't wrap. -->
+                <fieldset class="min-w-0" :disabled="locked" :class="locked && 'opacity-60'">
                     <slot/>
                 </fieldset>
             </div>
