@@ -7,8 +7,11 @@
 @source '../../../node_modules/@type32/workflows/dist';
 
 
+/* The kernel's `@utility` blocks are plain CSS, without `@apply`: community plugins' Tailwind reads them under its
+   prefix (`tw:no-scrollbar`), where an unprefixed `@apply` doesn't compile (the SDK's build checks). */
 @utility no-scrollbar {
-    @apply [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
 }
 
 /* Only a thin horizontal scrollbar (the file tree's wide rows); the vertical one stays hidden. */
@@ -48,7 +51,8 @@
 }
 
 /* Vertex's own theme. `static`: every variable is defined, since community plugins' Tailwind classes read them as
-   variables (`@type32/vertex-plugin/tailwind.css`; Tailwind's and Nuxt UI's values are written into their classes). */
+   variables (`@type32/vertex-plugin/tailwind.css`: `tw:font-sans` is `var(--font-sans)`; Tailwind's and Nuxt UI's
+   values are written into their classes). */
 @theme static {
     --font-sans: 'Geist', 'Inter', sans-serif;
 

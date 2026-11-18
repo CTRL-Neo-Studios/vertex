@@ -25,8 +25,12 @@ of failing when it calls what isn't there.
 ## The SDK
 
 `@type32/vertex-plugin`'s major is the `apiVersion` it types (`1.x` is `apiVersion` 1); a minor adds to the contract;
-its dependencies are the shared modules at Vertex's versions. Depend on it with `^` (`^1.1.0`), and update it to use
+its dependencies are the shared modules at Vertex's versions. Depend on it with `^` (`^1.2.0`), and update it to use
 what a newer Vertex adds, with `minAppVersion` to match.
+
+One change of 1.2.0 isn't an addition: a plugin's Tailwind classes carry the prefix `tw:` since then
+([why](ui.md#styles)). A plugin built with an older SDK keeps running; its sources need the prefix when it moves to
+1.2.0, or its classes write nothing.
 
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't

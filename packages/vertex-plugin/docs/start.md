@@ -36,7 +36,7 @@ settings, data and secrets, so it doesn't change once people use the plugin.
     "typecheck": "vue-tsc -p ."
   },
   "devDependencies": {
-    "@type32/vertex-plugin": "^1.1.0",
+    "@type32/vertex-plugin": "^1.2.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.8",
@@ -121,14 +121,14 @@ const {t} = props.ctx.i18n
 </script>
 
 <template>
-    <div class="flex items-center gap-2 p-3 text-sm text-muted">
+    <div class="tw:flex tw:items-center tw:gap-2 tw:p-3 tw:text-sm tw:text-muted">
         <span>{{ t('plugins.hello.greeting', {name: 'Vertex'}) }}</span>
         <UButton size="xs" icon="i-lucide-sparkles" variant="soft"/>
     </div>
 </template>
 ```
 
-`src/style.css`, Tailwind's utilities against Vertex's theme ([styles](ui.md#styles)):
+`src/style.css`, Tailwind against Vertex's theme; a plugin's classes carry the prefix `tw:` ([styles](ui.md#styles)):
 
 ```css
 @import "@type32/vertex-plugin/tailwind.css";

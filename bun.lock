@@ -153,7 +153,7 @@
     },
     "packages/vertex-plugin": {
       "name": "@type32/vertex-plugin",
-      "version": "1.0.0",
+      "version": "1.1.2",
       "dependencies": {
         "@codemirror/autocomplete": "^6.20.4",
         "@codemirror/commands": "^6.11.1",
@@ -175,6 +175,7 @@
         "vue": "^3.5.45",
       },
       "devDependencies": {
+        "@tailwindcss/node": "^4.3.5",
         "@types/node": "^26.6.6",
         "typescript": "6.0.3",
         "vite": "^8.3.8",

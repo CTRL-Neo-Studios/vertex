@@ -68,10 +68,14 @@ export interface SessionContext {
         /** Opens a `tab: true` view in a tab. */
         openInTab(id: PanelViewId): unknown
     }
-    /** The workspace's files and links (empty in a single-file window). Files by absolute path or uuid. */
+    /**
+     * The workspace's files and links (empty in a single-file window). Files by absolute path or uuid. Its entries are
+     * reactive (`files`, `tree`, `byPath`, `byUuid`, `backlinks`, `forelinks`): an entry's links follow an edit, its
+     * `modifiedTime` every save. `links`, `unresolved` and `resolveLink` read the link graph as it is now.
+     */
     index: {
         files(): ActiveWorkspaceFileIndex[]
-        /** Folders and files as Files shows them: the top level, each folder's children, sorted. Reactive. */
+        /** Folders and files as Files shows them: the top level, each folder's children, sorted. */
         tree(): UITreeNode[]
         byPath(path: string): ActiveWorkspaceFileIndex | undefined
         byUuid(uuid: string): ActiveWorkspaceFileIndex | undefined
@@ -80,11 +84,14 @@ export interface SessionContext {
         /** Uuids of the files linking to it / it links to. */
         backlinks(uuid: string): string[]
         forelinks(uuid: string): string[]
-        /** Every resolved link as a pair of uuids. */
+        /** Every resolved link as a pair of uuids, as they are now: read it again when the entries change. */
         links(): { from: string, to: string }[]
-        /** A file's link targets that find no file. */
+        /** A file's link targets that find no file, as they are now. */
         unresolved(uuid: string): string[]
-        /** Files created, removed, renamed, modified (removed with the session). */
+        /**
+         * Files created, removed and renamed, and modified outside Vertex or by `files.edit` (removed with the session).
+         * The editor's own saves aren't events: they change the file's entry.
+         */
         on(listener: WorkspaceIndexListener): () => void
         /**
          * Notes (Markdown and text files) whose path or text matches `query`, in path order (Rust `search_notes`, which

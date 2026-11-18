@@ -130,19 +130,37 @@ const defaults = {depth: 2}
 
 ## Styles
 
-`@import "@type32/vertex-plugin/tailwind.css";` at the top of the plugin's CSS gives it Tailwind's utilities against
-Vertex's theme: `text-muted`, `bg-elevated`, `border-default`, `text-primary` and the other Nuxt UI colours, Tailwind's
-palette and spacing, Vertex's fonts. The build writes the classes the plugin uses into its `styles.css`.
+`@import "@type32/vertex-plugin/tailwind.css";` at the top of the plugin's CSS gives it Tailwind, against Vertex's
+theme. A plugin's classes carry the prefix `tw:`, before everything else in the class:
 
-- **No preflight, nothing on `:root`**, but a plugin's rules are the page's: a utility applies to any element with its
-  class, Vertex's too. Tailwind writes one for every word of the sources that names one, in scripts as well as
-  templates (a variable named `resize` or `container`, the word `hidden` in a string), so a plugin can restyle Vertex's
-  elements that use the same class by accident. Keep Tailwind to templates whose words you control, or write plain CSS
-  scoped to the plugin's own elements (`<style scoped>`, a class of the plugin's id), as the graph sample does.
-- **The theme follows by itself:** Nuxt UI's colours are CSS variables, so `text-primary` changes with the user's
-  colour and light or dark. For what CSS can't reach (a canvas), read
+```vue
+<template>
+    <div class="tw:flex tw:items-center tw:gap-2 tw:p-3 tw:text-sm tw:text-muted tw:hover:bg-elevated">
+        <UButton class="tw:w-full" :ui="{label: 'tw:truncate'}" label="Open"/>
+    </div>
+</template>
+```
+
+The build writes the prefixed classes the plugin uses into its `styles.css`; a class without the prefix isn't the
+plugin's and writes nothing.
+
+- **Why a prefix:** the plugin's stylesheet loads beside Vertex's, and two stylesheets that both define `.p-4` can't be
+  ordered against each other: a plugin's `p-4`, loaded later, would undo the `sm:p-6` of every card and modal in the
+  window. With its own names a plugin's CSS sets nothing on Vertex's elements, and a Vertex update can't change how the
+  plugin looks.
+- **Everything else is Tailwind as usual:** variants after the prefix (`tw:hover:…`, `tw:sm:…`, `tw:dark:…`), the
+  markers too (`tw:group` with `tw:group-hover:…`, `tw:peer`), arbitrary values (`tw:w-[42px]`), opacity
+  (`tw:bg-primary/20`).
+- **The theme:** Nuxt UI's colours (`tw:text-muted`, `tw:bg-elevated`, `tw:border-default`, `tw:text-primary`),
+  Tailwind's palette and spacing, Vertex's fonts (`tw:font-sans`, `tw:font-mono`) and its own utilities
+  (`tw:no-scrollbar`). The colours and fonts are CSS variables, so they follow the user's colours, light and dark,
+  and fonts by themselves. For what CSS can't reach (a canvas), read
   [`ctx.ui.theme`](context.md#ctxuithemedark-ctxuithemevalue).
-- **Dark mode:** `dark:` variants work (Vertex puts `dark` on `<html>`), though the semantic colours (`text-muted`,
-  `bg-default`) already switch.
+- **On a Nuxt UI component**, a class of yours (`class`, `ui`) wins over the component's own of the same weight, since
+  the plugin's stylesheet comes later: `tw:rounded-full` rounds a button. The component keeps its states that weigh
+  more (`hover:`, `disabled:`); override those with the same variant (`tw:hover:bg-…`).
+- **No preflight, nothing on `:root`.** Plain CSS a plugin writes (a `<style>` in a component, a rule in its CSS file)
+  is the page's, like any CSS: scope it (`<style scoped>`, a class starting with the plugin's id). It's the way to
+  style what the plugin adds to Vertex's own elements, like an editor decoration's class.
 - Tailwind finds the classes in the project's files, skipping what Git ignores. A `.gitignore` in a folder above the
   project that ignores it hides them until the project is a Git repository of its own (`git init`).
