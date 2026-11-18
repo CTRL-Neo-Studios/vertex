@@ -134,8 +134,11 @@ const defaults = {depth: 2}
 Vertex's theme: `text-muted`, `bg-elevated`, `border-default`, `text-primary` and the other Nuxt UI colours, Tailwind's
 palette and spacing, Vertex's fonts. The build writes the classes the plugin uses into its `styles.css`.
 
-- **No preflight, nothing on `:root`:** the plugin's CSS can't restyle Vertex. Scope any plain CSS to the plugin's own
-  elements (a class of the plugin's id).
+- **No preflight, nothing on `:root`**, but a plugin's rules are the page's: a utility applies to any element with its
+  class, Vertex's too. Tailwind writes one for every word of the sources that names one, in scripts as well as
+  templates (a variable named `resize` or `container`, the word `hidden` in a string), so a plugin can restyle Vertex's
+  elements that use the same class by accident. Keep Tailwind to templates whose words you control, or write plain CSS
+  scoped to the plugin's own elements (`<style scoped>`, a class of the plugin's id), as the graph sample does.
 - **The theme follows by itself:** Nuxt UI's colours are CSS variables, so `text-primary` changes with the user's
   colour and light or dark. For what CSS can't reach (a canvas), read
   [`ctx.ui.theme`](context.md#ctxuithemedark-ctxuithemevalue).

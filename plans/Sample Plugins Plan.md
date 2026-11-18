@@ -26,37 +26,37 @@ building and released.
 
 | Question | Decision |
 | --- | --- |
-| Where a sample lives | Its own folder beside Vertex and its own public repository under `Type-32`, as the test plugin (the user's choice, 17 Nov). Vertex's repository, tests and build know none of them. |
+| Where a sample lives | Its own folder beside Vertex and its own public repository under the `CTRL-Neo-Studios` organisation (the user's choice, 17 Nov). Vertex's repository, tests and build know none of them. |
 | How Vertex gets one | As a user does: Settings → Plugins → Install…, from the repository's release (`plugin.zip`). Checked globally and in a workspace. |
 | What a sample may import | The SDK's modules and what it bundles itself. The SDK's build already fails on any other import of the app's. |
-| What a sample's author may read | The author docs and the SDK's published types. Not Vertex's source (Open questions, 3). |
+| Who writes a sample | Written here, with Vertex's source in reach, keeping to the SDK's imports (the user's choice, 17 Nov; Open questions, 3). The user checks each sample's use of the plugin API afterwards. |
 | A gap | The sample stops. The gap gets a row under Gaps, is closed in Vertex (contract, a test, the docs), and Vertex is committed before the sample goes on. Nothing reaches into the kernel's internals to get by. |
 | Contract changes | Additions only, within `apiVersion` 1 (the docs' Versions page). A sample sets `minAppVersion` to the Vertex that has what it uses. |
 | Author docs | In the SDK's package (`packages/vertex-plugin/docs/`, shipped with it), since they version with the contract and reach an author with the types. `Concepts and Structures.md` links them. |
 | Each repository's checks | `bun run build`, `bun run typecheck`, and one `bun test` file for logic that isn't drawing (the graph's data, the board's parser, the calendar's grid). |
-| Order | The graph first, alone: it is the plan's first user of the docs and finds the gaps the others share. Then the small ones, each on a different part of the contract. The file browser last: the widest surface. |
+| Order | The graph first, alone: it finds the gaps the others share. Then the small ones, each on a different part of the contract; the file browser after them, the widest surface. The board (S4) last: the user has a clearer plan for it, which replaces S4 below when it comes (17 Nov). |
 | The test plugin | Stays the fixture for install and update tests. It isn't a sample. |
 | A plugin's strings (P0) | Files, `locales/<locale>.json` in the package, each `{"plugins": {"<id>": {…}}}` as a core layer's are. Not in the bundle, as first proposed: the Settings window shows a plugin's schema labels without running it (it runs the global plugins made for `settings` only), so the strings must be readable without its code. The host merges only `plugins.<id>`; a workspace copy's strings are pinned with it. |
 | The SDK (P0) | Published by the user on 17 Nov: `@type32/vertex-plugin` `1.0.0` on `latest`, released with `bun run release` in the package. P0's additions to the contract are a minor version. |
 | The template (P0) | `Type-32/vertex-plugin-template`, a GitHub template repository beside Vertex (`../vertex-plugin-template`), the samples' and the docs' starting point. |
 
-Still open (Open questions): who writes the samples (3), the new file format (5).
+Still open: S4's plan (the user's).
 
 ```mermaid
 flowchart LR
-  P0 --> D1 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> D2
+  P0 --> D1 --> S1 --> S2 --> S3 --> S5 --> S6 --> S4 --> D2
 ```
 
 ## Repositories
 
 | Phase | Folder beside Vertex | Repository | Plugin `id` | Exercises |
 | --- | --- | --- | --- | --- |
-| S1 | `vertex-plugin-graph` | `Type-32/vertex-plugin-graph` | `graph` | panel views in a pane and a tab, commands, the index and its events, the theme, config with workspace overrides, bundled dependencies |
-| S2 | `vertex-plugin-settings-sample` | `Type-32/vertex-plugin-settings-sample` | `settings-sample` | schema settings, a settings page of its own, an overridable key, a secret, a permission |
-| S3 | `vertex-plugin-stat-block` | `Type-32/vertex-plugin-stat-block` | `stat-block` | a code block widget, a slash item, Markdown syntax, the editor's nested contexts |
-| S4 | `vertex-plugin-board` | `Type-32/vertex-plugin-board` | `board` | a file type with New, a viewer that loads text, a link extractor |
-| S5 | `vertex-plugin-bases-calendar` | `Type-32/vertex-plugin-bases-calendar` | `bases-calendar` | `requires`, a core plugin's API (`ctx.use('bases')`) |
-| S6 | `vertex-plugin-navigator` | `Type-32/vertex-plugin-navigator` | `navigator` | `session.files` whole (menus, New, drags, undo), `data.workspace`, assets |
+| S1 | `vertex-plugin-graph` | `CTRL-Neo-Studios/vertex-plugin-graph` | `graph` | panel views in a pane and a tab, commands, the index and its events, the theme, config with workspace overrides, bundled dependencies |
+| S2 | `vertex-plugin-settings-sample` | `CTRL-Neo-Studios/vertex-plugin-settings-sample` | `settings-sample` | schema settings, a settings page of its own, an overridable key, a secret, a permission |
+| S3 | `vertex-plugin-stat-block` | `CTRL-Neo-Studios/vertex-plugin-stat-block` | `stat-block` | a code block widget, a slash item, Markdown syntax, the editor's nested contexts |
+| S4 | (the user's plan) | | | a file type with New, a viewer that loads text, a link extractor (as planned so far) |
+| S5 | `vertex-plugin-bases-calendar` | `CTRL-Neo-Studios/vertex-plugin-bases-calendar` | `bases-calendar` | `requires`, a core plugin's API (`ctx.use('bases')`) |
+| S6 | `vertex-plugin-navigator` | `CTRL-Neo-Studios/vertex-plugin-navigator` | `navigator` | `session.files` whole (menus, New, drags, undo), `data.workspace`, assets |
 
 None of the ids is a core plugin's (`ai`, `ai-assistant`, `backlinks`, `bases`, `bases-map`, `canvas`, `chat`,
 `files`, `git`, `image`, `latex`, `mermaid`, `outgoing-links`, `outline`, `palette`, `workflows`, `writers-tools`,
@@ -75,6 +75,8 @@ Found by reading the contract, before any sample is written. P0 closes the first
 | The SDK outside this machine | all | Closed: published (Decisions). |
 | A worker | the graph, maybe | A plugin is one `main.js` imported from a blob URL. Whether a `Worker` can start from a plugin's asset isn't known; only needed if 5,000 notes don't lay out on the main thread (S1 measures first). |
 | A community plugin's API, typed | a community plugin another uses (none of the six) | Found in D1. `ctx.provide` works for any plugin, but `PluginApis` is augmented through `#shared/plugin/api`, which only the SDK's own files resolve, so `ctx.use('<community id>')` doesn't type-check. The docs say so (the package, what can't be done). |
+| The index's reactivity, as documented | the graph | Found in S1; the docs were wrong, the contract is fine. The session page said all of the index was reactive: its entries are (an entry's `forelinks`, `backlinks`, `modifiedTime`), but `links()` and `unresolved()` read the link graph as it is, and the editor's own saves aren't `index.on` events. Closed: the session page says so. |
+| A plugin's Tailwind classes reach Vertex | any sample drawing with Tailwind | Found in S1. Tailwind writes a utility for every word of the sources that names one, scripts included (the graph's `resize`, `container`, `hidden`), and a plugin's rules apply to Vertex's elements with that class. The docs warned of nothing; the UI page now does, and the graph draws with scoped CSS. Not closed in the SDK: a prefix (Tailwind's `prefix(…)`) would isolate a plugin's classes but changes how every plugin writes them; the user's call. |
 
 ## P0: What every sample needs
 
@@ -152,7 +154,7 @@ Each of S1 to S6, besides its own:
 - [ ] A release with `plugin.zip`; installed from the repository for every workspace, and into a workspace.
 - [ ] Works in en and zh-CN.
 - [ ] Survives a relaunch: on, with its config, its data and what it had open.
-- [ ] Written from the docs and the SDK's types only. Its gaps are rows under Gaps, each closed in Vertex first.
+- [ ] Keeps to the SDK's imports. Its gaps are rows under Gaps, each closed in Vertex first.
 - [ ] Its README: what it shows of the contract, with links into the docs.
 
 ## S1: Graph
@@ -167,10 +169,19 @@ A relation graph like Obsidian's (`d3-force`, `d3-zoom` and `d3-drag`, bundled i
 - Filters, colour groups and forces are its config: global, with per-workspace overrides.
 
 ### Acceptance
-- [ ] A vault of 5,000 notes lays out and stays responsive while panning (frame times measured and written here).
-- [ ] An edit that adds a link shows without reopening the view.
-- [ ] Open in a pane and in a tab at once, each keeps its own layout.
-- [ ] A workspace's override of a filter applies there only.
+- [x] A vault of 5,000 notes lays out and stays responsive while panning (frame times measured and written here). (5,000 notes in 50 folders, 1 to 3 random links each, a tenth with a tag; the global graph opened in a tab in `tauri dev` on this Mac. Frame intervals: the first 2 s of the layout p50 17 ms, p95 22 ms, one frame of 137 ms (the graph built); the next 10 s of layout p50 17 ms, p95 18 ms, max 27 ms; a 3 s pan (synthetic mouse events, one a frame; that the view moved wasn't checked) p50 17 ms, p95 19 ms, max 32 ms. No worker needed: the Gaps row stays open.)
+- [x] An edit that adds a link shows without reopening the view. (A `session.files.write` adding `[[F]]` to A: F joined the local graph of A, refitted.)
+- [x] Open in a pane and in a tab at once, each keeps its own layout. (The local graph in the right pane and in a tab, each laid out on its own; after a relaunch both reopened.)
+- [x] A workspace's override of a filter applies there only. (The vault's `.vertex/settings.json` with `showTags: true`, the user's default off: its tags drew. The "only" half wasn't looked at in another vault; it's the kernel's scope rule, tested there.)
+
+### As built
+
+- **Repository:** [`CTRL-Neo-Studios/vertex-plugin-graph`](https://github.com/CTRL-Neo-Studios/vertex-plugin-graph) (`../vertex-plugin-graph`), release `v0.1.0` from its workflow (install, type-check, build, release with `plugin.zip`; `bun test` added to it after). A fresh clone installs, tests, type-checks and builds. Installed from the repository in `tauri dev` for every workspace (the release resolved as `v0.1.0`, origin `github.com/ctrl-neo-studios/vertex-plugin-graph`) and into a trusted workspace (pinned, accepted).
+- **Plugin:** `graph` and `graph-local` panel views (`tab: true`; the global one starts Hidden, the local one on the right), Open graph view and Open local graph in the View menu and the palette (registered per session). One `GraphView.vue` for both: `d3-force` on a canvas, `d3-zoom` to pan and zoom, `d3-drag` for nodes; hover lights a node's neighbours, a click opens a note or an attachment; names show around the focus, or all from 1.5×; Fit to view in the header; the layout fits itself once settled and after a change until the user moves it; the local graph's note is pinned in the middle (the shown tab's file, else the note shown last, else the first open file, which is what a relaunch has). Colours from `ctx.ui.theme` (`--ui-text-muted`, `--ui-primary`, `--ui-success` for tags, `--ui-warning` for attachments), colour groups over them.
+- **Data** (`src/graph.ts`, `bun test`: 7 tests): `buildGraph` (notes, attachments, tags, unresolved targets, orphans), `neighbourhood` (within a depth, either way), `parseGroups` and `groupColor` (`path:`, `tag:` with nested tags, a name). The view feeds it the index's entries (reactive) and `unresolved()` again on each save (an entry's `modifiedTime`).
+- **Config:** the schema's ten fields (four filters, the local depth, colour groups as a `list` of `<query> <colour>` lines, four forces), each overridable by any workspace.
+- **Checked in the app:** both views, the link added, the pane and the tab together, zh-CN, the workspace's override, a relaunch (on, its tabs, its config, the language), 5,000 notes (above). Each with a temporary harness and scratch vaults, deleted after.
+- **Found:** the two Gaps rows above (the docs fixed; the Tailwind prefix left to the user).
 
 ## S2: Settings sample
 
@@ -199,7 +210,8 @@ A relation graph like Obsidian's (`d3-force`, `d3-zoom` and `d3-drag`, bundled i
 
 ## S4: Board
 
-A new file format: `.board`, a kanban board as JSON whose cards hold Markdown.
+Deferred to the last sample phase: the user has a clearer plan, which replaces this section when it comes. As first
+planned: a new file format, `.board`, a kanban board as JSON whose cards hold Markdown.
 
 ### Change
 - A file type with New Board (File → New, Files' menus, the palette) and an icon.
@@ -256,14 +268,11 @@ A file browser that can replace Files.
 
 ## Open questions
 
-Each has a recommendation; the plan above assumes it. Answers change P0 only, except 3.
+Each had a recommendation; the plan above follows what was decided.
 
 1. **How a plugin ships its strings.** Decided in P0: files (Decisions).
 2. **Publishing the SDK.** Decided: published (Decisions).
-3. **Who writes the samples.** Recommended: the docs first, then each sample by an agent that may read only the docs
-   and the SDK's built types, listing what it lacked; the graph alone first, then one at a time in the order above.
-   The other way: written here with the kernel's source in reach, keeping to the SDK's imports, which proves less
-   about the docs.
+3. **Who writes the samples.** Decided: written here, keeping to the SDK's imports; the user checks the API use
+   afterwards (Decisions). Recommended was an agent reading only the docs and the SDK's types.
 4. **A template repository.** Decided: `Type-32/vertex-plugin-template` (Decisions).
-5. **The new file format.** Recommended: `.board` (above), because its cards give the link extractor real work.
-   Any small text format with links in it would do.
+5. **The new file format.** Deferred: the user's plan for S4.

@@ -22,8 +22,10 @@ workspace's `rootPath`.
 
 ## The index
 
-The workspace's files and links, kept up to date as files change, by Vertex or outside it. Reactive: a `computed`
-that reads it follows.
+The workspace's files and links, kept up to date as files change, by Vertex or outside it. The entries are reactive:
+a `computed` that reads `files()`, `byPath`, `byUuid`, `tree()`, `backlinks` or `forelinks` follows them, an entry's
+`forelinks` and `backlinks` when a link is added or removed, its `modifiedTime` on each save. `links()`,
+`unresolved()` and `resolveLink()` read the link graph as it is now: read them again when the entries change.
 
 ### `session.index.files`, `session.index.byPath`, `session.index.byUuid`
 
@@ -52,8 +54,10 @@ const off = session.index.on(event => {
 })
 ```
 
-Files created (`create`), removed (`remove`, with every entry removed), renamed (`rename`), modified (`modify`), by
-absolute path. Returns what stops listening; it stops with the session anyway.
+Files created (`create`), removed (`remove`, with every entry removed), renamed (`rename`), by absolute path; and
+modified (`modify`) outside Vertex, or by [`session.files.edit`](#sessionfilesedit). The editor's own saves aren't
+events: they change the entry (its `modifiedTime`, its links). Returns what stops listening; it stops with the
+session anyway.
 
 ### `session.index.search`
 
