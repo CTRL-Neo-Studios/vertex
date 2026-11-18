@@ -54,24 +54,16 @@ const off = session.index.on(event => {
 })
 ```
 
-What other programs do to the workspace's files (an editor, Git, a sync tool), by absolute path: created (`create`),
-removed (`remove`, with every entry removed), renamed (`rename`), modified (`modify`); and
-[`session.files.edit`](#sessionfilesedit)'s edits, as `modify`. Returns what stops listening; it stops with the
-session anyway.
+Files created (`create`), removed (`remove`) and renamed (`rename`: a move is one), by absolute path, whoever did it:
+Vertex (Files' New, Delete, Rename and moves, and their undo) or another program (an editor, Git, a sync tool). A
+folder is one event, for the folder: `remove` has every entry removed (`removedNodes`), `rename` names the folder,
+and what's inside went with it. A file keeps its `uuid` through a rename or a move.
 
-What Vertex does itself isn't an event: Files' New, Delete, Rename and moves, and the editor's saves change the
-entries (a save an entry's `modifiedTime` and links). To follow a rename or a move, whoever made it, watch the
-entries: a file keeps its `uuid` through one.
+`modify` is a file's content changed outside Vertex, or by [`session.files.edit`](#sessionfilesedit). The editor's own
+saves aren't events: they change the entry (its `modifiedTime`, its links). A rename doesn't change `modifiedTime`.
 
-```ts
-// A uuid whose path changed has been renamed or moved.
-watch(() => new Map(session.index.files().map(file => [file.uuid, file.relativePath])), (now, before) => {
-    for (const [uuid, to] of now) {
-        const from = before.get(uuid)
-        if (from !== undefined && from !== to) console.log(from, '→', to)
-    }
-})
-```
+Returns what stops listening; it stops with the session anyway. A listener that throws is logged, and the file
+operation goes on.
 
 ### `session.index.search`
 

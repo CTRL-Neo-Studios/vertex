@@ -89,10 +89,11 @@ export interface SessionContext {
         /** A file's link targets that find no file, as they are now. */
         unresolved(uuid: string): string[]
         /**
-         * What other programs do to the workspace's files (the watcher's events): created, removed, renamed, modified;
-         * and `files.edit`'s edits, as `modify` (removed with the session). What Vertex does itself (Files' New, Delete,
-         * Rename and moves, the editor's saves) isn't an event: it changes the entries, and a file keeps its uuid
-         * through a rename or a move.
+         * Files created, removed and renamed (a move is a rename), whoever did it: Vertex (Files' New, Delete, Rename,
+         * moves, their undo) or another program. A folder is one event, for the folder: `remove` lists every entry
+         * removed, `rename` names the folder, and what's inside went with it (a file keeps its uuid through one).
+         * `modify` is a change of a file's content from outside Vertex, or by `files.edit`; the editor's own saves
+         * aren't events, they change the file's entry. A listener that throws is logged. Removed with the session.
          */
         on(listener: WorkspaceIndexListener): () => void
         /**

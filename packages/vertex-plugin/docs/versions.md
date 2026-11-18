@@ -41,6 +41,10 @@ release with them.
 
 1.3.0 adds `NoteEditor`'s `readonly` (a canvas card shown, not edited, draws through it).
 
+1.4.0 changes no type. With it, [`session.index.on`](session.md#sessionindexon) hears what Vertex does itself
+(Files' New, Delete, Rename, moves and their undo), not only other programs, and a rename keeps a file's
+`modifiedTime`. A plugin that relies on either sets `minAppVersion` to the first release with them.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

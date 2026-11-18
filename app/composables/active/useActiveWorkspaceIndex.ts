@@ -252,6 +252,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if (isIndexedText(path)) await reparse(path)
                 syncAround(node.uuid)
             }
+            broadcast({type: 'create', path})
             return node
         } catch (error) {
             console.error(`[index] could not add ${path}`, error)
@@ -259,11 +260,12 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
     }
 
-    function removeFileFromIndex(path: string): ActiveWorkspaceFileIndex[] {
+    /** Takes the item at `path` out of the index, a folder's contents first; everything it removed. */
+    function detach(path: string): ActiveWorkspaceFileIndex[] {
         const node = unref(fileIndex)[path]
         if (!node) return []
         const removed: ActiveWorkspaceFileIndex[] = []
-        if (node.isFolder) for (const child of [...node.children]) removed.push(...removeFileFromIndex(child))
+        if (node.isFolder) for (const child of [...node.children]) removed.push(...detach(child))
         else {
             const g = runtime().graph
             const touched = [...g.forelinks(node.uuid), ...g.backlinks(node.uuid), ...g.referencingFiles(node.uuid)]
@@ -277,6 +279,13 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         delete unref(fileIndex)[path]
         removed.push(node)
         return removed
+    }
+
+    /** Removes the item at `path` (a folder with what's in it) from the index, as one `remove` event; everything removed. */
+    function removeFileFromIndex(path: string): ActiveWorkspaceFileIndex[] {
+        const removedNodes = detach(path)
+        if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})
+        return removedNodes
     }
 
     /**
@@ -294,7 +303,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             const node = index[from]
             if (!node) return
             const fileName = to.slice(to.lastIndexOf('/') + 1)
-            const next = {...node, fullPath: to, relativePath: relativeOf(to), fileName, fileExt: fileExtOf(fileName), modifiedTime: new Date()}
+            // Its times stay: a rename doesn't modify a file.
+            const next = {...node, fullPath: to, relativePath: relativeOf(to), fileName, fileExt: fileExtOf(fileName)}
             if (node.isFolder) {
                 next.children = []
                 for (const child of node.children) {
@@ -328,6 +338,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             for (const id of [uuid, ...g.forelinks(uuid), ...g.backlinks(uuid), ...g.referencingFiles(uuid)]) touched.add(id)
         }
         syncLinks(touched)
+        // One event for the item moved: what's inside a folder went with it.
+        broadcast({type: 'rename', oldPath, newPath})
     }
 
     /** Re-parse one document's properties and links after its content changed (in-app save or external edit). */
@@ -371,8 +383,20 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             .filter(r => r.file && r.targets.length > 0)
     }
 
+    /**
+     * Tells the listeners. `create`, `remove` and `rename` come from the index's own `addFileToIndex`,
+     * `removeFileFromIndex` and `moveFileInIndex`, so they're raised whoever changed the files: the app (Files' New,
+     * Delete, Rename, moves, their undo) or another program (the watcher). A listener that throws is logged and the
+     * rest still hear it: a file operation is never left half done by one.
+     */
     function broadcast(event: WorkspaceIndexEvent) {
-        for (const listener of runtime().listeners) listener(event)
+        for (const listener of runtime().listeners) {
+            try {
+                listener(event)
+            } catch (error) {
+                console.error('[index] a listener threw', error)
+            }
+        }
     }
 
     async function handleWatchEvent(event: WatchEvent) {
@@ -393,13 +417,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         // `.vertex/` (settings temp files, trash), `.git/` and `.DS_Store` never reach the index.
         const paths = event.paths.filter(p => !relativeOf(p).split('/').some(part => part.startsWith('.')))
         if (paths.length === 0) return
-        const drop = (path: string) => {
-            const removedNodes = removeFileFromIndex(path)
-            if (removedNodes.length) broadcast({type: 'remove', path, removedNodes})
-        }
-
         if ('remove' in type) {
-            for (const path of paths) if (!rt.selfWrites.has(path)) drop(path)
+            for (const path of paths) if (!rt.selfWrites.has(path)) removeFileFromIndex(path)
             return
         }
 
@@ -408,7 +427,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             for (const path of paths) {
                 if (rt.selfWrites.has(path) || unref(fileIndex)[path]) continue
                 await addFileToIndex(path)
-                broadcast({type: 'create', path})
             }
             return
         }
@@ -422,7 +440,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if (rt.selfWrites.has(oldPath) && rt.selfWrites.has(newPath)) return
                 if (!unref(fileIndex)[oldPath]) return
                 await moveFileInIndex(oldPath, newPath)
-                broadcast({type: 'rename', oldPath, newPath})
                 return
             }
             // macOS reports some renames as two single-path events; resolve from disk.
@@ -438,28 +455,30 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 if (!node) {
                     if (!rt.wholeFolder) return
                     await addFileToIndex(path)
-                    broadcast({type: 'create', path})
                     return
                 }
                 const actual = (await readDir(parentPathOf(path))).find(e => e.name.toLowerCase() === node.fileName.toLowerCase())
-                if (actual && actual.name !== node.fileName) {
-                    const newPath = await join(parentPathOf(path), actual.name)
-                    await moveFileInIndex(path, newPath)
-                    broadcast({type: 'rename', oldPath: path, newPath})
-                }
+                if (actual && actual.name !== node.fileName) await moveFileInIndex(path, await join(parentPathOf(path), actual.name))
             } catch {
-                drop(path)
+                removeFileFromIndex(path)
             }
             return
         }
 
         // Content changes from other editors, git, sync tools…: re-parse indexed formats, and tell open tabs
         // about every tracked file so they can reload (including code/LaTeX files).
+        // The disk decides what happened, not the event's kind: macOS reports a file's recent events together, so a
+        // file deleted seconds after it was made arrives as a modify, and so can a new one.
         if (kind === 'data' || kind === 'any') {
             for (const path of paths) {
-                if (rt.selfWrites.has(path) || !unref(fileIndex)[path]) continue
-                if (isIndexedText(path)) await reparse(path)
-                broadcast({type: 'modify', path})
+                if (rt.selfWrites.has(path)) continue
+                if (!await stat(path).catch(() => null)) removeFileFromIndex(path)
+                else if (!unref(fileIndex)[path]) {
+                    if (rt.wholeFolder) await addFileToIndex(path)
+                } else {
+                    if (isIndexedText(path)) await reparse(path)
+                    broadcast({type: 'modify', path})
+                }
             }
         }
     }
