@@ -21,7 +21,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "sdk:release": "cd ./packages/vertex-plugin && bun run release"
+    "sdk:release": "cd ./packages/vertex-plugin && bun run release",
+    "sdk:publish": "cd ./packages/vertex-plugin && bun publish"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.90",
