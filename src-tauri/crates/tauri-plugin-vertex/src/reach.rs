@@ -169,7 +169,7 @@ pub fn gate<R: Runtime>(
 /// The kernel's commands whose arguments are paths, by those arguments' names.
 pub(crate) fn kernel_path_args(command: &str) -> &'static [&'static str] {
     match command {
-        "read_text_files_batch" | "clipboard_files_set" | "reveal_paths" => &["paths"],
+        "read_text_files_batch" | "describe_paths" | "clipboard_files_set" | "reveal_paths" => &["paths"],
         "scan_directory_recursive" => &["rootPath"],
         "trash_item" | "trust_set" | "trust_follow_edit" => &["path"],
         "trust_move" => &["from", "to"],

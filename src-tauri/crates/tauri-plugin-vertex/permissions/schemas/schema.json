@@ -343,6 +343,18 @@
           "markdownDescription": "Denies the data_set command without any pre-configured scope."
         },
         {
+          "description": "Enables the describe_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-describe-paths",
+          "markdownDescription": "Enables the describe_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the describe_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-describe-paths",
+          "markdownDescription": "Denies the describe_paths command without any pre-configured scope."
+        },
+        {
           "description": "Enables the dialog_open command without any pre-configured scope.",
           "type": "string",
           "const": "allow-dialog-open",

@@ -1,6 +1,6 @@
 import {watch as watchVue, type WatchStopHandle} from "vue";
 import {sessionScope, StateKey} from "#shared/constants/app";
-import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
+import type {ActiveWorkspaceFileIndex, ScannedEntry, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
 import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {vertexInvoke} from "~/utils/vertexInvoke"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
@@ -34,15 +34,6 @@ interface SessionRuntime {
 const runtimes = new Map<string, SessionRuntime>()
 
 interface FileReadResult { path: string, content?: string, error?: string }
-interface DirectoryEntry {
-    path: string
-    name: string
-    is_directory: boolean
-    size: number
-    created?: number
-    modified?: number
-    children: string[]
-}
 
 /** The link extractor a plugin registered for files of this extension (a canvas's), if any. */
 export const linkExtractorFor = (extension: string) => [...linkExtractors.items.values()].find(d => d.match(extension))
@@ -149,46 +140,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         const root = unref(rootRef)
         const rt = runtime()
         rt.root = root
-        rt.graph = new LinkGraph()
         rt.wholeFolder = true
         const started = Date.now()
 
-        const entries = await vertexInvoke<DirectoryEntry[]>('scan_directory_recursive', {rootPath: root})
-        const next: Record<string, ActiveWorkspaceFileIndex> = {}
-        const uuidMap = unref(uuidToFilePathIndex)
-        uuidMap.clear()
-        for (const e of entries) {
-            const node = defaultActiveWorkspaceFileIndex({
-                fullPath: e.path,
-                relativePath: e.path.slice(root.length).replace(/^\//, ''),
-                fileName: e.name,
-                fileExt: fileExtOf(e.name),
-                isFolder: e.is_directory,
-                size: e.size,
-                children: e.children,
-                createdTime: e.created ? new Date(e.created) : new Date(),
-                modifiedTime: e.modified ? new Date(e.modified) : new Date(),
-            })
-            next[e.path] = node
-            uuidMap.set(node.uuid, e.path)
-            if (!node.isFolder) rt.graph.addFile({id: node.uuid, relativePath: node.relativePath})
-        }
-
-        const textPaths = Object.values(next).filter(n => !n.isFolder && isIndexedText(n.fullPath)).map(n => n.fullPath)
-        const results = await vertexInvoke<FileReadResult[]>('read_text_files_batch', {paths: textPaths})
-        fileIndex.value = next
-        for (const r of results) {
-            if (r.error || r.content === undefined) {
-                console.warn(`[index] could not read ${r.path}: ${r.error}`)
-                continue
-            }
-            applyProperties(r.path, r.content)
-            rt.graph.setLinks(next[r.path]!.uuid, parseLinkTargets(r.path, r.content, parsers))
-        }
-        syncLinks(uuidMap.keys())
+        const entries = await vertexInvoke<ScannedEntry[]>('scan_directory_recursive', {rootPath: root})
+        const texts = await readTexts(entries)
+        rt.graph = new LinkGraph()
+        fileIndex.value = {}
+        unref(uuidToFilePathIndex).clear()
+        addEntries(entries, texts)
         followExtractors()
-        console.log(`[index] ${entries.length} entries, ${textPaths.length} parsed in ${Date.now() - started}ms`)
-        return next
+        console.log(`[index] ${entries.length} entries, ${texts.size} parsed in ${Date.now() - started}ms`)
     }
 
     /**
@@ -225,43 +187,114 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         runtimes.delete(scope)
     }
 
-    /** Indexes the item at `path`. `uuid` gives it back the one it had (Undo of a delete), unless that's in use. */
-    async function addFileToIndex(path: string, root: string = runtime().root, uuid?: string) {
-        const existing = unref(fileIndex)[path]
-        if (existing) return existing
-        runtime().root = root
-        try {
-            const info = await stat(path)
-            const fileName = path.slice(path.lastIndexOf('/') + 1)
-            const node = defaultActiveWorkspaceFileIndex({
-                uuid: uuid && !unref(uuidToFilePathIndex).has(uuid) ? uuid : undefined,
-                fullPath: path,
-                relativePath: relativeOf(path),
-                fileName,
-                fileExt: fileExtOf(fileName),
-                isFolder: info.isDirectory,
-                size: info.size || 0,
-                createdTime: info.birthtime ? new Date(info.birthtime) : new Date(),
-                modifiedTime: info.mtime ? new Date(info.mtime) : new Date(),
-            })
-            unref(fileIndex)[path] = node
-            unref(uuidToFilePathIndex).set(node.uuid, path)
-            const parent = unref(fileIndex)[parentPathOf(path)]
-            if (parent && !parent.children.includes(path)) {
-                parent.children.push(path)
-                parent.children.sort()
-            }
-            if (!node.isFolder) {
-                runtime().graph.addFile({id: node.uuid, relativePath: node.relativePath})
-                if (isIndexedText(path)) await reparse(path)
-                syncAround(node.uuid)
-            }
-            broadcast({type: 'create', path})
-            return node
-        } catch (error) {
-            console.error(`[index] could not add ${path}`, error)
-            return null
+    /** The text of the entries whose format carries properties or links, read in one call. */
+    async function readTexts(entries: ScannedEntry[]) {
+        const paths = entries.filter(e => !e.is_directory && isIndexedText(e.path) && !isUnreadableAsText(getFileExtensionFromPath(e.path))).map(e => e.path)
+        const texts = new Map<string, string>()
+        if (!paths.length) return texts
+        for (const r of await vertexInvoke<FileReadResult[]>('read_text_files_batch', {paths})) {
+            if (r.error || r.content === undefined) console.warn(`[index] could not read ${r.path}: ${r.error}`)
+            else texts.set(r.path, r.content)
         }
+        return texts
+    }
+
+    /**
+     * Puts entries in the index in one synchronous pass, so what reads the index recomputes once, however many there
+     * are: the nodes and the link graph, each one's properties and links from `texts`, then the links of every file
+     * they touch. One at a time, each add cost a recomputation of everything derived from the whole index (about
+     * 90 ms in a workspace of 13,000 files: the undo of a deleted folder of 2,000 notes took three minutes).
+     *
+     * `entries` are as the scan describes them (a folder with its `children`); one already indexed is left alone.
+     * `uuids` gives entries back the uuids they had (the undo of a delete), unless in use. Raises no event: the
+     * caller does. Returns what it added, parents first.
+     */
+    function addEntries(entries: ScannedEntry[], texts: ReadonlyMap<string, string>, uuids?: ReadonlyMap<string, string>) {
+        const index = unref(fileIndex), uuidMap = unref(uuidToFilePathIndex), rt = runtime()
+        const added: ActiveWorkspaceFileIndex[] = []
+        for (const e of entries) {
+            if (index[e.path]) continue
+            const uuid = uuids?.get(e.path)
+            const node = defaultActiveWorkspaceFileIndex({
+                uuid: uuid && !uuidMap.has(uuid) ? uuid : undefined,
+                fullPath: e.path,
+                relativePath: relativeOf(e.path),
+                fileName: e.name,
+                fileExt: fileExtOf(e.name),
+                isFolder: e.is_directory,
+                size: e.size,
+                children: e.children,
+                createdTime: e.created ? new Date(e.created) : new Date(),
+                modifiedTime: e.modified ? new Date(e.modified) : new Date(),
+            })
+            index[e.path] = node
+            uuidMap.set(node.uuid, e.path)
+            if (!node.isFolder) rt.graph.addFile({id: node.uuid, relativePath: node.relativePath})
+            added.push(node)
+        }
+        // A folder that was there before lists what arrived in it (one that arrived has its `children` from the scan):
+        // once a folder, not once an arrival.
+        const arrived = new Set(added.map(n => n.fullPath)), into = new Map<string, string[]>()
+        for (const node of added) {
+            const parent = parentPathOf(node.fullPath)
+            if (!arrived.has(parent) && index[parent]) (into.get(parent) ?? into.set(parent, []).get(parent)!).push(node.fullPath)
+        }
+        for (const [parent, paths] of into) index[parent]!.children = [...new Set([...index[parent]!.children, ...paths])].sort()
+        const g = rt.graph, touched = new Set<string>()
+        for (const node of added) {
+            if (node.isFolder) continue
+            const text = texts.get(node.fullPath)
+            if (text !== undefined) {
+                applyProperties(node.fullPath, text)
+                g.setLinks(node.uuid, parseLinkTargets(node.fullPath, text, parsers))
+            }
+        }
+        for (const node of added) {
+            if (!node.isFolder) for (const id of [node.uuid, ...g.forelinks(node.uuid), ...g.backlinks(node.uuid), ...g.referencingFiles(node.uuid)]) touched.add(id)
+        }
+        syncLinks(touched)
+        return added.sort((a, b) => (a.fullPath < b.fullPath ? -1 : 1))
+    }
+
+    /**
+     * Indexes what's at `paths`, a folder with everything in it (hidden names skipped, as in a scan), in one pass
+     * (`addEntries`), then raises a `create` for each entry. What isn't on disk, or is indexed already, is skipped.
+     * `uuids`: as `addEntries`. Returns what it added, parents first.
+     */
+    async function addPaths(paths: string[], root: string = runtime().root, uuids?: ReadonlyMap<string, string>) {
+        runtime().root = root
+        const states = await describePaths([...new Set(paths)].filter(path => !unref(fileIndex)[path]))
+        const describe = async (entry: ScannedEntry): Promise<ScannedEntry[]> => {
+            if (!entry.is_directory) return [entry]
+            const inside = await vertexInvoke<ScannedEntry[]>('scan_directory_recursive', {rootPath: entry.path}).catch((error: unknown): ScannedEntry[] => {
+                console.error(`[index] could not scan ${entry.path}`, error)
+                return []
+            })
+            inside.push({...entry, children: inside.filter(e => parentPathOf(e.path) === entry.path).map(e => e.path).sort()})
+            return inside
+        }
+        // A path may be named twice, or be inside a folder named too: `addEntries` takes each once.
+        const entries = (await Promise.all(states.flatMap(s => (s.entry ? [describe(s.entry)] : [])))).flat()
+        const texts = await readTexts(entries)
+        const added = addEntries(entries, texts, uuids)
+        for (const node of added) broadcast({type: 'create', path: node.fullPath})
+        return added
+    }
+
+    /**
+     * What the disk has at each path, in one call (`describe_paths`): gone (no `entry`), or an entry without its
+     * `children`, its path and name as the folder lists them (a disk that ignores case finds `Note.md` for `note.md`).
+     */
+    async function describePaths(paths: string[]) {
+        if (!paths.length) return []
+        const states = await vertexInvoke<{ path: string, entry?: ScannedEntry | null }[]>('describe_paths', {paths})
+        return states.map(({path, entry}) => ({path, entry: entry ? {...entry, path: `${parentPathOf(path)}/${entry.name}`} : undefined}))
+    }
+
+    /** Indexes the item at `path` (`addPaths`); the entry, also when it was there already, or `null` when nothing is. */
+    async function addFileToIndex(path: string, root: string = runtime().root) {
+        if (!unref(fileIndex)[path]) await addPaths([path], root)
+        return unref(fileIndex)[path] ?? null
     }
 
     /** Takes the item at `path` out of the index, a folder's contents first; everything it removed. */
@@ -567,6 +600,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         fileTree,
         getFileByUuid,
         addFileToIndex,
+        addPaths,
+        describePaths,
         removeFileFromIndex,
         moveFileInIndex,
         startWatcher,

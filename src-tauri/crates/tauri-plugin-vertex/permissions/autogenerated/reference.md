@@ -114,6 +114,32 @@ Denies the data_set command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-describe-paths`
+
+</td>
+<td>
+
+Enables the describe_paths command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-describe-paths`
+
+</td>
+<td>
+
+Denies the describe_paths command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-dialog-open`
 
 </td>

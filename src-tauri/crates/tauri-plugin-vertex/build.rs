@@ -2,6 +2,7 @@
 const COMMANDS: &[&str] = &[
     "read_text_files_batch",
     "scan_directory_recursive",
+    "describe_paths",
     "sessions_list",
     "sessions_upsert",
     "sessions_remove",

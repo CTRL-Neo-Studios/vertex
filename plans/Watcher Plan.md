@@ -57,20 +57,21 @@ Why, measured in the same session:
 
 ## Decisions
 
-Mine, for the user to change.
+Mine, for the user to change. The first and fifth rows, and W2 and W3, were rewritten on 18 Nov when the user chose
+the smaller shape (Open questions, 1): the watch stays the fs plugin's; Rust describes paths.
 
 | Question | Decision |
 | --- | --- |
-| What moves to Rust | The watch and what it finds out from the disk: which paths changed, what each is now (gone, a file, a folder, its size and times), which pairs are renames. One message a batch. Not the index: it stays in the page, reactive, where everything reads it. |
+| What moves to Rust | What the page asks of the disk about a batch's paths: what each is now (gone, a file, a folder, its size and times, its name as its folder lists it), in one call (`describe_paths`). The watch stays the fs plugin's, and the index stays in the page, reactive, where everything reads it. |
 | What stays in the page | What a batch does to the index, as one synchronous pass, and which files are text worth reading (`isIndexedText`: plain text, YAML, and whatever a plugin registered a link extractor for, which only the page knows). The page reads those in one `read_text_files_batch`: two round trips a batch, not two a file. |
 | The disk decides | A path in a batch is described as the disk has it when the batch is made, whatever kind the event had. The kind is used for one thing: pairing a rename's two paths, which keeps a file's uuid, and so its tab. |
-| Batching | `notify-debouncer-full`, already a dependency of the kernel's crate (the plugins' folder watch), with its file-id cache (what pairs renames on macOS and Windows): a batch is what it hands over after 100 ms of quiet, a constant to tune. |
+| Batching | In the page: the fs plugin's events (each path, the kind, and a rename's two paths when it pairs them) gathered until 100 ms pass with none, a constant to tune. A batch is applied whole before the next is gathered. |
 | One pass in the index | New `addEntries` (entries shaped as the scan's, with their text) beside `removeFileFromIndex` and `moveFileInIndex`: the batch's renames, then removes, then adds, then changed notes, with no `await` between, then the events (`rename`, `remove`, `create`, `modify`: unchanged for listeners, one an item, a folder's for the folder), then `changed` once with every path. |
 | A folder that arrives | Scanned whole (`scan_directory_recursive` on it) and added in the same pass. |
 | Vertex's own bulk adds | The same `addEntries`: the undo of a delete, `addTree`, a paste, an import. |
 | Self-writes | As today (the 1.5 s window). Comparing with what the index holds would need the index to keep the disk's times after its own saves; not this plan. |
-| The fs plugin's watch | Removed from the page and from the windows' permissions once nothing uses it (the index is its only user). |
-| Who may watch | The command is reach-gated like `scan_directory_recursive` (`root` among its path arguments), one watch a window, dropped with the window. |
+| The fs plugin's watch | Stays: the index uses it as now, with its own debounce (50 ms) and its pairing of renames. |
+| Who may describe | `describe_paths` is reach-gated like `read_text_files_batch` (`paths`), and only session windows are granted it. |
 | The contract | `session.index.on` and `session.watch` behave as now, but a burst arrives as one batch: listeners run after the whole batch is in the index. No type changes. |
 
 ## W0: The numbers again
@@ -143,43 +144,82 @@ In the page only. Nothing about the watch changes yet.
   add.
 
 ### Acceptance
-- [ ] An undo of a deleted folder of 2,000 notes is in the index within 1 s, with no frame over 200 ms (W0's number
-  beside it).
-- [ ] Tests for the batch's plan; the index's existing behaviour unchanged (the scratch plugin of the Navigator
-  Plan's Gaps: the same events for create, relocate, remove, undo).
+- [x] An undo of a deleted folder of 2,000 notes is in the index within 1 s, with no frame over 200 ms (W0's number
+  beside it). (218 ms, the longest frame 174 ms; W0: 181.5 s. Every entry back with the uuid it had, links to them
+  resolving.)
+- [x] Tests for the batch's plan; the index's existing behaviour unchanged (the scratch plugin of the Navigator
+  Plan's Gaps: the same events for create, relocate, remove, undo). (`watchBatch.test.ts`, 9 cases; one caught the
+  plan adding again what a renamed folder took along. The events, logged from the page instead of a plugin: a
+  `create` each for a folder and two notes, one `rename` for a note moved and one for the folder renamed, one
+  `remove` listing the folder and its note, a `create` each on undo, parents first.)
 
-## W2: The watch in Rust
+### As built (18 Nov)
 
-In the kernel's crate only. The page doesn't use it yet.
+- **`addEntries(entries, texts, uuids?)`** (`useActiveWorkspaceIndex`): one synchronous pass; a folder that was there
+  lists what arrived in it once a folder, not once an arrival. `buildIndex` builds through it (1.5 s at startup, as
+  before). `ScannedEntry` (`shared/types/active/workspace.d.ts`) is the scan's entry, typed for both.
+- **`addPaths(paths, root, uuids?)`:** each path described (`stat`, and `scan_directory_recursive` for a folder), the
+  text read in one `read_text_files_batch`, one `addEntries`, a `create` per entry. `addFileToIndex(path)` is that
+  for one path, so a folder is indexed with what's in it, whoever adds it.
+- **Who uses it:** the undo of a delete (`fromTrash`, with the uuids), a merged folder put back, the vault's move out
+  of a dot folder (`addTree` is gone). An import and a duplicate write many files over time, so they add in passes
+  (`indexingAsWritten`): when done, and about twice a second on the way, which keeps each file in the index before
+  the watcher stops skipping its events as the app's own (1.5 s).
+- **`planBatch`** (`shared/utils/index/watchBatch.ts`): pure, for W3. Nothing calls it yet.
+
+| | W0 | Now |
+| --- | --- | --- |
+| A deleted folder of 2,000 notes undone | 181.5 s, 143 s blocked | 218 ms, longest frame 174 ms |
+| A folder of 2,000 notes duplicated | not run (an add an entry, as the undo was) | 2.7 s, most of it copying; longest frame 170 ms |
+| A folder of 50 notes and a subfolder moved in from outside | the folder's entry only | all 53 entries in one pass, 87 ms; links to them resolve |
+| 500 notes created outside in a new folder | 45.5 s | one pass, longest frame 92 ms (the folder's event scans it) |
+| 500 notes created outside in a folder that's there | (the 45.5 s row, as measured then) | 41.5 s: unchanged, W3's |
+| `rm -rf` of a folder of 500 notes | 25.6 s | 54.7 s at 14,306 entries, one frame of 33.5 s: unchanged, W3's |
+
+A single-file window, whose one file is now read with `read_text_files_batch`: its note indexed with its properties,
+icon and tags, the other file of its folder not; edited outside, the tab and the entry followed.
+
+Not run: an import (a drop from Finder, a paste), which goes through the same `indexingAsWritten` as the duplicate.
+
+## W2: Describing paths in Rust
 
 ### Change
-- `watch_start(root, recursive, onBatch)` and `watch_stop` (`watch.rs`): one debounced watch a window, replaced by a
-  second call, dropped with the window (`windows::destroyed`) and with `watch_stop`.
-- A batch: `paths` (every path the events named, dot paths too), `renames` (`from`, `to`, both paths of one event,
-  the target there), `entries` (each other path not under a dot name, once: gone, or its name as the folder has it,
-  folder or file, size, created, modified). A path whose event was a rename with no pair gets its real name from its
-  folder's listing, so a rename of case is seen.
-- The batch is made by a function of the events and the disk (`batch_of`), tested on a temporary folder: create,
-  modify, delete, a create then a delete in one batch, a rename, a rename of case, a folder with files, dot paths, a
-  link that leads nowhere.
+- `describe_paths(paths)` in the kernel's crate (`lib.rs`): for each path, `entry` (as the scan's, without
+  `children`) or none. Its name as its folder lists it (each folder listed once a call), so on a disk that ignores
+  case a path asked as `note.md` finds `Note.md`. A link is what it leads to; one that leads nowhere is gone.
+  Reach-gated (`paths`), granted to session windows.
+- The page: `describePaths` in `useActiveWorkspaceIndex`, the entry's path set from its listed name. `addPaths` uses
+  it (one call for all its paths, not a `stat` each).
 
 ### Acceptance
-- [ ] The Rust tests; a window that closes leaves no watch (checked by a second window's batches going on alone).
+- [x] A Rust test on a temporary folder: a file, a folder, a missing path, a link that leads nowhere, a path asked in
+  another case. (`paths_are_described_as_the_disk_has_them`; the case is asserted either way, by what the disk does.)
+- [x] In `tauri dev`: Vertex's own create, undo and duplicate as in W1, through `describe_paths`. (The same events as
+  W1's, uuids back after the undo; the undo of the 2,000-note folder and its duplicate whole, links resolving. Timed
+  with DevTools on this time, so 0.4 s and 5.5 s, not W1's 0.2 s and 2.7 s. In the page, `describePaths` of
+  `Bulk/bulk 3.md` gave `Bulk/Bulk 3.md`; adding `area 0`, which is indexed as `Area 0`, added nothing.)
+
+### As built (18 Nov)
+
+`describe_paths` (`lib.rs`, with `entry_of`, which the scan uses too), registered in `build.rs`, the handler and the
+reach gate's path arguments, granted to session windows (`grants.rs`). `describePaths` in the index, and `addPaths`
+on it. 64 Rust tests.
 
 ## W3: The page on batches
 
 ### Change
-- `startWatcher` calls `watch_start`; each batch: `changed`, `session.watch` listeners and the settings' reload as
-  now, then W1's plan, one `read_text_files_batch` (and a scan for each folder that arrived), one pass, the events.
-  Batches apply in order.
-- `handleWatchEvent`, the 100 ms wait and the fs plugin's `watch` go; the session windows' permission for it
-  (`plugin:fs|watch`) goes with its ACL test.
-- A single-file window: the same, not recursive, adds nothing.
+- `startWatcher` gathers the fs plugin's events (100 ms of quiet), then for each batch: `changed`, `session.watch`
+  listeners and the settings' reload as now; `describePaths` on the batch's paths (not under a dot name); `planBatch`
+  (W1); one pass: the moves, the removes (one `remove` event each, as now), `addPaths` for the adds, the reads in one
+  `read_text_files_batch` with a `modify` each. Batches apply in order.
+- `handleWatchEvent` and its 100 ms wait for a lone rename go: a rename of case shows as a path whose listed name
+  differs.
+- A single-file window: the same, adds nothing (`planBatch`'s `wholeFolder`).
 
 ### Acceptance
 - [ ] The baseline's three rows: the index current within 1 s of the last write, no frame over 200 ms. (The first,
   rewrites, already is since the four fixes: W0.)
-- [ ] A folder of notes moved in from Finder is indexed with its notes; moved out, gone with them.
+- [ ] A folder of notes moved in from Finder is indexed with its notes; moved out, gone with them. (In since W1.)
 - [ ] A note renamed outside keeps its tab; a rename of case only is seen; a note edited outside reloads its tab; a
   file made and deleted within the same second leaves nothing.
 - [ ] Vertex's own save, rename and delete raise no second event from the watch.

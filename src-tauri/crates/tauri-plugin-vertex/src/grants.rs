@@ -255,6 +255,7 @@ const KERNEL: Grants = &[
             "vertex:allow-quit-app",
             "vertex:allow-read-text-files-batch",
             "vertex:allow-scan-directory-recursive",
+            "vertex:allow-describe-paths",
             "vertex:allow-clipboard-files-get",
             "vertex:allow-clipboard-files-set",
             "vertex:allow-reveal-paths",

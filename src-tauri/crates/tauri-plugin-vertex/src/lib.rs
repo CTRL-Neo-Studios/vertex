@@ -86,9 +86,6 @@ fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, St
 
 /// Adds what `listing` holds (and what's under it) to `entries`; the listed paths, sorted.
 fn scan_dir(listing: fs::ReadDir, entries: &mut Vec<DirectoryEntry>, inside: &mut Vec<PathBuf>) -> Vec<String> {
-    let millis = |time: std::io::Result<SystemTime>| {
-        time.ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64)
-    };
     let mut children = Vec::new();
     for entry in listing.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -112,18 +109,68 @@ fn scan_dir(listing: fs::ReadDir, entries: &mut Vec<DirectoryEntry>, inside: &mu
                 }
             }
         }
-        entries.push(DirectoryEntry {
-            path: path_str,
-            name,
-            is_directory,
-            size: metadata.len(),
-            created: millis(metadata.created()),
-            modified: millis(metadata.modified()),
-            children: child_children,
-        });
+        entries.push(entry_of(path_str, name, &metadata, child_children));
     }
     children.sort();
     children
+}
+
+fn entry_of(path: String, name: String, metadata: &fs::Metadata, children: Vec<String>) -> DirectoryEntry {
+    let millis = |time: std::io::Result<SystemTime>| {
+        time.ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64)
+    };
+    DirectoryEntry {
+        path,
+        name,
+        is_directory: metadata.is_dir(),
+        size: metadata.len(),
+        created: millis(metadata.created()),
+        modified: millis(metadata.modified()),
+        children,
+    }
+}
+
+/// A path as `describe_paths` found it.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PathState {
+    path: String,
+    /// What's there (a folder without its `children`), or `None` when nothing is.
+    entry: Option<DirectoryEntry>,
+}
+
+/// What the disk has at each path, in one call (Watcher Plan, W2): gone, or a file or folder with its size and times,
+/// named as its folder lists it. On a disk that ignores case, a path asked for as `note.md` finds `Note.md`, and the
+/// entry says `Note.md`: how a rename of case shows. A link is what it leads to; one that leads nowhere is gone.
+#[tauri::command]
+fn describe_paths(paths: Vec<String>) -> Vec<PathState> {
+    // Each folder listed once, however many of the paths are in it.
+    let mut listings: std::collections::HashMap<PathBuf, Vec<String>> = std::collections::HashMap::new();
+    paths
+        .into_iter()
+        .map(|path| {
+            let entry = fs::metadata(&path).ok().map(|metadata| {
+                let asked = Path::new(&path);
+                let asked_name = asked.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let names = asked.parent().map(|parent| {
+                    listings.entry(parent.to_path_buf()).or_insert_with(|| {
+                        fs::read_dir(parent).map(|l| l.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect()).unwrap_or_default()
+                    })
+                });
+                // The name as written when the folder has it, else the one it has under another case.
+                let name = names
+                    .and_then(|names| {
+                        if names.contains(&asked_name) {
+                            None
+                        } else {
+                            names.iter().find(|n| n.to_lowercase() == asked_name.to_lowercase()).cloned()
+                        }
+                    })
+                    .unwrap_or(asked_name);
+                entry_of(path.clone(), name, &metadata, Vec::new())
+            });
+            PathState { path, entry }
+        })
+        .collect()
 }
 
 /// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
@@ -218,6 +265,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(reach::gate(reach::kernel_path_args, tauri::generate_handler![
             read_text_files_batch,
             scan_directory_recursive,
+            describe_paths,
             state::sessions_list,
             state::sessions_upsert,
             state::sessions_remove,
@@ -288,7 +336,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::scan_directory_recursive;
+    use super::{describe_paths, scan_directory_recursive};
     use std::fs;
     use std::os::unix::fs::symlink;
 
@@ -314,6 +362,31 @@ mod tests {
         ];
         assert_eq!(listed, expected.map(|(path, children)| (path.to_string(), children)));
         assert!(scan_directory_recursive(root.join("gone").to_string_lossy().into_owned()).is_err());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn paths_are_described_as_the_disk_has_them() {
+        let root = std::env::temp_dir().join(format!("vertex-describe-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(root.join("folder")).unwrap();
+        fs::write(root.join("Note.md"), "four").unwrap();
+        symlink(root.join("gone"), root.join("dangling.md")).unwrap();
+        let path = |name: &str| root.join(name).to_string_lossy().into_owned();
+        let asked = ["Note.md", "folder", "gone.md", "dangling.md", "note.md"].map(path);
+
+        let found = describe_paths(asked.to_vec());
+        let shown: Vec<_> = found.iter().map(|s| (s.path.clone(), s.entry.as_ref().map(|e| (e.name.clone(), e.is_directory, e.size)))).collect();
+        assert_eq!(shown[..4], [
+            (path("Note.md"), Some(("Note.md".to_string(), false, 4))),
+            (path("folder"), Some(("folder".to_string(), true, shown[1].1.as_ref().unwrap().2))),
+            (path("gone.md"), None),
+            (path("dangling.md"), None),
+        ]);
+        assert!(found[0].entry.as_ref().unwrap().modified.is_some());
+        // A disk that ignores case (macOS's, Windows') finds `Note.md` for `note.md`, under its own name; one that
+        // doesn't, nothing.
+        let case_blind = fs::metadata(root.join("note.md")).is_ok();
+        assert_eq!(shown[4].1, case_blind.then(|| ("Note.md".to_string(), false, 4)));
         fs::remove_dir_all(&root).unwrap();
     }
 }

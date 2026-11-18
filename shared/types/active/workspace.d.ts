@@ -31,6 +31,20 @@ export interface UITreeNode extends Pick<ActiveWorkspaceFileIndex, 'uuid' | 'fil
     children: UITreeNode[]
 }
 
+/** A file or folder as the Rust scan describes it (`scan_directory_recursive`): what an index entry is made from. */
+export interface ScannedEntry {
+    /** Absolute. */
+    path: string
+    name: string
+    is_directory: boolean
+    size: number
+    /** Milliseconds since the epoch. */
+    created?: number
+    modified?: number
+    /** A folder's direct children, by path, sorted. */
+    children: string[]
+}
+
 /** `removedNodes` holds every entry removed (folder contents included). */
 export type WorkspaceIndexEvent =
     | { type: 'create'; path: string; }

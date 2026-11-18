@@ -25,7 +25,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
     const scope = useSettingsScope()
     const updateLinksModal = useOverlay().create(UpdateLinksModal)
     const conflictModal = useOverlay().create(FileConflictModal)
-    const {getFileByUuid, getFileByPath, getFilteredFiles, addFileToIndex, moveFileInIndex, removeFileFromIndex, getRenameImpact, markSelfWrite, updateIndex, notifyModified} = useActiveWorkspaceIndex(session)
+    const {getFileByUuid, getFileByPath, getFilteredFiles, addFileToIndex, addPaths, moveFileInIndex, removeFileFromIndex, getRenameImpact, markSelfWrite, updateIndex, notifyModified} = useActiveWorkspaceIndex(session)
     const history = useFilesHistory(session?.uuid)
     const deletedFiles = () => scope.effective.value?.fileConfig.deletedFiles ?? 'trash'
 
@@ -75,7 +75,30 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             if (await exists(item.original) || !item.trashed || !await exists(item.trashed)) return false
             await rename(item.trashed, item.original)
         } else await vertexInvoke('trash_restore', {item: {original: item.original, trashed: item.trashed, deletedAt: item.deletedAt}})
-        for (const node of item.nodes) await addFileToIndex(node.path, session!.rootPath!, node.uuid)
+        // One pass for the item and everything in it, each with the uuid it had.
+        await addPaths([item.nodes[0]?.path ?? item.original], session!.rootPath!, new Map(item.nodes.map(n => [n.path, n.uuid])))
+    }
+
+    /**
+     * Indexes what a bulk operation writes, in passes (`addPaths`) instead of an entry at a time: when it's done
+     * (`flush`), and about twice a second on the way, so each file is in the index while the watcher still skips its
+     * events as the app's own (`markSelfWrite`'s window).
+     */
+    function indexingAsWritten(root: string) {
+        let pending: string[] = [], last = Date.now()
+        const flush = async () => {
+            const paths = pending
+            pending = []
+            last = Date.now()
+            if (paths.length) await addPaths(paths, root)
+        }
+        return {
+            flush,
+            async wrote(path: string) {
+                pending.push(path)
+                if (Date.now() - last > 500) await flush()
+            },
+        }
     }
 
     /** Moves the item `uuid` from `from` to `to`, on disk and in the index; false unless it's still at `from`. */
@@ -132,7 +155,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
             if (getFileByPath(folder.path)) return
             markSelfWrite(folder.path)
             await mkdir(folder.path)
-            await addFileToIndex(folder.path, session!.rootPath!, folder.uuid)
+            await addPaths([folder.path], session!.rootPath!, new Map([[folder.path, folder.uuid]]))
         }),
         ...await each([...c.moves].reverse(), m => m.to, m => shift(m.uuid, m.to, m.from)),
         ...await each([...c.trashed].reverse(), i => i.original, fromTrash),
@@ -378,22 +401,27 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
 
         await removeItems(replacedBy(plan.steps), change)
         const added: string[] = [], failed: string[] = []
+        const indexing = indexingAsWritten(root)
         const write = async (item: OutsideItem, path: string) => {
             try {
                 markSelfWrite(path)
                 if (item.isFolder) await mkdir(path)
                 else if (item.source) await copyFile(item.source, path)
                 else await writeFile(path, await item.read!())
-                await addFileToIndex(path, root)
+                await indexing.wrote(path)
                 if (item.isFolder) for (const child of item.children()) await write(child, await join(path, child.name))
             } catch (error) {
                 console.error(`[importItems] could not add ${path}`, error)
                 failed.push(item.name)
             }
         }
+        const paths: string[] = []
         for (const {item, dir, name} of plan.steps) {
-            const path = await join(dir, name)
-            await write(item, path)
+            paths.push(await join(dir, name))
+            await write(item, paths.at(-1)!)
+        }
+        await indexing.flush()
+        for (const path of paths) {
             const uuid = getFileByPath(path)?.uuid
             if (!uuid) continue
             added.push(uuid)
@@ -655,22 +683,28 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         const {ok, skipped} = await targetsOf(items)
         const change = newChange()
         const done: { uuid: string, to: string }[] = []
+        const indexing = indexingAsWritten(root)
         const copy = async (from: ActiveWorkspaceFileIndex, path: string) => {
             markSelfWrite(path)
             if (from.isFolder) await mkdir(path)
             else await copyFile(from.fullPath, path)
-            await addFileToIndex(path, root)
+            await indexing.wrote(path)
             for (const child of from.isFolder ? from.children.flatMap(p => getFileByPath(p) ?? []) : []) await copy(child, await join(path, child.fileName))
         }
         try {
             for (const {file, rel, target} of ok) {
                 await ensureFolder(rel.split('/').slice(0, -1).join('/'))
                 await copy(file, target)
-                const uuid = getFileByPath(target)?.uuid
-                if (uuid) done.push({uuid, to: rel})
-                change.created.push({path: target, ...await sizeAndTime(target)})
             }
         } finally {
+            // Also after a failure: what was copied is indexed, and the step can be undone.
+            await indexing.flush()
+            for (const {rel, target} of ok) {
+                const uuid = getFileByPath(target)?.uuid
+                if (!uuid) continue
+                done.push({uuid, to: rel})
+                change.created.push({path: target, ...await sizeAndTime(target)})
+            }
             const count = change.created.length
             remember(change, t('app.editor.ui.filetree.stepAdd', {count}), t('app.editor.ui.filetree.added', {count}))
         }

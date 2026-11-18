@@ -1,4 +1,4 @@
-import {exists, mkdir, readDir, readTextFile, rename, writeTextFile} from "@tauri-apps/plugin-fs"
+import {exists, mkdir, readTextFile, rename, writeTextFile} from "@tauri-apps/plugin-fs"
 import type {ActiveSession} from "#shared/types/active/sessions"
 import type {ActiveWorkspaceFileIndex} from "#shared/types/active/workspace"
 import {parentOf, type Vault, type VaultEntry} from "#shared/utils/vault"
@@ -29,13 +29,6 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
 
     async function refuseExisting(path: string) {
         if (await exists(abs(path))) throw new Error(`"${path}" already exists`)
-    }
-
-    /** Indexes a path and, for a folder, everything under it (hidden names skipped, as in a scan). */
-    async function addTree(path: string) {
-        const node = await $index.addFileToIndex(path, root)
-        if (!node?.isFolder) return
-        for (const e of await readDir(path)) if (!e.name.startsWith('.')) await addTree(`${path}/${e.name}`)
     }
 
     return {
@@ -88,7 +81,8 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
                 // Into the trash: out of the index, and its tab closes like a deleted file's.
                 for (const node of $index.removeFileFromIndex(src)) $tabs.closeTab(node.uuid)
             } else if (hidden(from)) {
-                await addTree(dest)
+                // Out of the trash: the item and, for a folder, everything in it, in one pass.
+                await $index.addPaths([dest], root)
             } else {
                 $index.moveFileInIndex(src, dest, root)
             }
