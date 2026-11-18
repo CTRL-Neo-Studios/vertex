@@ -174,7 +174,14 @@ In the page only. Nothing about the watch changes yet.
 | A folder of 50 notes and a subfolder moved in from outside | the folder's entry only | all 53 entries in one pass, 87 ms; links to them resolve |
 | 500 notes created outside in a new folder | 45.5 s | one pass, longest frame 92 ms (the folder's event scans it) |
 | 500 notes created outside in a folder that's there | (the 45.5 s row, as measured then) | 41.5 s: unchanged, W3's |
-| `rm -rf` of a folder of 500 notes | 25.6 s | 54.7 s at 14,306 entries, one frame of 33.5 s: unchanged, W3's |
+| `rm -rf` of a folder of 500 notes | 25.6 s | 25.9 s (439 `remove` events), and 28.8 s (457) after the row above: unchanged, W3's |
+
+The delete first read 54.7 s here (467 events, 117 ms each, one frame of 33.5 s), put down to a larger index. The
+user asked whether that wasn't slower than W0's. It was, and the reason given was a guess: measured again on W2's
+code in a fresh run, W0's sequence gave 25.9 s and W1's own sequence, at 14,306 entries, 28.8 s; one entry removed
+costs the page 63 to 67 ms after each of W1's steps, as one added does (60 to 75 ms). The 54.7 s run wasn't
+reproduced and its cause isn't known (one run, with the machine in use). A number that surprises is measured twice
+before it's written here.
 
 A single-file window, whose one file is now read with `read_text_files_batch`: its note indexed with its properties,
 icon and tags, the other file of its folder not; edited outside, the tab and the entry followed.
