@@ -17,6 +17,7 @@ export const StateCommand = {
     settingsSet: 'settings_set',
     trustGet: 'trust_get',
     trustSet: 'trust_set',
+    trustRevoke: 'trust_revoke',
     trustClear: 'trust_clear',
     trustMove: 'trust_move',
     trustFollowEdit: 'trust_follow_edit',
@@ -53,9 +54,11 @@ export const stateClient = {
 
     /** Raw `trust.json`; normalise with `defaultTrustRecords`. */
     getTrust: () => invoke<unknown>(StateCommand.trustGet),
-    /** One entry; `null` revokes it. Never a whole-store write, so windows can't undo each other's changes. */
-    setTrust: <K extends keyof TrustRecords>(kind: K, path: string, record: TrustRecords[K][string] | null) =>
+    /** Trusts one entry. Never a whole-store write, so windows can't undo each other's changes. */
+    setTrust: <K extends keyof TrustRecords>(kind: K, path: string, record: TrustRecords[K][string]) =>
         invoke(StateCommand.trustSet, {kind, path, record}),
+    /** Revokes one entry, wherever it is (Settings → Trust lists folders this window can't reach). */
+    revokeTrust: (kind: keyof TrustRecords, path: string) => invoke(StateCommand.trustRevoke, {kind, path}),
     clearTrust: () => invoke(StateCommand.trustClear),
     onTrustChanged: (cb: (trust: unknown) => void): Promise<UnlistenFn> =>
         listen<unknown>(StateEvent.trustChanged, e => cb(e.payload)),

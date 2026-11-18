@@ -46,6 +46,43 @@ export interface SettingsSectionEmits {
     reset: []
 }
 
+/**
+ * Something done to the rows a `SettingsList` has selected (Remove, Revoke, Turn off). Its button shows while it
+ * applies to one of them, with how many.
+ */
+export interface SettingsListAction<T extends { id: string } = { id: string }> {
+    id: string
+    /** The button's text for `count` rows ("Remove (3)"), already translated. */
+    label(count: number): string
+    icon?: string
+    color?: 'neutral' | 'primary' | 'warning' | 'error'
+    /** Asked before it runs (a native dialog, with the button's text as OK); none: it runs at once. */
+    confirm?(count: number): string
+    /** Which of the selected rows it acts on; default all of them. */
+    applies?(item: T): boolean
+    run(items: T[]): unknown
+}
+
+/**
+ * A list in a `SettingsSection`: a search over its rows, and with `actions`, a checkbox per row, one for all the rows
+ * shown, and the actions for the selection. Rows are the `row` slot (`{item}`), with the `actions` slot (`{item}`) at
+ * their end; `group` puts headings between them, in the items' order. Every part is a `SettingsRow`, so it lines up
+ * with the section's other rows. `v-model:query` holds the search (in the URL, so a Back link returns to it).
+ */
+export interface SettingsListProps<T extends { id: string } = { id: string }> {
+    items: readonly T[]
+    /** What the search matches, in any case. */
+    text(item: T): string
+    placeholder?: string
+    /** Shown when there are no items at all; "Nothing matches" is the list's own. */
+    empty: string
+    actions?: readonly SettingsListAction<T>[]
+    /** Keeps a row out of the selection (the default profile). */
+    selectable?(item: T): boolean
+    /** A row's heading, already translated: a heading before the first row of each. */
+    group?(item: T): string
+}
+
 /** A settings page: a sticky header with the title (`header-leading`, `header-trailing`) over the scrolling content. */
 export interface SettingsScrollLayoutProps {
     title?: string

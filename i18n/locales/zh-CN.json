@@ -73,6 +73,11 @@
 			"title": "设置",
 			"resetSection": "恢复默认",
 			"info": "详细说明",
+			"list": {
+				"selectAll": "全选显示的项",
+				"select": "选择",
+				"noMatch": "没有匹配搜索的项。"
+			},
 			"nav": {
 				"about": "关于",
 				"general": "通用",
@@ -231,7 +236,6 @@
 				"noTrusted": "暂无。工作流首次运行或工作区的设置会询问你，也可以在这里添加文件夹或文件。",
 				"revoke": "撤销信任",
 				"trustedAt": "信任于 {date}",
-				"noMatches": "没有匹配项。",
 				"search": "搜索路径",
 				"folders": "文件夹",
 				"files": "文件",
@@ -241,6 +245,8 @@
 				"programs": "程序",
 				"unreadable": "无法将“{name}”读取为程序",
 				"revokeAll": "全部撤销",
+				"revokeSelected": "撤销（{count}）",
+				"revokeConfirm": "撤销对 {count} 项的信任？它们的程序在运行前会再次询问。",
 				"alsoTrustedBy": "也通过文件夹 {folder} 受信任",
 				"trustFailed": "无法更改信任",
 				"fileTrust": "信任记住",

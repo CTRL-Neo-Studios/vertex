@@ -3,11 +3,11 @@ import {parse} from '@vue/compiler-sfc'
 import {describe, expect, it} from 'vitest'
 
 /**
- * A settings page's anatomy, held in the sources (Settings Plan, U1): a `SettingsSection`'s content is `SettingsRow`s
- * and nothing else, so nothing pads by hand and every page lines up. A full-width control, a notice or a preview is a
- * `stacked` row; "nothing here yet" is the section's `empty`.
+ * A settings page's anatomy, held in the sources (Settings Plan, U1): a `SettingsSection`'s content is `SettingsRow`s,
+ * and `SettingsList`s (rows themselves), and nothing else, so nothing pads by hand and every page lines up. A
+ * full-width control, a notice or a preview is a `stacked` row; "nothing here yet" is the section's `empty`.
  */
-const ROWS = new Set(['SettingsRow'])
+const ROWS = new Set(['SettingsRow', 'SettingsList'])
 
 interface Node {
     type: number

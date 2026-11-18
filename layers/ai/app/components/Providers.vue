@@ -2,7 +2,7 @@
 import type {AiProviderProfile} from "../../shared/types";
 import {useAiConfig} from "../lib/useAiConfig";
 import {aiClient} from "../lib/aiClient";
-import {SettingsScrollLayout} from "~/plugin/ui";
+import {SettingsList, SettingsScrollLayout, SettingsSection} from "~/plugin/ui";
 
 const {t} = useI18n()
 const $route = useRoute()
@@ -40,33 +40,34 @@ const text = (p: AiProviderProfile) => `${p.name} ${p.baseURL}`
         </template>
         <div class="space-y-4">
             <AiOffBanner/>
-            <p class="text-sm text-muted">{{ t('plugins.ai.providers.description') }}</p>
-            <AiList
-                v-model:query="query"
-                :items="providers"
-                :text
-                :placeholder="t('plugins.ai.providers.search')"
-                :empty="t('plugins.ai.providers.empty')"
-                :confirm="count => t('plugins.ai.providers.removeConfirm', {count})"
-                @remove="removeProviders"
-            >
-                <template #row="{item}">
-                    <NuxtLink :to="linkTo(item.id)" class="group block min-w-0">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                            <span class="text-sm font-medium truncate group-hover:text-primary">{{ item.name || t('plugins.ai.providers.unnamed') }}</span>
-                            <UBadge v-if="keyed.has(item.id)" size="sm" color="success" variant="subtle" icon="i-lucide-key-round" :label="t('plugins.ai.providers.keySaved')"/>
-                            <UBadge size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.providers.modelCount', {count: item.models.length})"/>
-                        </div>
-                        <div class="text-xs text-muted font-mono truncate">{{ item.baseURL }}</div>
-                    </NuxtLink>
-                </template>
-                <template #actions="{item}">
-                    <UTooltip :text="t('plugins.ai.providers.remove')">
-                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" :aria-label="t('plugins.ai.providers.remove')" @click="removeProviders([item.id])"/>
-                    </UTooltip>
-                    <UButton :to="linkTo(item.id)" size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('plugins.ai.providers.edit')"/>
-                </template>
-            </AiList>
+            <SettingsSection :title="t('plugins.ai.nav.providers')" :description="t('plugins.ai.providers.description')" :info="t('plugins.ai.providers.info')">
+                <SettingsList
+                    v-model:query="query"
+                    :items="providers"
+                    :text
+                    :placeholder="t('plugins.ai.providers.search')"
+                    :empty="t('plugins.ai.providers.empty')"
+                    :actions="[{id: 'remove', label: count => t('plugins.ai.list.removeSelected', {count}), icon: 'i-lucide-trash-2', color: 'error',
+                                confirm: count => t('plugins.ai.providers.removeConfirm', {count}), run: items => removeProviders(items.map(p => p.id))}]"
+                >
+                    <template #row="{item}">
+                        <NuxtLink :to="linkTo(item.id)" class="group block min-w-0">
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="text-sm font-medium truncate group-hover:text-primary">{{ item.name || t('plugins.ai.providers.unnamed') }}</span>
+                                <UBadge v-if="keyed.has(item.id)" size="sm" color="success" variant="subtle" icon="i-lucide-key-round" :label="t('plugins.ai.providers.keySaved')"/>
+                                <UBadge size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.providers.modelCount', {count: item.models.length})"/>
+                            </div>
+                            <div class="text-xs text-muted font-mono truncate">{{ item.baseURL }}</div>
+                        </NuxtLink>
+                    </template>
+                    <template #actions="{item}">
+                        <UTooltip :text="t('plugins.ai.providers.remove')">
+                            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" :aria-label="t('plugins.ai.providers.remove')" @click="removeProviders([item.id])"/>
+                        </UTooltip>
+                        <UButton :to="linkTo(item.id)" size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('plugins.ai.providers.edit')"/>
+                    </template>
+                </SettingsList>
+            </SettingsSection>
         </div>
     </SettingsScrollLayout>
 </template>

@@ -2,7 +2,7 @@
 import type {DropdownMenuItem} from "@nuxt/ui";
 import type {AiModelProfile} from "../../shared/types";
 import {useAiConfig} from "../lib/useAiConfig";
-import {SettingsScrollLayout} from "~/plugin/ui";
+import {SettingsList, SettingsScrollLayout, SettingsSection} from "~/plugin/ui";
 
 const {t} = useI18n()
 const $route = useRoute()
@@ -53,35 +53,36 @@ const actions = (p: AiModelProfile): DropdownMenuItem[][] => [
         </template>
         <div class="space-y-4">
             <AiOffBanner/>
-            <p class="text-sm text-muted">{{ t('plugins.ai.models.description') }}</p>
-            <AiList
-                v-model:query="query"
-                :items="profiles"
-                :text="p => `${p.name} ${p.modelId} ${providerName(p)}`"
-                :selectable="p => !isDefault(p)"
-                :placeholder="t('plugins.ai.models.search')"
-                :empty="t('plugins.ai.models.empty')"
-                :confirm="count => t('plugins.ai.models.removeConfirm', {count})"
-                @remove="removeModelProfiles"
-            >
-                <template #row="{item}">
-                    <NuxtLink :to="linkTo(item.id)" class="group block min-w-0">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                            <span class="text-sm font-medium truncate group-hover:text-primary">{{ item.name || t('plugins.ai.models.unnamed') }}</span>
-                            <UBadge v-if="isDefault(item)" size="sm" variant="subtle" :label="t('plugins.ai.models.isDefault')"/>
-                            <UBadge v-if="item.tools === false" size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.models.toolsOff')"/>
-                            <UBadge v-if="item.params" size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.models.customParams')"/>
-                        </div>
-                        <div class="text-xs text-muted truncate">{{ subtitle(item) }}</div>
-                    </NuxtLink>
-                </template>
-                <template #actions="{item}">
-                    <UDropdownMenu :items="actions(item)" size="sm" :content="{ align: 'end' }">
-                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-ellipsis" :aria-label="t('plugins.ai.models.actions')"/>
-                    </UDropdownMenu>
-                    <UButton :to="linkTo(item.id)" size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('plugins.ai.models.edit')"/>
-                </template>
-            </AiList>
+            <SettingsSection :title="t('plugins.ai.nav.models')" :description="t('plugins.ai.models.description')">
+                <SettingsList
+                    v-model:query="query"
+                    :items="profiles"
+                    :text="p => `${p.name} ${p.modelId} ${providerName(p)}`"
+                    :selectable="p => !isDefault(p)"
+                    :placeholder="t('plugins.ai.models.search')"
+                    :empty="t('plugins.ai.models.empty')"
+                    :actions="[{id: 'remove', label: count => t('plugins.ai.list.removeSelected', {count}), icon: 'i-lucide-trash-2', color: 'error',
+                                confirm: count => t('plugins.ai.models.removeConfirm', {count}), run: items => removeModelProfiles(items.map(p => p.id))}]"
+                >
+                    <template #row="{item}">
+                        <NuxtLink :to="linkTo(item.id)" class="group block min-w-0">
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="text-sm font-medium truncate group-hover:text-primary">{{ item.name || t('plugins.ai.models.unnamed') }}</span>
+                                <UBadge v-if="isDefault(item)" size="sm" variant="subtle" :label="t('plugins.ai.models.isDefault')"/>
+                                <UBadge v-if="item.tools === false" size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.models.toolsOff')"/>
+                                <UBadge v-if="item.params" size="sm" color="neutral" variant="subtle" :label="t('plugins.ai.models.customParams')"/>
+                            </div>
+                            <div class="text-xs text-muted truncate">{{ subtitle(item) }}</div>
+                        </NuxtLink>
+                    </template>
+                    <template #actions="{item}">
+                        <UDropdownMenu :items="actions(item)" size="sm" :content="{ align: 'end' }">
+                            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-ellipsis" :aria-label="t('plugins.ai.models.actions')"/>
+                        </UDropdownMenu>
+                        <UButton :to="linkTo(item.id)" size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('plugins.ai.models.edit')"/>
+                    </template>
+                </SettingsList>
+            </SettingsSection>
         </div>
     </SettingsScrollLayout>
 </template>

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-trust-revoke"
+description = "Enables the trust_revoke command without any pre-configured scope."
+commands.allow = ["trust_revoke"]
+
+[[permission]]
+identifier = "deny-trust-revoke"
+description = "Denies the trust_revoke command without any pre-configured scope."
+commands.deny = ["trust_revoke"]

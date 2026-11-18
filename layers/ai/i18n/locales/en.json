@@ -16,7 +16,8 @@
       },
       "providers": {
         "title": "AI Providers",
-        "description": "OpenAI-compatible APIs your model profiles can use. API keys are kept in the system keychain and never shown again.",
+        "description": "OpenAI-compatible APIs your model profiles can use.",
+        "info": "API keys are kept in the system keychain and never shown again.",
         "add": "Add provider",
         "empty": "No providers yet.",
         "newProvider": "New provider",
@@ -153,11 +154,7 @@
       "off": "AI is off, so nothing here is used.",
       "turnOn": "Go to its switch",
       "list": {
-        "selectAll": "Select all shown",
-        "select": "Select",
-        "removeSelected": "Remove selected ({count})",
-        "noMatch": "Nothing matches the search.",
-        "remove": "Remove"
+        "removeSelected": "Remove ({count})"
       },
       "nav": {
         "ai": "AI",

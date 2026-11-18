@@ -73,6 +73,11 @@
 			"title": "Settings",
 			"resetSection": "Reset to defaults",
 			"info": "More about this",
+			"list": {
+				"selectAll": "Select all shown",
+				"select": "Select",
+				"noMatch": "Nothing matches the search."
+			},
 			"nav": {
 				"about": "About",
 				"general": "General",
@@ -231,7 +236,6 @@
 				"noTrusted": "Nothing yet. A workflow’s first run or a workspace’s settings ask you, or add a folder or file here.",
 				"revoke": "Revoke",
 				"trustedAt": "Trusted {date}",
-				"noMatches": "Nothing matches.",
 				"search": "Search paths",
 				"folders": "Folders",
 				"files": "Files",
@@ -241,6 +245,8 @@
 				"programs": "Programs",
 				"unreadable": "“{name}” can’t be read as a program",
 				"revokeAll": "Revoke all",
+				"revokeSelected": "Revoke ({count})",
+				"revokeConfirm": "Revoke trust for {count} item(s)? Their programs ask again before they run.",
 				"alsoTrustedBy": "also trusted by folder {folder}",
 				"trustFailed": "Couldn’t change trust",
 				"fileTrust": "Trust remembers",

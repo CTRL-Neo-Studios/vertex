@@ -16,7 +16,8 @@
       },
       "providers": {
         "title": "AI 服务商",
-        "description": "模型配置可使用的 OpenAI 兼容 API。API 密钥保存在系统钥匙串中，保存后不再显示。",
+        "description": "模型配置可使用的 OpenAI 兼容 API。",
+        "info": "API 密钥保存在系统钥匙串中，保存后不再显示。",
         "add": "添加服务商",
         "empty": "还没有服务商。",
         "newProvider": "新服务商",
@@ -153,11 +154,7 @@
       "off": "AI 已关闭，这里的设置不会被使用。",
       "turnOn": "前往开关",
       "list": {
-        "selectAll": "全选显示的项",
-        "select": "选择",
-        "removeSelected": "移除所选（{count}）",
-        "noMatch": "没有匹配搜索的项。",
-        "remove": "移除"
+        "removeSelected": "移除（{count}）"
       },
       "nav": {
         "ai": "AI",

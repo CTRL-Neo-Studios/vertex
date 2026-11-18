@@ -766,7 +766,7 @@ pub fn trust_get<R: Runtime>(
     state.with_trust(&app, |t| Ok(t.clone()), false)
 }
 
-/// `record: null` revokes. `kind` is `folders` or `files`; `path` must be absolute.
+/// Trusts one folder or file (`kind`: `folders` or `files`; `path` absolute), in the calling window's reach.
 #[tauri::command]
 pub fn trust_set<R: Runtime>(
     app: AppHandle<R>,
@@ -775,7 +775,22 @@ pub fn trust_set<R: Runtime>(
     path: String,
     record: Value,
 ) -> Result<(), String> {
+    if record.is_null() {
+        return Err("trust_set needs a record: trust_revoke removes one".into());
+    }
     state.with_trust(&app, |t| set_trust_entry(t, &kind, path, record), true)
+}
+
+/// Revokes one folder or file. Not held to the window's reach: removing a record grants nothing, and Settings → Trust
+/// lists folders trusted from windows long closed, which it can't reach.
+#[tauri::command]
+pub fn trust_revoke<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    kind: String,
+    path: String,
+) -> Result<(), String> {
+    state.with_trust(&app, |t| set_trust_entry(t, &kind, path, Value::Null), true)
 }
 
 #[tauri::command]

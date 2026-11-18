@@ -138,9 +138,17 @@ Report 4's groundwork.
 - Trust's folders and files move onto it: Revoke for a selection, in place of Revoke all alone.
 
 ### Acceptance
-- [ ] AI's three lists behave as before (search kept in the URL, the default profile not selectable, Remove selected asks).
-- [ ] Trust: a search narrows both groups; Revoke on three selected rows revokes those three.
-- [ ] Keyboard: the search field, then rows by Tab; Space toggles a row's checkbox.
+- [x] AI's three lists behave as before (search kept in the URL, the default profile not selectable, Remove selected asks). (In `tauri dev`, four profiles and three providers seeded: the default's checkbox disabled; Select all shown checked the other three and offered "Remove (3)"; a search went into the URL as `q`, and a profile opened and Back came back with it in the field and the URL; a provider's three models listed with their own search. Not run: AI's Remove itself; it's the list's action path that Trust's revoke ran, with AI's question.)
+- [x] Trust: a search narrows both groups; Revoke on three selected rows revokes those three. (Four folders and two files in `trust.json`: headings Folders and Files; `/tmp/u3/d` left the four folders; two folders and a file selected, "Revoke (3)", the native question ("Revoke trust for 3 item(s)?…") answered with Return: those three gone from the list and from `trust.json`, the other three kept. It first failed: see As built.)
+- [x] Keyboard: the search field, then rows by Tab; Space toggles a row's checkbox. (Real key presses: from the focused search, Tab reached the first row's checkbox and Space checked it.)
+
+### As built
+
+- **`Settings/List.vue`** (`SettingsList`, generic over its items), published in `/ui`; its props and actions are the contract's (`SettingsListProps`, `SettingsListAction` in `shared/plugin/components.ts`; methods, so a plugin's own item type fits). Every part is a `SettingsRow`, so the anatomy test lets it into a section. Its strings are the kernel's (`app.settings.list.*`); an action's label and question are the caller's.
+- **AI:** `layers/ai/app/components/List.vue` deleted; the three lists are each a `SettingsList` in a `SettingsSection` (Providers and Model profiles titled by their nav labels, a provider's Models with Add models as the section's action), their descriptions in the section (Providers' cut to a line, the rest in `info`). `plugins.ai.list.*` down to `removeSelected` ("Remove ({count})").
+- **Trust:** one `SettingsList` of folders and files (groups, search by path, Revoke for a selection with a question); Revoke all stays in the section's header. `trust.noMatches` went (the list's own).
+- **Found:** revoking a folder Settings → Trust can't reach failed ("… is outside what this window may reach"): `trust_set` revoked with `record: null`, and the reach gate checks its `path`, though removing a record grants nothing. The Settings window reaches open workspaces and its dialogs' picks, so a folder trusted from a workspace long closed couldn't be revoked one at a time (Revoke all, `trust_clear`, has no path). Now `trust_revoke(kind, path)`, granted where `trust_set` is and not in the gate's list; `trust_set` refuses `null`; `useTrust` revokes through it (its own revoke and a changed file's).
+- **Numbers:** 371 tests (54 files); 62 Rust tests; typecheck unchanged; the SDK builds with `SettingsList` typed.
 
 ## U4: The Plugins page
 

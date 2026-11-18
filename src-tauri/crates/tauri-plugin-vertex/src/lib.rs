@@ -247,6 +247,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             state::settings_set,
             state::trust_get,
             state::trust_set,
+            state::trust_revoke,
             state::trust_clear,
             state::trust_move,
             state::trust_follow_edit,

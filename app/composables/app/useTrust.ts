@@ -112,7 +112,7 @@ export function useTrust() {
         const file = normalizeTrustPath(path)
         if (trustedBy(records.value, file, hash, mode())) return true
         if (mode() === 'content') {
-            if (records.value.files[file]) await stateClient.setTrust('files', file, null)
+            if (records.value.files[file]) await stateClient.revokeTrust('files', file)
             const folder = coveringFolder(records.value, file)
             if (folder && records.value.folders[folder]!.files[file]) await stateClient.pinTrust(folder, file, null)
         }
@@ -152,7 +152,7 @@ export function useTrust() {
         formatExtensions: () => [...trustedFormats].flatMap(f => f.extensions),
         trustFile: (path: string, hash: string) =>
             stateClient.setTrust('files', normalizeTrustPath(path), {trustedAt: new Date().toISOString(), hash}),
-        revoke: (kind: keyof TrustRecords, path: string) => stateClient.setTrust(kind, path, null),
+        revoke: (kind: keyof TrustRecords, path: string) => stateClient.revokeTrust(kind, path),
         revokeAll: () => stateClient.clearTrust(),
     }
 }

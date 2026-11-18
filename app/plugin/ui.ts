@@ -11,6 +11,7 @@
  */
 export {default as SettingsRow} from '~/components/Settings/Row.vue'
 export {default as SettingsSection} from '~/components/Settings/Section.vue'
+export {default as SettingsList} from '~/components/Settings/List.vue'
 export {default as SettingsScrollLayout} from '~/components/Settings/ScrollLayout.vue'
 export {default as ViewerLayout} from '~/components/ViewerEditor/LayoutWrapper.vue'
 export {default as NoteEditor} from '~/components/NoteEditor.vue'

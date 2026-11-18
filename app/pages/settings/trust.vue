@@ -28,21 +28,32 @@ const fileTrustItems = computed(() => [
 ])
 const setFileTrust = (fileTrust: AppTrustConfig['fileTrust']) => save({trustConfig: {fileTrust}})
 
-const query = ref('')
-const shown = <R extends {path: string, trustedAt: string}>(records: R[]) => {
-    const q = query.value.trim().toLowerCase()
-    return records.filter(r => r.path.toLowerCase().includes(q)).sort((a, b) => b.trustedAt.localeCompare(a.trustedAt))
-}
-const folders = computed(() => shown(Object.entries(trust.records.value.folders).map(([path, r]) => ({path, ...r}))))
+const byDate = <R extends {trustedAt: string}>(records: R[]) => records.sort((a, b) => b.trustedAt.localeCompare(a.trustedAt))
+const folders = computed(() => byDate(Object.entries(trust.records.value.folders).map(([path, r]) => ({path, ...r}))))
 // A file a folder covers too stays trusted after it's revoked; the row says so.
-const files = computed(() => shown(Object.entries(trust.records.value.files).map(([path, r]) => {
+const files = computed(() => byDate(Object.entries(trust.records.value.files).map(([path, r]) => {
     // In content mode a folder covers a file only with a pin for it.
     const folder = coveringFolder(trust.records.value, path)
     const covers = folder && (config.value?.trustConfig.fileTrust === 'path' || trust.records.value.folders[folder]!.files[path])
     return {path, ...r, coveredBy: covers ? folder : undefined}
 })))
-const any = computed(() => Object.keys(trust.records.value.folders).length + Object.keys(trust.records.value.files).length > 0)
+const any = computed(() => folders.value.length + files.value.length > 0)
 const trustedAt = (date: string) => t('app.settings.trust.trustedAt', {date: new Date(date).toLocaleString()})
+/** Folders, then files, each a row of the list: what it says under its name, and for a folder whether it takes its subfolders. */
+const records = computed(() => [
+    ...folders.value.map(r => ({
+        id: `folders:${r.path}`, kind: 'folders' as const, path: r.path, trustedAt: r.trustedAt, nested: r.nested,
+        detail: `${trustedAt(r.trustedAt)} · ${t('app.settings.trust.pinned', {count: Object.keys(r.files).length})} · ${r.path}`,
+    })),
+    ...files.value.map(r => ({
+        id: `files:${r.path}`, kind: 'files' as const, path: r.path, trustedAt: r.trustedAt, nested: false,
+        detail: [trustedAt(r.trustedAt), r.path, r.coveredBy && t('app.settings.trust.alsoTrustedBy', {folder: r.coveredBy})].filter(Boolean).join(' · '),
+    })),
+])
+type TrustRow = typeof records.value[number]
+const revoke = (rows: TrustRow[]) => attempt(async () => {
+    for (const row of rows) await trust.revoke(row.kind, row.path)
+})
 /** Files trust can hold: those of the formats plugins registered (`ctx.trust.format`). */
 const fileExtensions = computed(() => trust.formatExtensions())
 
@@ -91,43 +102,35 @@ const addFile = () => attempt(async () => {
                 :title="t('app.settings.trust.trusted')"
                 :description="t('app.settings.trust.trustedDescription')"
                 :info="t('app.settings.trust.trustedInfo')"
-                :empty="!folders.length && !files.length ? t(any ? 'app.settings.trust.noMatches' : 'app.settings.trust.noTrusted') : undefined"
             >
                 <template #actions>
                     <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-folder-plus" :label="t('app.settings.trust.addFolder')" @click="addFolder"/>
                     <UButton v-if="fileExtensions.length" size="xs" color="neutral" variant="ghost" icon="i-lucide-file-plus" :label="t('app.settings.trust.addFile')" @click="addFile"/>
                     <UButton v-if="any" size="xs" color="error" variant="ghost" icon="i-lucide-shield-off" :label="t('app.settings.trust.revokeAll')" @click="attempt(trust.revokeAll)"/>
                 </template>
-                <SettingsRow v-if="any" stacked>
-                    <UInput v-model="query" class="w-full" size="sm" icon="i-lucide-search" :placeholder="t('app.settings.trust.search')"/>
-                </SettingsRow>
-                <SettingsRow v-if="folders.length" stacked>
-                    <h3 class="text-xs font-medium text-dimmed">{{ t('app.settings.trust.folders') }}</h3>
-                </SettingsRow>
-                <SettingsRow
-                    v-for="record in folders"
-                    :key="`folder:${record.path}`"
-                    :label="fileNameFromPath(record.path)"
-                    :description="`${trustedAt(record.trustedAt)} · ${t('app.settings.trust.pinned', {count: Object.keys(record.files).length})} · ${record.path}`"
+                <SettingsList
+                    :items="records"
+                    :text="row => row.path"
+                    :group="row => t(`app.settings.trust.${row.kind}`)"
+                    :placeholder="t('app.settings.trust.search')"
+                    :empty="t('app.settings.trust.noTrusted')"
+                    :actions="[{id: 'revoke', label: count => t('app.settings.trust.revokeSelected', {count}), icon: 'i-lucide-shield-off', color: 'error',
+                                confirm: count => t('app.settings.trust.revokeConfirm', {count}), run: revoke}]"
                 >
-                    <USwitch
-                        :label="t('app.settings.trust.nested')"
-                        :model-value="record.nested"
-                        @update:model-value="attempt(() => trust.trustFolder(record.path, $event, {trustedAt: record.trustedAt}))"
-                    />
-                    <UButton size="sm" color="error" variant="soft" icon="i-lucide-shield-off" :label="t('app.settings.trust.revoke')" @click="attempt(() => trust.revoke('folders', record.path))"/>
-                </SettingsRow>
-                <SettingsRow v-if="files.length" stacked>
-                    <h3 class="text-xs font-medium text-dimmed">{{ t('app.settings.trust.files') }}</h3>
-                </SettingsRow>
-                <SettingsRow
-                    v-for="record in files"
-                    :key="`file:${record.path}`"
-                    :label="fileNameFromPath(record.path)"
-                    :description="[trustedAt(record.trustedAt), record.path, record.coveredBy && t('app.settings.trust.alsoTrustedBy', {folder: record.coveredBy})].filter(Boolean).join(' · ')"
-                >
-                    <UButton size="sm" color="error" variant="soft" icon="i-lucide-shield-off" :label="t('app.settings.trust.revoke')" @click="attempt(() => trust.revoke('files', record.path))"/>
-                </SettingsRow>
+                    <template #row="{item}">
+                        <div class="text-sm text-default truncate">{{ fileNameFromPath(item.path) }}</div>
+                        <div class="text-xs text-muted truncate" :title="item.detail">{{ item.detail }}</div>
+                    </template>
+                    <template #actions="{item}">
+                        <USwitch
+                            v-if="item.kind === 'folders'"
+                            :label="t('app.settings.trust.nested')"
+                            :model-value="item.nested"
+                            @update:model-value="attempt(() => trust.trustFolder(item.path, $event, {trustedAt: item.trustedAt}))"
+                        />
+                        <UButton size="sm" color="error" variant="soft" icon="i-lucide-shield-off" :label="t('app.settings.trust.revoke')" @click="revoke([item])"/>
+                    </template>
+                </SettingsList>
             </SettingsSection>
         </div>
     </SettingsScrollLayout>

@@ -1024,6 +1024,32 @@ Denies the trust_pin command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-trust-revoke`
+
+</td>
+<td>
+
+Enables the trust_revoke command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-trust-revoke`
+
+</td>
+<td>
+
+Denies the trust_revoke command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-trust-set`
 
 </td>

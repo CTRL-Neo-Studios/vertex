@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "trust_get",
     "trust_set",
+    "trust_revoke",
     "trust_clear",
     "trust_move",
     "trust_follow_edit",

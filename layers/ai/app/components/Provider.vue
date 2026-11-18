@@ -4,7 +4,7 @@ import {useAiConfig} from "../lib/useAiConfig";
 import {useAiModels} from "../lib/useAiModels";
 import {useNotify} from "../lib/notify";
 import {aiClient} from "../lib/aiClient";
-import {SettingsRow, SettingsScrollLayout, SettingsSection} from "~/plugin/ui";
+import {SettingsList, SettingsRow, SettingsScrollLayout, SettingsSection} from "~/plugin/ui";
 
 /** One provider: name, base URL, its keychain key (write-only) and the models enabled on it. */
 const props = defineProps<{ id: string }>()
@@ -125,33 +125,31 @@ const removeConfirm = (count: number) => t('plugins.ai.providers.removeModelsCon
                 </SettingsRow>
             </SettingsSection>
 
-            <div class="flex items-end gap-2">
-                <div class="flex-1 min-w-0">
-                    <h2 class="text-sm font-semibold text-highlighted">{{ t('plugins.ai.providers.models') }}</h2>
-                    <p class="text-xs text-muted">{{ t('plugins.ai.providers.modelsDescription', {count: models.length}) }}</p>
-                </div>
-                <UButton size="sm" color="neutral" variant="outline" icon="i-lucide-list-plus" :label="t('plugins.ai.providers.addModels')" @click="adding = true"/>
-            </div>
-            <AiList
-                v-model:query="modelQuery"
-                :items="models"
-                :text="modelText"
-                :placeholder="t('plugins.ai.providers.searchModels')"
-                :empty="t('plugins.ai.providers.noEnabledModels')"
-                :confirm="removeConfirm"
-                @remove="removeModels"
-            >
-                <template #row="{item}">
-                    <div class="text-sm truncate">{{ item.name ?? item.id }}</div>
-                    <div v-if="item.name" class="text-xs text-muted font-mono truncate">{{ item.id }}</div>
+            <SettingsSection :title="t('plugins.ai.providers.models')" :description="t('plugins.ai.providers.modelsDescription', {count: models.length})">
+                <template #actions>
+                    <UButton size="xs" color="neutral" variant="outline" icon="i-lucide-list-plus" :label="t('plugins.ai.providers.addModels')" @click="adding = true"/>
                 </template>
-                <template #actions="{item}">
-                    <AiModelBadges :model="item"/>
-                    <UTooltip :text="t('plugins.ai.providers.removeModel')">
-                        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('plugins.ai.providers.removeModel')" @click="removeModels([item.id])"/>
-                    </UTooltip>
-                </template>
-            </AiList>
+                <SettingsList
+                    v-model:query="modelQuery"
+                    :items="models"
+                    :text="modelText"
+                    :placeholder="t('plugins.ai.providers.searchModels')"
+                    :empty="t('plugins.ai.providers.noEnabledModels')"
+                    :actions="[{id: 'remove', label: count => t('plugins.ai.list.removeSelected', {count}), icon: 'i-lucide-trash-2', color: 'error',
+                                confirm: removeConfirm, run: items => removeModels(items.map(m => m.id))}]"
+                >
+                    <template #row="{item}">
+                        <div class="text-sm truncate">{{ item.name ?? item.id }}</div>
+                        <div v-if="item.name" class="text-xs text-muted font-mono truncate">{{ item.id }}</div>
+                    </template>
+                    <template #actions="{item}">
+                        <AiModelBadges :model="item"/>
+                        <UTooltip :text="t('plugins.ai.providers.removeModel')">
+                            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('plugins.ai.providers.removeModel')" @click="removeModels([item.id])"/>
+                        </UTooltip>
+                    </template>
+                </SettingsList>
+            </SettingsSection>
 
             <AiAddModelsModal v-if="provider" v-model:open="adding" :provider/>
         </div>
