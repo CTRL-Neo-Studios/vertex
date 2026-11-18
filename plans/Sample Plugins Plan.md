@@ -230,7 +230,7 @@ Written with what the Settings Plan built (`plans/Settings Plan.md`): rows and s
 
 ## S4 and S5: Tasks
 
-One plugin with a plan of its own (`plans/Tasks Plan.md`, T0 to T8; the user, 18 Nov): `.task` files in the user's
+One plugin with a plan of its own (`plans/Tasks Plan.md`, T0 to T10; the user, 18 Nov): `.task` files in the user's
 Tasks format (`@type32/tasks`) shown as a list, a board, a calendar and a timeline, the workspace's notes that are
 tasks, iCalendar, alerts. It takes S4's place (first planned as a `.board` file: a file type with New, a viewer that
 loads text, a link extractor) and S5's (first planned as a Bases calendar: `requires`, `ctx.use('bases')`), whose
@@ -240,7 +240,7 @@ point it keeps: its calendar and timeline are Bases layouts.
 - The Tasks Plan's phases.
 
 ### Acceptance
-- [ ] The Tasks Plan's T0 to T8 accepted.
+- [ ] The Tasks Plan's T0 to T10 accepted.
 
 ## S6: Navigator
 

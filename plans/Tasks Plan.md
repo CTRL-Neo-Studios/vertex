@@ -76,7 +76,8 @@ flowchart LR
   T0 --> T3["T3 Calendar"] --> T4["T4 Timeline"]
   T1 --> T3
   T2 --> T5["T5 The workspace's tasks"]
-  T4 --> T5 --> T6["T6 iCalendar, alerts"] --> T7["T7 Bases layouts"] --> T8["T8 Release"]
+  T4 --> T5 --> T6["T6 iCalendar, alerts"] --> T7["T7 Bases layouts"] --> T8["T8 Plugin windows"]
+  T8 --> T9["T9 Tools for the AI"] --> T10["T10 Release"]
 ```
 
 ## Format 1.1
@@ -106,7 +107,8 @@ first open questions, 2 to 4.
 ## Gaps
 
 Found by reading, before anything is written. T0 closed the first two (checked: a `CalendarDateTime` of another copy
-of the package is not one to Reka's `isCalendarDateTime`, of Vertex's copy it is); T6 closes the others.
+of the package is not one to Reka's `isCalendarDateTime`, of Vertex's copy it is); T6 closed the next two. The last
+two were asked for by the user after T6 and read then; T8 and T9 close them.
 
 | What's missing | Who needs it | Today |
 | --- | --- | --- |
@@ -114,6 +116,8 @@ of the package is not one to Reka's `isCalendarDateTime`, of Vertex's copy it is
 | Nuxt UI's components by import | A plugin that uses a component library built on Nuxt UI | Closed in T0. The preset refused every `@nuxt/ui` import but `/composables`: components were the host's, by name only. |
 | Reading and writing a file picked in a dialog | Import and export (iCalendar) | `ctx.dialogs.open` and `save` return a path that "is this window's to read or write", and a community plugin has nothing to do either with: the core plugins that export (Canvas, Bases) import Tauri's fs. |
 | Notifications | Alerts | Nothing in the contract. The kernel has the permission and the Tauri plugin. |
+| A window of a plugin's own | A plugin with something to keep in view beside the workspace (Tasks' list, a timer, a preview) | Nothing in the contract: `ctx.window` says the kind and the label of the window the plugin runs in, `ctx.settings.open` opens Settings, and that's all. Only the kernel makes windows (`window_open` in `windows.rs`: a session's, Settings, About), and since the Window Permissions Plan no webview may create one (a label carries its grant). A manifest's `windows` says which of Vertex's kinds the plugin runs in, not windows of its own. |
+| Tools for the AI | A plugin whose data a chat should read or change (tasks, a base, a board) | `ctx.use('ai')` gives models and Features (`resolveFeature`, `registerFeature`); a plugin can call a model, not be called by one. Chat's tools are a fixed set (`layers/chat/app/lib/tools.ts`, `chatTools`), and `ctx.use('chat')` has one member, `chatsInWorkspace`. |
 
 Not gaps, checked: `ctx.use('bases')` is typed for a community plugin (Bases is core); a viewer gets its file's text
 and saves it; `session.files.edit` writes notes as one undo step; a plugin's dialog draws since the Navigator Plan.
@@ -525,12 +529,70 @@ In the library, then in the plugin.
 - [ ] The layouts are offered in a `.base` file and in a ` ```base ` block; with Bases off, the plugin runs without them.
 - [ ] Changing a note's date moves it on the calendar without reopening the base; dragging it changes the note.
 
-## T8: Release
+## T8: Plugin windows
+
+The design is mine, from the Window Permissions Plan's rules (Rust opens every window, a label carries its grant,
+nothing is taken from what a webview says); Open question 4 is what's yours in it.
+
+### Change
+- **Vertex, the manifest:** `ownWindows`, the windows a plugin may open: `[{id, width, height, minWidth?,
+  minHeight?, resizable?}]`. Rust reads them from the manifest, so it can refuse an id the plugin never declared, and
+  the install dialog can say "opens windows of its own".
+- **Vertex, the kernel:** a fifth kind of window, `plugin`. `WindowRequest::Plugin {plugin, id}` from a session
+  window where that plugin is on: label `plugin-<plugin>-<id>-<session>` (one per id and session; asked again, it
+  comes forward), route `/plugin-window/<plugin>/<id>`. Its grant: the windows' shared base, the owning plugin's
+  `permissions`, and nothing of a session's (no files, no kernel commands but the ones below). It closes with the
+  session window that opened it.
+- **Vertex, the contract:** `ctx.windows.define({id, title, component | mount})` (drawn in the window, in the
+  plugin's error boundary, with the theme, the language and Vertex's title bar); `ctx.windows.open(id, {params?})` →
+  a handle: `focus()`, `close()`, `closed` (a promise), `post(message)`, `on(fn)`; `ctx.windows.isOpen(id)`. The
+  component gets `WindowProps`: `params`, `channel` (`post`, `on`: JSON to and from the plugin's instance in the
+  opening window, and no other plugin's), and `window` (`setTitle`, `setSize`, `setAlwaysOnTop`, `close`).
+- **No session in it.** Only the owning plugin runs there (kind `plugin`), `onSession` doesn't run, and there is no
+  index: a webview can't share another's, and building one per window is a second scan of the workspace. What the
+  window shows comes over its channel from the session window, which also does the work (writes, opening a tab).
+- Docs (`context.md`, `package.md`, `ui.md`), the SDK's types, `versions.md`; tests: the request's plan (an unknown
+  plugin, an undeclared id, a plugin that's off: refused), the kind's grant.
+- **Plugin:** Open Tasks in a window (palette): the panel's Overdue, Today and Upcoming in a small window that can
+  stay on top. The session window sends it the list as it changes; a tick or a click goes back, and is done there.
+
+### Acceptance
+- [ ] The window opens from the command, drawn themed; asked again it comes forward; it closes with its session
+  window.
+- [ ] From inside it, each refused: a file read, a session's kernel command, a window for an id the manifest lacks.
+- [ ] A task ticked in the window is done in its file; one added in the session window shows in the window.
+
+## T9: Tools for the AI
+
+### Change
+- **Vertex:** `registerTool(def)` on the chat plugin's API (`ctx.use('chat')`, typed in the SDK as Bases' is):
+  `{name, label, description, inputSchema, writes?, execute(input, {session, signal})}`. `inputSchema` is JSON
+  Schema; `execute` returns JSON. The model sees it as `<plugin id>_<name>`; its card in the chat names the plugin.
+  - Found through chat's tool search (`FIND_TOOLS`), as chat's own lesser tools are, so plugins' tools don't grow
+    every prompt.
+  - A tool with `writes` follows the chat's mode as chat's own do: refused outside Write (`modeError`), and asked
+    for approval there (`needsApproval`). One without runs in every mode.
+  - What it returns is cut at the size a note read is (`NOTE_READ_CHARS`); what it throws goes to the model as
+    `{error}`. It's gone when its plugin stops.
+- Docs (`context.md`, Other plugins), `versions.md`; tests: a registered tool in the set and in the search, the mode
+  rule, the cut, removal.
+- **Plugin:** `requires` gains `"chat?"`. Three tools over what T5 and T6 built (`workspaceTasks`, `addTask`):
+  `tasks_list` (the workspace's open tasks; by text, by due range, by file), `tasks_add` (a title, Do, Due, notes;
+  into the inbox file; `writes`), `tasks_update` (complete, reopen, retitle, move its dates; `writes`).
+
+### Acceptance
+- [ ] In a chat, "what's due this week?" is answered from `.task` files and task notes by the plugin's tool, its
+  card naming Tasks.
+- [ ] In Write mode, "add Call Ann tomorrow at 9" asks first, then the task is in the inbox file; in Read mode the
+  tool refuses and nothing is written.
+- [ ] With Chat off the plugin runs without its tools; turned off, its tools are gone from the next reply.
+
+## T10: Release
 
 ### Change
 - The library published by the user; the plugin on the published library and SDK, released from its workflow.
-- Strings in `en` and `zh-CN`; `README.md` for both; the author docs for what T0 and T6 added to the contract;
-  `Concepts and Structures.md`; SMOKE rows.
+- Strings in `en` and `zh-CN`; `README.md` for both; the author docs for what T0, T6, T8 and T9 added to the
+  contract; `Concepts and Structures.md`; SMOKE rows.
 - The Sample Plugins Plan's S4 and S5 ticked with what this plan built.
 
 ### Acceptance
@@ -558,3 +620,11 @@ In the library, then in the plugin.
 3. **Tasks without a list in a filtered view** (T3, Noticed). The format's `listIds` shows only tasks in those lists,
    so a calendar with one list switched off hides every task without a list. A view key for them (say
    `withoutList: true`) would be the format's to add, in a minor.
+4. **What a plugin's window may reach** (T8). Planned: nothing of the workspace; it draws what the session window
+   sends it and asks that window to act. That keeps a new kind of window from being a second way to the files, and
+   costs each plugin a channel to write. The other way is a window with its workspace (its own index, the session's
+   file reach): simpler for the plugin, a second scan of the workspace per window, and a wider grant. Also yours: a
+   window that outlives its session window (a global one, opened from the start page) isn't planned.
+5. **Where a plugin's tools show** (T9). Planned: in chats only, through chat's tool search. The inline assistant
+   (`ai-assistant`) and workflows have no tool sets today (only `layers/chat` builds one); giving them plugins'
+   tools would be a phase of theirs.
