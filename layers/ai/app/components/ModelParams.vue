@@ -45,6 +45,7 @@ function saveExtra() {
 }
 </script>
 
+<!-- settings-index: off -->
 <template>
     <SettingsSection
         :title="t('plugins.ai.models.params.title')"

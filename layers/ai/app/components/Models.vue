@@ -46,6 +46,7 @@ const actions = (p: AiModelProfile): DropdownMenuItem[][] => [
 ]
 </script>
 
+<!-- settings-index: /settings/ai/models -->
 <template>
     <SettingsScrollLayout :title="t('plugins.ai.models.title')" v-if="ai" global-only>
         <template #header-trailing>

@@ -73,6 +73,10 @@
 			"title": "设置",
 			"resetSection": "恢复默认",
 			"info": "详细说明",
+			"search": {
+				"placeholder": "搜索设置",
+				"noResults": "没有匹配的设置。"
+			},
 			"list": {
 				"selectAll": "全选显示的项",
 				"filter": "筛选",

@@ -70,6 +70,7 @@ const untrusted = computed(() => props.config.root !== null && (props.config.ove
 const featureKeys = [FEATURES]
 </script>
 
+<!-- settings-index: /settings/ai/features -->
 <template>
     <SettingsScrollLayout :title="t('plugins.ai.features.title')">
         <div class="space-y-4">
@@ -116,6 +117,7 @@ const featureKeys = [FEATURES]
                 </SettingsRow>
                 <template v-for="feature in features" :key="feature.id">
                     <SettingsRow
+                        data-no-index
                         :setting="config.path(path(feature.id))"
                         :label="t(feature.label)"
                         :description="t(feature.description)"

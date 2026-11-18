@@ -243,7 +243,8 @@ The component gets `SettingsPageProps`: `path` (the route below the page: `/sett
 with `SettingsScrollLayout`, `SettingsSection` and `SettingsRow` ([UI](ui.md#vertexs-components)) so it looks and
 behaves like Vertex's pages: Settings lays the page out (the plugin's icon, the schema), and the page's
 `SettingsScrollLayout` draws inside it, its `title` and header buttons in the page's header. `children` adds
-sub-entries to the nav (`{label, icon, path}`); `icon` defaults to the manifest's.
+sub-entries to the nav (`{label, icon, path}`); `icon` defaults to the manifest's. Settings search finds the plugin
+by name, the page and its sub-entries by their labels, and the schema's fields; not the rows the page draws itself.
 
 ### `ctx.settings.open`
 

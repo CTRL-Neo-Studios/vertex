@@ -8,7 +8,8 @@ import {useSettingsScope} from "~/composables/app/useSettingsScope";
  * width, and without a `label` the content alone. A section's content is rows, so every one has the same padding.
  * The description is one line (cut, with the whole as its tooltip); `info` holds what takes more. With `setting`, it
  * follows the Settings window's scope: in a workspace, a setting it can't override is disabled ("Global only"), and
- * an overridden one says so with a button back to the global value. Published to plugins (`SettingsRowProps`).
+ * an overridden one says so with a button back to the global value. Its label is its anchor (`data-settings-label`):
+ * Settings search finds a result's row by it. Published to plugins (`SettingsRowProps`).
  */
 const props = defineProps<SettingsRowProps>()
 const scope = useSettingsScope()
@@ -18,7 +19,7 @@ const overridden = computed(() => setting.value !== undefined && scope.overridde
 </script>
 
 <template>
-    <div class="px-4 py-2.5" :class="stacked ? 'space-y-2' : 'flex items-center gap-4 min-h-12'" data-settings-row>
+    <div class="px-4 py-2.5 rounded-md transition-shadow" :class="stacked ? 'space-y-2' : 'flex items-center gap-4 min-h-12'" data-settings-row :data-settings-label="label">
         <!-- Beside the control, or over it: the same head either way. -->
         <div v-if="label || !stacked" :class="stacked ? 'flex items-center gap-4' : 'contents'">
             <UIcon v-if="icon" :name="icon" class="size-5 shrink-0 text-muted"/>

@@ -61,6 +61,7 @@ async function remove() {
 }
 </script>
 
+<!-- settings-index: off -->
 <template>
     <SettingsScrollLayout v-if="ai" :title="profile ? profile.name || t('plugins.ai.models.unnamed') : t('plugins.ai.models.title')" global-only>
         <template #header-leading>

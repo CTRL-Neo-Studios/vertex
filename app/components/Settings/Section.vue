@@ -12,7 +12,7 @@ defineEmits<SettingsSectionEmits>()
 </script>
 
 <template>
-    <section class="rounded-lg ring ring-default bg-default">
+    <section class="rounded-lg ring ring-default bg-default transition-shadow" :data-settings-title="title">
         <header class="flex items-center gap-2 px-4 pt-3 pb-1">
             <div class="flex-1 min-w-0">
                 <h2 class="text-sm font-semibold text-highlighted flex items-center gap-1.5">

@@ -52,6 +52,7 @@ const KIND_COLORS = {missing: 'info', bug: 'error', confusing: 'warning'} as con
 const when = (at: number) => new Date(at).toLocaleString(locale.value)
 </script>
 
+<!-- settings-index: /settings/chat -->
 <template>
     <SettingsScrollLayout :title="t('plugins.chat.settings.nav')">
         <div class="space-y-4">

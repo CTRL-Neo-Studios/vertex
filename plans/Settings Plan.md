@@ -249,10 +249,19 @@ Report 6.
 - Matching is over the UI language's strings and English, so a setting is found by either name.
 
 ### Acceptance
-- [ ] "font" finds Theme's font rows; "trash" finds Files' deleted-files row; "graph" finds the plugin and its fields; "字体" finds the fonts in zh-CN.
-- [ ] A result opens its page scrolled to its row, in the scope being edited.
-- [ ] The build fails on a `SettingsRow` whose label the module can't read and that doesn't opt out.
-- [ ] A plugin that's off isn't found by its settings, only by its row on Plugins.
+- [x] "font" finds Theme's font rows; "trash" finds Files' deleted-files row; "graph" finds the plugin and its fields; "字体" finds the fonts in zh-CN. (In `tauri dev` with the graph installed: "font" gave Theme's Fonts section and its four rows; "trash" gave View → Files → Deleted files (by its info, "the Trash…") with Workflows' Ask before trashing; "graph" gave Graph on Plugins and the graph's ten fields; with the UI in zh-CN, "字体" gave 主题's 字体 and its four rows, and "font" (English) the same.)
+- [x] A result opens its page scrolled to its row, in the scope being edited. ("Editor" under Fonts opened Theme with that row ringed and in view, the query gone from the URL and the field; with real keys, ⌘F, "trash", ↓ and Enter opened View at Deleted files; "zzq" said "No settings match."; Esc cleared the field and brought back the nav and the scope. The scope isn't touched: navigation keeps `useSettingsScope`'s.)
+- [x] The build fails on a `SettingsRow` whose label the module can't read and that doesn't opt out. (A scratch component in Chat's layer with `:label="label"`: `nuxt prepare` stopped with "[settings-index] Settings search can't read these … layers/chat/app/components/ZzIndex.vue:5 (a row's label)"; `modules/lib/settingsIndex.test.ts` holds the reading.)
+- [x] A plugin that's off isn't found by its settings, only by its row on Plugins. (Canvas turned off: "canvas" gave its row on Plugins only; on, also its two fields. `app/utils/settingsSearch.test.ts` holds the rule.)
+
+### As built
+
+- **The index:** `modules/settings-index.ts` writes `#build/settings-index.mjs` (`settingsIndex`), checked at startup and rebuilt on a page's change (`builder:watch`, `updateTemplates`); the reading is `modules/lib/settingsIndex.ts` (`@vue/compiler-sfc`'s template AST). Entries `{page, title, section?, label, description?, info?, kernel}` as keys or plain text. Vertex's pages are `app/pages/settings/*.vue` at their file routes; a core plugin's component with rows says its route in `<!-- settings-index: /settings/… -->` (`off` for AI's item pages: Model, ModelParams, Provider). A label is read as `t('key')` (or `$t`, with params), plain text, or `` t(`prefix.${v}`) `` in a `v-for` over a `const` array of strings in the same file (View's toggles, Git's commit keys; Theme's fonts were rewritten from a computed list to that). Rows drawn from data opt out with `data-no-index`: AI's features, Git's tokens; the schema page's rows are in `Settings/PluginPage.vue`, which isn't read (fields are added from the manifests). Kernel components aren't read: a row added in one isn't indexed until a page draws it.
+- **The search** (`layouts/settings.vue`): `UCommandPalette` above the scope select; while there's a query its results (grouped by page) replace the nav and the scope select (hidden, not moved under the results). Matched on `label`, `suffix` (the section, else the description) and `also`: the English texts, the info, and the page's title (so "graph" lists the graph's fields: its name is their page's title). `app/utils/settingsSearch.ts` builds the groups: the index (a plugin page's entries while the plugin registers it), registered pages and sub-entries, schema fields of the plugins on in the scope, every plugin by name (`/settings/plugins?q=`; the Plugins page keeps its search in the URL now).
+- **Anchors:** `SettingsRow` carries `data-settings-label`, `SettingsSection` `data-settings-title`; a result opens `?find=<text>&in=<section>`, and the layout waits for the page (up to 3 s), scrolls, rings it for 1.6 s, and drops the query.
+- **Found:** the palette's template ref's `$el` isn't its root element (⌘F threw "querySelector is not a function", with real keys); the shortcut finds the input by `[data-settings-search] input`. And `v-show` on `UNavigationMenu` didn't hide it: it's wrapped in a `div`. The focused field's top was cut off (reported by the user): the sidebar's scroll area clips at its top edge, and the sticky header started there; the header has `pt-1` now (checked in the app, focused, at full size).
+- **Strings:** `app.settings.search.placeholder`, `noResults` (en, zh-CN).
+- **Numbers:** 379 tests (57 files); typecheck unchanged.
 
 ## U8: Close
 

@@ -132,7 +132,12 @@ const rows = computed<Row[]>(() => {
 const anyBlocked = computed(() => rows.value.some(row => row.group !== 'workspace' && row.waitsForTrust))
 const pending = computed(() => (scope.root.value ? workspacePlugins().filter(p => p.manifest && !p.listed.accepted) : []))
 
-const query = ref('')
+// The search lives in the URL: Settings search opens a plugin's row with `?q=<name>`.
+const $route = useRoute()
+const query = computed({
+    get: () => (typeof $route.query.q === 'string' ? $route.query.q : ''),
+    set: q => void navigateTo({query: {...$route.query, q: q || undefined}}, {replace: true}),
+})
 const filter = ref('all')
 const filters = computed<SettingsListFilter<Row>[]>(() => [
     {id: 'all', label: t('app.settings.plugins.filter.all')},

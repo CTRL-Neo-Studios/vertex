@@ -73,6 +73,10 @@
 			"title": "Settings",
 			"resetSection": "Reset to defaults",
 			"info": "More about this",
+			"search": {
+				"placeholder": "Search settings",
+				"noResults": "No settings match."
+			},
 			"list": {
 				"selectAll": "Select all shown",
 				"filter": "Filter",

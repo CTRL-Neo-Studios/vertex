@@ -11,7 +11,7 @@ export default defineConfig({
         },
     },
     test: {
-        include: ['{app,shared}/**/*.test.ts', 'layers/*/{app,shared}/**/*.test.ts', 'packages/*/src/**/*.test.ts'],
+        include: ['{app,shared,modules}/**/*.test.ts', 'layers/*/{app,shared}/**/*.test.ts', 'packages/*/src/**/*.test.ts'],
         passWithNoTests: true,
     },
 })

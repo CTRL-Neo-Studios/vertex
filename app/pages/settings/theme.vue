@@ -17,13 +17,6 @@ const COLOR_KEYS: (keyof AppThemeConfig)[] = ['primaryColor', 'neutralColor', 'b
 const SHAPE_KEYS: (keyof AppThemeConfig)[] = ['roundedRadius']
 const FONT_KEYS = ['appFont', 'appMonoFont', 'editorFont', 'editorMonoFont'] as const
 
-const fonts = computed(() => FONT_KEYS.map(key => ({
-    key,
-    label: t(`app.settings.theme.${key}`),
-    description: t(`app.settings.theme.${key}Description`),
-    monospace: key.endsWith('MonoFont'),
-})))
-
 // Saved when the editor loses focus or on ⌘S, not per keystroke; follows the scope (and other windows) otherwise.
 const CSS = 'advancedThemeConfig.customCss' as const
 const css = ref('')
@@ -72,13 +65,19 @@ const cssOff = computed(() => scope.root.value !== null && scope.overridden(CSS)
             </SettingsSection>
 
             <SettingsSection :title="t('app.settings.theme.fonts')" :dirty="isDirty([...FONT_KEYS])" @reset="reset([...FONT_KEYS])">
-                <SettingsRow v-for="font in fonts" :key="font.key" :setting="`themeConfig.${font.key}`" :label="font.label" :description="font.description">
+                <SettingsRow
+                    v-for="key in FONT_KEYS"
+                    :key
+                    :setting="`themeConfig.${key}`"
+                    :label="t(`app.settings.theme.${key}`)"
+                    :description="t(`app.settings.theme.${key}Description`)"
+                >
                     <SettingsThemeFontPicker
-                        :model-value="theme[font.key]"
-                        :monospace="font.monospace"
-                        :default-value="defaults[font.key]"
-                        :aria-label="font.label"
-                        @update:model-value="update({ [font.key]: $event })"
+                        :model-value="theme[key]"
+                        :monospace="key.endsWith('MonoFont')"
+                        :default-value="defaults[key]"
+                        :aria-label="t(`app.settings.theme.${key}`)"
+                        @update:model-value="update({ [key]: $event })"
                     />
                 </SettingsRow>
             </SettingsSection>

@@ -44,6 +44,7 @@ const intervals = computed(() => [0, 5, 15, 30, 60].map(minutes => ({
 const untrusted = computed(() => props.config.root !== null && props.config.overridden(AUTO) && !props.config.trusted)
 </script>
 
+<!-- settings-index: /settings/git -->
 <template>
     <SettingsScrollLayout :title="t('plugins.git.settings.title')">
         <div class="space-y-4">
@@ -99,6 +100,7 @@ const untrusted = computed(() => props.config.root !== null && props.config.over
                 data-git-tokens
             >
                 <SettingsRow
+                    data-no-index
                     v-for="token in tokens"
                     :key="token.host"
                     :label="token.host"

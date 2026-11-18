@@ -33,6 +33,7 @@ async function add() {
 const text = (p: AiProviderProfile) => `${p.name} ${p.baseURL}`
 </script>
 
+<!-- settings-index: /settings/ai/providers -->
 <template>
     <SettingsScrollLayout :title="t('plugins.ai.providers.title')" v-if="ai" global-only>
         <template #header-trailing>

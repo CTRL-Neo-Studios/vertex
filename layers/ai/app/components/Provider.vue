@@ -86,6 +86,7 @@ const modelText = (m: AiModelInfo) => `${m.name ?? ''} ${m.id}`
 const removeConfirm = (count: number) => t('plugins.ai.providers.removeModelsConfirm', {count})
 </script>
 
+<!-- settings-index: off -->
 <template>
     <SettingsScrollLayout v-if="ai" :title="provider ? provider.name || t('plugins.ai.providers.unnamed') : t('plugins.ai.providers.title')" global-only>
         <template #header-leading>

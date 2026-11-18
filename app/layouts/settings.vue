@@ -12,19 +12,21 @@ import {scopeEntries} from "~/utils/plugins/catalog";
 import {contributionPlugin} from "~/utils/plugins/runtime";
 import {settingsPages} from "~/utils/contributions";
 import {pluginNavGroups} from "~/utils/settingsNav";
+import {settingsSearchGroups} from "~/utils/settingsSearch";
+import {settingsIndex} from "#build/settings-index.mjs";
+import {platform} from "@tauri-apps/plugin-os";
 
-const {t, locale} = useI18n()
+const {t, te, locale} = useI18n()
 const $route = useRoute()
 const scope = useSettingsScope()
 const {appSessions} = useAppSessions()
 
+const navPages = computed(() => [...settingsPages.items.values()].map(def => ({def, owner: contributionPlugin(def)})))
+const navPlugins = computed(() => scopeEntries().map(entry => ({entry, on: pluginEnabled(entry.manifest, scope.effective.value?.plugins.enabled ?? {})})))
+
 /** Vertex's own pages, then Core plugins and Community plugins (`pluginNavGroups`), each group under its heading. */
 const links = computed<NavigationMenuItem[][]>(() => {
-    const {core, community} = pluginNavGroups(
-        [...settingsPages.items.values()].map(def => ({def, owner: contributionPlugin(def)})),
-        scopeEntries().map(entry => ({entry, on: pluginEnabled(entry.manifest, scope.effective.value?.plugins.enabled ?? {})})),
-        {t, locale: locale.value, base: Routes.settings, path: $route.path},
-    )
+    const {core, community} = pluginNavGroups(navPages.value, navPlugins.value, {t, locale: locale.value, base: Routes.settings, path: $route.path})
     return [
         [
             {label: t('app.settings.nav.about'), icon: 'i-lucide-info', to: Routes.settings},
@@ -61,6 +63,36 @@ onMounted(async () => {
     unlisten.push(await window.listen<string | null>(SETTINGS_SCOPE_EVENT, e => choose(e.payload)))
     unlisten.push(await window.listen<string>(SETTINGS_ROUTE_EVENT, e => void navigateTo(e.payload)))
 })
+
+/**
+ * Settings search (Settings Plan, U7): while there's a query, its results replace the nav, grouped by page and matched
+ * in the UI's language and in English. ⌘F focuses it; Esc clears it; Enter opens the highlighted result.
+ */
+const term = ref('')
+const mod = platform() === 'macos' ? '⌘' : 'Ctrl'
+const translate = (key: string, english = false) => (te(key, english ? 'en' : undefined) ? t(key, {mod}, english ? {locale: 'en'} : {}) : key)
+const searchGroups = computed(() => (term.value.trim()
+    ? settingsSearchGroups(settingsIndex, {t: key => translate(key), en: key => translate(key, true), pages: navPages.value, plugins: navPlugins.value, base: Routes.settings})
+        .map(group => ({...group, items: group.items.map(item => ({...item, onSelect: () => (term.value = '')}))}))
+    : []))
+defineShortcuts({meta_f: () => document.querySelector<HTMLInputElement>('[data-settings-search] input')?.focus()})
+
+/** A result opened its page with `find` (and `in`, its section): that row, or section, scrolled to and marked. */
+watch(() => [$route.path, $route.query.find, $route.query.in], async ([, find, within]) => {
+    if (typeof find !== 'string') return
+    const selector = (attr: string, text: string) => `[${attr}=${JSON.stringify(text)}]`
+    let target: Element | null = null
+    for (let tries = 0; tries < 40 && !target; tries++) {
+        const scopeEl = typeof within === 'string' ? document.querySelector(selector('data-settings-title', within)) : document
+        target = scopeEl?.querySelector(selector('data-settings-label', find)) ?? document.querySelector(selector('data-settings-title', find))
+        if (!target) await new Promise(r => setTimeout(r, 75))
+    }
+    void navigateTo({path: $route.path, query: {...$route.query, find: undefined, in: undefined}}, {replace: true})
+    if (!target) return
+    target.scrollIntoView({block: 'center', behavior: 'smooth'})
+    target.classList.add('ring-2', 'ring-primary')
+    setTimeout(() => target.classList.remove('ring-2', 'ring-primary'), 1600)
+}, {immediate: true})
 </script>
 
 <template>
@@ -73,8 +105,24 @@ onMounted(async () => {
 
                 <div class="w-full flex-1 min-h-0 overflow-y-auto px-4 pb-12">
                     <!-- The scope stays at the top; the nav fades out under it as it scrolls, as a note does under its header. -->
-                    <div class="sticky top-0 z-10 bg-submuted pb-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-6 after:bg-linear-to-b after:from-submuted after:to-transparent">
-                        <UFormField :label="t('app.settings.scope.label')" size="xs">
+                    <!-- `pt-1`: the scroll area clips at its top edge, and the focused field's ring sits outside its border. -->
+                    <div class="sticky top-0 z-10 bg-submuted pt-1 pb-1 space-y-2 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-6 after:bg-linear-to-b after:from-submuted after:to-transparent">
+                        <UCommandPalette
+                            v-model:search-term="term"
+                            :groups="searchGroups"
+                            :autofocus="false"
+                            :placeholder="t('app.settings.search.placeholder')"
+                            :fuse="{fuseOptions: {keys: ['label', 'suffix', 'also'], ignoreLocation: true, threshold: 0.2}, resultLimit: 50, matchAllWhenSearchEmpty: false}"
+                            :input="{size: 'sm', variant: 'soft'}"
+                            :ui="{root: 'bg-transparent divide-y-0', input: '[&>input]:h-8 border-0 px-0', content: term ? 'max-h-[calc(100vh-11rem)] overflow-y-auto' : 'hidden', group: 'p-0', item: 'px-1.5'}"
+                            data-settings-search
+                            @keydown.esc="term = ''"
+                        >
+                            <template #empty>
+                                <p class="py-3 text-xs text-muted text-center">{{ t('app.settings.search.noResults') }}</p>
+                            </template>
+                        </UCommandPalette>
+                        <UFormField v-show="!term" :label="t('app.settings.scope.label')" size="xs">
                             <UTooltip :text="t('app.settings.scope.help')" :delay-duration="100" :content="{side: 'right'}">
                                 <USelect
                                     class="w-full"
@@ -87,13 +135,15 @@ onMounted(async () => {
                             </UTooltip>
                         </UFormField>
                     </div>
-                    <UNavigationMenu
-                        class="mt-3"
-                        :items="links"
-                        orientation="vertical"
-                        tooltip
-                        popover
-                    />
+                    <div v-show="!term">
+                        <UNavigationMenu
+                            class="mt-3"
+                            :items="links"
+                            orientation="vertical"
+                            tooltip
+                            popover
+                        />
+                    </div>
                 </div>
             </SplitterPanel>
             <SplitterResizeHandle
