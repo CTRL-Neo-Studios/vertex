@@ -217,22 +217,60 @@ on it. 64 Rust tests.
 ### Change
 - `startWatcher` gathers the fs plugin's events (100 ms of quiet), then for each batch: `changed`, `session.watch`
   listeners and the settings' reload as now; `describePaths` on the batch's paths (not under a dot name); `planBatch`
-  (W1); one pass: the moves, the removes (one `remove` event each, as now), `addPaths` for the adds, the reads in one
+  (W1); one pass: the moves, the removes (a `remove` event for each outermost item: a folder deleted outside is one
+  event listing what it held, as a delete in Vertex is), `addPaths` for the adds, the reads in one
   `read_text_files_batch` with a `modify` each. Batches apply in order.
 - `handleWatchEvent` and its 100 ms wait for a lone rename go: a rename of case shows as a path whose listed name
   differs.
 - A single-file window: the same, adds nothing (`planBatch`'s `wholeFolder`).
 
 ### Acceptance
-- [ ] The baseline's three rows: the index current within 1 s of the last write, no frame over 200 ms. (The first,
-  rewrites, already is since the four fixes: W0.)
-- [ ] A folder of notes moved in from Finder is indexed with its notes; moved out, gone with them. (In since W1.)
-- [ ] A note renamed outside keeps its tab; a rename of case only is seen; a note edited outside reloads its tab; a
-  file made and deleted within the same second leaves nothing.
-- [ ] Vertex's own save, rename and delete raise no second event from the watch.
-- [ ] A single-file window: its file edited outside reloads, deleted closes the window.
-- [ ] Git's view, the property types and chats stored in the workspace still follow what changes under `.git/`,
-  `.vertex/` and `.obsidian/`.
+- [x] The baseline's three rows: the index current within 1 s of the last write, no frame over 200 ms. (The first,
+  rewrites, already is since the four fixes: W0.) (Below: the slowest 0.85 s from the start of the writes, the
+  longest frame 125 ms.)
+- [x] A folder of notes moved in from Finder is indexed with its notes; moved out, gone with them. (In since W1.)
+  (`mv` from a folder outside: 53 entries, links resolving; out again: none.)
+- [x] A note renamed outside keeps its tab; a rename of case only is seen; a note edited outside reloads its tab; a
+  file made and deleted within the same second leaves nothing. (The shown note renamed with `mv`: one `rename`, its
+  tab still shown. Then to another case through a temporary name, two `mv` within one batch: one `rename`, the tab
+  kept. Rewritten from the shell: the editor showed the new text and properties. `echo x > Blink.md; rm Blink.md`:
+  not in the index.)
+- [x] Vertex's own save, rename and delete raise no second event from the watch. (Logged for 2.5 s after each: the
+  save none, the rename its one `rename`, the delete its one `remove`, the undo its one `create`. Found here: the undo
+  of a delete is a rename out of the trash, which the app marks only at its target, so it also arrived from the
+  watcher as a `modify`. A rename onto a path the app just wrote is now the app's own.)
+- [x] A single-file window: its file edited outside reloads, deleted closes the window. (A file created beside it
+  wasn't indexed.)
+- [x] Git's view, the property types and chats stored in the workspace still follow what changes under `.git/`,
+  `.vertex/` and `.obsidian/`. (A `changed` with `.git/HEAD`, `.obsidian/types.json` and the chat's file, and
+  `watchUnder('.vertex/chats/')` called with the chat's file. What those listeners do with them is unchanged and
+  wasn't run.)
+
+### As built (18 Nov)
+
+- **`startWatcher`** gathers the fs plugin's events: every path for `changed` (the app's own writes too, as before),
+  the rest for the index, a rename's two paths as a pair; `BATCH_QUIET` (100 ms) with none, then `applyBatch`, in
+  order. Its stop clears a waiting batch.
+- **`applyBatch`:** `changed`, `watchUnder` and the settings' reload once a batch; `describePaths`; `planBatch`; the
+  texts of the changed notes in one call; moves, removes and reads with no `await` between; then `addPaths`.
+- **`handleWatchEvent`, `reparse` and the 100 ms wait for a lone rename are gone,** and the fs plugin's `stat` and
+  `readDir` with them.
+- **`planBatch`** follows renames chained in one batch (`a` → `b` → `c` is one move; and back is none). Found by
+  reading it while checking the case rename, not seen in the app (the fs plugin gave those two `mv` as one rename):
+  the second rename's source wasn't in the index yet, so it was taken for an add. Tested (10 cases).
+- A rename also re-reads its file (a `modify` after the `rename`): the batch names the new path among its changes.
+  Harmless (a tab reloads the same text); not changed.
+
+| From outside, 13,302 entries, DevTools off | W0 | Now |
+| --- | --- | --- |
+| 500 notes rewritten | 20.3 s (0.43 s after the fixes) | 0.42 s from the first write, longest frame 46 ms |
+| 500 notes created in a folder that's there | 41.5 s | 0.5 s, longest frame 119 ms |
+| 500 notes created in a new folder | 45.5 s | 0.43 s, longest frame 125 ms |
+| `rm -rf` of that folder | 25.6 s, frozen throughout | 0.85 s, one `remove`, longest frame 105 ms |
+| Those 500 in a folder that's there deleted one `rm` at a time | not run | 0.8 s, 500 `remove` events, longest frame 105 ms |
+
+The writes themselves took 37 to 70 ms; the rest is the fs plugin's debounce (50 ms), the batch's quiet (100 ms) and
+the batch.
 
 ## W4: Close
 

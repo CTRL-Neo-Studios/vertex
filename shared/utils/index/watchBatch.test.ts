@@ -61,6 +61,13 @@ describe('what a batch of changes does to the index', () => {
             .toEqual({...nothing, moves: [{from: '/v/Note.md', to: '/v/note.md'}]})
     })
 
+    it('renames chained within a batch are one move, and one back where it was is none', () => {
+        expect(plan(['/v/a.md', '/v/x.md'], {renames: [{from: '/v/a.md', to: '/v/b.md'}, {from: '/v/b.md', to: '/v/c.md'}, {from: '/v/x.md', to: '/v/y.md'}, {from: '/v/y.md', to: '/v/x.md'}]}))
+            .toEqual({...nothing, moves: [{from: '/v/a.md', to: '/v/c.md'}]})
+        expect(plan(['/v/a.md'], {renames: [{from: '/v/a.md', to: '/v/b.md'}, {from: '/v/b.md', to: '/v/.trash/b.md'}]}))
+            .toEqual({...nothing, removes: ['/v/a.md']})
+    })
+
     it('a single-file window adds nothing', () => {
         expect(plan(['/v/a.md'], {changes: [there('/v/a.md'), there('/v/other.md')], renames: [{from: '/v/x.md', to: '/v/y.md'}]}, {wholeFolder: false}))
             .toEqual({...nothing, reads: ['/v/a.md']})

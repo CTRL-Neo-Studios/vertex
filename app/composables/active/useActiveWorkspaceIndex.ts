@@ -1,7 +1,7 @@
 import {watch as watchVue, type WatchStopHandle} from "vue";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveWorkspaceFileIndex, ScannedEntry, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
-import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
+import {readTextFile, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
 import {vertexInvoke} from "~/utils/vertexInvoke"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
@@ -11,6 +11,7 @@ import {type ContentParsers, isPropertiesFile, parentPathOf, parseLinkTargets, p
 import {LinkGraph} from "#shared/utils/index/linkGraph";
 import {RecentWrites} from "#shared/utils/index/selfWrites";
 import {getInternalLinks} from "#shared/utils/index/rewriteLinks";
+import {planBatch} from "#shared/utils/index/watchBatch";
 import {stateClient} from "~/utils/stateClient";
 import {linkExtractors} from "~/utils/contributions";
 
@@ -52,6 +53,9 @@ function fileExtOf(fileName: string) {
 }
 
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+
+/** How long the watcher waits with no event before it applies what it gathered (Watcher Plan, W3): a `git checkout` is one batch. */
+const BATCH_QUIET = 100
 
 /**
  * The file index of one session, in both modes. A workspace scans its folder (`buildIndex`); a singlespace
@@ -402,15 +406,6 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         syncAround(node.uuid, before)
     }
 
-    async function reparse(path: string) {
-        if (isUnreadableAsText(getFileExtensionFromPath(path))) return
-        try {
-            await updateIndex(path, await readTextFile(path))
-        } catch (error) {
-            console.error(`[index] could not read ${path}`, error)
-        }
-    }
-
     /** Call right before the app writes a file itself, so the watcher does not re-process it. */
     function markSelfWrite(...paths: string[]) {
         runtime().selfWrites.mark(...paths)
@@ -440,99 +435,86 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         }
     }
 
-    async function handleWatchEvent(event: WatchEvent) {
-        const type = event.type
-        if (typeof type !== 'object' || type === null) return
-        if (event.paths.length === 0 || 'access' in type || 'metadata' in type) return
+    /**
+     * Applies one batch of what changed on disk (Watcher Plan, W3): tells `changed` and `watchUnder` listeners, reloads
+     * the workspace's settings when their file is among the paths, then asks the disk what the paths are now
+     * (`describePaths`), works out what that does to the index (`planBatch`), and does it in one pass: moves and
+     * removes, the changed notes read again in one call (a `modify` each, for open tabs), then what arrived
+     * (`addPaths`). The watcher's word on what kind of change it was isn't trusted (macOS reports a file's recent
+     * events together); only its pairing of a rename's two paths is, which keeps an entry's uuid, and so its tab.
+     */
+    async function applyBatch(seen: Set<string>, paths: Set<string>, renames: { from: string, to: string }[]) {
         const rt = runtime()
-        if (rt.wholeFolder) broadcast({type: 'changed', paths: event.paths})
-        // The workspace's own settings changed on disk (an editor, git, sync): Rust re-reads and broadcasts them.
-        if (rt.wholeFolder && event.paths.includes(`${rt.root}/.vertex/settings.json`)) {
-            void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
-        }
-        if (rt.wholeFolder) for (const {prefix, fn} of rt.folderWatchers) {
-            const under = event.paths.filter(p => relativeOf(p).startsWith(prefix))
-            if (under.length) fn(under)
-        }
-        // Same rule as the initial scan (`scan_directory_recursive`): nothing under a dot-name is indexed, so
-        // `.vertex/` (settings temp files, trash), `.git/` and `.DS_Store` never reach the index.
-        const paths = event.paths.filter(p => !relativeOf(p).split('/').some(part => part.startsWith('.')))
-        if (paths.length === 0) return
-        if ('remove' in type) {
-            for (const path of paths) if (!rt.selfWrites.has(path)) removeFileFromIndex(path)
-            return
-        }
-
-        if ('create' in type) {
-            if (!rt.wholeFolder) return
-            for (const path of paths) {
-                if (rt.selfWrites.has(path) || unref(fileIndex)[path]) continue
-                await addFileToIndex(path)
+        // What listeners of raw changes get: every path named, the app's own writes too (git, chats, property types).
+        const all = [...seen]
+        if (rt.wholeFolder) {
+            broadcast({type: 'changed', paths: all})
+            // The workspace's own settings changed on disk (an editor, git, sync): Rust re-reads and broadcasts them.
+            if (all.includes(`${rt.root}/.vertex/settings.json`)) {
+                void stateClient.reloadWorkspaceSettings(rt.root).catch(e => console.error('[index] workspace settings', e))
             }
-            return
-        }
-
-        if (!('modify' in type)) return
-        const kind = type.modify.kind
-
-        if (kind === 'rename') {
-            if (paths.length >= 2) {
-                const [oldPath, newPath] = paths as [string, string]
-                if (rt.selfWrites.has(oldPath) && rt.selfWrites.has(newPath)) return
-                if (!unref(fileIndex)[oldPath]) return
-                moveFileInIndex(oldPath, newPath)
-                return
-            }
-            // macOS reports some renames as two single-path events; resolve from disk.
-            const path = paths[0]!
-            if (rt.selfWrites.has(path)) return
-            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- void marks the "no value" settle signal
-            const settled = Promise.withResolvers<void>()
-            setTimeout(settled.resolve, 100)
-            await settled.promise
-            try {
-                await stat(path)
-                const node = unref(fileIndex)[path]
-                if (!node) {
-                    if (!rt.wholeFolder) return
-                    await addFileToIndex(path)
-                    return
-                }
-                const actual = (await readDir(parentPathOf(path))).find(e => e.name.toLowerCase() === node.fileName.toLowerCase())
-                if (actual && actual.name !== node.fileName) moveFileInIndex(path, `${parentPathOf(path)}/${actual.name}`)
-            } catch {
-                removeFileFromIndex(path)
-            }
-            return
-        }
-
-        // Content changes from other editors, git, sync tools…: re-parse indexed formats, and tell open tabs
-        // about every tracked file so they can reload (including code/LaTeX files).
-        // The disk decides what happened, not the event's kind: macOS reports a file's recent events together, so a
-        // file deleted seconds after it was made arrives as a modify, and so can a new one.
-        if (kind === 'data' || kind === 'any') {
-            for (const path of paths) {
-                if (rt.selfWrites.has(path)) continue
-                if (!await stat(path).catch(() => null)) removeFileFromIndex(path)
-                else if (!unref(fileIndex)[path]) {
-                    if (rt.wholeFolder) await addFileToIndex(path)
-                } else {
-                    if (isIndexedText(path)) await reparse(path)
-                    broadcast({type: 'modify', path})
-                }
+            for (const {prefix, fn} of rt.folderWatchers) {
+                const under = all.filter(p => relativeOf(p).startsWith(prefix))
+                if (under.length) fn(under)
             }
         }
+        // Same rule as the scan: nothing under a dot name is indexed (`.vertex/`, `.git/`, `.DS_Store`).
+        const hidden = (path: string) => relativeOf(path).split('/').some(part => part.startsWith('.'))
+        const changes = await describePaths([...paths].filter(path => !hidden(path)))
+        const index = unref(fileIndex)
+        const plan = planBatch({renames, changes}, {has: path => !!index[path]}, {root: rt.root, wholeFolder: rt.wholeFolder, isSelfWrite: () => false})
+        const texts = await readTexts(plan.reads.flatMap(path => {
+            const node = index[path]
+            return node ? [{path, name: node.fileName, is_directory: false, size: node.size, children: []}] : []
+        }))
+        for (const {from, to} of plan.moves) moveFileInIndex(from, to)
+        for (const path of plan.removes) removeFileFromIndex(path)
+        for (const path of plan.reads) {
+            const text = texts.get(path)
+            if (text !== undefined) void updateIndex(path, text)
+            broadcast({type: 'modify', path})
+        }
+        if (plan.adds.length) await addPaths(plan.adds)
     }
 
+    /**
+     * Watches the workspace (the fs plugin's watch, its own debounce 50 ms) and gathers what it reports into batches:
+     * one is applied once `BATCH_QUIET` ms pass without an event, the next only after it. The app's own writes are left
+     * out as they arrive (`markSelfWrite`'s window), not when the batch is applied.
+     */
     async function startWatcher(root: string) {
         await stopWatcher()
         const rt = runtime()
         rt.root = root
-        // Serialize events so an async handler never interleaves with the next one.
+        // Every path named (for `changed`), and those the app didn't just write itself (for the index).
+        let seen = new Set<string>(), paths = new Set<string>(), renames: { from: string, to: string }[] = []
+        let timer: ReturnType<typeof setTimeout> | undefined
         let queue: Promise<void> = Promise.resolve()
-        rt.unwatch = await watch(root, (event) => {
-            queue = queue.then(() => handleWatchEvent(event)).catch(e => console.error('[index] watcher event failed', e))
+        const flush = () => {
+            const batch = {seen, paths, renames}
+            seen = new Set()
+            paths = new Set()
+            renames = []
+            queue = queue.then(() => applyBatch(batch.seen, batch.paths, batch.renames)).catch(e => console.error('[index] watcher batch failed', e))
+        }
+        const unwatch = await watch(root, (event: WatchEvent) => {
+            const type = event.type
+            if (typeof type !== 'object' || type === null || !event.paths.length || 'access' in type || 'metadata' in type) return
+            for (const path of event.paths) seen.add(path)
+            const [from, to] = event.paths
+            if ('modify' in type && type.modify.kind === 'rename' && event.paths.length === 2 && from && to) {
+                // One onto a path the app just wrote is the app's own (a rename, an undo out of the trash).
+                if (!rt.selfWrites.has(to)) renames.push({from, to})
+            } else {
+                for (const path of event.paths) if (!rt.selfWrites.has(path)) paths.add(path)
+            }
+            clearTimeout(timer)
+            timer = setTimeout(flush, BATCH_QUIET)
         }, {recursive: rt.wholeFolder, delayMs: 50})
+        rt.unwatch = () => {
+            clearTimeout(timer)
+            unwatch()
+        }
     }
 
     async function stopWatcher() {

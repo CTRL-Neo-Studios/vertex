@@ -57,6 +57,15 @@ export function planBatch(batch: WatchBatch, index: IndexView, {root, wholeFolde
 
     for (const {from, to} of batch.renames) {
         if (isSelfWrite(from) && isSelfWrite(to)) continue
+        // A rename of what an earlier one in this batch made (`a` → `b`, then `b` → `c`): one move, `a` → `c`.
+        const chained = moves.find(m => m.to === from)
+        if (chained) {
+            if (hidden(to)) {
+                moves.splice(moves.indexOf(chained), 1)
+                removes.add(chained.from)
+            } else chained.to = to
+            continue
+        }
         if (!index.has(from) || hidden(from)) {
             if (hidden(to)) continue
             if (index.has(to)) reads.add(to)
@@ -87,7 +96,8 @@ export function planBatch(batch: WatchBatch, index: IndexView, {root, wholeFolde
         return false
     }
     return {
-        moves,
+        // A file renamed and back within the batch hasn't moved.
+        moves: moves.filter(m => m.from !== m.to),
         removes: [...removes].filter(path => !inside(path, removes)).sort(),
         adds: [...adds].filter(path => !inside(path, adds)).sort(),
         reads: [...reads].filter(path => !adds.has(path) && !inside(path, adds)).sort(),
