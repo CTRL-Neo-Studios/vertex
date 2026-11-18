@@ -419,3 +419,25 @@ const path = await ctx.dialogs.open({title: 'Import', filters: [{name: 'CSV', ex
 ```
 
 `directory: true` picks a folder. Files inside the workspace are the session's ([session](session.md#files)).
+
+### `ctx.dialogs.readText`, `ctx.dialogs.writeText`
+
+The text of a file the plugin picked with `open`, and new text for one it picked with `save` (UTF-8). Any other path
+is refused: another plugin's picks, a folder's files, the workspace's (read and write those through the session).
+
+```ts
+const to = await ctx.dialogs.save({defaultPath: 'Tasks.ics', filters: [{name: 'iCalendar', extensions: ['ics']}]})
+if (to) await ctx.dialogs.writeText(to, ics)
+```
+
+## Notifications
+
+### `ctx.notifications.send`
+
+A system notification, `{title, body?}`. It needs the [`notifications` permission](config.md#permissions); without
+it, the call throws. The first one asks the user to allow Vertex's notifications; it resolves `false` when they don't.
+Vertex shows them only while it runs: one for later needs a window open then.
+
+```ts
+await ctx.notifications.send({title: 'Due now', body: 'Ship invoice'})
+```

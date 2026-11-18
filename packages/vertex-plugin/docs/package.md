@@ -33,7 +33,7 @@ Unknown keys are errors; the build lists every problem.
 | `minAppVersion` | Optional. The oldest Vertex it runs in (`0.9.2`); an older one keeps it off. |
 | `windows` | Optional. The kinds of window it runs in: `session` (a workspace or a file), `main` (the start page), `settings`. Default `["session"]`. A plugin with a settings page of its own runs in `settings` too. |
 | `requires` | Optional. Plugin ids it needs (`["bases"]`); a trailing `?` marks one it uses when it's there (`"chat?"`). Without a required one, it's off and Settings says why. |
-| `permissions` | Optional. `network`, `secrets`, `files-outside-workspace` ([what each grants](config.md#permissions)). |
+| `permissions` | Optional. `network`, `secrets`, `files-outside-workspace`, `notifications` ([what each grants](config.md#permissions)). |
 | `enabledByDefault` | Optional. Ignored for a plugin someone installs, which the install turns on. |
 | `config` | Optional. Its settings: `schema` (drawn by Settings), `overridable` (what a workspace may change) ([Config](config.md)). |
 

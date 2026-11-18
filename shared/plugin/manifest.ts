@@ -15,7 +15,7 @@ export type WindowKind = typeof WINDOW_KINDS[number]
  * What a plugin may use beyond the window's own grant. Rust grants a window what each name stands for
  * (`permissions.json`, the kernel's `grants.rs`) while a plugin asking for it is on there.
  */
-export type PluginPermission = 'network' | 'secrets' | 'files-outside-workspace'
+export type PluginPermission = 'network' | 'secrets' | 'files-outside-workspace' | 'notifications'
 export const PLUGIN_PERMISSIONS = Object.keys(permissionTable) as PluginPermission[]
 // Spelled out above so the SDK's types don't import JSON; this fails to compile when `permissions.json` names others.
 const permissionsMatch: [PluginPermission, keyof typeof permissionTable] extends [keyof typeof permissionTable, PluginPermission] ? true : false = true

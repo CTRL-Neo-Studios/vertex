@@ -133,7 +133,7 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
                 overridden: path => !!workspace() && scope.overridden(at(path)),
             }
         },
-        services: (id, own) => hostServices(id, workspace(), own, {trust, i18n: strings}),
+        services: (manifest, own) => hostServices(manifest, workspace(), own, {trust, i18n: strings}),
         openSettings: path => appSettings.createOrFocusSettingsWindow(workspace(), `/settings/${path}`),
         assetUrl: pluginAssetUrl,
         onFailed(manifest, error) {

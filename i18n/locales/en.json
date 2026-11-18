@@ -288,7 +288,8 @@
 				"permission": {
 					"network": "the network",
 					"secrets": "the keychain",
-					"files-outside-workspace": "files outside the workspace"
+					"files-outside-workspace": "files outside the workspace",
+					"notifications": "notifications"
 				},
 				"reason": {
 					"missing": "Off: it needs {name}, which isn't installed",

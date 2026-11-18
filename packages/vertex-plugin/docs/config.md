@@ -133,3 +133,4 @@ the plugin hasn't asked for is refused.
 | `network` | `ctx.http.fetch`. |
 | `secrets` | `ctx.secrets`. |
 | `files-outside-workspace` | Every file on the computer, in each window it runs in. Without it, a window reaches its workspace, the files the user picks in a dialog there, and the clipboard's. |
+| `notifications` | `ctx.notifications.send`: system notifications, in each window it runs in. |

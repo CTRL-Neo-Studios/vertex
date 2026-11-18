@@ -156,7 +156,7 @@ const SHARED: &[&str] = &[
     "opener:allow-default-urls",
     "os:default",
     "process:default",
-    "notification:default",
+    // Not `notification:default`: Vertex sends none, so it's the `notifications` permission's (`permissions.json`).
     "updater:default",
     "drag:default",
     // `fs:default`'s denies only (the webview's own data on Linux and Windows): its allows are global scopes, which
@@ -616,6 +616,6 @@ mod tests {
     #[test]
     fn the_table_names_what_manifests_may_ask_for() {
         let names: Vec<&str> = PERMISSION_TABLE.keys().map(String::as_str).collect();
-        assert_eq!(names, ["files-outside-workspace", "network", "secrets"]);
+        assert_eq!(names, ["files-outside-workspace", "network", "notifications", "secrets"]);
     }
 }

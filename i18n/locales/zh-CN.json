@@ -288,7 +288,8 @@
 				"permission": {
 					"network": "网络",
 					"secrets": "钥匙串",
-					"files-outside-workspace": "工作区以外的文件"
+					"files-outside-workspace": "工作区以外的文件",
+					"notifications": "通知"
 				},
 				"reason": {
 					"missing": "已关闭：它依赖 {name}，但未安装",

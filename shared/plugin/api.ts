@@ -333,10 +333,23 @@ export interface HostServices {
         /** The plugin's document in the window's workspace (`.vertex/plugins-data/`); `undefined` outside a workspace window. */
         workspace: Store<unknown> | undefined
     }
-    /** The Open and Save dialogs; what's picked is this window's to read (open) or write (save). `null` when cancelled. */
+    /**
+     * The Open and Save dialogs; what's picked is this window's to read (open) or write (save). `null` when cancelled.
+     * `readText` and `writeText` read a file this plugin picked with `open`, and write one it picked with `save`, as
+     * UTF-8; any other path is refused.
+     */
     dialogs: {
         open(options?: DialogOptions & { directory?: boolean }): Promise<string | null>
         save(options?: DialogOptions): Promise<string | null>
+        readText(path: string): Promise<string>
+        writeText(path: string, text: string): Promise<void>
+    }
+    /**
+     * A system notification. Needs the `notifications` permission; the first one asks the user to allow Vertex's.
+     * Whether it was shown (`false` when the user doesn't allow them).
+     */
+    notifications: {
+        send(notification: { title: string, body?: string }): Promise<boolean>
     }
     /** The app's strings and language. A plugin's own are `plugins.<id>.…`, from its `locales/<locale>.json`. */
     i18n: {

@@ -15,8 +15,8 @@ export interface PluginHostOptions {
     contribute<P extends keyof ContributionPoints>(point: P, owner: string, def: ContributionPoints[P]): () => void
     /** A plugin's `ctx.config`: its settings in this window. */
     config(manifest: PluginManifest): PluginConfigAccess<Record<string, unknown>>
-    /** A plugin's `ctx.http`, `ctx.secrets` and `ctx.data`; `own` ties a listener to the current scope like a registration. */
-    services(id: string, own: (dispose: () => void) => void): HostServices
+    /** A plugin's `ctx.http`, `ctx.secrets`, `ctx.data`, `ctx.dialogs` and `ctx.notifications`; `own` ties a listener to the current scope like a registration. */
+    services(manifest: PluginManifest, own: (dispose: () => void) => void): HostServices
     /** `ctx.settings.open`: the Settings window at `/settings/<path>`, on this window's scope. */
     openSettings(path: string): Promise<void>
     /** `ctx.plugin.assetUrl`: a URL for a file of an installed plugin's folder. */
@@ -124,7 +124,7 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
         return {
             plugin: {id, version: manifest.version, source, assetUrl: path => options.assetUrl(id, path)},
             config: options.config(manifest),
-            ...options.services(id, own),
+            ...options.services(manifest, own),
             window: {...options.window},
             commands: {
                 register: command => add('command', {...command, id: `${id}:${command.id}`, plugin: id}),

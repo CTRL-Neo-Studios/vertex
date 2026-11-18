@@ -449,19 +449,69 @@ In the library, then in the plugin.
 - **Noticed:** Vertex's frontmatter writer turns flow lists into block lists (`aliases: [invoice]` became a list of
   lines), as for Bases' writes; the values are the same. A workspace by a symlinked path is still Open question 2.
 
-## T6: iCalendar and alerts
+## T6: iCalendar, alerts and commands
 
 ### Change
 - **Vertex:** the text of a file picked with `ctx.dialogs.open` read, and text written to one picked with `save`
-  (`ctx.dialogs.readText`, `writeText`: only what this window picked). `ctx.notifications.send({title, body})`,
-  behind a new permission, `notifications`, which the install dialog names. Docs, tests, the SDK's next minor.
+  (`ctx.dialogs.readText`, `writeText`: only what this plugin picked). `ctx.notifications.send({title, body})`,
+  behind a new permission, `notifications`, which the install dialog names: the kernel grants the notification
+  plugin to a window only while a plugin asking for it is on there (it's every window's today, though Vertex sends
+  none). Docs, tests, the SDK's next minor.
 - **Plugin:** Import… (`fromICS`, what was dropped listed) and Export… (`toICS`) on a `.task` file. Alerts: at a
   task's due time while a window has the workspace open; each once (remembered in `ctx.data.global`); a setting.
+- **Commands** (the user, after T5: "Go in T6"), in the palette, Import and Export also in the menu bar's File:
+  Show Tasks panel; New task… (a title, into the `.task` file a setting names, `Inbox.task` by default, made when
+  missing); the workspace's open tasks as a palette group (overdue and due first; one picked opens as the panel
+  opens it); Import from iCalendar… and Export to iCalendar… while a `.task` file is shown; Make this note a task
+  for the shown note.
 
 ### Acceptance
-- [ ] A calendar exported from another app imports, with what couldn't be listed; exported again, another app opens it.
-- [ ] A plugin without the permission can't notify; with it, a task due in a minute notifies once, not again after a
+- [x] A calendar exported from another app imports, with what couldn't be listed; exported again, another app opens it.
+- [x] A plugin without the permission can't notify; with it, a task due in a minute notifies once, not again after a
   relaunch.
+- [x] Each command does what it says from the palette; a task found by its title in the palette opens.
+
+### As built
+- **Vertex** (uncommitted): `ctx.dialogs.readText` and `writeText` (`pluginDialogs`, `app/utils/plugins/services.ts`):
+  each plugin's services remember the files its Open dialogs picked (not folders) and the paths its Save dialogs did,
+  and refuse any other path, before Rust's scope would refuse one outside the window's reach. `ctx.notifications.send`
+  (`pluginNotifications`): refused without the permission; the OS's permission asked the first time, `false` if denied.
+  The services now take the manifest (`HostOptions.services(manifest, own)`). The permission `notifications`
+  (`permissions.json`: `notification:default`), so a window holds the notification plugin only while a plugin asking
+  for it is on there; `notification:default` left `SHARED` (`grants.rs`). The main window's launch-time
+  `requestPermission` went with it: Vertex sends no notification of its own, and that window can't call the plugin
+  now. Install and trust dialogs name it ("notifications", "通知"). Docs: `context.md` (Dialogs, Notifications),
+  `config.md` and `package.md` (the permission), `versions.md` (1.4.0), Concepts and Structures. Tests: services 4
+  (2 new: picks only, the permission), the grant table's names; Vertex's 393, typecheck at its 7, lint clean, the
+  SDK's 8.
+- **Plugin:** `permissions: ["notifications"]`; settings `inbox` (a path, `Inbox.task`, a workspace's to change) and
+  `alerts` (on). `commands.ts`: Show Tasks panel; New task… (`TasksOverlay.vue`: a modal for the title, `addTask`
+  into the inbox's first list, the file made with `files.create` when missing, a toast with Open); Make this note a
+  task (the shown note); Import from iCalendar… (`fromICS`, then `merge` into the shown file: a calendar imported again
+  updates its events by UID) and Export to iCalendar… (`toICS`), both also in the menu bar's File, enabled while a
+  `.task` file is shown; the workspace's open tasks as a palette group (dated first, by day; Overdue said). The
+  overlay (`ctx.views.overlay`) draws what commands ask for (`prompts.ts`): they run outside any component. Alerts
+  (`alerts.ts`, `due.ts`): every 30 s while a session window has the workspace, open tasks with a due time (a date
+  has none to alert at; a repeating task's occurrence around now), up to 10 minutes late, in the task's zone (a
+  floating one the viewer's); what's sent is written to the plugin's global data before it's sent (two days kept), so
+  another window or a relaunch doesn't send it again. The timers stop with the session's scope (`onScopeDispose`
+  inside `onSession`). 2 tests (12 in all).
+- **Checked** in `tauri dev`: with Tasks off, the session window's `plugin:notification|is_permission_granted` and
+  `notify` were refused ("not allowed", the permission named); with it on, allowed. A task due two minutes after
+  launch, and one added outside due a minute later: each sent once, by the notification plugin's `Notification`
+  (seen by a wrapper around it: "Send the invoice", "Due Nov 18 at 5:39 PM · plan.task"), both in the plugin's data;
+  relaunched two minutes after the second was due, nothing sent in 45 s. Import from the palette, a Google-style
+  calendar picked in the real Open panel (a `VTIMEZONE`, a weekly event in Berlin with an alarm, an all-day trip with
+  an attendee, an event without a UID, a to-do): three tasks into `plan.task`, the modal listing `VEVENT #3: VEVENT
+  without UID`. Export saved through the real Save panel; Mozilla's `ical.js` (Thunderbird's parser) read every
+  component back, the weekly event recurring on the 16th and the 23rd. Show Tasks panel, New task… (`Inbox.task`
+  made, the task in its Inbox list, the toast), the palette finding "Book hotel" by "Book hot" and opening it in its
+  file's List with the editor, Make this note a task (off while a `.task` file is shown, on for the note). Not
+  checked: the notification on screen (macOS's records are closed to scripts; the plugin's `Notification` was
+  called, whether it reached the screen wasn't seen), the install dialog's new name, the settings' rows.
+- **Noticed, in `@type32/tasks`:** `toICS` writes `TZID=Europe/Berlin` without a `VTIMEZONE`, which RFC 5545
+  requires (apps that know IANA names read it, as `ical.js` did); and `fromICS` drops an event's `VALARM` and
+  `ATTENDEE` without listing them. Yours to decide (the format's).
 
 ## T7: Bases layouts
 
