@@ -37,7 +37,8 @@ export default definePlugin<Config>({
 ### The schema
 
 Settings the Settings window draws from `plugin.json`, without running the plugin: the plugin needs no settings page
-of its own. A field's `default` is the config's default, so `ctx.config.value` has it too.
+of its own. With one ([`ctx.settings.page`](context.md#ctxsettingspage)), the fields are at its top, on the same
+page. A field's `default` is the config's default, so `ctx.config.value` has it too.
 
 ```json
 "config": {

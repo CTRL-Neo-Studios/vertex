@@ -27,7 +27,7 @@ describe('pluginNavGroups', () => {
     ]
     const {core, community} = pluginNavGroups(pages, plugins, options)
 
-    it("groups by where a plugin is from, sorted by label: a registered page, else the schema page while it's on, never both", () => {
+    it("groups by where a plugin is from, sorted by label: one entry each, its registered page, else its schema page while it's on", () => {
         expect(core.map(i => i.label)).toEqual(['AI', 'Canvas', 'CHAT', 'GIT'])
         expect(community.map(i => [i.label, i.to])).toEqual([['Graph', '/settings/plugins/graph'], ['Mine', '/settings/plugins/mine']])
     })

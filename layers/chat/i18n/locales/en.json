@@ -274,12 +274,6 @@
           "clear": "Clear",
           "clearConfirm": "Remove all {count}?",
           "cancel": "Cancel"
-        },
-        "options": {
-          "title": "Options",
-          "label": "Chat options",
-          "description": "Where chats are kept, the mode new chats start in, titles, and files from outside.",
-          "open": "Open"
         }
       }
     }

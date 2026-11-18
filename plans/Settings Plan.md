@@ -223,9 +223,19 @@ Report 5.
 - Docs: the author docs' `ctx.settings.page` and Config pages; the SDK's minor.
 
 ### Acceptance
-- [ ] Settings → Chat shows its four options and its feedback list on one page; no link to another settings page.
-- [ ] A community plugin with a schema and a page (a scratch one) shows both on one page, from the nav and from its gear.
-- [ ] AI's sub-entries and item pages, and `ctx.settings.open('ai/models/<id>')`, work as before.
+- [x] Settings → Chat shows its four options and its feedback list on one page; no link to another settings page. (In `tauri dev`: `/settings/chat` titled Chat, its sections Settings (storage, mode, titles, importFiles) and Tool feedback; no link to `/settings/plugins/chat`, which itself went to `/settings/chat`.)
+- [x] A community plugin with a schema and a page (a scratch one) shows both on one page, from the nav and from its gear. (A plugin written by hand into the app data, with a switch in its schema and a page drawing its own `SettingsScrollLayout` titled "Scratch page" with a header button and a section: the nav's one entry was `/settings/scratch`; there, the field and "Own section" on one page, the header titled "Scratch page" with its button; Plugins' gear went to `/settings/scratch`, the same page.)
+- [x] AI's sub-entries and item pages, and `ctx.settings.open('ai/models/<id>')`, work as before. (`/settings/ai` went to Providers, titled AI Providers with Add provider in the header; Model Profiles with Add profile; `createOrFocusSettingsWindow(null, '/settings/ai/models/default')`, what `ctx.settings.open` calls, opened the Default profile with Back, Test connection and Remove in the header; Features drew.)
+
+### As built
+
+- **`Settings/PluginPage.vue`** (the kernel's, not published): both routes' page. The header has the plugin's icon (or the page's) and the page's label or the manifest's name; then the trust alert and the schema's section, at the page's root (`path` empty: an AI item page doesn't get it), left out with a registered page and no fields; then the registered page through `PluginMount`, with `path` and its `ScopedConfig` (moved here from `[...path].vue`). `[...path].vue` finds the page and its plugin; `plugins/[id].vue` goes to the plugin's registered page when there is one, else draws the schema alone. The schema page's back chevron to Plugins went (the nav has Plugins).
+- **`SettingsScrollLayout`:** an outer one provides itself (`SCROLL_LAYOUT_HOST`, local to the file: its id and a title slot); an inner one draws its lock alert and content only, sets the outer title while it's mounted (an owner token, so a page leaving doesn't clear the next one's), and teleports `header-leading` and `header-trailing` (`<Teleport defer>`) into the outer header, before the outer's own: AI's Back comes before the plugin's icon. No plugin page changed; the contract didn't either (`SettingsScrollLayoutProps` documents the nesting).
+- **The nav:** unchanged code; `pluginNavGroups` already gave one entry per plugin (the "never both" rule was its outcome). Its doc and test name say so.
+- **Chat:** its Options section and `plugins.chat.settings.options.*` (en and zh-CN) went.
+- **Docs:** the author docs' `ctx.settings.page` (one page, schema on top, the layout inside), Config (the schema on a registered page) and UI (`SettingsScrollLayout`); `Concepts and Structures.md` (Settings pages, Settings → Plugins, the nav). The SDK's minor is U8's.
+- **The switch's state** in the header: an "Off" badge while the plugin is off in the scope being edited (a schema page stays reachable from its gear then). Added after the in-app run; checked by typecheck only.
+- **Numbers:** 374 tests (55 files); typecheck unchanged.
 
 ## U7: Settings search
 

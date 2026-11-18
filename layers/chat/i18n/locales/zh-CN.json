@@ -274,12 +274,6 @@
           "clear": "清除",
           "clearConfirm": "移除全部 {count} 条？",
           "cancel": "取消"
-        },
-        "options": {
-          "title": "选项",
-          "label": "聊天选项",
-          "description": "聊天的保存位置、新聊天的初始模式、标题以及来自外部的文件。",
-          "open": "打开"
         }
       }
     }

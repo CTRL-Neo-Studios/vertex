@@ -226,7 +226,9 @@ ctx.files.menuItem({
 
 A page of the Settings window, at `/settings/<id>`, in the nav under the plugin. The plugin must run in the Settings
 window (`"windows": ["session", "settings"]`). A plugin with only a schema doesn't need one: Settings draws it from
-the manifest ([Config](config.md#the-schema)).
+the manifest ([Config](config.md#the-schema)). A plugin has one settings page: with a schema too, Settings draws the
+schema's fields at the top of this page (at `/settings/<id>`, not below it), and the nav and the plugin's gear on
+Settings → Plugins lead here.
 
 ```ts
 ctx.settings.page({
@@ -239,8 +241,9 @@ ctx.settings.page({
 The component gets `SettingsPageProps`: `path` (the route below the page: `/settings/hello/a/b` → `['a', 'b']`) and
 `config` (`ScopedConfig`: the plugin's config in the scope Settings is editing, the user's or a workspace's). Draw it
 with `SettingsScrollLayout`, `SettingsSection` and `SettingsRow` ([UI](ui.md#vertexs-components)) so it looks and
-behaves like Vertex's pages. `children` adds sub-entries to the nav (`{label, icon, path}`); `icon` defaults to the
-manifest's.
+behaves like Vertex's pages: Settings lays the page out (the plugin's icon, the schema), and the page's
+`SettingsScrollLayout` draws inside it, its `title` and header buttons in the page's header. `children` adds
+sub-entries to the nav (`{label, icon, path}`); `icon` defaults to the manifest's.
 
 ### `ctx.settings.open`
 

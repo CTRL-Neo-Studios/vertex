@@ -104,7 +104,11 @@ export interface MarkdownProps {
     assetUrl?(path: string): string
 }
 
-/** A settings page: a sticky header with the title (`header-leading`, `header-trailing`) over the scrolling content. */
+/**
+ * A settings page: a sticky header with the title (`header-leading`, `header-trailing`) over the scrolling content.
+ * Inside another one (a plugin's page, laid out by Settings), its content only; its title and header slots go into
+ * that one's header.
+ */
 export interface SettingsScrollLayoutProps {
     title?: string
     /** Read-only while the Settings window edits a workspace: none of the page's settings can be overridden there. */

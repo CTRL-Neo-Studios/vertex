@@ -8,7 +8,7 @@ import {useNotify} from "../lib/notify";
 
 /**
  * Settings → Chat: the tool feedback the chat's models reported (`toolFeedback`), kept on this computer only, newest
- * first; the user copies an entry as a GitHub issue, or removes it. Chat's options are on its plugin page.
+ * first; the user copies an entry as a GitHub issue, or removes it. Settings draws Chat's options above it.
  */
 defineProps<SettingsPageProps>()
 const {t, locale} = useI18n()
@@ -93,12 +93,6 @@ const when = (at: number) => new Date(at).toLocaleString(locale.value)
                         </div>
                     </div>
                     </details>
-                </SettingsRow>
-            </SettingsSection>
-            <SettingsSection :title="t('plugins.chat.settings.options.title')">
-                <SettingsRow :label="t('plugins.chat.settings.options.label')" :description="t('plugins.chat.settings.options.description')">
-                    <UButton size="sm" color="neutral" variant="outline" trailing-icon="i-lucide-arrow-right"
-                             :label="t('plugins.chat.settings.options.open')" to="/settings/plugins/chat"/>
                 </SettingsRow>
             </SettingsSection>
         </div>

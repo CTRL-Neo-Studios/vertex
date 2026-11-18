@@ -21,10 +21,11 @@ export interface NavGroups {
 export const PLUGIN_ICON = 'i-lucide-puzzle'
 
 /**
- * The plugins' part of the Settings nav (Plugin Architecture Plan, K6): Core plugins, and Community plugins (installed
- * ones and a workspace's own). A plugin's entry is the pages it registers, with their sub-entries, or else its schema
- * page while it's on; never both. A page's icon defaults to its plugin's, then the puzzle piece. Each group is sorted by
- * label in the UI's language. `base` is the Settings route; `path` the current one, to open the group it's in.
+ * The plugins' part of the Settings nav (Plugin Architecture Plan, K6; Settings Plan, U6): Core plugins, and Community
+ * plugins (installed ones and a workspace's own). A plugin has one entry, its one page: the page it registers (with
+ * its sub-entries; it draws the plugin's schema too), or else its schema page while it's on. A page's icon defaults to
+ * its plugin's, then the puzzle piece. Each group is sorted by label in the UI's language. `base` is the Settings
+ * route; `path` the current one, to open the group it's in.
  */
 export function pluginNavGroups(pages: readonly NavPage[], plugins: readonly NavPlugin[], options: {
     t: (key: string) => string
