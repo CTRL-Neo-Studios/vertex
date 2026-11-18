@@ -404,8 +404,10 @@ ctx.whenPlugin('bases', bases => {
 
 Put the plugin you use in `requires` (`"requires": ["bases"]`, or `"bases?"` when it's optional). The SDK types the
 APIs of Vertex's own plugins: `bases` (`registerView`, `Value`), `ai`, `chat`, `mermaid` (`Diagram`), `workflows`
-(`run`, `dryRun`, `registerNodes`). A community plugin's API can be provided and used at run time, but it can't be
-typed yet.
+(`run`, `dryRun`, `registerNodes`), and exports their types by name: a layout's component takes `BaseViewProps`
+(`defineProps<BaseViewProps>()`, from `@type32/vertex-plugin`), whose `context` has the base's rows (`result`), the
+view's options (`view`), `commit` for the base and `newItem`. A community plugin's API can be provided and used at
+run time, but it can't be typed yet.
 
 ## Dialogs
 

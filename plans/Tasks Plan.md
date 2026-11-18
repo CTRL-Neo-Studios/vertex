@@ -68,6 +68,8 @@ The user's, 18 Nov (the questions asked before this plan, and the answers to its
 | Deleting (mine) | `deletedAt`, as the format says. Deleted records are hidden. |
 | Alerts (mine) | While Vertex is open on the workspace: a system notification at a task's due time. Vertex can't schedule one for when it's closed. |
 | Size (mine) | Measured in T0, not assumed. The plugin bundles `@type32/tasks` (with zod, a Temporal polyfill, `js-yaml`, `smol-toml`: 259 KB minified, 82 KB gzipped, measured 18 Nov) and the components; one `main.js`, as every plugin. |
+| A plugin's window (the user, after T6) | It reaches the plugin and nothing else: no workspace, no index, no files. What it wants done to the workspace it asks its plugin, which does it through the SDK's API in the session window. (Was Open question 4.) |
+| Where plugins' AI tools show (the user, after T6) | In chats only for now. The inline assistant's and workflows' tools, and plugins' own workflow widgets, are for later. (Was Open question 5.) |
 
 ```mermaid
 flowchart LR
@@ -485,7 +487,8 @@ In the library, then in the plugin.
   for it is on there; `notification:default` left `SHARED` (`grants.rs`). The main window's launch-time
   `requestPermission` went with it: Vertex sends no notification of its own, and that window can't call the plugin
   now. Install and trust dialogs name it ("notifications", "通知"). Docs: `context.md` (Dialogs, Notifications),
-  `config.md` and `package.md` (the permission), `versions.md` (1.4.0), Concepts and Structures. Tests: services 4
+  `config.md` and `package.md` (the permission), `versions.md` (1.4.0, moved to 1.5.0 in T7: the user had published
+  1.4.0 before these), Concepts and Structures. Tests: services 4
   (2 new: picks only, the permission), the grant table's names; Vertex's 393, typecheck at its 7, lint clean, the
   SDK's 8.
 - **Plugin:** `permissions: ["notifications"]`; settings `inbox` (a path, `Inbox.task`, a workspace's to change) and
@@ -526,13 +529,43 @@ In the library, then in the plugin.
   item with that date.
 
 ### Acceptance
-- [ ] The layouts are offered in a `.base` file and in a ` ```base ` block; with Bases off, the plugin runs without them.
-- [ ] Changing a note's date moves it on the calendar without reopening the base; dragging it changes the note.
+- [x] The layouts are offered in a `.base` file and in a ` ```base ` block; with Bases off, the plugin runs without them.
+- [x] Changing a note's date moves it on the calendar without reopening the base; dragging it changes the note.
+
+### As built
+- **Vertex** (uncommitted): the SDK's types export the core plugins' API types by name (`scripts/build.ts`:
+  `export type *` for each `app/api.ts`, which only augmented `PluginApis` before), so a layout's component can take
+  `BaseViewProps`; nothing at run time. `context.md` (a layout's component and its `context`), `versions.md`. Found:
+  the user published SDK 1.4.0 before T6, so T6's additions and this one are 1.5.0's (`versions.md` says so now);
+  the plugin's release (T10) needs 1.5.0 and a `minAppVersion` to match. SDK checks: types, its 8 tests, lint.
+- **The library** (uncommitted): `TaskCalendar` and `TaskTimeline` take `editor` (default on). Off, a click reports
+  `open(id)` instead of opening the editor, a new task isn't opened, and the timeline has no menu and no dependency
+  drawing: what a base's rows (notes, not tasks) can take.
+- **The plugin:** `requires: ["bases?"]`; with Bases running (`ctx.whenPlugin`), two layouts, `tasks-calendar` and
+  `tasks-timeline` ("Calendar (Tasks)", "Timeline (Tasks)": Bases may get a calendar of its own, and a base names
+  its layout by type), each with three property options, Start, End and Due (unset: the notes' own `start`, `end`,
+  `due`), 600 and 480 px high in a note. `BaseLayout.vue`: the shown rows as tasks (`baseRows.ts`, 3 tests: a
+  note's property read as written in the index's frontmatter, a date or a date-time; a file's or a formula's date as
+  Bases reads it; an end the format won't take with its start dropped; a row without a time left out), titled by the
+  file. A drag writes the moved times to the note's properties (`setNoteProperties`: Vertex's frontmatter writer, one
+  step of Files' undo, as Bases' own edits); a file's or a formula's time isn't written. A click opens the note; a
+  task drawn on the calendar (or a double click) is Bases' New with Start set to that day. The scale is the base
+  view's own option (`scale`, written with `commit`).
+- **Checked** in `tauri dev` by script, on a base of three notes in `Projects/` (a two-day trip, a timed review, a
+  report due): the calendar drew all three (the review in the 20th's overflow); Launch dragged from the 19th to the
+  21st wrote `start: 2026-11-21`, `end: 2026-11-23` to its note; Review's note rewritten from outside moved it to
+  the 26th with the base still open; a click on Report opened `Report.md`; a double click on the 27th opened Bases'
+  New with `2026-11-27` (it made `Untitled.md`, as Bases' New does); Add view's Layout listed Calendar (Tasks) and
+  Timeline (Tasks) after Bases' five; a ` ```base ` block in a note drew the timeline (four rows, no dependency
+  dots); with Bases off, Tasks ran (its commands in the palette, no failure) and the block showed as code. Not
+  checked: a drag in the week's hours, the timeline's drags in a base, Configure view's property pickers.
+- **Fixed on the way:** the timeline's outline header wrapped "Progress" in a narrow embed (now one line).
+- **Noticed:** Vertex's frontmatter writer turned the note's `tags: [work]` into a block list, as in T5.
 
 ## T8: Plugin windows
 
 The design is mine, from the Window Permissions Plan's rules (Rust opens every window, a label carries its grant,
-nothing is taken from what a webview says); Open question 4 is what's yours in it.
+nothing is taken from what a webview says), with the user's rule on what the window reaches (Decisions).
 
 ### Change
 - **Vertex, the manifest:** `ownWindows`, the windows a plugin may open: `[{id, width, height, minWidth?,
@@ -620,11 +653,5 @@ nothing is taken from what a webview says); Open question 4 is what's yours in i
 3. **Tasks without a list in a filtered view** (T3, Noticed). The format's `listIds` shows only tasks in those lists,
    so a calendar with one list switched off hides every task without a list. A view key for them (say
    `withoutList: true`) would be the format's to add, in a minor.
-4. **What a plugin's window may reach** (T8). Planned: nothing of the workspace; it draws what the session window
-   sends it and asks that window to act. That keeps a new kind of window from being a second way to the files, and
-   costs each plugin a channel to write. The other way is a window with its workspace (its own index, the session's
-   file reach): simpler for the plugin, a second scan of the workspace per window, and a wider grant. Also yours: a
-   window that outlives its session window (a global one, opened from the start page) isn't planned.
-5. **Where a plugin's tools show** (T9). Planned: in chats only, through chat's tool search. The inline assistant
-   (`ai-assistant`) and workflows have no tool sets today (only `layers/chat` builds one); giving them plugins'
-   tools would be a phase of theirs.
+4. Decided by the user after T6: a plugin's window reaches only its plugin (Decisions).
+5. Decided by the user after T6: plugins' AI tools in chats only for now (Decisions).

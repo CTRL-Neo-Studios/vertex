@@ -169,10 +169,11 @@ write(join(typesDir, 'nuxt-ui.d.ts'), [
 write(join(dist, 'nuxt-ui-components.json'), `${JSON.stringify(Object.fromEntries(Object.entries(nuxtUiFiles)
     .map(([name, file]) => [nuxtUiPath(file), name])), null, 2)}\n`)
 
+// The core plugins' APIs: their `PluginApis` entries, and their types by name (a Bases layout's `BaseViewProps`).
 write(join(typesDir, 'index.d.ts'), [
     "export * from './shared/plugin/api'",
     "import './nuxt-ui'",
-    ...apis.map(f => `import './${f.replace(/\.ts$/, '')}'`),
+    ...apis.map(f => `export type * from './${f.replace(/\.ts$/, '')}'`),
     '',
 ].join('\n'))
 

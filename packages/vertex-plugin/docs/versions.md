@@ -51,9 +51,11 @@ UI's components by file (`@nuxt/ui/components/Button.vue`), so a component libra
 it sets `minAppVersion` to the first release with them. And a component with `defineModel` beside `defineProps`
 builds: Vue's compiler imports `mergeModels` for it, which 1.3.0's preset didn't know Vertex's Vue has.
 
-1.4.0 adds to the contract `ctx.dialogs.readText` and `writeText` (the text of what the plugin picked in an Open or
+1.5.0 adds to the contract `ctx.dialogs.readText` and `writeText` (the text of what the plugin picked in an Open or
 Save dialog) and `ctx.notifications.send`, behind a new permission, `notifications`. A plugin that uses them sets
-`minAppVersion` to the first release with them; an older Vertex refuses a manifest asking for `notifications`.
+`minAppVersion` to the first release with them; an older Vertex refuses a manifest asking for `notifications`. It
+also exports the core plugins' API types by name (`BaseViewProps` for a Bases layout's component, `AiApi`,
+`ChatApi`…), which 1.4.0 only put in `PluginApis`; types alone, so nothing changes at run time.
 
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
