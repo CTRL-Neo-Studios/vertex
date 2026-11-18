@@ -23,7 +23,8 @@ use api::SESSION_WINDOW_PREFIX;
 use rayon::prelude::*;
 use state::AppState;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{AppHandle, Manager, RunEvent, Runtime, WindowEvent};
 
@@ -67,85 +68,62 @@ fn read_text_files_batch(paths: Vec<String>) -> Vec<FileReadResult> {
         .collect()
 }
 
-/// Recursively scans a directory tree and returns all entries with metadata.
-/// This is much faster than doing recursive readDir calls from JavaScript
-/// because it eliminates all the IPC overhead and does the entire traversal in native code.
+/// Every file and folder under `root_path` (hidden names skipped), each folder with its children's paths, in one
+/// native traversal: no IPC per folder. Only the root failing is an error. What else can't be read is skipped, so one
+/// bad entry doesn't cost the workspace its index: a link that leads nowhere, a folder without permission, something
+/// deleted mid-scan. A linked folder is followed, except one that leads back to a folder it's inside (a loop), which
+/// is listed without its contents.
 #[tauri::command]
 fn scan_directory_recursive(root_path: String) -> Result<Vec<DirectoryEntry>, String> {
+    let root = Path::new(&root_path);
+    let listing = fs::read_dir(root).map_err(|e| format!("Failed to read directory {}: {e}", root.display()))?;
     let mut entries = Vec::new();
-    let mut properties_files = Vec::new();
-
-    fn scan_dir(
-        path: &Path,
-        entries: &mut Vec<DirectoryEntry>,
-        properties_files: &mut Vec<String>,
-    ) -> Result<Vec<String>, String> {
-        let dir_entries = fs::read_dir(path)
-            .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?;
-
-        let mut children = Vec::new();
-
-        for entry in dir_entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let entry_path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-
-            // Skip hidden files (starting with .)
-            if name.starts_with('.') {
-                continue;
-            }
-
-            let metadata = fs::metadata(&entry_path).map_err(|e| {
-                format!("Failed to get metadata for {}: {}", entry_path.display(), e)
-            })?;
-
-            let is_directory = metadata.is_dir();
-            let size = metadata.len();
-
-            let created = metadata
-                .created()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64);
-
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64);
-
-            let path_str = entry_path.to_string_lossy().to_string();
-            children.push(path_str.clone());
-
-            // Track properties files
-            if !is_directory && (name == "properties.yml" || name == "properties.yaml") {
-                properties_files.push(path_str.clone());
-            }
-
-            let child_children = if is_directory {
-                scan_dir(&entry_path, entries, properties_files)?
-            } else {
-                Vec::new()
-            };
-
-            entries.push(DirectoryEntry {
-                path: path_str,
-                name,
-                is_directory,
-                size,
-                created,
-                modified,
-                children: child_children,
-            });
-        }
-
-        // Sort children for consistent ordering
-        children.sort();
-        Ok(children)
-    }
-
-    scan_dir(Path::new(&root_path), &mut entries, &mut properties_files)?;
+    // The folders being scanned, outermost first, by their real paths.
+    let mut inside = vec![fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf())];
+    scan_dir(listing, &mut entries, &mut inside);
     Ok(entries)
+}
+
+/// Adds what `listing` holds (and what's under it) to `entries`; the listed paths, sorted.
+fn scan_dir(listing: fs::ReadDir, entries: &mut Vec<DirectoryEntry>, inside: &mut Vec<PathBuf>) -> Vec<String> {
+    let millis = |time: std::io::Result<SystemTime>| {
+        time.ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64)
+    };
+    let mut children = Vec::new();
+    for entry in listing.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') {
+            continue;
+        }
+        let path = entry.path();
+        // A link is what it leads to.
+        let Ok(metadata) = fs::metadata(&path) else { continue };
+        let is_directory = metadata.is_dir();
+        let path_str = path.to_string_lossy().to_string();
+        children.push(path_str.clone());
+
+        let mut child_children = Vec::new();
+        if is_directory {
+            if let (Ok(real), Ok(listing)) = (fs::canonicalize(&path), fs::read_dir(&path)) {
+                if !inside.contains(&real) {
+                    inside.push(real);
+                    child_children = scan_dir(listing, entries, inside);
+                    inside.pop();
+                }
+            }
+        }
+        entries.push(DirectoryEntry {
+            path: path_str,
+            name,
+            is_directory,
+            size: metadata.len(),
+            created: millis(metadata.created()),
+            modified: millis(metadata.modified()),
+            children: child_children,
+        });
+    }
+    children.sort();
+    children
 }
 
 /// The files on the system clipboard (a Copy in Finder, Explorer or Vertex's Files), as absolute paths; none when it
@@ -306,4 +284,36 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             }
         })
         .build()
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::scan_directory_recursive;
+    use std::fs;
+    use std::os::unix::fs::symlink;
+
+    #[test]
+    fn a_scan_skips_what_it_cannot_read_and_follows_no_loop() {
+        let root = std::env::temp_dir().join(format!("vertex-scan-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(root.join("notes/deep")).unwrap();
+        fs::write(root.join("notes/a.md"), "a").unwrap();
+        fs::write(root.join(".hidden.md"), "h").unwrap();
+        // A link that leads nowhere, one back to the root from inside it, and one to a folder beside it.
+        symlink(root.join("gone"), root.join("dangling.md")).unwrap();
+        symlink(&root, root.join("notes/deep/loop")).unwrap();
+        symlink(root.join("notes"), root.join("linked")).unwrap();
+
+        let entries = scan_directory_recursive(root.to_string_lossy().into_owned()).unwrap();
+        let prefix = format!("{}/", root.to_string_lossy());
+        let mut listed: Vec<(String, usize)> =
+            entries.iter().map(|e| (e.path.trim_start_matches(&prefix).to_string(), e.children.len())).collect();
+        listed.sort();
+        let expected = [
+            ("linked", 2), ("linked/a.md", 0), ("linked/deep", 1), ("linked/deep/loop", 0),
+            ("notes", 2), ("notes/a.md", 0), ("notes/deep", 1), ("notes/deep/loop", 0),
+        ];
+        assert_eq!(listed, expected.map(|(path, children)| (path.to_string(), children)));
+        assert!(scan_directory_recursive(root.join("gone").to_string_lossy().into_owned()).is_err());
+        fs::remove_dir_all(&root).unwrap();
+    }
 }

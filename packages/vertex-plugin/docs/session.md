@@ -30,7 +30,7 @@ a `computed` that reads `files()`, `byPath`, `byUuid`, `tree()`, `backlinks` or 
 ### `session.index.files`, `session.index.byPath`, `session.index.byUuid`
 
 Every file and folder (`ActiveWorkspaceFileIndex`: `uuid`, `fullPath`, `relativePath`, `fileName`, `fileExt`,
-`isFolder`, `size`, `properties` (a note's frontmatter), `forelinks`, `backlinks` (uuids), `meta` (a note's tags, link
+`isFolder`, `size`, `properties` (a note's frontmatter), `icon` (its `icon` property, when that's text), `forelinks`, `backlinks` (uuids), `meta` (a note's tags, link
 texts, embeds), `createdTime`, `modifiedTime`), and one by absolute path or uuid.
 
 ### `session.index.tree`

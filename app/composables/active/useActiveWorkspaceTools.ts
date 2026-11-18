@@ -84,7 +84,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
         markSelfWrite(from)
         await relocatePath(from, to)
         markSelfWrite(to)
-        await moveFileInIndex(from, to, session!.rootPath!)
+        moveFileInIndex(from, to, session!.rootPath!)
     }
 
     /** Writes `text` into the note `uuid` if it still reads `expected`; false otherwise. */
@@ -438,7 +438,7 @@ export function useActiveWorkspaceTools(session?: ActiveSession) {
                 markSelfWrite(from)
                 const to = await relocate(from)
                 markSelfWrite(to)
-                await moveFileInIndex(from, to, session.rootPath)
+                moveFileInIndex(from, to, session.rootPath)
                 change.moves.push({uuid: file.uuid, from, to})
             } catch (error) {
                 failure ??= error

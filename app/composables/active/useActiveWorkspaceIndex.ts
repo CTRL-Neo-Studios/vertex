@@ -2,7 +2,6 @@ import {watch as watchVue, type WatchStopHandle} from "vue";
 import {sessionScope, StateKey} from "#shared/constants/app";
 import type {ActiveWorkspaceFileIndex, UITreeNode, WorkspaceIndexEvent, WorkspaceIndexListener} from "#shared/types/active/workspace";
 import {readDir, readTextFile, stat, type UnwatchFn, watch, type WatchEvent} from "@tauri-apps/plugin-fs";
-import {join} from "@tauri-apps/api/path"
 import {vertexInvoke} from "~/utils/vertexInvoke"
 import {defaultActiveWorkspaceFileIndex} from "#shared/utils/defaults/actives";
 import type {PossiblyRef} from "#shared/types/types";
@@ -103,20 +102,18 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
 
     const fileTree = computed<UITreeNode[]>(() => {
         const index = unref(fileIndex)
-        const toNode = (file: ActiveWorkspaceFileIndex): UITreeNode => {
-            const icon = file.properties.icon
-            return {
-                uuid: file.uuid,
-                fileName: file.fileName,
-                relativePath: file.relativePath,
-                isFolder: file.isFolder,
-                icon: typeof icon === 'string' && icon ? icon : undefined,
-                children: file.children.flatMap(path => {
-                    const child = index[path]
-                    return child ? [toNode(child)] : []
-                }),
-            }
-        }
+        // Nothing a save changes but `icon`: a note's other properties don't rebuild the tree.
+        const toNode = (file: ActiveWorkspaceFileIndex): UITreeNode => ({
+            uuid: file.uuid,
+            fileName: file.fileName,
+            relativePath: file.relativePath,
+            isFolder: file.isFolder,
+            icon: file.icon,
+            children: file.children.flatMap(path => {
+                const child = index[path]
+                return child ? [toNode(child)] : []
+            }),
+        })
         // Sorted like a folder's children (the scan and every move sort those), so a file moved to the top level
         // lands in place rather than at the end.
         return Object.keys(index).filter(p => !index[parentPathOf(p)]).sort().map(p => toNode(index[p]!))
@@ -130,10 +127,17 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
         if (error) console.warn(`[index] could not parse properties of ${path}:`, error)
         // An autosave that changed no property mustn't re-render what reads them (the tree, Bases).
         const changed = JSON.stringify(properties) !== JSON.stringify(node.properties)
-        if (changed) node.properties = properties
+        const icon = typeof properties.icon === 'string' && properties.icon ? properties.icon : undefined
+        if (changed) {
+            node.properties = properties
+            node.icon = icon
+        }
         if (changed && isPropertiesFile(node.fileName)) {
             const parent = unref(fileIndex)[parentPathOf(path)]
-            if (parent?.isFolder) parent.properties = properties
+            if (parent?.isFolder) {
+                parent.properties = properties
+                parent.icon = icon
+            }
         }
         if (!isPlainTextFile(getFileExtensionFromPath(path))) return
         const meta = parseNoteMeta(content, properties)
@@ -291,15 +295,19 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
     /**
      * Rename/move, keeping uuids (and therefore open tabs). Links written against the old name are kept
      * as unresolved targets; `getRenameImpact` lets the UI offer to rewrite them.
+     *
+     * One synchronous pass, so what reads the index recomputes once, however much a folder holds. It awaited a path
+     * join (an IPC call) per child, and the page recomputed between children: 75 ms each in a workspace of 13,000
+     * files, 2 s for a folder of 26 notes.
      */
-    async function moveFileInIndex(oldPath: string, newPath: string, root: string = runtime().root) {
+    function moveFileInIndex(oldPath: string, newPath: string, root: string = runtime().root) {
         const index = fileIndex.value
         if (!index[oldPath] || oldPath === newPath) return
         runtime().root = root
         runtime().selfWrites.mark(oldPath, newPath)
 
         const moved: string[] = []
-        const relocate = async (from: string, to: string) => {
+        const relocate = (from: string, to: string) => {
             const node = index[from]
             if (!node) return
             const fileName = to.slice(to.lastIndexOf('/') + 1)
@@ -308,8 +316,8 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             if (node.isFolder) {
                 next.children = []
                 for (const child of node.children) {
-                    const childTo = await join(to, child.slice(child.lastIndexOf('/') + 1))
-                    await relocate(child, childTo)
+                    const childTo = `${to}/${child.slice(child.lastIndexOf('/') + 1)}`
+                    relocate(child, childTo)
                     next.children.push(childTo)
                 }
             } else moved.push(node.uuid)
@@ -318,7 +326,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
             index[to] = next
             unref(uuidToFilePathIndex).set(node.uuid, to)
         }
-        await relocate(oldPath, newPath)
+        relocate(oldPath, newPath)
         // Moves inside the open workspace (Vertex's own, and ones its watcher sees) carry trust along.
         void stateClient.moveTrust(oldPath, newPath).catch(e => console.error('[index] could not move trust', e))
 
@@ -439,7 +447,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                 const [oldPath, newPath] = paths as [string, string]
                 if (rt.selfWrites.has(oldPath) && rt.selfWrites.has(newPath)) return
                 if (!unref(fileIndex)[oldPath]) return
-                await moveFileInIndex(oldPath, newPath)
+                moveFileInIndex(oldPath, newPath)
                 return
             }
             // macOS reports some renames as two single-path events; resolve from disk.
@@ -458,7 +466,7 @@ export function useActiveWorkspaceIndex(session?: ActiveSession) {
                     return
                 }
                 const actual = (await readDir(parentPathOf(path))).find(e => e.name.toLowerCase() === node.fileName.toLowerCase())
-                if (actual && actual.name !== node.fileName) await moveFileInIndex(path, await join(parentPathOf(path), actual.name))
+                if (actual && actual.name !== node.fileName) moveFileInIndex(path, `${parentPathOf(path)}/${actual.name}`)
             } catch {
                 removeFileFromIndex(path)
             }

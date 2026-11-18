@@ -90,7 +90,7 @@ export function useWorkspaceVault(session: ActiveSession): Vault {
             } else if (hidden(from)) {
                 await addTree(dest)
             } else {
-                await $index.moveFileInIndex(src, dest, root)
+                $index.moveFileInIndex(src, dest, root)
             }
         },
     }

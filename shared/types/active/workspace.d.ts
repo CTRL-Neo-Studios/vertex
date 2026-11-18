@@ -16,6 +16,8 @@ export interface ActiveWorkspaceFileIndex {
     size: number,
     children: string[]
     properties: NoteProperties,
+    /** Its `icon` property when that's text (a folder's comes from its properties file): what the file tree reads. */
+    icon?: string
     forelinks: string[]
     backlinks: string[]
     /** Body tags, link texts and embeds of a note, for Bases; empty for other files. */
@@ -24,10 +26,8 @@ export interface ActiveWorkspaceFileIndex {
     modifiedTime: Date,
 }
 
-/** What the file tree shows of an index entry: nothing a save changes, so saving doesn't rebuild the tree. */
-export interface UITreeNode extends Pick<ActiveWorkspaceFileIndex, 'uuid' | 'fileName' | 'relativePath' | 'isFolder'> {
-    /** The entry's `icon` property, when it's a non-empty string. */
-    icon?: string
+/** What the file tree shows of an index entry: nothing a save changes but its icon, so saving doesn't rebuild the tree. */
+export interface UITreeNode extends Pick<ActiveWorkspaceFileIndex, 'uuid' | 'fileName' | 'relativePath' | 'isFolder' | 'icon'> {
     children: UITreeNode[]
 }
 
