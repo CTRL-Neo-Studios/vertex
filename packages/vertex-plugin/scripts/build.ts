@@ -54,6 +54,9 @@ ts.forEachChild(host.getSourceFile(registry)!, function visit(node) {
 })
 const names = Object.fromEntries(Object.entries(modules).map(([id, module]) =>
     [id, checker.getExportsOfModule(module).filter(s => isValue(checker, s)).map(s => s.name).sort()]))
+// What Vue's compiler writes imports of without its types declaring them (`mergeModels` for `defineModel` beside
+// `defineProps`, `mergeDefaults`…): the runtime's own names too, which the host's copy has.
+names.vue = [...new Set([...names.vue!, ...Object.keys(await import('vue')).filter(k => /^[A-Za-z_$][\w$]*$/.test(k))])].sort()
 write(join(dist, 'modules.json'), `${JSON.stringify(names, null, 2)}\n`)
 
 // `/ui`: each component typed by its props and events in the contract (`shared/plugin/components.ts`: `<Name>Props`,

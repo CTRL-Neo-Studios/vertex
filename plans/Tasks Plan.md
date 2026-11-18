@@ -58,13 +58,13 @@ The user's, 18 Nov (the questions asked before this plan, and the answers to its
 | The library's name (mine) | `@type32/tasks-ui-components`, as its folder. |
 | How the library is built (mine) | Compiled ES modules with types; `vue`, `@nuxt/ui`, `@internationalized/date` and `@type32/tasks` are peers. Its templates import Nuxt UI's components by file (`@nuxt/ui/components/Button.vue`), so no consumer needs auto-imports or global registration. A `/nuxt` module only adds the package to `build.transpile` (a server render can't import `.vue` from `node_modules`) and its stylesheet. |
 | How the library is styled (mine) | Tailwind utilities under its own prefix (`tk:`), compiled into one stylesheet the consumer imports. Colours, radii and fonts are Nuxt UI's CSS variables, so it follows the consumer's theme. No consumer Tailwind setup, and no clash with the consumer's own utilities: the reason Vertex's plugins carry `tw:`. |
-| What the components take (mine) | The format's own objects: `tasks`, the resolved `fields`, `lists`, a time zone, a first day of the week. They draw and report (`open`, `create`, `change` with a patch, `complete`); they write nothing. The plugin applies a patch, sets `updatedAt` and saves; a Bases layout turns the same patch into a property write. |
+| What the components take (mine) | The format's own objects: the document, the view, a time zone, a locale, a first day of the week, labels. They draw and report (`change` with a patch, `create`; the same for lists); they write nothing. The consumer applies a patch with the library's `applyPatch` (stamps `updatedAt`, removes keys set to `undefined`); a Bases layout turns the same patch into a property write. Completing is a patch too (`toggleDone`, the format's `completeTask`). |
 | Dates in the components (mine) | `@internationalized/date` (what Nuxt UI's date inputs take) and `Intl`. No `date-fns`. Recurrence and what a task's times mean come from `@type32/tasks`. |
 | What's taken from the template (mine) | Its views, layout maths and drag behaviour, ported to the format's tasks and the library's prefix; its licence notice kept. Not its data layer, routes or sidebar. |
-| Editing a task (mine) | One editor, the library's: title, notes, Do (`start`), Due, repeat, list, status, priority, tags, star, the document's custom fields. Inline in the list (the screenshot's card), a popover elsewhere. Notes are a slot, a textarea by default; the plugin puts `NoteEditor` there. |
+| Editing a task (mine) | One editor, the library's: title, notes, Do (`start`), Due, repeat, list, status, priority, tags, star, the document's custom fields. Inline in the list (the screenshot's card), a popover elsewhere. Notes are a slot, a textarea by default; the plugin draws them with a read-only `NoteEditor`, editable once clicked (as a canvas card), so the title keeps the focus (an editable `NoteEditor` takes it when drawn). |
 | The screenshot's flags | The flame is priority (mine). The star is a task key, `starred` (the user: a task property), in Format 1.1. |
 | Saving (mine) | The document is parsed once and kept; an edit changes it in memory and the file is written after a pause (`stringify`, which validates). A file that doesn't validate shows its problems by path, and isn't written over. |
-| A file changed outside while open (mine) | Read again when nothing is unsaved; with unsaved edits, `merge` (the format's own rule) and its repairs shown. |
+| A file changed outside while open (mine, changed in T1) | The tab's rule, as for every text viewer: it reloads the text only while nothing is unsaved, and the viewer reads it again. The `merge` first planned had nothing to do: the tab never hands over outside text while edits wait. |
 | Deleting (mine) | `deletedAt`, as the format says. Deleted records are hidden. |
 | Alerts (mine) | While Vertex is open on the workspace: a system notification at a task's due time. Vertex can't schedule one for when it's closed. |
 | Size (mine) | Measured in T0, not assumed. The plugin bundles `@type32/tasks` (with zod, a Temporal polyfill, `js-yaml`, `smol-toml`: 259 KB minified, 82 KB gzipped, measured 18 Nov) and the components; one `main.js`, as every plugin. |
@@ -188,11 +188,55 @@ The risky part first: a component library on Nuxt UI inside a plugin. Nothing of
   system's by default).
 
 ### Acceptance
-- [ ] A new `.task` file opens, takes tasks and reopens with them; the file on disk validates against the library.
-- [ ] A JSON and a TOML document open and are written back as they were, an unknown key still there.
-- [ ] A file with an error says where, and isn't written over; fixed outside, it opens.
-- [ ] Completing a weekly task moves it to next week; completing its last occurrence marks it done.
-- [ ] 5,000 tasks: opening, typing in one and scrolling the list without a pause over 200 ms.
+- [x] A new `.task` file opens, takes tasks and reopens with them; the file on disk validates against the library.
+- [x] A JSON and a TOML document open and are written back as they were, an unknown key still there.
+- [x] A file with an error says where, and isn't written over; fixed outside, it opens.
+- [x] Completing a weekly task moves it to next week; completing its last occurrence marks it done.
+- [x] 5,000 tasks: opening, typing in one and scrolling the list without a pause over 200 ms.
+
+### As built
+- **The library** (`../tasks-ui-components`, uncommitted): `TaskList` (a new task typed at the top, the rows of
+  `taskRows`, one open for editing, the lists column, which hides itself under 42rem), `TaskRow`, `TaskEditor`,
+  `DatePicker` (a calendar, a time for Due), `FieldInput` (a field's value by its type). The rows are pure
+  (`rows.ts`): the format's `viewTasks`, then sections (Today with overdue, Upcoming, Anytime, Done with cancelled;
+  Today and Upcoming by day unless the view sorts; a zoned time on the viewer's day), or groups by `listId`,
+  `starred`, a select's options in order then values outside them, a multiSelect's values (a task in each), a
+  boolean; subtasks under a shown parent. Only the rows on screen are drawn (`@tanstack/vue-virtual`, measured
+  heights). The edits are pure too (`changes.ts`): `toggleDone`, `withStart` (a span keeps its time and length),
+  `withDue`, `withRepeat`, `withValue`; a change of the anchor's form drops what had the old form (`until`,
+  `excludedDates`). Built-in fields' and options' titles are labels (translated), a document's own title for one wins.
+  Labels: every string a component shows, English by default, a consumer's over them. 8 tests (vitest). `@tanstack/
+  vue-virtual` a dependency, `@type32/tasks` a peer. T0's probe is gone.
+- **The plugin** (`../vertex-plugin-tasks`, committed locally): the `.task` file type with New; `TaskViewer` (the
+  document kept, each edit checked whole by `validate` and refused with the format's message when it would break the
+  file, written 300 ms after the last one in the file's own format; the tab autosaves); `document.ts` (the format
+  sniffed, a new file's document, `withRecord`); `ViewBar` (the file's views, Add view, a view's name, grouping,
+  sorting, Hide done tasks, Delete view; a file without views shows a List, written once its options change; a view
+  of a type not drawn yet says so); `TaskNotes`; settings: the first day of the week (`auto`: the language's, from
+  `Intl.Locale`'s week info) and the time zone (empty or invalid: the system's). Strings in `en` and `zh-CN` (the
+  components' under `ui.*`). 7 tests (`bun test`): the sniffing, a new file valid, JSON and TOML kept, a broken
+  file's issue paths, `withRecord`, and `en.json` having every component string.
+- **Checked** in `tauri dev`, by script (a temporary page script running code sent from the shell), devtools off: a
+  new file written at once and reopened with its tasks; tasks typed; an editor opened (the title focused), a Due
+  picked on the calendar, notes written in the `NoteEditor` with a `[[link]]`, a list added and a task filed there,
+  the view grouped by status (written to the file); JSON and TOML files completed and still JSON and TOML with `x-app`;
+  the broken file's `tasks.0.title` shown, the file untouched, fixed outside and shown; the weekly task to Nov 25,
+  then done with `count` used up. Every file written validates: `stringify` validates before it writes.
+- **Measured** (5,000 tasks, 740 KB of YAML, dev build): a first open 79 and 89 ms (two copies of the file), the
+  longest frame after it 19 to 27 ms; a keystroke in a title 33 to 38 ms to the second frame after it (two frames);
+  the write after the pause one 55 to 57 ms frame (twice); scrolling the whole list 600 px a frame, median 17 ms,
+  worst 101 and 90 ms (two runs), 34 rows drawn. `main.js` 406 KB minified, 107 KB gzipped (T0's 290 KB used
+  `parse` alone: the writer, `validate` and the rest of the format arrived with the edits).
+- **Found, in Vertex:**
+  - The SDK's `modules.json` listed Vue's exports from its types, which leave out what Vue's compiler imports:
+    `mergeModels` (a component with `defineModel` beside `defineProps`) failed the plugin's build ("not exported by
+    vertex-shared:vue"). Closed: the build adds the runtime's own names for `vue` (174, were 164). `versions.md`
+    (1.4.0), Concepts and Structures.
+  - A workspace opened by a path through a symlink (`/tmp/tk-ws`, which is `/private/tmp/tk-ws`) gets every outside
+    change wrong: the watcher reports the real path, which the index doesn't have, so a changed file is added again
+    (a second `new.task` in Files), a reload never reaches its tab, and the session stores paths cut at the wrong
+    place (`mp/tk-ws/new2.task`). Not closed: Watcher Plan territory. Whether the Open dialog ever hands over such a
+    path (a folder reached through a link) isn't checked. Open questions, 2.
 
 ## T2: Board
 
@@ -312,3 +356,6 @@ In the library, then in the plugin.
 1. **Order within a board column.** Dragging a card up or down reorders the document's tasks, and the format doesn't
    sync order (a merge keeps the first copy's). Enough for a file one person edits; a `rank` key would be the
    format's next minor if two devices reorder the same column.
+2. **A workspace by a symlinked path** (T1, Found). The fix is the watcher's: compare event paths with the root's
+   real path (resolved once when it starts), or open workspaces by their real path. Yours to schedule, in the Watcher
+   Plan or here before T5 (which reads the index the most).
