@@ -324,6 +324,12 @@ In the library, then in the plugin.
   drawn (the rest counted); a drag across two days, its worst frame 29 ms. `main.js` 456 KB minified, 119 KB gzipped.
 - **Noticed:** a list switched off hides the tasks without a list too, the format's rule for `listIds`. A "No list"
   switch would need the format to say how a view shows tasks without one (Open questions, 3).
+- **Fixed after the user's report** (a screenshot: the dates over the week stood wider than the hours' columns under
+  them, and "10:00 AM" wrapped in the hours' margin): the dates and the all-day row were rows of their own above the
+  hours' scroller, so a shown scrollbar (macOS's "always") narrowed only the hours. They're now stuck to the top
+  inside the one scroller (`sticky`), as wide as the hours whatever the scrollbar; the margin is 4.5rem and its
+  labels don't wrap. Measured with a 17 px scrollbar: each date's left and right edges at the same pixel as its
+  column's, the labels one line (17 px) high.
 
 ## T4: Timeline
 
@@ -336,9 +342,46 @@ In the library, then in the plugin.
   own message; the bar's menu (Edit, Duplicate, Delete, its list as colour).
 
 ### Acceptance
-- [ ] The third screenshot's structure from a document: groups, their subtasks, durations, progress, bars.
-- [ ] A dependency drawn is in `dependsOn`; one that would loop isn't written.
-- [ ] 2,000 bars scroll both ways without a pause over 200 ms (rows drawn as they're scrolled to).
+- [x] The third screenshot's structure from a document: groups, their subtasks, durations, progress, bars.
+- [x] A dependency drawn is in `dependsOn`; one that would loop isn't written.
+- [x] 2,000 bars scroll both ways without a pause over 200 ms (rows drawn as they're scrolled to).
+
+### As built
+- **The library** (uncommitted): `timeline.ts`, pure: `timelineAxis` (a month before the earliest time and today, to
+  two months after the latest), `timelineRows` (the view's tasks depth first, subtasks under their parent, a folded
+  one's left out; each occurrence in the axis from `calendarItems`, in days from the axis' start: a span's start and
+  end, a moment and a todo's due as points, a date's at its middle; a span's own due as a mark; a parent without times
+  of its own covers its subtasks', its progress theirs weighted by length; `progress` is `values.progress`, 100 for a
+  completed task), `timelineTicks` (days or weeks under months, months under years), `linkPath` (finish to start,
+  around through the gap between rows when the next starts first), `DAY_WIDTH` (day 40, week 16, month 4 px).
+  `TaskTimeline.vue`: one scroller, the outline `sticky` at the left and the header at the top (as the week's fix in
+  T3), so both sides scroll together with no syncing; rows virtual (`@tanstack/vue-virtual`), lines only for rows
+  drawn. A drag moves a bar by days (`shiftTask`, so a repeating task's series moves whole, its exclusions with it), its
+  end stretches it; a click opens the editor; a drag from the dot after a bar to a row adds the bar's task to that
+  row's `dependsOn` (`change`). Scale in the view's `scale`; Today, and each new scale, scroll to today.
+  `followPointer` taken out of the calendar's drag, for both. Labels edit, duplicate, list, duration,
+  removeDependency; lengths are `Intl` units (`5d`, `2.5h`), so not labels. 6 tests (29 in all).
+- **The menu is the library's, not the plugin's** (the Change said the plugin's): Edit, Duplicate, List (each with its
+  colour), Remove dependency on (each it waits for), Delete; on a right click on a bar or an outline row
+  (`UContextMenu`). Nothing in it is Vertex's, so other apps get it too.
+- **The plugin:** `timeline` in the views drawn and in Add view (`i-lucide-chart-gantt`); its strings (en, zh-CN). A
+  loop needs nothing of its own: every edit is validated whole (`commit`), so it's refused with the format's message
+  (`tasks.1.dependsOn: "interviews" is part of a dependsOn cycle`).
+- **Checked** in `tauri dev` by script on a plan of three parents, their subtasks, progress and four dependencies: the
+  outline (Research 12d 74%, Design 19d 14% from 30% of 9 days, Build 15.6d), bars, a moment, a due mark, a todo's
+  flag, the lines (one around); Wireframes dragged two days (`2026-11-18`–`2026-11-26`); Visual design stretched three
+  (`end: 2026-12-07`); Survey's dot dragged to Wireframes (`dependsOn: [interviews, survey]`); Launch's dot to
+  Interviews refused, the file's bytes the same; Duplicate, List → Home, Edit (its title focused) from the menu;
+  Research folded. Not checked: Remove dependency on, Delete from the menu, a drag at the month scale.
+- **Measured** (2,100 rows, 2,000 bars, 1,300 lines; dev build): opening it 97–143 ms; scrolling 80 frames down, right,
+  up, left and diagonally, the worst frame 18–82 ms; the day scale 75 ms to switch, 43 ms at worst scrolled; 32–46
+  rows drawn. `main.js` 479 KB minified, 124 KB gzipped (23 KB more).
+- **Fixed on the way:** a closed task's row faded its outline too, so lines showed through its background (the fade
+  is the bars' now); the month's name in the header was clipped by its cell (a `sticky` label needs no clipping
+  ancestor); a time on the axis' first day would have come out `NaN` (`CalendarDateTime.compare` with a
+  `CalendarDate`; found by the type check, the day is taken first now).
+- **Not done:** a new task from the timeline (the other views make them); the order of rows (the file's, as
+  `viewTasks` sorts); a column's width.
 
 ## T5: The workspace's tasks
 
