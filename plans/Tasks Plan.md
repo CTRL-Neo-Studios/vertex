@@ -970,6 +970,76 @@ dependency lines kept but quiet.
   passed its 20 tests and built; tag `v0.3.0` pushed, the workflow released it with `plugin.zip`:
   https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.3.0
 
+## T12: Every dated task is a bar you can move
+
+The user (19 Nov), with a screenshot of a task "Do Nov 19, Due Nov 20" at the Hours zoom: no bar shows, so there's
+nothing to drag or stretch; a diamond and an unlabelled red mark instead. "I could've dragged my event left or right,
+or resized it to modify its end time, and yet it doesn't work."
+
+**Where T11 went wrong:**
+- **The timeline took the calendar's kinds.** `timelineRows` draws what `calendarItems` gives: a span only for a task
+  with a `start` and an `end` or `duration`. The editor's two dates are Do (`start`) and Due, so the task anyone
+  makes there is a "moment": a diamond at Do, a red mark at Due. Only a task made by dragging on the calendar got a
+  bar. T11 was checked on a hand-written plan where every task had an `end`, never on one made in the editor.
+- **A date was drawn at noon** (`point`: a date's middle), so at Hours it reads as 12 PM.
+- **Stretching only writes `end` or `duration`** (`shiftTask`, `edge: 'end'`: `{}` for anything else), and only the
+  right end has a handle.
+- **Two thin red lines** for two things: today's line and a due.
+- **The outline:** Duration and Status are blank for such tasks and still take 210 of its 440 px, so titles are cut.
+- **The bracket between the two diamonds** in the screenshot: not known yet whether it's a dependency (one can be
+  made by a drag from the dot) or a line that shouldn't be there.
+
+**The rule:** a task with any date is one bar. Its body moves it, either end stretches it, and every such drag
+writes something. Nothing dated is drawn as anything else. A task with no date gets a bar by dragging across its row.
+
+### Change
+No format change. The library (`../tasks-ui-components`, 0.4.0, published by the user), then Tasks 0.4.0.
+
+- **What a bar covers** (`timeline.ts`, `timelineRows`; the calendar's kinds stay the calendar's), per occurrence:
+
+  | The task has | From | To | The right end writes | The left end writes |
+  | --- | --- | --- | --- | --- |
+  | `start` and `end` or `duration` | start | end | `end` / `duration` (as now) | `start` (the end stays: `duration` shortened) |
+  | `start` and `due`, no end | start | due | `due` | `start` |
+  | `start` alone | start | the end of its day; an hour later for a time | `end` | `start` |
+  | `due` alone | the start of its day; an hour before a time | due | `due` | `start` (it becomes Do → Due) |
+
+  A date covers its whole day (a due date through that day's end), so nothing is at noon. A bar never ends before it
+  starts: an end dragged past the other stops a day (15 minutes at hour widths) short of it.
+- **`stretchTask(task, edge, shift)`** beside `shiftTask` for the table's two right columns; `shiftTask`'s
+  `edge: 'end'` branch goes with it (the calendar calls the new one). Moving a bar stays `shiftTask` (`start`, `end`
+  and `due` together).
+- **Drawing:** bars as T11's, for every row of the table. A bar under 16 px is drawn 16 px wide with its title after
+  it. A handle at each end. The diamond and the due mark are gone. A due that isn't the bar's end (a task with
+  `start`, `end` and `due`) is a small flag in the task's colour at the due, red when it's past and the task open; its
+  date on hover; it isn't dragged (the editor sets it). Today's line in the theme's primary, as its pill.
+- **A task without dates:** its row is empty; a drag across it draws its bar (`start` and `end`, dates, or times at
+  hour widths), as the calendar's drag on empty hours makes one.
+- **Groups:** a parent with dates of its own is a bar like any other. One without is the line over its subtasks, and
+  dragging the line moves every subtask by as much (one `change` each); it has no ends to stretch.
+- **Duration** is the bar's length; blank where that length is only drawn (a time alone, a due alone).
+  **Status** shows the progress bar when there's progress, else the status' name. The two columns narrow (80 and
+  96 px) so a title has about 260 px; a cut title shows whole on hover.
+- **The bracket:** find what draws it. A dependency between two bars now has somewhere to run; a line that shouldn't
+  be there is removed.
+- **Tests** (library): the table's four rows to bars, dates and times, a repeating task; `stretchTask` for each cell
+  of the table and the stop at the other end; a group's drag.
+- README (library, plugin); Tasks 0.4.0 once the library is published.
+
+### Acceptance
+Checked in the app on tasks made in the editor (Do, Due, both, a time), not on a hand-written file.
+- [ ] A task with Do Nov 19 and Due Nov 20 is a bar over both days; dragged, both dates move in the file; its right
+  end dragged moves Due, its left end Do.
+- [ ] A task with only a Do, only a Due, and a time alone each draw a bar, and each end of each writes what the table
+  says.
+- [ ] A drag across the row of a task without dates gives it a `start` and an `end`.
+- [ ] No diamond and no due mark is left; today's line and a due flag can't be mistaken for each other.
+- [ ] A group's line dragged moves its subtasks together.
+- [ ] Left open by T11: a task's colour shows in the list, the board and the calendar; the zoom is there after a
+  reload. (A trackpad pinch stays the user's to try.)
+- [ ] T11's measure on 2,000 bars holds (no frame over 200 ms scrolling, 100 ms zooming).
+
+
 
 ## Not in this plan
 
