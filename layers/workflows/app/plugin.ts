@@ -1,3 +1,4 @@
+import {defineAsyncComponent} from 'vue'
 import {hashProgram} from '@type32/workflows/core'
 import type {PluginContext} from '#shared/plugin/api'
 import {definePlugin} from '#shared/plugin/api'
@@ -55,8 +56,9 @@ export default definePlugin<WorkflowsConfig>({
         }
         context.provide({
             run: (path, options) => ready().runPath(path, false, options),
-            dryRun: async (path, options) => (await ready().runPath(path, true, options))!,
+            dryRun: (path, options) => ready().runPath(path, true, options),
             registerNodes,
+            Ops: defineAsyncComponent(() => import('./components/Ops.vue')),
         } satisfies WorkflowsApi)
 
         // Run workflow from the file menu and the palette. Workflows run on a workspace folder.

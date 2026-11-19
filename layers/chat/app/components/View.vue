@@ -3,7 +3,7 @@ import type {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart} from "ai";
 import type {VertexChatMessage} from "../../shared/types";
 import {ask} from "@tauri-apps/plugin-dialog";
-import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/plugin/files";
+import {fileNameFromPath, isImage} from "#shared/plugin/files";
 import {useScrollFade, ViewerLayout} from "~/plugin/ui";
 import {chatContext, chatSession} from "../plugin";
 import {useChats} from "../lib/chats";
@@ -114,7 +114,6 @@ const input = ref('')
 const notes = ref<string[]>([])
 const isFolderRef = (ref: string) => ref.endsWith('/')
 const refName = (ref: string) => isFolderRef(ref) ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
-const refIcon = (ref: string) => isFolderRef(ref) ? 'i-lucide-folder' : isImage(getFileExtensionFromPath(ref)) ? 'i-lucide-image' : 'i-lucide-file-text'
 
 // Files dropped on the chat (from Files, Finder or Explorer) or pasted into the prompt are attached: `useChatAttach`
 // decides what chat can take and copies outside files into the workspace first.
@@ -429,15 +428,8 @@ const MENU = 'w-max min-w-48 max-w-80'
 					             @submit="onSubmit" @blur="mention = null">
 						<template #header v-if="notes.length">
 							<div class="flex flex-wrap gap-1">
-								<UBadge v-for="note in notes" :key="note"
-								        :icon="refIcon(note)" size="sm"
-								        color="neutral" variant="soft" :label="refName(note)" :title="note">
-									<template #trailing>
-										<UButton icon="i-lucide-x" size="xs" color="neutral" variant="link" class="p-0"
-										         :aria-label="$t('plugins.chat.removeNote')"
-										         @click="notes = notes.filter(n => n !== note)"/>
-									</template>
-								</UBadge>
+								<ChatRefAttachment v-for="note in notes" :key="note" :path="note" removable
+								                   @remove="notes = notes.filter(n => n !== note)"/>
 							</div>
 						</template>
 						<template #footer>

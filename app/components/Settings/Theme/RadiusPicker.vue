@@ -6,22 +6,19 @@ const {theme, update} = useAppTheme()
 </script>
 
 <template>
-    <div class="flex gap-1">
-        <UTooltip v-for="r in RADIUSES" :key="r" :text="`${r}rem`">
-            <UButton
-                size="sm"
-                color="neutral"
-                variant="outline"
-                square
-                :active="theme.roundedRadius === r"
-                active-color="primary"
-                active-variant="subtle"
-                :aria-label="`${r}rem`"
-                @click="update({ roundedRadius: r })"
-            >
+    <UToggleGroup
+        :items="RADIUSES.map(r => ({ value: r, square: true, 'aria-label': `${r}rem` }))"
+        :model-value="theme.roundedRadius"
+        size="sm"
+        variant="outline"
+        active-variant="subtle"
+        @update:model-value="v => RADIUSES.includes(v as never) && update({ roundedRadius: v as number })"
+    >
+        <template #default="{ item }">
+            <UTooltip :text="`${item.value}rem`">
                 <!-- The top-left corner of a 1rem box at that radius. -->
-                <span class="block size-4 border-t-2 border-s-2 border-current" :style="{ borderTopLeftRadius: `${r}rem` }"/>
-            </UButton>
-        </UTooltip>
-    </div>
+                <span class="block size-4 border-t-2 border-s-2 border-current" :style="{ borderTopLeftRadius: `${item.value}rem` }"/>
+            </UTooltip>
+        </template>
+    </UToggleGroup>
 </template>

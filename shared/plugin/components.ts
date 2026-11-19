@@ -169,6 +169,8 @@ export interface NoteEditorEmits {
 export interface PluginMountProps {
     ui: UiSlot<never>
     props: object
+    /** The plugin named if it fails to draw, for a slot that isn't a registered contribution (a chat tool's `preview`). */
+    owner?: string
 }
 
 /** The vault picker: files or folders of the workspace (`v-model`: workspace-relative paths). */

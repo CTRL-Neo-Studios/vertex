@@ -88,11 +88,11 @@ const openEntry = (entry: RecentEntry) => busy(() => recents.open(entry))
                         </div>
                     </div>
                     <UTooltip :text="entry.session.pinned ? $t('app.home.unpin') : $t('app.home.pin')">
-                        <UButton
+                        <UToggle
+                            :model-value="entry.session.pinned"
                             icon="i-lucide-pin"
                             size="xs"
-                            :color="entry.session.pinned ? 'primary' : 'neutral'"
-                            variant="ghost"
+                            active-variant="ghost"
                             :class="entry.session.pinned ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'"
                             :aria-label="entry.session.pinned ? $t('app.home.unpin') : $t('app.home.pin')"
                             @click.stop="recents.setPinned(entry, !entry.session.pinned)"

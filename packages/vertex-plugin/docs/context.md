@@ -32,9 +32,9 @@ export default definePlugin<Config>({
 
 ## About the plugin and the window
 
-### `ctx.plugin.id`, `ctx.plugin.version`, `ctx.plugin.source`, `ctx.plugin.assetUrl`
+### `ctx.plugin.id`, `ctx.plugin.name`, `ctx.plugin.version`, `ctx.plugin.source`, `ctx.plugin.assetUrl`
 
-Its id and version as its manifest says, and `source`: `global` (installed for every workspace), `workspace` (a
+Its id, name and version as its manifest says, and `source`: `global` (installed for every workspace), `workspace` (a
 workspace's own) or `core`. `assetUrl(path)` is a URL for a file of the plugin's folder (`logo.svg`, `data/words.json`,
 nothing outside it), for an `<img>`, `fetch` or `import()`; the build puts `public/` at the folder's top.
 
@@ -404,10 +404,44 @@ ctx.whenPlugin('bases', bases => {
 
 Put the plugin you use in `requires` (`"requires": ["bases"]`, or `"bases?"` when it's optional). The SDK types the
 APIs of Vertex's own plugins: `bases` (`registerView`, `Value`), `ai`, `chat`, `mermaid` (`Diagram`), `workflows`
-(`run`, `dryRun`, `registerNodes`), and exports their types by name: a layout's component takes `BaseViewProps`
-(`defineProps<BaseViewProps>()`, from `@type32/vertex-plugin`), whose `context` has the base's rows (`result`), the
-view's options (`view`), `commit` for the base and `newItem`. A community plugin's API can be provided and used at
-run time, but it can't be typed yet.
+(`run`, `dryRun`, `registerNodes`, `Ops`: a run's changes drawn), and exports their types by name: a layout's
+component takes `BaseViewProps` (`defineProps<BaseViewProps>()`, from `@type32/vertex-plugin`), whose `context` has
+the base's rows (`result`), the view's options (`view`), `commit` for the base and `newItem`. A community plugin's API
+can be provided and used at run time, but it can't be typed yet.
+
+Chat's `registerTool(ctx.plugin, def)` gives chats' models a tool, as `<plugin id>_<name>`. The model finds it
+through the chat's tool search by its `description`'s words; its card in the chat says the plugin's name and its
+`label`. `inputSchema` is a JSON Schema the model fills (not checked: check `input` yourself); `execute(input,
+{session, signal})` returns JSON, cut at 20,000 characters, and a throw reaches the model as `{error}`. A tool with
+`writes: true` runs in Suggest and Write mode, each call approved by the user first; Read mode refuses it. Tools are
+in chats only, not in the inline assistant or workflows.
+
+```ts
+ctx.whenPlugin('chat', chat => {
+    chat.registerTool(ctx.plugin, {
+        name: 'count', label: 'plugins.hello.tools.count', description: 'Count the notes in a folder.',
+        inputSchema: {type: 'object', properties: {folder: {type: 'string'}}, additionalProperties: false},
+        execute: (input, {session}) => {
+            const {folder = ''} = input as { folder?: string }
+            return {notes: session.index.files().filter(f => f.fileExt === 'md' && f.relativePath.startsWith(folder)).length}
+        },
+    })
+})
+```
+
+A tool that changes something should show what, before it's approved: its `preview` (`component` or `mount`, as any
+plugin UI) draws under the tool's row while the user is asked, with `ChatToolPreviewProps` (`input`, `session`).
+Work it out with the same code `execute` runs, from the workspace as it is, so what's approved is what's done.
+Without one, the row lists the input.
+
+```ts
+chat.registerTool(ctx.plugin, {
+    name: 'archive', label: 'plugins.hello.tools.archive', description: 'Archive a note.', writes: true,
+    inputSchema: {type: 'object', properties: {path: {type: 'string'}}, required: ['path']},
+    preview: {component: () => import('./ArchivePreview.vue')}, // defineProps<ChatToolPreviewProps>()
+    execute: (input, {session}) => archive(session, (input as { path: string }).path),
+})
+```
 
 ## Dialogs
 

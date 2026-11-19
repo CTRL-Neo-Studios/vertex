@@ -1,6 +1,8 @@
 import {getToolName, isToolUIPart, jsonSchema, tool, toolSearch, type ModelMessage, type Tool, type ToolSet} from "ai";
+import {getCurrentScope, onScopeDispose, shallowReactive} from "vue";
 import {editorTools} from "@type32/codemirror-rich-obsidian-editor/ext/ai/tools";
-import type {FileOpResult, FileOpSkip, NoteSearch, NoteSearchOptions} from "#shared/plugin/api";
+import type {FileOpResult, FileOpSkip, NoteSearch, NoteSearchOptions, SessionContext} from "#shared/plugin/api";
+import type {ChatApi, ChatToolDef} from "../api";
 import type {ChatMode, ChatScope, VertexChatMessage} from "../../shared/types";
 import {globToRegExp} from "../../shared/glob";
 import type {FeedbackInput} from "./feedback";
@@ -51,6 +53,8 @@ export interface NoteToolDeps {
      * model gets back.
      */
     bash?: (command: string, signal?: AbortSignal) => Promise<object>
+    /** The chat's session, for plugins' tools ({@link registerTool}); absent: they refuse. */
+    session?: SessionContext
 }
 
 /** `askUser`'s questions; see the tool's schema. */
@@ -78,10 +82,42 @@ const BASH = 'bash'
 
 const MODE_NAMES: Record<ChatMode, string> = {read: 'Read', suggest: 'Suggest', write: 'Write'}
 
-/** The tools made for one mode; every other tool works in any. */
+/** The tools made for one mode; every other tool works in any. A plugin's that `writes` runs in Suggest and Write ({@link modesOf}). */
 const MODE_OF: Partial<Record<string, ChatMode>> = {
     proposeEdit: 'suggest', proposeInsert: 'suggest', createNote: 'write', writeNote: 'write', editNote: 'write',
     moveFiles: 'write', copyFiles: 'write',
+}
+
+/** A plugin's tool, by the name the model sees. */
+export interface PluginTool {
+    plugin: Parameters<ChatApi['registerTool']>[0]
+    def: ChatToolDef
+}
+/** Plugins' tools by the name the model sees (`<plugin id>_<name>`); reactive, for their cards. */
+export const pluginTools = shallowReactive(new Map<string, PluginTool>())
+
+/** `ChatApi.registerTool`: a second tool of the same name is an error. Removed with the scope it's called in, or by what it returns. */
+export function registerTool(plugin: PluginTool['plugin'], def: ChatToolDef) {
+    const name = `${plugin.id}_${def.name}`
+    // Providers take `[A-Za-z0-9_-]{1,64}`; a plugin's id has letters, digits and `-`.
+    if (!/^\w+$/.test(def.name) || name.length > 64) throw new Error(`"${def.name}" isn't a chat tool's name: letters, digits and _, at most ${63 - plugin.id.length}`)
+    if (pluginTools.has(name)) throw new Error(`a chat tool "${name}" is registered already`)
+    const entry = {plugin, def}
+    pluginTools.set(name, entry)
+    const remove = () => {
+        if (pluginTools.get(name) === entry) pluginTools.delete(name)
+    }
+    if (getCurrentScope()) onScopeDispose(remove)
+    return remove
+}
+
+/**
+ * The modes tool `name` runs in; `undefined`: every mode. A plugin's tool that `writes` changes files at once, each
+ * call approved: an accepted suggestion in Suggest, an applied change in Write.
+ */
+const modesOf = (name: string): ChatMode[] | undefined => {
+    const one = MODE_OF[name]
+    return one ? [one] : pluginTools.get(name)?.def.writes ? ['suggest', 'write'] : undefined
 }
 /** What does the same in another mode, by tool and mode. */
 const INSTEAD: Partial<Record<string, Partial<Record<ChatMode, string>>>> = {
@@ -93,14 +129,15 @@ const INSTEAD: Partial<Record<string, Partial<Record<ChatMode, string>>>> = {
 
 /** Why tool `name` can't run in `mode`, worded for the model with what to do instead; `undefined` when it can. */
 export function modeError(name: string, mode: ChatMode): { error: string } | undefined {
-    const needs = MODE_OF[name]
-    if (!needs || needs === mode) return undefined
+    const modes = modesOf(name)
+    if (!modes || modes.includes(mode)) return undefined
     const instead = INSTEAD[name]?.[mode]
+    const needs = modes.map(m => MODE_NAMES[m]).join(' or ')
     return {
-        error: `${name} only works in ${MODE_NAMES[needs]} mode, and this chat is in ${MODE_NAMES[mode]} mode. `
+        error: `${name} only works in ${needs} mode, and this chat is in ${MODE_NAMES[mode]} mode. `
             + (instead ? `Use ${instead} instead.`
                 : mode === 'read' ? 'Read mode can\'t change notes: ask the user to switch the chat to Suggest or Write mode.'
-                    : `Ask the user to switch the chat to ${MODE_NAMES[needs]} mode.`),
+                    : `Ask the user to switch the chat to ${needs} mode.`),
     }
 }
 
@@ -135,12 +172,15 @@ export function toolsPrompt(mode: ChatMode, scope: string, tools: boolean): stri
             : 'Edits are only proposed: the user accepts or rejects each one, and the result tells you which. You may propose '
             + `edits to ${scope}. To edit a note that isn't open, pass its path.`
     // Tools first: small models lose the tool search behind the mode's wording and call made-up tools.
+    const byPlugin = new Map<string, string[]>()
+    for (const [name, {plugin}] of pluginTools) byPlugin.set(plugin.name, [...byPlugin.get(plugin.name) ?? [], name])
     return [
         'You can use tools on the user\'s notes. They load on demand: first call `findTools` with what you want to do (for '
         + 'example "search notes", "find files", "folder tree", "read note", "edit a note", "move files", "run a workflow", '
         + `"fetch a web page" or "run a bash command"), then call the tools it returns. Only \`findTools\` and \`${ASK_USER}\` `
         + 'can be called without searching first. Prefer the note tools: the sandboxed shell over the workspace (search "run '
         + 'a bash command") is for what they can\'t do, like counting across many notes or changing many files at once.',
+        byPlugin.size ? `The user's plugins add tools, found the same way: ${[...byPlugin].map(([plugin, names]) => `${plugin} (${names.join(', ')})`).join('; ')}.` : '',
         current,
         rule,
         `${MODES} A tool whose description names a mode only works in that mode.`,
@@ -151,8 +191,15 @@ export function toolsPrompt(mode: ChatMode, scope: string, tools: boolean): stri
         + 'asking in your reply, and don\'t end a reply with a question you could have asked with it.',
         'When no tool can do what the user asks, or a tool fails, misbehaves or misleads you, call `toolFeedback` and tell '
         + 'the user in your reply, instead of working around it.',
-    ].join(' ')
+    ].filter(Boolean).join(' ')
 }
+
+/**
+ * The day, for the system prompt: a model doesn't know it, and the dates a user names ("tomorrow", "this week") need
+ * it. The day and not the time, so the prompt stays the same all day.
+ */
+export const todayText = (now: Date) => `Today is ${now.toLocaleDateString('en-US', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})} `
+    + `(${now.toLocaleDateString('en-CA')}), in the user's time zone, ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`
 
 /** The named scope: notes by path, and folders whose notes all count. */
 export interface NamedNotes {
@@ -196,7 +243,7 @@ export function rankTools({query, tools}: { query: string, tools: { name: string
             name: t.name,
             score: asked.reduce((sum, w) => sum + (name.includes(w) ? 2 : 0) + (description.includes(w) ? 1 : 0), 0),
             // Another mode's tools after this mode's, and bash after both.
-            later: Number(!!mode && !!MODE_OF[t.name] && MODE_OF[t.name] !== mode) + Number(t.name === BASH) * 2,
+            later: Number(!!mode && !!modesOf(t.name) && !modesOf(t.name)!.includes(mode)) + Number(t.name === BASH) * 2,
         }
     })
     const matched = scored.filter(s => s.score > 0)
@@ -509,8 +556,29 @@ const askUser = tool({
 /** Only `execute` tools: a tool made for another mode answers with {@link modeError} instead of running. */
 function gated(name: string, t: Tool, mode: ChatMode): Tool {
     const run = t.execute
-    if (!run || !MODE_OF[name]) return t
+    if (!run || !modesOf(name)) return t
     return {...t, execute: (input, options) => modeError(name, mode) ?? run(input, options)}
+}
+
+/**
+ * A plugin's tool in a chat: one that `writes` says it's Suggest and Write mode's and asks before each call there;
+ * what it returns goes to the model as plain JSON, cut where a note read is, and what it throws as `{error}`.
+ */
+function pluginTool(def: ChatToolDef, deps: NoteToolDeps): Tool {
+    return tool({
+        description: def.writes ? `Suggest and Write mode: ${def.description} The user approves each call.` : def.description,
+        inputSchema: jsonSchema(def.inputSchema as Parameters<typeof jsonSchema>[0]),
+        ...(def.writes && {needsApproval: () => deps.mode !== 'read'}),
+        execute: async (input, {abortSignal}) => {
+            if (!deps.session) return {error: 'Plugins\' tools can\'t run in this chat.'}
+            try {
+                const json = JSON.stringify(await def.execute(input, {session: deps.session, signal: abortSignal}) ?? null)
+                return json.length > NOTE_READ_CHARS ? {truncated: true, json: json.slice(0, NOTE_READ_CHARS)} : JSON.parse(json)
+            } catch (e) {
+                return {error: e instanceof Error ? e.message : String(e)}
+            }
+        },
+    })
 }
 
 /**
@@ -696,6 +764,7 @@ export function chatTools(deps: NoteToolDeps, used: ReadonlySet<string>): ToolSe
             }),
             execute: ({command}, {abortSignal}) => deps.bash ? deps.bash(command, abortSignal) : {error: 'Commands can\'t run in this chat.'},
         }),
+        ...Object.fromEntries([...pluginTools].map(([name, {def}]) => [name, pluginTool(def, deps)])),
     }
     const deferred = Object.entries(tools).map(([name, t]) => [name, used.has(name) ? gated(name, t, deps.mode) : {...gated(name, t, deps.mode), deferLoading: true}])
     return {

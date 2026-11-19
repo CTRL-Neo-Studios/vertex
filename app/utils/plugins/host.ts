@@ -124,7 +124,7 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
             (states.get(target as string)?.status === 'active' ? running.get(target as string)?.api : undefined) as PluginApis[K] | undefined
 
         return {
-            plugin: {id, version: manifest.version, source, assetUrl: path => options.assetUrl(id, path)},
+            plugin: {id, name: manifest.name, version: manifest.version, source, assetUrl: path => options.assetUrl(id, path)},
             config: options.config(manifest),
             ...options.services(manifest, own),
             window: {...options.window},

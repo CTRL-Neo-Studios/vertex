@@ -21,13 +21,6 @@ watch(questions, list => {
     own.value = list.map(() => '')
 }, {immediate: true})
 
-function pick(at: number, label: string) {
-    const current = picked.value[at] ?? []
-    picked.value[at] = questions.value[at]?.multiple
-        ? current.includes(label) ? current.filter(l => l !== label) : [...current, label]
-        : current[0] === label ? [] : [label]
-}
-
 const answers = computed(() => questions.value.map((q, i) => {
     const typed = own.value[i]?.trim()
     const chosen = [...picked.value[i] ?? [], ...typed ? [typed] : []]
@@ -59,20 +52,22 @@ function given(at: number) {
             <p>{{ q.question }}</p>
             <p v-if="output && 'answers' in output" class="text-muted">{{ given(i) }}</p>
             <template v-else-if="!output">
-                <div v-if="q.options?.length" class="flex flex-wrap gap-1">
-                    <UButton
-                        v-for="option in q.options"
-                        :key="option.label"
-                        size="xs"
-                        :color="picked[i]?.includes(option.label) ? 'primary' : 'neutral'"
-                        :variant="picked[i]?.includes(option.label) ? 'soft' : 'outline'"
-                        :icon="q.multiple ? picked[i]?.includes(option.label) ? 'i-lucide-square-check' : 'i-lucide-square' : undefined"
-                        :label="option.label"
-                        :title="option.description"
-                        :disabled
-                        @click="pick(i, option.label)"
-                    />
-                </div>
+                <UToggleGroup
+                    v-if="q.options?.length"
+                    :type="q.multiple ? 'multiple' : 'single'"
+                    :items="q.options.map(option => ({
+                        value: option.label,
+                        label: option.label,
+                        title: option.description,
+                        icon: q.multiple ? picked[i]?.includes(option.label) ? 'i-lucide-square-check' : 'i-lucide-square' : undefined,
+                    }))"
+                    :model-value="q.multiple ? picked[i] : picked[i]?.[0]"
+                    size="xs"
+                    variant="outline"
+                    :disabled
+                    class="flex-wrap"
+                    @update:model-value="v => picked[i] = [v ?? []].flat().filter(Boolean) as string[]"
+                />
                 <UInput
                     v-model="own[i]"
                     size="xs"

@@ -61,14 +61,25 @@ function trigger(tool: Tool) {
     <div class="flex items-center gap-0.5 z-10">
         <UTooltip v-for="tool in items" :key="tool.id" :text="tool.label" :kbds="tool.kbds">
             <!-- mousedown.prevent keeps the editor's focus and selection, so formatting applies to what's selected. -->
-            <UButton
+            <UToggle
+                v-if="tools === 'format'"
+                :model-value="tool.active"
                 :icon="tool.icon"
                 size="xs"
-                :color="tool.active ? 'primary' : 'neutral'"
-                :variant="tool.active ? 'soft' : 'ghost'"
                 :disabled="disabled || !tool.enabled"
                 :aria-label="tool.label"
-                :aria-pressed="tools === 'format' ? tool.active : undefined"
+                @mousedown.prevent
+                @click="trigger(tool)"
+				class="backdrop-blur-lg"
+            />
+            <UButton
+                v-else
+                :icon="tool.icon"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                :disabled="disabled || !tool.enabled"
+                :aria-label="tool.label"
                 @mousedown.prevent
                 @click="trigger(tool)"
 				class="backdrop-blur-lg"

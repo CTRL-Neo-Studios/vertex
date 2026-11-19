@@ -10,7 +10,7 @@ import {getInternalLinks} from '#shared/plugin/links'
 import {LinkGraph} from '#shared/utils/index/linkGraph'
 import {overlayVault} from './dryRun'
 import {createVertexEffects, undoOps, type Op} from './effects'
-import {hasTag, matchesPattern, obsidianYaml, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from '#shared/plugin/vault'
+import {hasTag, matchesPattern, obsidianYaml, removeFrontmatterProperty, retag, setFrontmatterProperty, vaultPath, type Vault, type VaultEntry} from '#shared/plugin/vault'
 import {buildLanguage, vertexBuilder, type VertexEffects, type VertexExtension} from './vertex'
 
 const vertexLanguage = vertexBuilder().build()
@@ -413,6 +413,14 @@ describe('helpers', () => {
         // A YAML 1.1 reader made `due` a Date, written back as `2026-02-03T00:00:00.000Z`, and quoted the key `n`.
         expect(setFrontmatterProperty('---\ndue: 2026-02-03\nn: 1\n---\nx', 'status', 'done', yaml))
             .toBe('---\ndue: 2026-02-03\nn: 1\nstatus: done\n---\nx')
+    })
+
+    it('removeFrontmatterProperty takes one key out, the block with it when it was the last', () => {
+        expect(removeFrontmatterProperty('---\ntask:\n  id: a\nn: 1\n---\nx', 'task', yaml)).toBe('---\nn: 1\n---\nx')
+        expect(removeFrontmatterProperty('---\ntask:\n  id: a\n---\n\n# T\n', 'task', yaml)).toBe('# T\n')
+        expect(removeFrontmatterProperty('---\nn: 1\n---\nx', 'task', yaml)).toBe('---\nn: 1\n---\nx')
+        expect(removeFrontmatterProperty('# T\n', 'task', yaml)).toBe('# T\n')
+        expect(() => removeFrontmatterProperty('---\nn: 1\nbody', 'n', yaml)).toThrow(/not closed/)
     })
 
     it('matchesPattern: names with or without extension, globs on names or paths', () => {

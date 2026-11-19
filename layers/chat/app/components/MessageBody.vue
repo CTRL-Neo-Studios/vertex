@@ -2,11 +2,10 @@
 import type {Chat} from "@ai-sdk/vue";
 import {getToolName, isToolUIPart, type DynamicToolUIPart, type ToolUIPart} from "ai";
 import type {VertexChatMessage} from "../../shared/types";
-import {fileNameFromPath, getFileExtensionFromPath, isImage} from "#shared/plugin/files";
 import {chatSession} from "../plugin";
 import {useChats} from "../lib/chats";
 import {useNotify} from "../lib/notify";
-import {ASK_USER, hostnameOf, type AskUserOutput} from "../lib/tools";
+import {ASK_USER, hostnameOf, pluginTools, type AskUserOutput} from "../lib/tools";
 
 /**
  * One message's content: attached notes, text, reasoning, tool calls (with their questions and approvals) and staged
@@ -18,11 +17,7 @@ const props = defineProps<{ chatId: string, chat: Chat<VertexChatMessage>, messa
 const {t, te} = useI18n()
 const $qt = useNotify()
 const session = chatSession()!
-const {allowHost, root} = useChats(session)
-/** An attached image shows as itself (from disk, through `session.files.assetUrl`), not as a name. */
-const imageSrc = (note: string) => root.value && isImage(getFileExtensionFromPath(note)) ? session.files.assetUrl(`${root.value}/${note}`) : undefined
-
-const refName = (ref: string) => ref.endsWith('/') ? ref.slice(0, -1).split('/').at(-1)! : fileNameFromPath(ref, true)
+const {allowHost} = useChats(session)
 
 async function act(run: () => Promise<unknown>) {
 	try {
@@ -92,8 +87,10 @@ function toolView(part: ToolPart) {
 					: pending && (name === 'proposeEdit' || name === 'proposeInsert') ? t('plugins.chat.tools.waiting')
 						: input.query ?? input.glob ?? input.path ?? input.folder ?? input.url ?? input.command ?? input.summary
 							?? (moved.length > 1 ? t('plugins.chat.tools.items', {count: moved.length}) : moved[0])
+	const plugin = pluginTools.get(name)
 	return {
-		text: te(`plugins.chat.tools.names.${name}`) ? t(`plugins.chat.tools.names.${name}`) : name,
+		text: plugin ? t('plugins.chat.tools.pluginTool', {plugin: plugin.plugin.name, tool: t(plugin.def.label)})
+			: te(`plugins.chat.tools.names.${name}`) ? t(`plugins.chat.tools.names.${name}`) : name,
 		suffix,
 		icon: TOOL_ICONS[name] ?? 'i-lucide-wrench',
 		streaming: pending
@@ -140,14 +137,9 @@ async function allowSite(part: ToolPart, id: string) {
 		v-if="message.role === 'user' && (message.metadata?.notes?.length || message.metadata?.folders?.length)"
 		class="flex flex-wrap gap-1 mb-1.5">
 		<ChatLink v-for="note in message.metadata?.notes ?? []" :key="note" :note>
-			<img v-if="imageSrc(note)" :src="imageSrc(note)" :alt="fileNameFromPath(note)" :title="note"
-			     class="h-20 max-w-40 rounded-md border border-default object-cover">
-			<UBadge v-else icon="i-lucide-file-text" size="sm" color="neutral" variant="outline"
-			        :label="fileNameFromPath(note, true)"/>
+			<ChatRefAttachment :path="note" size="lg"/>
 		</ChatLink>
-		<UBadge v-for="folder in message.metadata?.folders ?? []" :key="`${folder}/`"
-		        icon="i-lucide-folder" size="sm" color="neutral" variant="outline"
-		        :label="refName(`${folder}/`)" :title="folder"/>
+		<ChatRefAttachment v-for="folder in message.metadata?.folders ?? []" :key="`${folder}/`" :path="`${folder}/`"/>
 	</div>
 	<template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
 		<UChatReasoning v-if="part.type === 'reasoning'" :text="part.text"
@@ -178,6 +170,8 @@ async function allowSite(part: ToolPart, id: string) {
 					<ul v-if="transfers(part).length" class="w-full text-xs text-muted break-all max-h-40 overflow-y-auto">
 						<li v-for="(line, i) in transfers(part)" :key="i">{{ line }}</li>
 					</ul>
+					<!-- What the call will change, so what's approved is seen first. -->
+					<ChatToolPreview :part/>
 					<UButton size="xs" icon="i-lucide-play" :label="$t(`plugins.chat.tools.${approvalOf(part).yes}`)"
 					         @click="approveRun(part.approval.id, true)"/>
 					<UButton size="xs" color="neutral" variant="ghost" :label="$t(`plugins.chat.tools.${approvalOf(part).no}`)"

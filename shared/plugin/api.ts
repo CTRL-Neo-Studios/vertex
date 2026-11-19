@@ -400,6 +400,8 @@ export interface TrustedFormatDef {
 export interface PluginContext<Config = Record<string, unknown>> extends HostServices {
     plugin: {
         id: string
+        /** Its manifest's `name`, as Vertex shows it. */
+        name: string
         version: string
         source: PluginSource
         /**

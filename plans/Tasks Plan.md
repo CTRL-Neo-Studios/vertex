@@ -79,7 +79,7 @@ flowchart LR
   T1 --> T3
   T2 --> T5["T5 The workspace's tasks"]
   T4 --> T5 --> T6["T6 iCalendar, alerts"] --> T7["T7 Bases layouts"] --> T8["T8 Plugin windows"]
-  T8 --> T9["T9 Tools for the AI"] --> T10["T10 Release"]
+  T8 --> T9["T9 Tools for the AI"] --> T9a["T9a Approvals that show the change, Nuxt UI 4.13"] --> T10["T10 Release"]
 ```
 
 ## Format 1.1
@@ -646,8 +646,9 @@ nothing is taken from what a webview says), with the user's rule on what the win
   Schema; `execute` returns JSON. The model sees it as `<plugin id>_<name>`; its card in the chat names the plugin.
   - Found through chat's tool search (`FIND_TOOLS`), as chat's own lesser tools are, so plugins' tools don't grow
     every prompt.
-  - A tool with `writes` follows the chat's mode as chat's own do: refused outside Write (`modeError`), and asked
-    for approval there (`needsApproval`). One without runs in every mode.
+  - A tool with `writes` follows the chat's mode as chat's own do: refused in Read (`modeError`), and asked for
+    approval in Suggest and Write (`needsApproval`; the user's call, after T9 was built Write-only). One without runs
+    in every mode.
   - What it returns is cut at the size a note read is (`NOTE_READ_CHARS`); what it throws goes to the model as
     `{error}`. It's gone when its plugin stops.
 - Docs (`context.md`, Other plugins), `versions.md`; tests: a registered tool in the set and in the search, the mode
@@ -657,17 +658,172 @@ nothing is taken from what a webview says), with the user's rule on what the win
   into the inbox file; `writes`), `tasks_update` (complete, reopen, retitle, move its dates; `writes`).
 
 ### Acceptance
-- [ ] In a chat, "what's due this week?" is answered from `.task` files and task notes by the plugin's tool, its
+- [x] In a chat, "what's due this week?" is answered from `.task` files and task notes by the plugin's tool, its
   card naming Tasks.
-- [ ] In Write mode, "add Call Ann tomorrow at 9" asks first, then the task is in the inbox file; in Read mode the
+- [x] In Write mode, "add Call Ann tomorrow at 9" asks first, then the task is in the inbox file; in Read mode the
   tool refuses and nothing is written.
-- [ ] With Chat off the plugin runs without its tools; turned off, its tools are gone from the next reply.
+- [x] With Chat off the plugin runs without its tools; turned off, its tools are gone from the next reply after the
+  restart Vertex offers (changed: see As built).
+
+### As built
+- **Vertex** (uncommitted): `ChatApi.registerTool(plugin, def)`, `plugin` being the caller's `ctx.plugin`: the API
+  is one object for every plugin, so chat can't tell who calls it, and the card needs the plugin's name, so
+  `ctx.plugin` gained `name` (the contract; docs, `versions.md` 1.5.0). `ChatToolDef` `{name, label, description,
+  inputSchema, writes?, execute(input, {session, signal})}`, `input` typed `unknown` (the AI SDK doesn't check a JSON
+  Schema). In `tools.ts`: `pluginTools` (by `<plugin id>_<name>`, a second of one name refused, a name outside
+  `\w+` or past 64 characters refused), removed with the registering scope; `modesOf` (chat's `MODE_OF`, else Suggest
+  and Write for a `writes` tool) behind `modeError`, `gated` and `rankTools`; `pluginTool` (description "Suggest and
+  Write mode: …" and `needsApproval` in both for one that writes: its change is made at once, so each approved call
+  is an accepted suggestion, never staged; the result through `JSON.stringify`, over `NOTE_READ_CHARS` as
+  `{truncated, json}`; a throw as `{error}`; no session, a refusal); the system prompt names the plugins' tools by
+  plugin. `NoteToolDeps.session` (the chat's). The card: "Tasks: List tasks" (`plugins.chat.tools.pluginTool`, en
+  and zh-CN). Docs: `context.md` Other plugins (with an example), `versions.md`, Concepts and Structures. Tests: two
+  in `tools.test.ts` (in the set, deferred, found first by the search, named in the prompt, the result as JSON and
+  cut, gone when removed and when its scope stops; refused in Read naming Suggest or Write, asked and run in Suggest
+  and in Write, a throw as the error, no session). Typecheck at its 7, 396 tests, lint clean (MessageBody's template
+  warnings are older), the SDK's 8.
+- **Found:** the chat's system prompt didn't say the date, so "this week" and "tomorrow" had nothing to go by:
+  `todayText` adds the day and the time zone (not the time, so the prompt stays the same all day).
+- **Decided after:** the writing tools were Write-only at first; at the user's ask they run in Suggest too, asked
+  first in both (unit-tested; the app run above was before, in Read and Write).
+- **Changed:** "turned off, its tools are gone from the next reply" can't hold as written: a plugin turned off runs
+  on until Vertex restarts (its grants can't be taken back), and chat, written against the SDK, can't see the
+  switch. Its tools go with it, as its panels and commands do: after the restart Vertex offers on turning it off.
+- **Plugin:** `requires: ["bases?", "chat?"]`; `chatTools.ts` registers `tasks_list`, `tasks_add`, `tasks_update`
+  through `ctx.whenPlugin('chat')`; `taskQuery.ts` (pure, 3 tests): `listTasks` (open, or all with `closed`; text in
+  the title or notes; a file by path or name; a day range on Due, else Do, in the viewer's days; by day, undated last;
+  100 at most with `more`), `updatePatch` (title, Do to a day keeping its time or to a time, Due, done/reopen only
+  when it changes). `addTask` takes Do, Due and notes, and makes a missing inbox file only once the task validates
+  (it used to make the file first). `inboxPath` shared with New task…. Labels `tools.*` (en, zh-CN). 18 tests,
+  typecheck, build (main.js 531.80 KB / 139.98 KB gz).
+- **Checked** in `tauri dev` with Ollama's `gemma4:12b` (a script driving the chat through `useChats`, the Run
+  click by hand-coded mouse event): in Read mode "What's due this week?" → `findTools` found `tasks_list` first,
+  which it called with `from`/`to` for the week and answered with Send the slides (Do tomorrow), Draft the brief
+  (`Work/Plan.task`) and File the taxes (`Taxes.md`, a task note); the row read "Tasks: List tasks". "Add a task:
+  Call Ann tomorrow at 9" in Read mode: `tasks_add` answered "only works in Write mode", no `Inbox.task` made. In
+  Write mode the row read "Tasks: Add a task asks to run" with Run / Don't run; after Run, `Inbox.task` was made with
+  Call Ann, `start: 2026-11-19T09:00`. "Mark Draft the brief as done, and move the venue booking's due date to next
+  Monday": two `tasks_list` calls, then two approved `tasks_update`s wrote `status: done` with `completedAt` and the
+  new Due (the model's Monday was a Tuesday: its sum, not the tool's). Tasks and Chat turned off while running: both
+  still ran, the tools stayed (as designed). After a restart with Chat off: Tasks active, no tools. After one with
+  Tasks off and Chat on: no `tasks_*` tools, and the model answered from the note tools alone.
+
+## T9a: Approvals that show the change, Nuxt UI 4.13
+
+Asked for by the user after T9: an approval says what a tool is ("Tasks: Add a task asks to run") but not what it
+will do to the files; and Nuxt UI 4.13 is out, with `ChatAttachment`, `Toggle` and `ToggleGroup`.
+
+### Change
+- **Vertex, the contract:** `ChatToolDef.preview?`, a `UiSlot` (`component` or `mount`, as every other plugin UI)
+  with `{input, session}`: what the call will change, drawn by the plugin under the tool's row while its approval is
+  asked, through `PluginMount` (so a preview that throws names its plugin and the buttons stay). The plugin draws
+  it, not chat from data: a task looks like a task only where tasks are drawn.
+  - A plugin's tool without a `preview` shows its input, field by field (today: nothing).
+  - The preview is live (it reads `session`), so a file changed while the approval waits changes it too; it's drawn
+    only while the approval is asked, the result after as now.
+- **Vertex, chat's own approvals:** a real `runWorkflow` shows what its dry run would change (`workflows.dryRun`,
+  the lines `opText` already writes for the model), or that it would change nothing. `moveFiles`, `copyFiles`
+  (each `from → to`) and `fetchUrl` (the URL) already show theirs.
+  - To settle in the phase: an untrusted workflow must say it needs trust in place of a preview, not ask for it from
+    a card nobody clicked.
+- **Plugin:** previews for its writing tools, computed by the function the run uses (`updatePatch`, `addTask`'s
+  task), so what's shown is what's written:
+  - `tasks_add`: the task as the list draws it (title, Do, Due, notes) and the file it goes to.
+  - `tasks_update`: the task as it is and as it will be (a completed one ticked, a moved date at its new day).
+  - `tasks_delete`, new (`writes`; the user's example names a removed task, and T9 had no way to remove one): a
+    `.task` file's task gets its `deletedAt` (the format's tombstone, as the list's delete does), a note's `task:`
+    is taken out of its frontmatter, the note kept. Its preview: the task that goes, and where from.
+  - Drawn with the library's `TaskRow`/`TaskCard` if they draw without their handlers; else the library gets a
+    read-only way to draw one task, and the plugin uses that.
+- **Nuxt UI 4.13** (from 4.12.0): Vertex, the SDK (its shared version, `nuxt-ui-components.json` with the three new
+  components for plugins), the library (peer and dev), the plugin through the SDK. It also brings 4.12.1 and
+  4.12.2, which close GHSA-x9jw-j844-v24h (a stored XSS for apps drawing untrusted Markdown, which chat's replies
+  are; whether Vertex was reachable isn't checked). `versions.md`: a plugin importing the new components sets
+  `minAppVersion`.
+  - **`ChatAttachment`:** the prompt's attached notes, folders and images (today `UBadge`s with a hand-made ✕) and
+    a sent message's (today a badge or a bare `<img>`): an image as its thumbnail (`session.files.assetUrl`), a
+    note or folder as a card with its icon, `removable` in the prompt, still a `ChatLink` in a message.
+    `ChatPrompt`'s new `v-model:files` isn't taken: chat attaches workspace paths, and copies a file from outside
+    into the workspace first (`useChatAttach`); the phase checks 4.13's prompt doesn't take paste and drop from it.
+  - **`Toggle`** where a button is pressed or not: the editor header's format tools (`HeaderTools.vue`, today a
+    `UButton` with `color`/`variant` ternaries and `aria-pressed`; its `mousedown.prevent` stays, so the selection
+    does), the start page's pin, the Tasks window's pin.
+  - **`ToggleGroup`** where one of a few is picked: the calendar's and the timeline's scale in the library (today
+    buttons with a `variant` ternary), chat's question options (`Questions.vue`, `type="multiple"` where several
+    may be picked), the theme's radius picker. A single group lets its pressed item be unpressed: where one must
+    stay (a scale), an empty pick is ignored.
+  - Not changed: tabs, the Files tree's rows, panel buttons and menus (they select or open, they aren't toggles).
+- Docs (`context.md`: the preview with an example; `versions.md`; Concepts and Structures), SMOKE row; tests: a
+  preview's slot reaching the card's data, the input fallback, `tasks_delete` on a file's task and on a note's, each
+  preview's task equal to what the run writes.
+
+### Acceptance
+- [x] Before Run, `tasks_add` shows the task that will be added and its file, `tasks_update` the task before and
+  after, `tasks_delete` the task that goes; after Run the file holds exactly what was shown.
+- [x] A plugin's tool without a preview shows its input; a real `runWorkflow` shows what it would change.
+- [x] On Nuxt UI 4.13, Vertex, the SDK, the library and the plugin pass their checks; the prompt's and a message's
+  attachments are `ChatAttachment`s (an image its thumbnail), removing one and opening one work, paste and drop
+  attach as before (by reading 4.13's `ChatPrompt`, not by pasting).
+- [x] The editor's format tools are `Toggle`s that follow the selection and keep it on click; the calendar's and
+  the timeline's scale is a `ToggleGroup` that can't be left empty (the calendar's checked in the app; the
+  timeline's is the same code).
+
+### As built
+- **Vertex, chat** (uncommitted): `ChatToolDef.preview?: UiSlot<ChatToolPreviewProps>` (`{input, session}`);
+  `ToolPreview.vue` (`ChatToolPreview`) above an approval's buttons: a plugin's `preview` through `PluginMount`
+  (`owner`, new on `PluginMountProps`: the plugin a non-contribution slot's error names), else its input as a
+  list; a real `runWorkflow`'s quiet dry run, drawn by the workflows plugin's own `Ops` (now on its API, as Bases
+  gives `Value`). Settled: a dry run of a program that talks to the user (`ui`) isn't run for a preview
+  (`dryRun(path, {quiet: true})` → `undefined`, the runner checking the compiled capabilities, as the trust prompt
+  does for its plan); the row says it can't be shown. No trust is asked by a preview: a dry run never needed it.
+  `previewWorkflow` shares `workflowAt` with `runWorkflow`. Strings `tools.preview.*` (en, zh-CN).
+- **Vertex, attachments:** `RefAttachment.vue` (`ChatRefAttachment`) for the prompt's and a message's notes,
+  images and folders: an image a thumbnail from disk (`lg` in a message), a note or folder a card, its path as
+  the description only when it's in a folder; removable in the prompt (the hand-made ✕ and `removeNote` gone).
+  4.13's `ChatPrompt` handles paste and drop only with `v-model:files` bound (`canAttach`), which chat doesn't bind.
+- **Vertex, toggles** (done by a subagent, reviewed): `HeaderTools.vue` (format tools `UToggle`, the others stay
+  buttons), the start page's pin (`active-variant="ghost"`, as it was), `RadiusPicker.vue` (`UToggleGroup`,
+  outline/subtle as before; each tooltip now sits on the corner icon inside the button), `Questions.vue`
+  (`UToggleGroup`, `multiple` where several may be picked; `pick` gone).
+- **Vertex, shared:** `removeFrontmatterProperty` in `shared/utils/vault.ts` (the key out, the block with it when
+  it was the last; unchanged without it; refuses an unclosed block), one test beside `setFrontmatterProperty`'s.
+- **Nuxt UI 4.13.0** in Vertex and the SDK (`^4.13.0`), the library (peer and dev); the SDK's
+  `nuxt-ui-components.json` lists `UToggle`, `UToggleGroup`, `UChatAttachment`. Docs: `context.md` (the preview
+  with an example, `Ops`), `session.md`/`package.md` (`removeFrontmatterProperty`), `ui.md` (`owner`),
+  `versions.md` (1.5.0), Concepts and Structures. Checks: typecheck at its 7, 397 tests, the SDK's 8, lint
+  warnings only (the files' own `first-attribute-linebreak` style).
+- **Library** (uncommitted): `TaskSummary` (one task as a row, nothing in it acts: a disabled `TaskCheck`, title,
+  `TaskMeta`, the start of its notes), `TaskCheck`'s `disabled`; the scale `UToggleGroup`s, imported by file as the
+  others are; README. Typecheck, 29 tests, build.
+- **Plugin:** `ToolPreview.vue` (one component, `kind` add/update/delete, wrapped per tool in `chatTools.ts`):
+  add from `withNewTask` on the inbox's current text (moved to `document.ts`, so the run and the preview share it;
+  a new file's names from `newNames()`, now in `context.ts` and used by the commands and `TaskFile` too), update
+  from `findEntry` + `updatePatch` + `applyPatch`, delete from `findEntry`; drawn with `TaskSummary`.
+  `tasks_delete` (`writes`): `store.remove` gives a file's task `deletedAt`, takes a note's `task:` out with
+  `removeFrontmatterProperty` (one undo step, "Delete “…”"). `addedFields` and `findEntry` in `taskQuery.ts`. Tests:
+  20 (`withNewTask`: what it writes is the task it returns, in the first list, a bad date throws; `findEntry`,
+  `addedFields`). Typecheck, build (main.js 538.88 KB / 141.55 KB gz).
+- **Checked** in `tauri dev` with Ollama's `gemma4:12b`, a script driving the chat and real clicks on Run: in Suggest
+  mode `tasks_add` showed "Adds to Inbox.task:" with Call Ann, Inbox, Do Nov 19 at 9:00 AM; after Run
+  `Inbox.task` held that task (`start: 2026-11-19T09:00`, the Inbox list). `tasks_update` (done) showed Draft the
+  brief open, an arrow, then ticked and struck; after Run, `status: done` and `completedAt`. `tasks_delete` on
+  `Taxes.md` showed "Takes the task out of Taxes.md; the note stays:"; after Run the note kept `tags` and its body,
+  `task:` gone; on `Work/Plan.task` the task got `deletedAt`. A tool registered without a preview listed `count 3`,
+  `message hello there`. A real run of a workflow setting `status: archived` on draft notes showed "Set properties
+  Idea.md" with its lines, no trust prompt, and declined, `Idea.md` unchanged. A message with a note, an image and a
+  folder, and the prompt with three: cards, the image a thumbnail; ✕ on one in the prompt removed it; a click on the
+  note in the message opened it. Bold's `UToggle` pressed on "bold", not on plain text; clicking it bolded the
+  selection and kept it. The calendar's scale: Month, then Week (written to the view), Week again stayed Week. Not
+  checked in the app: the radius picker, the questions' groups, the two pins, the timeline's scale.
+- **Noticed:** right after a hot update of a chat component, a note opened from the chat drew an empty editor until
+  the window reloaded (not seen after); and a chat's generated title shows "Untitled" after a reload (seen in T9
+  too), not looked into.
 
 ## T10: Release
 
 ### Change
 - The library published by the user; the plugin on the published library and SDK, released from its workflow.
-- Strings in `en` and `zh-CN`; `README.md` for both; the author docs for what T0, T6, T8 and T9 added to the
+- Strings in `en` and `zh-CN`; `README.md` for both; the author docs for what T0, T6, T8, T9 and T9a added to the
   contract; `Concepts and Structures.md`; SMOKE rows.
 - The Sample Plugins Plan's S4 and S5 ticked with what this plan built.
 

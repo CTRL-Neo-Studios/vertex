@@ -79,7 +79,7 @@ The helpers are Vertex's own, the ones its features use:
 
 | Module | |
 | --- | --- |
-| `@type32/vertex-plugin/vault` | `Vault` (what [`session.files.vault`](session.md#sessionfilesvault) returns), path helpers, tags, patterns, frontmatter written as Obsidian writes it (`setFrontmatterProperty`). |
+| `@type32/vertex-plugin/vault` | `Vault` (what [`session.files.vault`](session.md#sessionfilesvault) returns), path helpers, tags, patterns, frontmatter written as Obsidian writes it (`setFrontmatterProperty`, `removeFrontmatterProperty`). |
 | `@type32/vertex-plugin/links` | Wiki links in Markdown text: `getInternalLinks`, `rewriteLinks`, `renameTargets` (for a [link extractor](context.md#ctxindexlinkextractor)). |
 | `@type32/vertex-plugin/files` | File names and kinds: `fileNameFromPath`, `getFileExtensionFromPath`, `isImage`, `isPlainTextFile`, `IMAGE_TYPES`. |
 | `@type32/vertex-plugin/text` | Line diffs: `lineDiff`, `diffCounts` (what `TextDiff` draws). |

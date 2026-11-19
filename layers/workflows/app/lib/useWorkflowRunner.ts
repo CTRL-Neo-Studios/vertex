@@ -40,6 +40,8 @@ export function parseWorkflow(text: string): { doc?: DocumentV1, problems: Diagn
 export interface RunContext {
     /** The note it runs on, for Current note. */
     note?: string
+    /** A dry run only: a program that talks to the user (`ui`) isn't run, as its questions would come now. */
+    quiet?: boolean
 }
 
 /** What the editor's live run (`editor.run`) passes along: its trace, cancel signal and step control. */
@@ -206,6 +208,7 @@ export function useWorkflowRunner(session: SessionContext) {
         const {doc, problems} = parseWorkflow(await vault.read(path))
         if (!doc) throw new Error(problems[0]?.message ?? t('plugins.workflows.workflow.invalid'))
         try {
+            if (dry && context.quiet && compile(doc, language()).capabilities.has('ui')) return undefined
             const outcome = dry ? await dryRun(doc, name, context) : await run(doc, name, path, context)
             if (outcome && !dry) report(name, outcome)
             return outcome

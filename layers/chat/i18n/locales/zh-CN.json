@@ -13,7 +13,6 @@
       "sendFailed": "无法发送消息",
       "attachNote": "附加笔记或文件夹",
       "searchNotes": "搜索笔记和文件夹",
-      "removeNote": "移除笔记",
       "defaultProfile": "默认模型",
       "openInTab": "在标签页中打开",
       "moveToSidePanel": "移到侧边栏",
@@ -88,6 +87,7 @@
         "copy": "复制",
         "dontCopy": "不复制",
         "items": "{count} 项",
+        "pluginTool": "{plugin}：{tool}",
         "names": {
           "findTools": "查找工具",
           "searchNotes": "搜索笔记",
@@ -115,7 +115,14 @@
         "fetch": "获取",
         "dontFetch": "不获取",
         "allowSite": "始终允许 {host}",
-        "exitCode": "退出码 {code}"
+        "exitCode": "退出码 {code}",
+        "preview": {
+          "loading": "正在计算将会修改的内容…",
+          "nothing": "不会修改任何内容。",
+          "workflowAsks": "此工作流运行时会向你提问，因此无法事先显示它会修改什么。",
+          "workflowMissing": "没有可运行的此工作流。",
+          "workflowFault": "试运行提前停止：{message}"
+        }
       },
       "edit": "编辑",
       "send": "发送",

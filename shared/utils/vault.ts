@@ -172,3 +172,23 @@ export function setFrontmatterProperty(markdown: string, key: string, value: unk
     const block = `---\n${out.yaml}\n---`
     return range ? block + markdown.slice(range.to) : `${block}\n\n${markdown}`
 }
+
+/**
+ * Takes one frontmatter property out, keeping the rest of the note; the block goes when nothing's left in it. A note
+ * without the property comes back as it was. Refuses an unclosed or non-object block, as `setFrontmatterProperty` does.
+ */
+export function removeFrontmatterProperty(markdown: string, key: string, yaml: YamlTools): string {
+    const range = yaml.frontmatterRange(markdown)
+    if (!range) return markdown
+    if ('unclosed' in range) throw new Error('The note\'s frontmatter is not closed')
+    const parsed = yaml.parseYaml(range.yaml)
+    if (parsed.error || typeof parsed.data !== 'object' || parsed.data === null || Array.isArray(parsed.data))
+        throw new Error('The note\'s frontmatter is not a YAML object')
+    const {[key]: removed, ...rest} = parsed.data as Record<string, unknown>
+    if (removed === undefined && !(key in parsed.data)) return markdown
+    const body = markdown.slice(range.to)
+    if (!Object.keys(rest).length) return body.replace(/^\r?\n+/, '')
+    const out = yaml.stringifyYaml(rest)
+    if (out.error !== undefined || out.yaml === undefined) throw new Error('Can\'t write the frontmatter as YAML')
+    return `---\n${out.yaml}\n---${body}`
+}

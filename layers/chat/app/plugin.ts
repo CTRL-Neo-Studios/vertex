@@ -6,6 +6,7 @@ import type {ChatApi} from './api'
 import {chatSummaryOf, stateKey, useChats} from './lib/chats'
 import {useChatActions} from './lib/actions'
 import {chatChangeOf} from './lib/changes'
+import {registerTool} from './lib/tools'
 
 let ctx: PluginContext<ChatConfig> | undefined
 /**
@@ -29,7 +30,7 @@ export default definePlugin<ChatConfig>({
     setup(context) {
         ctx = context
         context.use('ai')?.registerFeature({id: 'chat', label: 'plugins.chat.feature.label', description: 'plugins.chat.feature.description', info: 'plugins.chat.feature.info'})
-        context.provide({chatsInWorkspace: () => context.config.value.storage === 'workspace'} satisfies ChatApi)
+        context.provide({chatsInWorkspace: () => context.config.value.storage === 'workspace', registerTool} satisfies ChatApi)
         // Tool feedback (`toolFeedback`), kept on this computer for the user to review.
         context.settings.page({id: 'chat', label: 'plugins.chat.settings.nav', component: () => import('./components/Settings.vue')})
         context.views.panel({

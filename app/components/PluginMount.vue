@@ -13,7 +13,7 @@ const props = defineProps<PluginMountProps>()
 
 const {t} = useI18n()
 const error = ref<string>()
-const owner = computed(() => contributionOwner(props.ui) ?? 'Vertex')
+const owner = computed(() => props.owner ?? contributionOwner(props.ui) ?? 'Vertex')
 const report = (cause: unknown) => {
     error.value = cause instanceof Error ? cause.message : String(cause)
     console.error(`[plugins] ${owner.value} couldn't draw:`, cause)

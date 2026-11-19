@@ -10,7 +10,7 @@ import type {ChatChange, ChatFile, ChatIndex, ChatMode, ChatScope, ChatStorage, 
 import {chatContext} from "../plugin";
 import {ChatError, chatClient} from "./client";
 import {createChatTransport, dataUrl, generateChatTitle, type ChatSendSetup} from "./transport";
-import {ASK_USER, chatTools, inScope, modeError, scopeText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "./tools";
+import {ASK_USER, chatTools, inScope, modeError, scopeText, todayText, toolsPrompt, usedToolNames, type AskUserOutput, type NamedNotes} from "./tools";
 import {branchAt, fork, pruneForks, switchBranch} from "./forks";
 import {changesSummary, chatChangeTabId, newNotePath, textChange} from "./changes";
 import {createSandbox, runCommand, sandboxWrites, WORKSPACE, type Sandbox} from "./bash";
@@ -326,20 +326,26 @@ export function useChats(session: SessionContext) {
         .map(f => ({path: slashed(f.relativePath), kind: f.isFolder ? 'folder' : f.fileExt.toLowerCase()}))
         .sort((a, b) => a.path.localeCompare(b.path))
 
+    /** The workflow at `path` (or by name) and the note it runs on (`note`, else the open note); `undefined`: none. */
+    function workflowAt(path: string, note: string | undefined) {
+        const name = path.toLowerCase().replace(/\.workflow$/, '')
+        const file = $index.files().filter(f => !f.isFolder && f.fileExt === 'workflow').find(f => slashed(f.relativePath) === path
+            || slashed(f.relativePath).toLowerCase().replace(/\.workflow$/, '') === name || fileNameFromPath(f.fileName, true).toLowerCase() === name)
+        if (!file) return undefined
+        const open = editTarget()
+        const on = note ? findNote(note)?.relativePath ?? note : open && $index.byUuid(open)?.relativePath
+        return {at: slashed(file.relativePath), options: {note: on && slashed(on)}}
+    }
+
     /**
      * `runWorkflow`: the workflow at `path` (or by name) on `note` (else the open note), through the workflows plugin:
      * a real run asks for trust when it isn't trusted, and ends in its toast with Undo. Worded for the model.
      */
     async function runWorkflow(workflows: PluginApis['workflows'], path: string, note: string | undefined, dry: boolean): Promise<object> {
-        const name = path.toLowerCase().replace(/\.workflow$/, '')
-        const file = $index.files().filter(f => !f.isFolder && f.fileExt === 'workflow').find(f => slashed(f.relativePath) === path
-            || slashed(f.relativePath).toLowerCase().replace(/\.workflow$/, '') === name || fileNameFromPath(f.fileName, true).toLowerCase() === name)
-        if (!file) return {error: `There's no workflow at "${path}". List them with findFiles, extension "workflow".`}
-        const at = slashed(file.relativePath)
-        const open = editTarget()
-        const on = note ? findNote(note)?.relativePath ?? note : open && $index.byUuid(open)?.relativePath
+        const found = workflowAt(path, note)
+        if (!found) return {error: `There's no workflow at "${path}". List them with findFiles, extension "workflow".`}
+        const {at, options} = found
         try {
-            const options = {note: on && slashed(on)}
             const outcome = dry ? await workflows.dryRun(at, options) : await workflows.run(at, options)
             if (!outcome) return {declined: true, reason: 'The user didn\'t trust the workflow.'}
             const {status, steps, fault} = outcome.result
@@ -352,6 +358,22 @@ export function useChats(session: SessionContext) {
             }
         } catch (e) {
             return {error: `"${at}" can't run: ${e instanceof Error ? e.message : String(e)}`}
+        }
+    }
+
+    /**
+     * What a real `runWorkflow` waiting for approval would change: its quiet dry run (`outcome`; `undefined` for a
+     * workflow that talks to the user, which can't run before it's approved), why it can't run (`error`), or that
+     * there's nothing to run (`missing`: no such workflow, or the workflows plugin isn't running).
+     */
+    async function previewWorkflow(path: string, note: string | undefined): Promise<{ outcome?: Awaited<ReturnType<PluginApis['workflows']['dryRun']>>, error?: string, missing?: true }> {
+        const workflows = chatContext().use('workflows')
+        const found = workflowAt(path, note)
+        if (!workflows || !found) return {missing: true}
+        try {
+            return {outcome: await workflows.dryRun(found.at, {...found.options, quiet: true})}
+        } catch (e) {
+            return {error: e instanceof Error ? e.message : String(e)}
         }
     }
 
@@ -608,6 +630,7 @@ export function useChats(session: SessionContext) {
             },
             runWorkflow: workflows && ((path, note, dry) => runWorkflow(workflows, path, note, dry)),
             bash: (command, signal) => runBash(entry, command, read, signal),
+            session,
         }, usedToolNames(messages)) : undefined
         const named = namedNotes(messages, entry.staging)
         const open = toolsOn ? editTarget() : undefined
@@ -620,6 +643,7 @@ export function useChats(session: SessionContext) {
         const prompt = [
             profile.systemPrompt,
             toolsPrompt(mode, scopeText(entry.meta.scope, named), toolsOn),
+            todayText(new Date()),
             openFile ? `The open note is "${slashed(openFile.relativePath)}": readNote without a path and readSelection read it${mode === 'suggest' ? ', and the proposals edit it unless given a path' : ''}.` : '',
             folders.length ? `The user referenced these folders; their notes are:\n${folders.join('\n')}` : '',
             changesSummary(messages),
@@ -965,6 +989,7 @@ export function useChats(session: SessionContext) {
         openInTab,
         askInChat,
         allowHost,
+        previewWorkflow,
         pendingPrompt,
     }
 }

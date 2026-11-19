@@ -1,8 +1,9 @@
 import {describe, expect, it} from "vitest";
 import type {Tool} from "ai";
 import type {VertexChatMessage} from "../../shared/types";
-import type {FileOpResult, NoteSearchOptions} from "#shared/plugin/api";
-import {chatTools, formatTree, inScope, markModeSwitches, modeError, rankTools, readLines, toolsPrompt, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./tools";
+import type {FileOpResult, NoteSearchOptions, SessionContext} from "#shared/plugin/api";
+import {effectScope} from "vue";
+import {chatTools, formatTree, inScope, markModeSwitches, modeError, rankTools, readLines, registerTool, toolsPrompt, toolsUnsupported, usedToolNames, type NoteToolDeps} from "./tools";
 
 const deps = (over: Partial<NoteToolDeps> = {}): NoteToolDeps => ({
     search: async () => ({hits: [], more: 0}),
@@ -195,6 +196,70 @@ describe('chatTools', () => {
         expect(await run(tools.editNote, {path: 'A.md', find: 'four', replace: '4'})).toEqual({error: expect.stringContaining('not found')})
         expect(await run(tools.editNote, {path: 'B.md', find: 'x', replace: 'y'})).toEqual({error: expect.stringContaining('"B.md"')})
         expect(staged).toHaveLength(1)
+    })
+})
+
+describe('plugins\' tools', () => {
+    const tasks = {id: 'tasks', name: 'Tasks'}
+    const session = {} as SessionContext
+    const calls: unknown[] = []
+    const list = {
+        name: 'list', label: 'plugins.tasks.tools.list', description: 'List the workspace\'s open tasks, by text or due date.',
+        inputSchema: {type: 'object', properties: {query: {type: 'string'}}},
+        execute: (input: unknown, context: { session: SessionContext }) => {
+            calls.push([input, context.session === session])
+            return (input as { long?: boolean }).long ? {text: 'x'.repeat(30_000)} : {tasks: [{title: 'Call Ann', due: undefined}]}
+        },
+    }
+    const add = {
+        name: 'add', label: 'plugins.tasks.tools.add', description: 'Add a task.', inputSchema: {type: 'object'}, writes: true,
+        execute: (input: unknown) => {
+            calls.push(input)
+            if ((input as { title?: string }).title === '') throw new Error('A task needs a title.')
+            return {added: true}
+        },
+    }
+
+    it('are in the chat\'s tools, deferred, found by the tool search and named in the prompt, until removed', async () => {
+        const scope = effectScope()
+        const remove = scope.run(() => registerTool(tasks, list))!
+        scope.run(() => registerTool(tasks, add))
+        expect(() => registerTool(tasks, list)).toThrow(/registered already/)
+        expect(() => registerTool(tasks, {...list, name: 'list tasks'})).toThrow(/name/)
+        const tools = chatTools(deps({session}), new Set())
+        expect(tools.tasks_list!.deferLoading).toBe(true)
+        expect(rankTools({query: 'tasks due this week', tools: Object.entries(tools).map(([name, t]) => ({name, description: t.description as string}))}, 'read')[0]).toBe('tasks_list')
+        expect(toolsPrompt('read', 'x', true)).toContain('Tasks (tasks_list, tasks_add)')
+        // What it returns reaches the model as plain JSON, cut at a note read's size.
+        calls.length = 0
+        expect(await run(tools.tasks_list, {query: 'Ann'})).toEqual({tasks: [{title: 'Call Ann'}]})
+        expect(calls).toEqual([[{query: 'Ann'}, true]])
+        expect(await run(tools.tasks_list, {long: true})).toEqual({truncated: true, json: expect.stringMatching(/^\{"text":"x+$/)})
+        expect((await run(tools.tasks_list, {long: true}) as { json: string }).json).toHaveLength(20_000)
+        remove()
+        expect(chatTools(deps({session}), new Set()).tasks_list).toBeUndefined()
+        scope.stop()
+        expect(chatTools(deps({session}), new Set()).tasks_add).toBeUndefined()
+        expect(toolsPrompt('read', 'x', true)).not.toContain('Tasks (')
+    })
+
+    it('one that writes is refused in Read, asked first in Suggest and Write; a throw reaches the model as its error', async () => {
+        const remove = registerTool(tasks, add)
+        calls.length = 0
+        const read = chatTools(deps({mode: 'read', session}), new Set())
+        expect((read.tasks_add!.needsApproval as (input: unknown) => boolean)({title: 'x'})).toBe(false)
+        expect(await run(read.tasks_add, {title: 'x'})).toEqual({error: expect.stringMatching(/only works in Suggest or Write mode.*switch the chat to Suggest or Write mode\.$/)})
+        expect(calls).toEqual([])
+        for (const mode of ['suggest', 'write'] as const) {
+            const tools = chatTools(deps({mode, session}), new Set())
+            expect(tools.tasks_add!.description).toMatch(/^Suggest and Write mode: /)
+            expect((tools.tasks_add!.needsApproval as (input: unknown) => boolean)({title: 'x'})).toBe(true)
+            expect(await run(tools.tasks_add, {title: 'Call Ann'})).toEqual({added: true})
+        }
+        const write = chatTools(deps({mode: 'write', session}), new Set())
+        expect(await run(write.tasks_add, {title: ''})).toEqual({error: 'A task needs a title.'})
+        expect(await run(chatTools(deps({mode: 'write'}), new Set()).tasks_add, {title: 'x'})).toEqual({error: expect.stringContaining('can\'t run')})
+        remove()
     })
 })
 

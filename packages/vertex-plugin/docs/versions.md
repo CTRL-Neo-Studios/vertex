@@ -61,6 +61,14 @@ also exports the core plugins' API types by name (`BaseViewProps` for a Bases la
 `plugin` in them ([Windows of its own](context.md#windows-of-its-own)). An older Vertex refuses a manifest with
 `ownWindows` (an unknown key), so a plugin that declares them sets `minAppVersion` too.
 
+1.5.0 also adds `ctx.plugin.name`, and `registerTool` to chat's API: a plugin's tools for a chat's model, each with
+a `preview` of what it will change shown before it's approved ([Other plugins](context.md#other-plugins)). A plugin
+that registers one checks `ctx.use('chat')?.registerTool` or sets `minAppVersion`. With them: `PluginMount`'s
+`owner`, `removeFrontmatterProperty` in `/vault`, the workflows API's `Ops` and `dryRun`'s `quiet`.
+
+1.5.0 also moves Nuxt UI to 4.13: `UToggle`, `UToggleGroup` and `UChatAttachment` resolve in a plugin's components.
+A plugin that uses them sets `minAppVersion` to the first Vertex on 4.13.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

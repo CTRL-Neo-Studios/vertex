@@ -13,7 +13,6 @@
       "sendFailed": "Couldn't send the message",
       "attachNote": "Attach notes or folders",
       "searchNotes": "Search notes and folders",
-      "removeNote": "Remove note",
       "defaultProfile": "Default model",
       "openInTab": "Open in tab",
       "moveToSidePanel": "Move to side panel",
@@ -88,6 +87,7 @@
         "copy": "Copy",
         "dontCopy": "Don't copy",
         "items": "{count} items",
+        "pluginTool": "{plugin}: {tool}",
         "names": {
           "findTools": "Find tools",
           "searchNotes": "Search notes",
@@ -115,7 +115,14 @@
         "fetch": "Fetch",
         "dontFetch": "Don't fetch",
         "allowSite": "Always for {host}",
-        "exitCode": "exit code {code}"
+        "exitCode": "exit code {code}",
+        "preview": {
+          "loading": "Working out what it would change…",
+          "nothing": "It wouldn't change anything.",
+          "workflowAsks": "This workflow asks you questions as it runs, so what it changes can't be shown before.",
+          "workflowMissing": "There's no such workflow to run.",
+          "workflowFault": "A dry run stopped early: {message}"
+        }
       },
       "edit": "Edit",
       "send": "Send",

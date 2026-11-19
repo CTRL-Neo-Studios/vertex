@@ -145,8 +145,9 @@ The workspace as a `Vault` (`@type32/vertex-plugin/vault`), over workspace-relat
 `linksTo`, `linksFrom`, `read`, `write`, `create`, `createFolder`, `move`; what it writes goes through the index as
 Vertex's own edits do. Throws in a single-file window.
 
-The same module writes frontmatter as Obsidian does. `setFrontmatterProperty` takes the YAML tools
-`obsidianYaml(frontmatterRange)` makes, `frontmatterRange` being the editor's:
+The same module writes frontmatter as Obsidian does. `setFrontmatterProperty` and `removeFrontmatterProperty` (the
+key taken out, the block with it when it was the last) take the YAML tools `obsidianYaml(frontmatterRange)` makes,
+`frontmatterRange` being the editor's:
 
 ```ts
 import {frontmatterRange} from '@type32/codemirror-rich-obsidian-editor'
