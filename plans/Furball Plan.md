@@ -53,6 +53,24 @@ The core and a page to play with it in a browser, with no Vertex.
 - [ ] On the demo page: it walks, sleeps and wakes; picked up it dangles, thrown it lands; stroked it purrs.
 - [ ] The user accepts the feel (the art is theirs to replace).
 
+### As built
+- **The core** (`../vertex-plugin-furball/src/pet/`, commit `1c227b4`, not pushed): `cat.ts` (states `sit`, `walk`, `sleep`, `happy`,
+  `eat`, `startle`, `held`, `fall`; gravity, walls, ceiling, a floor bounce above a speed; squash and stretch as a
+  spring; marks; a seeded random; speeds in body sizes, so 2× and 4× feel alike), `draw.ts` (`SHEET`: the layout,
+  7 rows of 32×32 cells: sit ×5, happy ×4, alert ×2, sleep ×2, walk ×4, hang ×2, marks ×4; `pose` picks the cell),
+  `stage.ts` (`createStage(canvas, {sheet, scale})`: the canvas takes no pointer events; window listeners, capturing,
+  take a press on the kitty and leave every other one alone; click boops, a drag past 4 px holds it, release throws,
+  movement over it strokes; `grab` cursor over it). `scripts/sheet.ts` (`bun run sheet`) writes `public/kitty.png`
+  from `sprites.ts` in that layout.
+- **The demo:** `bun run demo` (`demo/index.html`, Bun's HTML server): the kitty at 3× with Cheer, Eat, Startle and
+  Sleep buttons.
+- **Checked:** `bun test` (2: thrown at a wall it comes to rest sitting on the floor inside the world; not asleep
+  before `SLEEP_AFTER`, asleep after, a boop startles it and it sits again), typecheck. On the demo page in headless
+  Chromium: it sat at the bottom; dragged, it hung by the scruff under the pointer; thrown up and left it flew
+  stretched; Cheer made it hop with three hearts. No page errors. **Not observed:** stroking, eating, sleep and wake
+  on the page (the test covers sleep and wake), and how any of it feels: the user's.
+- **Not done, on purpose:** moving the surface (the stage's part in F2) waits for F2.
+
 ## F1: In the Vertex window
 
 The plugin, on the SDK as published (1.6.1): no change to Vertex.
