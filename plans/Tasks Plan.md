@@ -909,15 +909,62 @@ dependency lines kept but quiet.
   library's next minor.
 
 ### Acceptance
-- [ ] A plan of three groups and their subtasks reads as the reference: solid coloured bars with their titles and
+- [x] A plan of three groups and their subtasks reads as the reference: solid coloured bars with their titles and
   initials, groups as labelled lines, the outline's circles, durations and progress bars, the header's day letters
   and today's pill.
 - [ ] Pinch and ⌘-scroll zoom smoothly from months to hours and back, the day under the pointer staying put; the
-  presets do the same; the zoom is there after a reload.
+  presets do the same; the zoom is there after a reload. (⌘-scroll and the presets checked; a trackpad pinch not.)
 - [ ] A colour picked in the menu, a person assigned in the editor, a reschedule and a completed circle are written
-  to the file, and other views show the colour.
-- [ ] 2,000 bars still scroll without a frame over 200 ms, and a zoom gesture on them keeps up (no frame over
+  to the file, and other views show the colour. (All written; the other views' colour not looked at.)
+- [x] 2,000 bars still scroll without a frame over 200 ms, and a zoom gesture on them keeps up (no frame over
   100 ms).
+
+### As built
+- **Format 1.2** (`../tasks`, commit `855e4da`, not published): `Task.color`; built-in `assignees` (a `multiSelect`,
+  values must be its options); `View.zoom` (positive). iCalendar: each assignee an `ATTENDEE` with `CN`, `X-TASKS-ID`
+  (so the option's id comes back) and `mailto:` from an option's `email`, else `urn:x-tasks:assignee:<id>`; import
+  adds the people as options of `assignees`. SPEC 1.2, README, llms.txt, a changeset (minor: 0.3.0). Tests: a task's
+  bad colour, an assignee who isn't an option, a zoom of 0, attendees both ways; 308 in all, lint, types.
+- **The library** (`../tasks-ui-components`, 0.2.0, peer `@type32/tasks ^0.3.0`, dev on `file:../tasks`):
+  - `timeline.ts`: `ZOOM` (2 to 1,440 px a day), `ZOOM_PRESETS` (hours 960, days 48, weeks 16, months 4),
+    `viewZoom`, `scaleOf`, `presetOf`, `tickUnit`; `timelineTicks(axis, dayWidth, weekStartsOn, range)`: hours (by
+    1, 2, 3, 6 or 12, whichever is 40 px) under days, days or weeks under months, months under years, only those in
+    `range`. `DAY_WIDTH` and `Scale` gone. `people.ts`: `taskColor`, `textOn`, `initials`, `assigneesOf`;
+    `PeopleStack.vue`.
+  - `TaskTimeline.vue` rewritten: 44 px rows, the outline (Title, Duration in words, Status as a coloured progress
+    bar and %; a parent's row tinted with a chevron, a subtask's `TaskCheck`); bars as solid rounded fills with
+    initials and the title (black or white by contrast; after the bar when it doesn't fit; kept at the visible edge
+    of a bar that runs off the left); a parent as a grey line with its title after it; the header's day cells
+    weekday letter + date, today a primary pill; weekends shaded; month lines. Zoom: ⌘/Ctrl + wheel (batched a
+    frame) and WebKit's `gesturechange`, about the pointer; written back 600 ms after it rests (`zoom`, `scale`).
+    Click selects (ring; its links strong), double click edits, ⌘D, ⌫, Escape; drags snap to 15 minutes for a
+    timed task at hour widths. The menu: swatches (taken on `pointerup`, before the item's), Edit, Reschedule ›
+    (Tomorrow, Next week, In two weeks, Pick a date… in a `UCalendar` popover), Duplicate ⌘D, Copy link (only with a
+    `copyLink` prop), List ›, Remove dependency on, Delete ⌫.
+  - The editor: Assignees (`UInputMenu`, multiple, a new name added as an option: `createOption`, forwarded by every
+    view) and a colour popover; `assignees` out of the other fields. `TaskMeta` shows a task's own colour and its
+    initials (list and board); the calendar's events take `taskColor`. Labels for the new words. 33 tests (zoom,
+    hour ticks, people); typecheck, build.
+- **The plugin** (Tasks 0.3.0, on `file:` copies of both until they're published): the new strings (en, zh-CN);
+  a base's timeline keeps `zoom` beside `scale` in the base view. README. Copy link isn't given: a `.task` file has no
+  link to one task in Vertex yet. Typecheck, 20 tests, build.
+- **Checked** in `tauri dev` (the plugin from its `plugin.zip`; native clicks and ⌘-scroll; a plan of three groups,
+  colours, three people, a moment, a timed standup): the screenshot reads as the reference (bars with initials and
+  titles, group lines, circles, durations, progress bars, `T 19` as a pill, weekends); ⌘-scroll zoomed to hours
+  under Thu, Nov 19 with today's line where the pointer was, and `zoom: 1440` was written; Months drew months under
+  2026/2027 (`scale: month`, `zoom: 4`). Right click: the menu as the reference's; purple picked → `color: #a855f7`;
+  Reschedule › Tomorrow → Wireframing `2026-11-20`–`24`; Competitor Analysis' circle → `done`, `completedAt`; double
+  click → editor, Assignees, "Grace Hopper" + Enter → a new option and the task's value, `GH` on the bar; ⌘D on a
+  selected bar → 12 tasks; ⌫ on the copy → `deletedAt`; at Hours, Standup dragged 50 px → `10:45`–`11:30` (75
+  minutes later). **Measured** on 2,100 rows, 2,000 bars, 1,300 dependencies (dev build): worst frame scrolling 80
+  frames down 34 ms, right 27 ms, diagonally 22 ms; zooming in by Ctrl-wheel over 60 frames 87 ms, out over 90
+  frames 42 ms; 40 rows drawn.
+- **Not checked:** a trackpad pinch (WebKit's gesture events are handled, not tried), the colour in the board, list
+  and calendar, Pick a date…, a drag at Weeks or Months, the zoom after a reload (it's read from the view, which held
+  it).
+- **Found:** once, the saved zoom went from 1,440 to 73 with nothing done in the app; ⌘ may have stayed down for real
+  scrolling after the synthetic ⌘-scroll events. Not seen again. A document with a custom field named `assignees`
+  must rename it to be read as 1.2 (said in the SPEC).
 
 
 ## Not in this plan
