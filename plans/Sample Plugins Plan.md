@@ -240,7 +240,8 @@ point it keeps: its calendar and timeline are Bases layouts.
 - The Tasks Plan's phases.
 
 ### Acceptance
-- [ ] The Tasks Plan's T0 to T10 accepted.
+- [x] The Tasks Plan's T0 to T10 accepted (the user, 19 Nov). Released as
+  [`vertex-plugin-tasks` v0.1.0](https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.1.0).
 
 ## S6: Navigator
 

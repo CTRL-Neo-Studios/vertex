@@ -828,7 +828,8 @@ will do to the files; and Nuxt UI 4.13 is out, with `ChatAttachment`, `Toggle` a
 - The Sample Plugins Plan's S4 and S5 ticked with what this plan built.
 
 ### Acceptance
-- [ ] Installed from its release (`plugin.zip`), the plugin runs with every view on a document of the user's own.
+- [x] Installed from its release (`plugin.zip`), the plugin runs with every view on a document of the user's own.
+  Resolved by the user (19 Nov); the in-app install from the release was theirs, not run by me.
 
 ### As built
 - **Published by the user:** `@type32/tasks-ui-components` 0.1.0; `@type32/vertex-plugin` 1.6.0 (T8 to T9a, which
