@@ -82,8 +82,27 @@ The plugin, on the SDK as published (1.6.1): no change to Vertex.
 - Settings: on or off in the window, its size (2×, 3×, 4×).
 
 ### Acceptance
-- [ ] In `tauri dev`, installed from `dist/`: the kitty walks the window's bottom edge, can be picked up and thrown
+- [x] In `tauri dev`, installed from `dist/`: the kitty walks the window's bottom edge, can be picked up and thrown
   inside the window, and nothing under it stops taking clicks elsewhere.
+
+### As built
+- **The plugin:** `furball` 0.1.0, `minAppVersion` `1.0.0-beta.1`, SDK ^1.6.1. `src/main.ts`: one overlay, drawn while
+  `shown`; `src/Kitty.vue`: a canvas over the window (`fixed`, `inset-0`, `z-40`), the sheet from
+  `ctx.plugin.assetUrl('kitty.png')`, `size` changed live (`pet.size`). Settings: `shown` (switch, default on) and
+  `size` (Small 2×, Medium 3×, Large 4×, default 3×), both overridable by a workspace; strings in `en` and `zh-CN`.
+  The template's view and logo are gone; README for users and developers; the workflow runs `bun run test`.
+- **The stage:** a press on the kitty now also takes the mouse events that come of it (`mousedown`, `mouseup`,
+  `click`, `dblclick`, `contextmenu`): an editor listens to `mousedown`, which stopping `pointerdown` doesn't stop.
+  Each press decides again, so a press elsewhere after a throw isn't taken.
+- **Checked** in `tauri dev` (a harness in each window; the build's `plugin.zip` staged from a local URL, as a folder
+  outside the window's reach can't be staged without the picker), with native mouse events: the kitty sat on the
+  session window's bottom edge, over the sidebar; a click on it reached none of the document's listeners, a click in
+  the editor area reached them all (`pointerdown`, `mousedown`, `mouseup`, `click`); dragged up and let go, it flew
+  and landed at the bottom right; a click on it hopped it with a heart. Size 4× took effect without a reload; `shown`
+  off removed the canvas, on brought it back. Not checked: the Settings page's drawing of the two fields.
+- **Found:** this shell's `rustc` is 1.81 (`/usr/local/bin`), too old for Vertex; `tauri dev` ran with
+  `RUSTC=$(rustup which rustc)`. The overlay's canvas can't be read back (`getImageData`): the sheet comes from
+  another origin, which taints it. Nothing needs it.
 
 ## F2: Out on the desktop
 
