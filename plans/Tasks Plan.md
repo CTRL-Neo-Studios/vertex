@@ -1095,6 +1095,10 @@ file by hand rather than typed in the editor, and on one drawn on its empty row.
   Such a due is now said by the bar's end; a flag is a badge. The calendar still draws Do + Due as a day at Do (its
   kinds), so the same task reads differently there; not in T12.
 - **Not checked:** the plugin's own window's tooltips, the list view's colours, a real mouse or trackpad.
+- **Released (19 Nov):** the user published `@type32/tasks-ui-components` 0.4.0 (and `@type32/tasks` 0.4.0, a version
+  bump only; the library's peer is still `^0.3.0`, so Tasks stays on it). Tasks 0.4.0 on `^0.4.0`; a fresh clone
+  installed with the lockfile, passed 20 tests and built; tag `v0.4.0` released by the workflow with `plugin.zip`:
+  https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.4.0
 
 
 ## Not in this plan
