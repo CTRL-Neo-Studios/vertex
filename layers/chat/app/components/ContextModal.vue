@@ -7,10 +7,11 @@ import {chatContext} from "../plugin";
 /**
  * What a chat sent and got back, as of opening. Totals on top; per message its parts and raw JSON, a reply's model
  * calls (model, timing, tokens, the instructions without the notes, the notes sent, the tools offered) and its tool
- * calls by step. `focus` opens that message and scrolls to it.
+ * calls by step. `focus` opens that message and scrolls to it. Show in chat closes it with that message's id, for
+ * the chat to scroll to.
  */
 const props = defineProps<{ messages: VertexChatMessage[], title: string, focus?: string }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [messageId?: string] }>()
 
 const {t, locale} = useI18n()
 
@@ -82,6 +83,8 @@ const tokens = (r: ChatRequestInfo) => [
                 <UAccordion v-model="open" type="multiple" :items :ui="{ body: 'pb-4' }">
                     <template #body="{ item }">
                         <div :id="`chat-context-${item.value}`" class="flex flex-col gap-3">
+                            <UButton class="self-start" size="xs" color="neutral" variant="soft" icon="i-lucide-locate"
+                                     :label="$t('plugins.chat.context.showInChat')" @click="emit('close', item.value)"/>
                             <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
                                 <template v-if="item.message.role === 'user'">
                                     <dt class="text-muted">{{ $t('plugins.chat.context.sent') }}</dt>

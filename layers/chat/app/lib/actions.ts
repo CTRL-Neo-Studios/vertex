@@ -13,13 +13,16 @@ const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 const parentOf = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
 const join = (parent: string, name: string) => parent ? `${parent}/${name}` : name
 
+/** A message a chat's thread should scroll to, once it shows that chat (it may mount after this is set). */
+export const scrollRequest = shallowRef<{ chatId: string, messageId: string }>()
+
 /** The chat and folder menus (with their rename/delete modals), shared by the Chats view and a chat's header. */
 export function useChatActions(session: SessionContext) {
     // Not `useI18n`: the plugin's New Chat command uses it outside a component's setup.
     const {t} = useNuxtApp().$i18n
     const $qt = useNotify()
     const $ovl = useOverlay()
-    const {root, index, vault, lock, createChat, renameChat, moveChat, deleteChat, createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab, liveChat} = useChats(session)
+    const {root, index, vault, lock, createChat, renameChat, moveChat, deleteChat, createFolder, renameFolder, deleteFolder, showInSidePanel, openInTab, liveChat, sidePanelChatId} = useChats(session)
     const nameModal = $ovl.create(ChatNameModal)
     const deleteModal = $ovl.create(ChatDeleteModal)
     const passwordModal = $ovl.create(ChatPasswordModal)
@@ -38,9 +41,16 @@ export function useChatActions(session: SessionContext) {
 
     const newChat = (folder = '') => run(async () => openInTab((await createChat(folder)).id))
 
-    /** The chat's context view, opened at `focus` (a message id) if given. */
+    /**
+     * The chat's context view, opened at `focus` (a message id) if given. Its Show in chat closes it with a message id:
+     * the chat is shown (where it is, else in a tab) and scrolled to that message.
+     */
     const showContext = (chat: ChatSummary, focus?: string) => run(async () => {
-        void contextModal.open({messages: (await liveChat(chat.id)).messages, title: chatTitle(chat), focus})
+        const messageId = await contextModal.open({messages: (await liveChat(chat.id)).messages, title: chatTitle(chat), focus}).result
+        if (!messageId) return
+        scrollRequest.value = {chatId: chat.id, messageId}
+        if (sidePanelChatId.value === chat.id) showInSidePanel(chat.id)
+        else await openInTab(chat.id)
     })
 
     async function newFolder(parent = '') {

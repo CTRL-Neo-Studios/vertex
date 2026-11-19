@@ -144,6 +144,8 @@
       "context": {
         "open": "上下文…",
         "info": "信息",
+        "header": "上下文",
+        "showInChat": "在聊天中显示",
         "title": "上下文：{title}",
         "totals": "{messages} 条消息 · {calls} 次模型调用 · 输入 {input} 词元 · 输出 {output} · {seconds} 秒",
         "user": "你",

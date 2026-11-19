@@ -5,7 +5,7 @@ import {writeText} from "@tauri-apps/plugin-clipboard-manager";
 import {ask} from "@tauri-apps/plugin-dialog";
 import {chatContext, chatSession} from "../plugin";
 import {useChats} from "../lib/chats";
-import {useChatActions} from "../lib/actions";
+import {scrollRequest, useChatActions} from "../lib/actions";
 import {useNotify} from "../lib/notify";
 
 /**
@@ -52,6 +52,29 @@ async function showEarlier() {
 	observer.observe(root.value)
 	setTimeout(() => observer.disconnect(), 1000)
 }
+
+const messagesRef = useTemplateRef<{ scrollToMessage(id: string, smooth?: boolean): void }>('messages')
+/**
+ * Show in chat (the context view): the message mounted if it's before the window, then scrolled to the top, and held
+ * there for a second while the thread still lays out (markdown, a side panel opening). A thread that mounts for it
+ * takes the request too, after its own scroll to the latest message (Nuxt UI's, at mount and 100 ms later).
+ */
+watch(scrollRequest, async (request) => {
+	if (request?.chatId !== props.chatId) return
+	scrollRequest.value = undefined
+	const at = props.chat.messages.findIndex(m => m.id === request.messageId)
+	if (at === -1) return
+	if (at < from.value) start.value = at
+	await nextTick()
+	setTimeout(() => {
+		const go = () => messagesRef.value?.scrollToMessage(request.messageId, false)
+		go()
+		if (!root.value) return
+		const observer = new ResizeObserver(go)
+		observer.observe(root.value)
+		setTimeout(() => observer.disconnect(), 1000)
+	}, 150)
+}, {immediate: true})
 
 const lastId = computed(() => props.chat.messages.at(-1)?.id)
 const busy = computed(() => props.chat.status === 'submitted' || props.chat.status === 'streaming')
@@ -127,7 +150,7 @@ async function rewind(message: VertexChatMessage) {
 			         :label="$t('plugins.chat.showEarlier', { count: Math.min(WINDOW, from) })" data-chat-earlier
 			         @click="showEarlier"/>
 		</div>
-		<UChatMessages :messages="shown" :status="chat.status" should-auto-scroll>
+		<UChatMessages ref="messages" :messages="shown" :status="chat.status" should-auto-scroll>
 			<template #indicator>
 				<UChatShimmer :text="$t('plugins.chat.thinking')" class="text-sm"/>
 			</template>

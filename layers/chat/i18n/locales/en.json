@@ -144,6 +144,8 @@
       "context": {
         "open": "Context…",
         "info": "Info",
+        "header": "Context",
+        "showInChat": "Show in chat",
         "title": "Context: {title}",
         "totals": "{messages} messages · {calls} model calls · {input} tokens in · {output} out · {seconds} s",
         "user": "You",

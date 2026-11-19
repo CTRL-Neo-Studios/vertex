@@ -39,7 +39,7 @@ const {
 	pendingPrompt,
 	chatTakesImages,
 } = useChats(session)
-const {chatActions} = useChatActions(session)
+const {chatActions, showContext} = useChatActions(session)
 
 const title = computed(() => summary(props.chatId).value?.title || t('plugins.chat.untitled'))
 const current = computed(() => summary(props.chatId).value)
@@ -387,8 +387,9 @@ const MENU = 'w-max min-w-48 max-w-80'
 		</div>
 
 		<template v-else-if="chat">
+			<!-- `scroll-pt-*`: a message scrolled to (Show in chat) starts below the tab's header. -->
 			<div ref="scrollEl"
-			     :class="['flex-1 min-h-0 overflow-y-auto no-scrollbar', inSidePanel ? fade : 'pt-10']"
+			     :class="['flex-1 min-h-0 overflow-y-auto', inSidePanel ? [fade, 'scroll-pt-2'] : 'pt-10 scroll-pt-12']"
 			     :style="{ paddingBottom: `${promptHeight}px` }">
 				<!-- Its own component: typing in the prompt re-renders this body, and with the messages in it, every one of them
 				     (the reusable template renders without the compiler's slot optimizations). -->
@@ -559,6 +560,10 @@ const MENU = 'w-max min-w-48 max-w-80'
 			</UDropdownMenu>
 		</template>
 		<template #header-right>
+			<UTooltip v-if="current" :text="$t('plugins.chat.context.header')">
+				<UButton class="text-muted" icon="i-lucide-info" size="xs" color="neutral" variant="ghost"
+				         :aria-label="$t('plugins.chat.context.header')" @click="showContext(current)"/>
+			</UTooltip>
 			<UTooltip :text="$t('plugins.chat.moveToSidePanel')">
 				<UButton class="text-muted" icon="i-lucide-square-arrow-out-up-right" size="xs" color="neutral"
 				         variant="ghost" :aria-label="$t('plugins.chat.moveToSidePanel')" @click="showInSidePanel(chatId)"/>
@@ -573,6 +578,10 @@ const MENU = 'w-max min-w-48 max-w-80'
 		<div class="flex items-center gap-1.5 px-3 h-10 shrink-0 border-b border-default">
 			<UIcon name="i-lucide-message-square" class="size-4 text-muted shrink-0"/>
 			<span class="truncate text-sm font-medium text-highlighted grow">{{ title }}</span>
+			<UTooltip v-if="current" :text="$t('plugins.chat.context.header')">
+				<UButton icon="i-lucide-info" size="xs" color="neutral" variant="ghost"
+				         :aria-label="$t('plugins.chat.context.header')" @click="showContext(current)"/>
+			</UTooltip>
 			<UTooltip :text="$t('plugins.chat.openInTab')">
 				<UButton icon="i-lucide-square-arrow-out-up-left" size="xs" color="neutral" variant="ghost"
 				         :aria-label="$t('plugins.chat.openInTab')" @click="openInTab(chatId)"/>
