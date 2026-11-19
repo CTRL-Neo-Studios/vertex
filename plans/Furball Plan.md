@@ -217,6 +217,19 @@ Needs Vertex: a plugin window with no frame, and moving it. An SDK minor (1.7.0)
 ### Acceptance
 - [ ] Installed from its release, on the user's machine.
 
+### As built
+- **The user's calls (19 Nov):** release with the placeholder sheet (theirs in a later version), `minAppVersion`
+  `1.0.0-beta.1`, tag now, Tasks 0.2.0 tagged too. Asked with the risk named: a Vertex without F2 refuses the
+  manifest (`"ownWindows"[0] has unknown keys: bare`); `1.0.0-beta.1` builds from before 22eacbf are such.
+- **Furball 0.1.0:** on the published SDK (`^1.7.0`, the user's release `7e6ba8f`); README with the sheet's layout
+  (32×32 cells, 5×7, row by row, feet bottom middle, walking facing right). Fresh clone: install with the lockfile,
+  typecheck, 3 tests, build. Tag `v0.1.0` pushed; the workflow made the release with `plugin.zip` (kitty.png,
+  locales, main.js, plugin.json with `bare`, README, styles.css):
+  https://github.com/Type-32/vertex-plugin-furball/releases/tag/v0.1.0
+- **Tasks 0.2.0:** fresh clone the same (20 tests); tag `v0.2.0`, released with `plugin.zip`:
+  https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.2.0
+- **Not run:** an install of either release in the app (the acceptance, the user's).
+
 ## Open questions
 
 1. Two workspace windows open: two kitties (a plugin window belongs to one session window), or one?
