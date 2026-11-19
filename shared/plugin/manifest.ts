@@ -90,6 +90,11 @@ export interface OwnWindowManifest {
     minHeight?: number
     /** Default `true`. */
     resizable?: boolean
+    /**
+     * No frame, title bar or shadow, see-through, and not in the taskbar or the Dock's window list: the plugin draws
+     * all of it (and moves it, with `WindowProps.window.setPosition`).
+     */
+    bare?: boolean
 }
 
 export const PLUGIN_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -270,14 +275,14 @@ function validateOwnWindows(raw: unknown, errors: string[]) {
     raw.forEach((w: Record<string, unknown> | null, i) => {
         const at = `"ownWindows"[${i}]`
         if (!w || typeof w !== 'object') return void errors.push(`${at} must be an object`)
-        const unknown = Object.keys(w).filter(k => !['id', 'width', 'height', 'minWidth', 'minHeight', 'resizable'].includes(k))
+        const unknown = Object.keys(w).filter(k => !['id', 'width', 'height', 'minWidth', 'minHeight', 'resizable', 'bare'].includes(k))
         if (unknown.length) errors.push(`${at} has unknown keys: ${unknown.join(', ')}`)
         if (!isString(w.id) || !PLUGIN_ID.test(w.id)) errors.push(`${at}.id must be lowercase letters, digits and inner hyphens`)
         else if (seen.has(w.id)) errors.push(`${at}.id "${w.id}" is declared twice`)
         else seen.add(w.id)
         for (const key of ['width', 'height'] as const) if (!SIZE(w[key])) errors.push(`${at}.${key} must be a number from 100 to 4000`)
         for (const key of ['minWidth', 'minHeight'] as const) if (w[key] !== undefined && !SIZE(w[key])) errors.push(`${at}.${key} must be a number from 100 to 4000`)
-        if (w.resizable !== undefined && typeof w.resizable !== 'boolean') errors.push(`${at}.resizable must be true or false`)
+        for (const key of ['resizable', 'bare'] as const) if (w[key] !== undefined && typeof w[key] !== 'boolean') errors.push(`${at}.${key} must be true or false`)
     })
 }
 

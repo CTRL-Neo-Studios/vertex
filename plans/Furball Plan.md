@@ -127,7 +127,7 @@ Needs Vertex: a plugin window with no frame, and moving it. An SDK minor (1.7.0)
   goes when its workspace window closes.
 
 ### As built
-- **Vertex, the kernel** (uncommitted): `OwnWindow.bare` and `WindowPlan.bare`; the route carries `&bare=1`. A bare
+- **Vertex, the kernel:** `OwnWindow.bare` and `WindowPlan.bare`; the route carries `&bare=1`. A bare
   window: no shadow, out of the taskbar and the Dock's window list (`skip_taskbar`), its first click the plugin's
   (`accept_first_mouse`, macOS). On Windows and Linux it has no decorations. On macOS it keeps them, with its traffic
   lights hidden (`hide_window_buttons`, `objc2` on the main thread): the first try (`decorations(false)`) crashed the
@@ -140,7 +140,7 @@ Needs Vertex: a plugin window with no frame, and moving it. An SDK minor (1.7.0)
   more than the plan named: the floor above the Dock needs it. The page (`plugin-window/[plugin]/[id].vue`) drops
   its bar and background, and the document's, for a bare window. Docs: `context.md`, `package.md`, `versions.md`
   (1.7.0). Vertex's typecheck at its 7, 397 tests, lint clean; the SDK's 8.
-- **The plugin** (uncommitted): `ownWindows: [{id: desk, 192×192, not resizable, bare}]`; Let the kitty out on the
+- **The plugin:** `ownWindows: [{id: desk, 192×192, not resizable, bare}]`; Let the kitty out on the
   desktop / Call the kitty back (palette); `Desk.vue`: the stage with `desk` (its world the work area, the window
   2× the sprite moved to keep the kitty at its bottom middle, one `setPosition` in flight at a time, drawn against
   the place the window has reached; the pointer read from the screen, `screenX`/`screenY`, so a drag doesn't feed

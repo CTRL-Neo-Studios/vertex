@@ -72,6 +72,8 @@ pub struct WindowPlan {
     pub size: (f64, f64),
     pub min_size: Option<(f64, f64)>,
     pub resizable: bool,
+    /// A plugin's `bare` window ([`crate::grants::OwnWindow::bare`]).
+    pub bare: bool,
 }
 
 /// The longest `params` a plugin's window may start from, as JSON: they travel in its URL.
@@ -102,6 +104,7 @@ pub fn plan(
                 size: (900.0, 600.0),
                 min_size: None,
                 resizable: true,
+                bare: false,
             })
         }
         WindowRequest::Settings { path, scope } => {
@@ -118,6 +121,7 @@ pub fn plan(
                 size: (900.0, 600.0),
                 min_size: None,
                 resizable: true,
+                bare: false,
             })
         }
         WindowRequest::About => Ok(WindowPlan {
@@ -127,6 +131,7 @@ pub fn plan(
             size: (420.0, 480.0),
             min_size: None,
             resizable: false,
+            bare: false,
         }),
         WindowRequest::Plugin { plugin, id, params } => {
             let session = caller.strip_prefix(SESSION_WINDOW_PREFIX).ok_or("a plugin's window opens from a session window")?;
@@ -140,14 +145,15 @@ pub fn plan(
                 return Err(format!("a plugin window's params are over {PARAMS_MAX} bytes"));
             }
             let root = info.root.map(|r| format!("&root={}", encode(&r))).unwrap_or_default();
-            let OwnWindow { width, height, min_width, min_height, resizable, .. } = info.window;
+            let OwnWindow { width, height, min_width, min_height, resizable, bare, .. } = info.window;
             Ok(WindowPlan {
                 label: plugin_window_label(&plugin, &id, session),
-                route: format!("/plugin-window/{plugin}/{id}?params={}{root}", encode(&params)),
+                route: format!("/plugin-window/{plugin}/{id}?params={}{root}{}", encode(&params), if bare { "&bare=1" } else { "" }),
                 title: info.name,
                 size: (width, height),
                 min_size: (min_width.is_some() || min_height.is_some()).then(|| (min_width.unwrap_or(0.0), min_height.unwrap_or(0.0))),
                 resizable,
+                bare,
             })
         }
     }
@@ -202,7 +208,10 @@ fn build<R: Runtime>(app: &AppHandle<R>, plan: &WindowPlan) -> Result<(), String
         .inner_size(plan.size.0, plan.size.1)
         .resizable(plan.resizable)
         .center()
-        .decorations(true)
+        // On macOS every window keeps its frame: decorum (the app's title bar plugin) places every window's traffic
+        // lights, on opening and on each resize, and dereferences null on a window that has none. A bare window
+        // hides them instead (`hide_window_buttons`), its title bar see-through like the rest.
+        .decorations(!plan.bare || cfg!(target_os = "macos"))
         .transparent(true)
         // Tauri's own file-drop handler would take every drop, so the page's HTML5 drag and drop (Files, the
         // editor, chat) would never get one; `tauri.conf.json` says the same for `main`.
@@ -210,17 +219,48 @@ fn build<R: Runtime>(app: &AppHandle<R>, plan: &WindowPlan) -> Result<(), String
     if let Some((width, height)) = plan.min_size {
         builder = builder.min_inner_size(width, height);
     }
+    if plan.bare {
+        builder = builder.shadow(false).skip_taskbar(true);
+    }
     #[cfg(target_os = "macos")]
     {
         builder = builder
             .hidden_title(true)
             .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .traffic_light_position(tauri::LogicalPosition::new(14.0, 21.0));
+            .traffic_light_position(tauri::LogicalPosition::new(14.0, 21.0))
+            // A bare window is all the plugin's: its first click is the plugin's too, not only what brings Vertex
+            // forward.
+            .accept_first_mouse(plan.bare);
     }
     crate::grants::grant_window(app, &plan.label)?;
     let window = builder.build().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    if plan.bare {
+        hide_window_buttons(&window);
+    }
     opened(app, &window);
     Ok(())
+}
+
+/// Hides a window's close, minimize and zoom buttons (on the main thread, where AppKit wants it).
+#[cfg(target_os = "macos")]
+fn hide_window_buttons<R: Runtime>(window: &WebviewWindow<R>) {
+    let handle = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        use objc2::{msg_send, runtime::AnyObject};
+        let Ok(ns_window) = handle.ns_window() else { return };
+        let ns_window = ns_window.cast::<AnyObject>();
+        // NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton.
+        for kind in 0usize..3 {
+            // SAFETY: `ns_window` is this window's live NSWindow, on the main thread; a missing button is nil.
+            unsafe {
+                let button: *mut AnyObject = msg_send![ns_window, standardWindowButton: kind];
+                if let Some(button) = button.as_ref() {
+                    let _: () = msg_send![button, setHidden: true];
+                }
+            }
+        }
+    });
 }
 
 /// The windows at launch: the start window, from its entry in `tauri.conf.json` (`create: false` there, so this is the
@@ -309,7 +349,7 @@ mod tests {
 
     #[test]
     fn a_plugin_window_is_one_its_plugin_declares_and_a_session_window_asks_for() {
-        let window = OwnWindow { id: "list".into(), width: 360.0, height: 560.0, min_width: Some(280.0), min_height: None, resizable: true };
+        let window = OwnWindow { id: "list".into(), width: 360.0, height: 560.0, min_width: Some(280.0), min_height: None, resizable: true, bare: false };
         // What `grants::own_window` answers: tasks is on in session-abc, with one window, `list`.
         let own = |caller: &str, plugin: &str, id: &str| {
             (caller == "session-abc" && plugin == "tasks" && id == "list")
@@ -319,7 +359,7 @@ mod tests {
         let opened = plan(request("tasks", "list", Some(json!({"a": 1}))), "session-abc", |_| true, own).unwrap();
         assert_eq!(opened.label, "plugin:tasks:list:abc");
         assert_eq!(opened.route, "/plugin-window/tasks/list?params=%7B%22a%22%3A1%7D&root=%2FUsers%2Fme%2FMy+Notes");
-        assert_eq!((opened.title.as_str(), opened.size, opened.min_size), ("Tasks", (360.0, 560.0), Some((280.0, 0.0))));
+        assert_eq!((opened.title.as_str(), opened.size, opened.min_size, opened.bare), ("Tasks", (360.0, 560.0), Some((280.0, 0.0)), false));
         assert_eq!(plugin_window_parts(&opened.label), Some(("tasks", "list", "abc")));
         assert_eq!(crate::grants::WindowKind::of(&opened.label), Some(crate::grants::WindowKind::Plugin));
 
@@ -332,6 +372,15 @@ mod tests {
         }
         assert!(plan(request("tasks", "list", Some(json!([1]))), "session-abc", |_| true, own).is_err());
         assert!(plan(request("tasks", "list", Some(json!({"x": "y".repeat(PARAMS_MAX)}))), "session-abc", |_| true, own).is_err());
+    }
+
+    #[test]
+    fn a_bare_window_says_so_to_its_page() {
+        let window = OwnWindow { id: "desk".into(), width: 160.0, height: 160.0, min_width: None, min_height: None, resizable: false, bare: true };
+        let own = |_: &str, _: &str, _: &str| Some(PluginWindowInfo { window: window.clone(), name: "Furball".into(), root: None });
+        let opened = plan(WindowRequest::Plugin { plugin: "furball".into(), id: "desk".into(), params: None }, "session-abc", |_| true, own).unwrap();
+        assert!(opened.bare);
+        assert_eq!(opened.route, "/plugin-window/furball/desk?params=%7B%7D&bare=1");
     }
 
     #[test]

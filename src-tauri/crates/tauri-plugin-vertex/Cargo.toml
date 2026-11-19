@@ -47,6 +47,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 keyring = { version = "3.6", features = ["apple-native"] }
 # Files' Delete to the Trash, keeping where each item went so Undo can put it back (`trash.rs`).
 objc2-foundation = { version = "0.3.2", features = ["NSFileManager", "NSURL", "NSError", "NSString"] }
+# A bare plugin window's hidden traffic lights (`windows.rs`).
+objc2 = "0.6.5"
 
 # The Trash and Recycle Bin, with the listing that restoring needs (`trash.rs`); macOS uses NSFileManager instead.
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]

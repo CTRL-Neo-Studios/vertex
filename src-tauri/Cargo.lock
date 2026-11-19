@@ -5947,6 +5947,7 @@ dependencies = [
  "fontdb",
  "keyring",
  "notify-debouncer-full",
+ "objc2",
  "objc2-foundation",
  "percent-encoding",
  "rayon",

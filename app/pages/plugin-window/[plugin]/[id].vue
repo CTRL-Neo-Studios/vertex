@@ -14,6 +14,9 @@ const {t} = useI18n()
 const window = getCurrentWebviewWindow()
 const target = pluginWindowFromLabel(window.label)
 const def = computed(() => target && pluginWindowDefs.get(`${target.plugin}:${target.id}`))
+/** Its manifest's `bare`, which the kernel put in the URL: no bar, nothing behind the plugin's UI. */
+const bare = new URL(location.href).searchParams.get('bare') === '1'
+if (bare) document.documentElement.style.background = document.body.style.background = 'transparent'
 
 /** What it was opened with: a JSON object the kernel put in the URL. */
 function params(): Record<string, WindowMessage> {
@@ -34,8 +37,8 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="h-screen w-full flex flex-col overflow-hidden bg-default">
-        <div class="shrink-0 h-10 flex items-center justify-center px-20 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ title }}</div>
+    <div class="h-screen w-full flex flex-col overflow-hidden" :class="{'bg-default': !bare}">
+        <div v-if="!bare" class="shrink-0 h-10 flex items-center justify-center px-20 text-sm font-medium text-muted truncate" data-tauri-drag-region>{{ title }}</div>
         <PluginMount v-if="def && props" :ui="def" :props="props" class="min-h-0 flex-1"/>
         <p v-else-if="!def" class="p-6 text-center text-sm text-muted" data-plugin-window-missing>{{ t('app.plugins.windowMissing') }}</p>
     </div>

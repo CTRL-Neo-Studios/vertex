@@ -1,6 +1,7 @@
 import {listen} from '@tauri-apps/api/event'
+import {currentMonitor} from '@tauri-apps/api/window'
 import {getCurrentWebviewWindow, WebviewWindow} from '@tauri-apps/api/webviewWindow'
-import {LogicalSize} from '@tauri-apps/api/dpi'
+import {LogicalPosition, LogicalSize} from '@tauri-apps/api/dpi'
 import {pluginWindowFromLabel, pluginWindowLabel, sessionUuidFromLabel} from '#shared/constants/app'
 import type {PluginWindowHandle, WindowChannel, WindowMessage, WindowProps} from '#shared/plugin/api'
 import {vertexInvoke} from '~/utils/vertexInvoke'
@@ -104,6 +105,18 @@ export async function windowProps(params: Record<string, WindowMessage>, onTitle
             },
             setSize: (width, height) => window.setSize(new LogicalSize(width, height)),
             setAlwaysOnTop: on => window.setAlwaysOnTop(on),
+            position: async () => {
+                const {x, y} = (await window.outerPosition()).toLogical(await window.scaleFactor())
+                return {x, y}
+            },
+            setPosition: (x, y) => window.setPosition(new LogicalPosition(x, y)),
+            workArea: async () => {
+                const monitor = await currentMonitor()
+                if (!monitor) throw new Error('the window is on no screen')
+                const {x, y} = monitor.workArea.position.toLogical(monitor.scaleFactor)
+                const {width, height} = monitor.workArea.size.toLogical(monitor.scaleFactor)
+                return {x, y, width, height}
+            },
             close: () => window.close(),
         },
     }

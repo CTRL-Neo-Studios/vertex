@@ -415,6 +415,14 @@ export interface WindowProps {
         /** Its inner size, in logical pixels. */
         setSize(width: number, height: number): Promise<void>
         setAlwaysOnTop(on: boolean): Promise<void>
+        /** Its top left corner on the screen, in logical pixels. */
+        position(): Promise<{ x: number, y: number }>
+        setPosition(x: number, y: number): Promise<void>
+        /**
+         * The part of the screen it's on that windows may use (without the menu bar, the Dock or the taskbar), in
+         * logical pixels.
+         */
+        workArea(): Promise<{ x: number, y: number, width: number, height: number }>
         close(): Promise<void>
     }
 }

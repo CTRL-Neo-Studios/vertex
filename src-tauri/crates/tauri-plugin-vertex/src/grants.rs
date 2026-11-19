@@ -80,6 +80,10 @@ pub struct OwnWindow {
     pub min_height: Option<f64>,
     #[serde(default = "on")]
     pub resizable: bool,
+    /// No frame, title bar or shadow, see-through, and not in the taskbar or the Dock's window list: the plugin draws
+    /// all of it.
+    #[serde(default)]
+    pub bare: bool,
 }
 
 fn session_only() -> Vec<WindowKind> {

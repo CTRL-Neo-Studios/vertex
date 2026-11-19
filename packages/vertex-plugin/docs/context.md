@@ -515,5 +515,11 @@ window does to the workspace goes through the plugin and the contract. The plugi
 (`ctx.http` with `network`). A plugin it `requires` isn't running in the window.
 
 The component gets `WindowProps`: `params`, `channel` (`post`, `on`: to and from the plugin in the session window
-that opened it, and nothing else), and `window` (`setTitle`, `setSize`, `setAlwaysOnTop`, `close`). Vertex draws a
-bar at its top with its title, to drag it by.
+that opened it, and nothing else), and `window` (`setTitle`, `setSize`, `setAlwaysOnTop`, `position`, `setPosition`,
+`workArea`, `close`; positions and the work area, the screen without the menu bar, Dock or taskbar, in logical
+pixels). Vertex draws a bar at its top with its title, to drag it by.
+
+A window declared `bare` has no bar, frame, title bar or shadow, nothing behind the plugin's UI, and isn't in the
+taskbar or the Dock's window list: the plugin draws all of it, and moves it with `setPosition` (a desktop pet that
+walks the screen's bottom edge, a sticky note). Its first click is the plugin's, even while Vertex is in the
+background.

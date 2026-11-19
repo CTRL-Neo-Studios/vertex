@@ -71,6 +71,10 @@ that registers one checks `ctx.use('chat')?.registerTool` or sets `minAppVersion
 1.6.0 also moves Nuxt UI to 4.13: `UToggle`, `UToggleGroup` and `UChatAttachment` resolve in a plugin's components.
 A plugin that uses them sets `minAppVersion` to the first Vertex on 4.13.
 
+1.7.0 adds bare windows (`ownWindows[].bare`) and `position`, `setPosition` and `workArea` to `WindowProps.window`
+([Windows of its own](context.md#windows-of-its-own)). An older Vertex refuses a manifest with `bare` (an unknown key),
+so a plugin that declares one sets `minAppVersion` to the first Vertex with them.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).
