@@ -830,6 +830,25 @@ will do to the files; and Nuxt UI 4.13 is out, with `ChatAttachment`, `Toggle` a
 ### Acceptance
 - [ ] Installed from its release (`plugin.zip`), the plugin runs with every view on a document of the user's own.
 
+### As built
+- **Published by the user:** `@type32/tasks-ui-components` 0.1.0; `@type32/vertex-plugin` 1.6.0 (T8 to T9a, which
+  1.5.0 was published without) and 1.6.1.
+- **The plugin:** 0.1.0, `minAppVersion` `1.0.0-beta.1` (the user's), on the published packages
+  (`@type32/tasks-ui-components ^0.1.0`, `@type32/vertex-plugin ^1.6.1`). Tag `v0.1.0` pushed; the workflow made the
+  release with `plugin.zip` (https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.1.0).
+- **Checked:** the workflow's steps on a fresh clone before the tag (install with the lockfile, typecheck, 20 tests,
+  build); the release's `main.js` and `styles.css` are byte for byte the build run in `tauri dev` through T9a; its
+  `plugin.json` passes this Vertex's `validateManifest` at app version `1.0.0-beta.1` and is refused at
+  `1.0.0-alpha.3`. **Not run:** an install from the repository's URL in the app, and the acceptance above, which is
+  the user's document.
+- **Found:** the SDK refused a `minAppVersion` with a pre-release in it, so the release build failed
+  (`"minAppVersion" must be a version like 0.9.2`), and the preset's packing step hid that error behind `ENOENT …
+  scandir dist` by running after a build that wrote nothing. Both fixed in SDK 1.6.1 (`shared/plugin/manifest.ts`:
+  a minimum may name a pre-release, and then earlier pre-releases of that version don't meet it; `vite.ts`: no
+  packing unless the build wrote its bundle). A Vertex from before that change refuses this plugin's manifest.
+- **The small window users asked for** (always on top, by a pin) is T8's. The desktop pet that came of it is a
+  plugin of its own (`plans/Furball Plan.md`).
+
 ## Not in this plan
 
 - A Table view; a year view; printing.
