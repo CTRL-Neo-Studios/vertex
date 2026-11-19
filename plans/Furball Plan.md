@@ -175,8 +175,39 @@ Needs Vertex: a plugin window with no frame, and moving it. An SDK minor (1.7.0)
 - **Tasks 0.2.0:** feeds Furball its agenda when Furball is on; an alert makes the kitty hop and hold the task up.
 
 ### Acceptance
-- [ ] With Tasks on: the next task is held up; ticked from the bubble, it's done in its file; a late one makes it
+- [x] With Tasks on: the next task is held up; ticked from the bubble, it's done in its file; a late one makes it
   restless; without Tasks, Furball is still a pet.
+
+### As built
+- **The API** (`src/api.ts`, copied into Tasks as `src/furball-api.ts`): `FurballApi` (`source`, `cheer`, `nudge`),
+  `FurballSource` (`id`, `label`, `items()`, `done`, `open?`), `FurballThing` (`id`, `title`, `when?` already worded,
+  `late?`), and `PluginApis.furball` declared on `@type32/vertex-plugin`, so `ctx.use('furball')` is typed (Tasks'
+  typecheck proves it). `src/things.ts`: the session window's sources, `things` (late ones first), `shout` (cheer or
+  a text to hold up), `api`, provided in session windows only.
+- **The pet:** `cat.ts` gets `busy` (doesn't fall asleep on its own), `restless` (fidgets: a startle at half its
+  decisions, and wakes after 4 s asleep), `eat(last)` and `cheer(big)` (higher hop, seven hearts); one more test
+  (busy stays awake, restless fidgets and wakes). `stage.ts`: `onPoke`, `local()` (its feet in canvas pixels).
+  `PetView.vue`, drawn by the overlay (`Kitty.vue`) and the desk window (`Desk.vue`): the canvas, a sign over its
+  head (the next thing, red when late, or a nudged text for 10 s; hidden asleep, held or falling) and, on a poke,
+  the bubble (things by source, a checkbox and a title each), both placed every frame. The desk window grows to
+  272 px wide and the bubble's height taller while it's open; the session window sends it `{things}` and `{shout}`
+  and does its `{done}`/`{open}`.
+- **Tasks 0.2.0** (its commit `dfc7e2d`, not pushed or released): `src/furball.ts` feeds Overdue and Today (the agenda's rows,
+  `when` worded by `formatTime`, `late` for Overdue), a tick completes (`completeEntry`), a title opens
+  (`openTask`); started per session in its scope through `whenPlugin`. An alert also nudges the kitty with the
+  task's title. `requires` adds `furball?`; README. Its typecheck, 20 tests, build.
+- **Checked** in `tauri dev` (both plugins from their `plugin.zip`; a `.task` file with one task due yesterday and one
+  due 2.5 minutes later; native clicks): the kitty held up "Draft the brief" in red; at the second task's due minute
+  the sign turned to "Call the vet" (the alert's nudge); a click on the kitty opened the bubble with both; a tick on
+  the first wrote `done` and `completedAt` to the file, the row went, the kitty chomped with crumbs. Let out with one
+  task left: the desk window held it up; a click grew the window from 192×192 to 272×256 with the bubble; the tick
+  there wrote the task done in the file, and the window shrank back and was high in a hop. With Tasks turned off and
+  the window reloaded: the kitty there, no sign, no Tasks commands. **Not checked:** the restless fidgeting by eye
+  (the test covers it), the big cheer's hearts in a picture (the hop was caught, not the hearts), a nudge while out.
+- **Found:** turning a plugin off doesn't stop it in open windows (by design, until the app restarts), so its
+  source stays with Furball until then. A synthetic `click()` on the bubble's checkbox right after a poke was taken
+  by the stage (the last press was the kitty's); a real click's `pointerdown` decides again, so people never hit it.
+  Tasks' own `node_modules` had SDK 1.6.0's files under 1.6.1's `package.json`; a reinstall fixed it.
 
 ## F4: Release
 
