@@ -965,6 +965,10 @@ dependency lines kept but quiet.
 - **Found:** once, the saved zoom went from 1,440 to 73 with nothing done in the app; ⌘ may have stayed down for real
   scrolling after the synthetic ⌘-scroll events. Not seen again. A document with a custom field named `assignees`
   must rename it to be read as 1.2 (said in the SPEC).
+- **Released (19 Nov):** the user published `@type32/tasks` 0.3.0 and `@type32/tasks-ui-components` 0.3.0 (not the
+  0.2.0 written here). Tasks 0.3.0 moved onto both (`^0.3.0`); a fresh clone installed with the lockfile, typechecked,
+  passed its 20 tests and built; tag `v0.3.0` pushed, the workflow released it with `plugin.zip`:
+  https://github.com/CTRL-Neo-Studios/vertex-plugin-tasks/releases/tag/v0.3.0
 
 
 ## Not in this plan
