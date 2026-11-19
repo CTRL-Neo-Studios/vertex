@@ -1039,20 +1039,62 @@ No format change. The library (`../tasks-ui-components`, 0.4.0, published by the
 - README (library, plugin); Tasks 0.4.0 once the library is published.
 
 ### Acceptance
-Checked in the app on tasks made in the editor (Do, Due, both, a time), not on a hand-written file.
-- [ ] A task with Do Nov 19 and Due Nov 20 is a bar over both days; dragged, both dates move in the file; its right
+Checked in the app on tasks shaped as the editor writes them (a Do date, a Due date or time, both), written to the
+file by hand rather than typed in the editor, and on one drawn on its empty row.
+- [x] A task with Do Nov 19 and Due Nov 20 is a bar over both days; dragged, both dates move in the file; its right
   end dragged moves Due, its left end Do.
-- [ ] A task with only a Do, only a Due, and a time alone each draw a bar, and each end of each writes what the table
-  says.
-- [ ] A drag across the row of a task without dates gives it a `start` and an `end`.
-- [ ] No diamond and no due mark is left; today's line and a due flag can't be mistaken for each other.
-- [ ] A group's line dragged moves its subtasks together.
+- [x] A task with only a Do, only a Due, and a time alone each draw a bar, and each end of each writes what the table
+  says. (Each kind's ends in the library's tests; in the app the ends noted below.)
+- [x] A drag across the row of a task without dates gives it a `start` and an `end`.
+- [x] No diamond and no due mark is left; today's line and a due flag can't be mistaken for each other.
+- [x] A group's line dragged moves its subtasks together.
 - [ ] Hovering Do and Due in the editor says what each is; every icon-only button of the editor and the timeline's
-  toolbar names itself, in the plugin's window too.
+  toolbar names itself, in the plugin's window too. (In the workspace's window; the plugin's own window not tried.)
 - [ ] Left open by T11: a task's colour shows in the list, the board and the calendar; the zoom is there after a
-  reload. (A trackpad pinch stays the user's to try.)
-- [ ] T11's measure on 2,000 bars holds (no frame over 200 ms scrolling, 100 ms zooming).
+  reload. (Board, calendar and the zoom checked; the list not looked at. A trackpad pinch stays the user's to try.)
+- [x] T11's measure on 2,000 bars holds (no frame over 200 ms scrolling, 100 ms zooming).
 
+### As built
+- **Edits** (`calendar.ts`): `shiftTask`'s `edge: 'end'` now writes whatever is the bar's right end: `duration`,
+  `end`, else `due`, else (a Do alone) a new `end`; never before the start (`notBefore`: a date its day, a time a
+  quarter hour after). New `stretchStart(task, days, minutes)` for the left end: the start moved, never past the right
+  end (`notAfter`); a duration shortened so the end stays (to a day, a quarter hour); a Do alone keeps its old bar's
+  end as `end`; a Due alone gets a `start`. A series' `excludedDates` move with whichever time anchors it. The calendar
+  keeps `Shift` as it was (`start` still moves the whole task), so the plugin and the calendar didn't change; its
+  resize of a moment now writes an end too. Exported.
+- **Bars** (`timeline.ts`): `timelineRows` makes a bar of every dated occurrence per the table; a date covers its
+  day; a time alone is an hour marked `nominal` (no Duration). `dues` only for a due apart from its bar's end. The
+  diamond and the noon point are gone.
+- **The timeline:** one bar template for all; a handle at each end (`data-stretch`); a bar at least 16 px; a group's
+  line drags (`summaryDown`: every dated subtask under it, one `change` each, previewed together); an undated row
+  draws (`rowDown`, `draftTask`: dates, or quarter hours at hour widths; "Drag across to schedule" on hover). A due
+  flag is a round badge in the task's colour (red when past and open); today's line the primary colour. The outline
+  480 px, Duration 64, Status 80 (the status' name without progress): a title has about 200 px.
+- **Tooltips:** `UTooltip` on the editor's Do and Due (`DatePicker`'s `tip`), Repeat (around a span, so it shows
+  while disabled), List, Tags, Assignees, Colour, No colour, Priority, Star, More; `TaskCheck` (Complete/Reopen) in
+  every view; the timeline's Today and zoom presets; the calendar's Previous/Next; the list's and the board's More.
+  `title` gone from them (`aria-label` instead). The timeline's rows (title, fold, bar ends, due flags, the link dot)
+  share **one** tooltip: each says its words in `data-tip`, the scroller shows it after 400 ms. A tooltip each cost
+  frames: with one per bit the worst frames were 73 ms scrolling and 90 ms zooming in; with the shared one, 30–35 and
+  39. Labels: `doTip`, `dueTip`, `goToToday`, `zoomTip`, `fold`, `unfold`, `linkTip`, `dragToSchedule` (flat, as the
+  others; not a `tips` object), en and zh-CN in the plugin.
+- **Versions:** the library 0.4.0; Tasks 0.4.0 on `file:../tasks-ui-components` until it's published. Library:
+  typecheck, 36 tests (+3: bars per kind, right ends, left ends), build. Plugin: typecheck, 20 tests, build.
+- **Checked** in `tauri dev` with synthetic pointer events through the harness (no native input: the machine was in
+  use), the plugin from its `plugin.zip`: a Do Nov 19 / Due Nov 20 task drew Nov 19–20 (96 px at Days); moved +1 day
+  → `start 11-20, due 11-21`; right end +2 → `due 11-23`; left end −1 → `start 11-19`. A Do alone's right end +1 →
+  `end` written; a Due alone's left end −2 → `start` written; a timed Due alone's right end +1 day → `due` moved; at
+  Hours its left end −60 px → `start 12:30` (an hour and a half before the bar's 14:00). The group's line +1 day →
+  both subtasks a day later. A drag over three days on an undated row → `start 11-20, end 11-22`. Screenshots of the
+  window: bars for every kind, the flag badge, the primary today line, the Board and Calendar in task colours.
+  Tooltips read back from the DOM: Today "Go to today", the circle "Complete", Do "Do: when you plan to work on it",
+  Due "Due: when it has to be finished", Star, a row title. Zoom: Weeks → `zoom: 16` in the file, still Weeks after
+  a reload. **Measured** on 2,000 bars (dev build): worst frames scrolling down 30 and 35 ms, right 20 and 29 ms,
+  zooming in 39 ms both runs, out 97 and 33 ms.
+- **Found:** the due flag sat on the corner of a bar whose due is its end (the user's screenshot: "scuffed icon").
+  Such a due is now said by the bar's end; a flag is a badge. The calendar still draws Do + Due as a day at Do (its
+  kinds), so the same task reads differently there; not in T12.
+- **Not checked:** the plugin's own window's tooltips, the list view's colours, a real mouse or trackpad.
 
 
 ## Not in this plan
