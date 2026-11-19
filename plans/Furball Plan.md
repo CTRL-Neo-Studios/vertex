@@ -121,10 +121,48 @@ Needs Vertex: a plugin window with no frame, and moving it. An SDK minor (1.7.0)
 - Docs (`context.md`, `package.md`, `versions.md`), tests for the manifest key and the kernel's plan.
 
 ### Acceptance
-- [ ] The spike first: a bare see-through window moved every frame is smooth on macOS; what Windows and Linux do is
+- [x] The spike first: a bare see-through window moved every frame is smooth on macOS; what Windows and Linux do is
   written down, tried or not.
-- [ ] The kitty leaves the window for the desktop and comes back; it stays on top of other apps while pinned; it
+- [x] The kitty leaves the window for the desktop and comes back; it stays on top of other apps while pinned; it
   goes when its workspace window closes.
+
+### As built
+- **Vertex, the kernel** (uncommitted): `OwnWindow.bare` and `WindowPlan.bare`; the route carries `&bare=1`. A bare
+  window: no shadow, out of the taskbar and the Dock's window list (`skip_taskbar`), its first click the plugin's
+  (`accept_first_mouse`, macOS). On Windows and Linux it has no decorations. On macOS it keeps them, with its traffic
+  lights hidden (`hide_window_buttons`, `objc2` on the main thread): the first try (`decorations(false)`) crashed the
+  app, as decorum (the app's title bar plugin) places every window's traffic lights on opening and on each resize
+  and dereferenced the missing ones (`cocoa` `superview`, a null-pointer panic). The title bar is the see-through
+  overlay the other windows have, so nothing of it shows. Test: `a_bare_window_says_so_to_its_page`; 44 kernel
+  tests; clippy as before (two old warnings).
+- **Vertex, the contract:** `ownWindows[].bare` (validated as a boolean; the manifest test); `WindowProps.window`
+  gets `position()`, `setPosition(x, y)` and `workArea()` (the monitor's work area), logical pixels. `workArea` is
+  more than the plan named: the floor above the Dock needs it. The page (`plugin-window/[plugin]/[id].vue`) drops
+  its bar and background, and the document's, for a bare window. Docs: `context.md`, `package.md`, `versions.md`
+  (1.7.0). Vertex's typecheck at its 7, 397 tests, lint clean; the SDK's 8.
+- **The plugin** (uncommitted): `ownWindows: [{id: desk, 192×192, not resizable, bare}]`; Let the kitty out on the
+  desktop / Call the kitty back (palette); `Desk.vue`: the stage with `desk` (its world the work area, the window
+  2× the sprite moved to keep the kitty at its bottom middle, one `setPosition` in flight at a time, drawn against
+  the place the window has reached; the pointer read from the screen, `screenX`/`screenY`, so a drag doesn't feed
+  back through the moving window); the overlay hides while it's out. Where it settles goes back to the session
+  window every 2 s when it changed and is kept in `ctx.data.global` as a share of the screen's width. `onTop`
+  (switch, default on) applies live. The plugin builds against the local SDK (`file:../vertex/packages/vertex-plugin`)
+  until 1.7.0 is published.
+- **Checked** in `tauri dev` (harnesses in the session and Settings windows; `plugin.zip` from a local URL; native
+  mouse events; a sampler reading the window's place from `CGWindowListCopyWindowInfo` every 2 ms): the window opened
+  frameless and see-through, the kitty on the screen's bottom edge, the window's overlay kitty gone. With Finder in
+  front, a drag from the kitty held it by the scruff under the pointer across the screen (a screenshot at the
+  pointer showed its head there) and the throw landed on the floor; the window moved 179 times in 3.8 s, median 17 ms
+  apart (60 a second), 90th percentile 32 ms, at most 31 px a move. Window level 5 with `onTop` on, 0 off, 5 again
+  on, live. Call back: the window gone, the overlay kitty back. Out again: placed near where it had landed
+  (`furball.json` held `x` 0.286). Closing the session window closed it. **Not judged:** smoothness by eye (the
+  numbers only); Windows and Linux not tried (no `decorations` there, so decorum's macOS code doesn't run; whether a
+  see-through borderless window moved every frame is smooth there is open).
+- **Found:** the first click on a window of an app in the background only brought the app forward (fixed with
+  `accept_first_mouse`). A plugin window has no `data-get`, so its own state goes through the session window, as
+  designed. A kitty left alone sleeps after 45 s, so the window stops moving: not a stall.
+- **Not done:** letting it out by dragging it over the window's edge; the window keeps its size when Size changes
+  while it's out (it's set on opening).
 
 ## F3: Things to do
 
