@@ -1022,6 +1022,18 @@ No format change. The library (`../tasks-ui-components`, 0.4.0, published by the
   96 px) so a title has about 260 px; a cut title shows whole on hover.
 - **The bracket:** find what draws it. A dependency between two bars now has somewhere to run; a line that shouldn't
   be there is removed.
+- **Tooltips** (the user, 19 Nov: what Do and Due mean isn't said anywhere). The library has none: the editor's
+  buttons carry a native `title`, which shows late and plainly. Those become `UTooltip`s (labels' new `tips`, en and
+  zh-CN in the plugin), a `title` kept nowhere a tooltip is:
+  - **Do:** "When you plan to work on it." **Due:** "When it has to be finished." On the editor's two date buttons
+    and on a bar's ends that move them.
+  - The editor's icon-only buttons: Repeat ("Repeats…", or why it can't: no date), List, Tags, Assignees, Colour,
+    Priority, Star, More.
+  - The timeline: Today ("Go to today"), Hours/Days/Weeks/Months ("Zoom to…", with "Pinch or ⌘-scroll to zoom"), a
+    row's circle ("Complete"), the chevron ("Fold"/"Unfold"), the dot after a bar ("Drag to a task that waits for
+    this one"), a due flag (its date).
+  - The other views' icon-only buttons the same way, where they have a `title` now.
+  `UTooltip` needs Nuxt UI's provider above it: Vertex's views have `UApp`; checked in the plugin's own window.
 - **Tests** (library): the table's four rows to bars, dates and times, a repeating task; `stretchTask` for each cell
   of the table and the stop at the other end; a group's drag.
 - README (library, plugin); Tasks 0.4.0 once the library is published.
@@ -1035,6 +1047,8 @@ Checked in the app on tasks made in the editor (Do, Due, both, a time), not on a
 - [ ] A drag across the row of a task without dates gives it a `start` and an `end`.
 - [ ] No diamond and no due mark is left; today's line and a due flag can't be mistaken for each other.
 - [ ] A group's line dragged moves its subtasks together.
+- [ ] Hovering Do and Due in the editor says what each is; every icon-only button of the editor and the timeline's
+  toolbar names itself, in the plugin's window too.
 - [ ] Left open by T11: a task's colour shows in the list, the board and the calendar; the zoom is there after a
   reload. (A trackpad pinch stays the user's to try.)
 - [ ] T11's measure on 2,000 bars holds (no frame over 200 ms scrolling, 100 ms zooming).
