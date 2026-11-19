@@ -1,6 +1,6 @@
 {
   "name": "@type32/vertex-plugin",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": false,
   "description": "Vertex SDK - Types, the host's shared modules and a Vite preset for Vertex community plugins.",
   "type": "module",
