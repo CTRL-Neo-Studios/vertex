@@ -108,6 +108,8 @@ function zip(files: { name: string, data: Buffer }[]): Buffer {
 export function vertex(options: VertexOptions = {}): PluginOption[] {
     let root = process.cwd()
     let outDir = 'dist'
+    /** This build wrote `dist/`: a failed one packs nothing, as its `dist/` is missing or stale and its error is the one to show. */
+    let written = false
     const json = (file: string) => JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'))
     return [
         sharedModules(json('./modules.json') as Record<string, string[]>, json('./nuxt-ui-components.json') as Record<string, string>),
@@ -133,6 +135,9 @@ export function vertex(options: VertexOptions = {}): PluginOption[] {
                 root = config.root
                 outDir = resolve(root, config.build.outDir)
             },
+            buildStart() {
+                written = false
+            },
             generateBundle() {
                 const result = validateManifest(JSON.parse(readFileSync(resolve(root, 'plugin.json'), 'utf8')))
                 if (!result.ok) this.error(`plugin.json:\n  - ${result.errors.join('\n  - ')}`)
@@ -156,8 +161,11 @@ export function vertex(options: VertexOptions = {}): PluginOption[] {
                     this.emitFile({type: 'asset', fileName: `locales/${locale}.json`, source: `${JSON.stringify(messages, null, 2)}\n`})
                 }
             },
+            writeBundle() {
+                written = true
+            },
             closeBundle() {
-                if (!options.pack) return
+                if (!options.pack || !written) return
                 const files = readdirSync(outDir, {recursive: true, withFileTypes: true})
                     .filter(f => f.isFile())
                     .map(f => ({name: relative(outDir, join(f.parentPath, f.name)).split(sep).join('/'), data: readFileSync(join(f.parentPath, f.name))}))

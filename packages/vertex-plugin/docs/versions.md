@@ -20,7 +20,9 @@ that asks for a newer one than it has.
 
 An addition within an `apiVersion` (a new member of `ctx`) exists only in the Vertex releases since it was added. A
 plugin that uses one sets `minAppVersion` to that release; an older Vertex keeps the plugin off and says why, instead
-of failing when it calls what isn't there.
+of failing when it calls what isn't there. Only the numbers count (`1.0.0` is met by `1.0.0-beta.1`), unless the
+minimum names a pre-release itself (`1.0.0-beta.2`, since SDK 1.6.1): then earlier pre-releases of that version don't
+meet it. A Vertex or SDK from before 1.6.1 refuses a minimum with a pre-release in it.
 
 ## The SDK
 

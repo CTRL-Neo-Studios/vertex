@@ -176,12 +176,35 @@ function validateConfig(config: unknown, errors: string[]) {
     }
 }
 
-/** `a` is a later version than `b`, by their leading numbers (`0.10` > `0.9.2`; a pre-release suffix is ignored). */
-function laterVersion(a: string, b: string): boolean {
-    const parts = (v: string) => (/^\d+(?:\.\d+)*/.exec(v)?.[0] ?? '0').split('.').map(Number)
-    const [x, y] = [parts(a), parts(b)]
-    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0)
+/** Pre-release identifiers compared as semver does: numbers as numbers and before words, a shorter list first. */
+function laterPrerelease(a: string, b: string): boolean {
+    const [x, y] = [a.split('.'), b.split('.')]
+    for (let i = 0; i < Math.max(x.length, y.length); i++) {
+        const [p, q] = [x[i], y[i]]
+        if (p === q) continue
+        if (p === undefined || q === undefined) return q === undefined
+        const [m, n] = [/^\d+$/.test(p), /^\d+$/.test(q)]
+        if (m && n) return Number(p) > Number(q)
+        return m === n ? p > q : !m
+    }
     return false
+}
+
+/**
+ * `a` (a `minAppVersion`) is a later version than `b` (the app's), by their numbers (`0.10` > `0.9.2`). With the same
+ * numbers, a minimum that names a pre-release is later than an earlier pre-release (`1.0.0-beta.2` > `1.0.0-beta.1`);
+ * one that doesn't is met by that version's pre-releases too, so a beta runs what its release will.
+ */
+function laterVersion(a: string, b: string): boolean {
+    const split = (v: string) => {
+        const [, numbers = '0', pre] = /^(\d+(?:\.\d+)*)(?:-(.+))?/.exec(v) ?? []
+        return {numbers: numbers.split('.').map(Number), pre}
+    }
+    const [x, y] = [split(a), split(b)]
+    for (let i = 0; i < Math.max(x.numbers.length, y.numbers.length); i++) {
+        if ((x.numbers[i] ?? 0) !== (y.numbers[i] ?? 0)) return (x.numbers[i] ?? 0) > (y.numbers[i] ?? 0)
+    }
+    return !!x.pre && !!y.pre && laterPrerelease(x.pre, y.pre)
 }
 
 /**
@@ -203,7 +226,7 @@ export function validateManifest(raw: unknown, appVersion?: string): ManifestRes
         if (m[key] !== undefined && !isString(m[key])) errors.push(`"${key}" must be a string`)
     }
     if (m.minAppVersion !== undefined) {
-        if (!isString(m.minAppVersion) || !/^\d+(?:\.\d+){0,2}$/.test(m.minAppVersion)) errors.push('"minAppVersion" must be a version like 0.9.2')
+        if (!isString(m.minAppVersion) || !/^\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/.test(m.minAppVersion)) errors.push('"minAppVersion" must be a version like 0.9.2 or 1.0.0-beta.2')
         else if (appVersion && laterVersion(m.minAppVersion, appVersion)) errors.push(`"minAppVersion" ${m.minAppVersion} is newer than this Vertex (${appVersion})`)
     }
     if (m.repository !== undefined && !(isString(m.repository) && /^https:\/\/[^\s/]+\/\S+$/.test(m.repository))) {

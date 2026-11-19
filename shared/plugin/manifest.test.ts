@@ -32,6 +32,13 @@ describe('validateManifest', () => {
         expect(runs('0.9.2', '0.9.2-beta.1')).toBe(true)
         expect(runs('1.0.0', '0.9.9')).toBe(false)
         expect(validateManifest({...valid, minAppVersion: 'soon'}).ok).toBe(false)
+        // A pre-release names itself: later betas meet it, earlier ones don't, its release does.
+        expect(runs('1.0.0-beta.2', '1.0.0-beta.1')).toBe(false)
+        expect(runs('1.0.0-beta.2', '1.0.0-beta.10')).toBe(true)
+        expect(runs('1.0.0-beta.1', '1.0.0-beta.1')).toBe(true)
+        expect(runs('1.0.0-beta.2', '1.0.0')).toBe(true)
+        expect(runs('1.0.0-rc.1', '1.0.0-beta.3')).toBe(false)
+        expect(runs('1.0.0-beta', '1.0.0-beta.1')).toBe(true)
     })
 
     it('refuses a plugin that requires itself or an invalid id', () => {
