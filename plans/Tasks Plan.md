@@ -850,6 +850,76 @@ will do to the files; and Nuxt UI 4.13 is out, with `ChatAttachment`, `Toggle` a
 - **The small window users asked for** (always on top, by a pin) is T8's. The desktop pet that came of it is a
   plugin of its own (`plans/Furball Plan.md`).
 
+## T11: The timeline as the reference
+
+Users' feedback (19 Nov): no bars to speak of, a Gantt look they disliked, and zoom (pinch, days into hours and back)
+that doesn't exist. The user: the reference wasn't followed. It's `plans/assets/timeline-reference.png`.
+
+**Where T4 went wrong:**
+- **Bars:** T4 kept the reference's structure (outline, bars on a day axis) but drew each bar as a thin outlined
+  strip filled up to the task's progress, so a task at 0% is almost invisible. The title sat outside the bar, and a
+  parent was a grey strip.
+- **Zoom:** three fixed widths (40, 16 and 4 px a day) behind a Day/Week/Month toggle. Nothing finer than a day.
+
+The user's calls (19 Nov): a colour per task (a format change), assignees in the format and shown in the bars,
+dependency lines kept but quiet.
+
+### Change
+- **Format 1.2** (`@type32/tasks`, the user's library; written here, published by the user):
+  - **A task's colour:** `color` (Color), optional. Absent: its list's colour, then the app's.
+  - **Assignees:** a built-in field `assignees`, a `multiSelect` with no categories, whose options are the people
+    (`id`, `title` the name, `color`), so they're edited, synced and shown like tags. iCalendar: `ATTENDEE` both ways
+    (`CN` the title, `mailto:` kept in the option as an extra key).
+  - **A view's `zoom`:** pixels a day, a number, optional; `scale` stays (`day`, `week`, `month`) for apps that only
+    know presets. SPEC, validation, `merge`, tests, `fromICS`/`toICS`.
+- **The timeline** (`tasks-ui-components`, `TaskTimeline.vue` and `timeline.ts`), drawn as the reference:
+  - **Bars:** each span is a solid pill as tall as most of its row, in the task's colour. The title is inside it, in
+    white or black by the colour's contrast. Assignees are initials circles at its start (three, then `+n`). Where
+    the bar is too short for its title, the title goes after it. No progress fill: progress is the outline's.
+  - **Moments, dues and todos:** a moment is a small pill with its title; a due is a mark on the row; a todo's due
+    is a flag.
+  - **A parent** (a group): a thin grey line over its subtasks' span, its title after the line, muted. In the
+    outline its row is tinted and rounded, with a chevron.
+  - **Outline:** the columns are Title, Duration and Status. A subtask has a circle that completes it
+    (`toggleDone`) and shows a tick when done. Duration reads as words (`7 days`, `3 hours`, `Intl`). Status is a
+    progress bar in the task's colour, then the percent.
+  - **Header:** the month's name, and under it each day as weekday letter + date (`M 25`). Today's day is a filled
+    primary pill. A line marks each month's start, and weekends are lightly shaded down the chart.
+  - **Dependency lines:** faint, and drawn in full only for the hovered or selected bar (both ways: what it waits
+    for, what waits for it). A drag from a bar's end dot still adds one.
+  - **Menu** (right click on a bar or a row): a row of colour swatches (the task's `color`, and one to clear it),
+    Edit, Reschedule › (Tomorrow, Next week, In two weeks, Pick a date…; the whole task moves, `shiftTask`),
+    Duplicate, Copy link (only when the consumer gives `copyLink`; Tasks gives the task's wiki link), Delete.
+    Shortcuts are shown only where they're bound: ⌘D and ⌫ on the selected bar. A click selects a bar; a double
+    click opens the editor.
+- **Zoom:**
+  - Pinch, and ⌘/Ctrl + scroll, zoom around the pointer: the day under the pointer stays under it.
+  - The range runs from 2 px a day (years) to 1,440 px a day (a minute a pixel), smoothly. The header's two rows
+    follow the width: hours under days, days under months, weeks under months, months under years, each tick
+    labelled only when it fits.
+  - The toggle becomes presets (Hours, Days, Weeks, Months) that zoom to a width, shown as picked when the zoom is
+    near one. The zoom is kept in the view (`zoom`, and the nearest `scale`).
+  - Drags snap to the shown unit: 15 minutes at hour widths (a date-time task moves by minutes, `shiftTask`'s
+    `minutes`; a date task still by days), a day otherwise.
+- **Editor:** a colour picker (the swatches) and Assignees (the multiSelect field, with "Add a person"), so both are
+  set outside the timeline too.
+- **The rest that draws a task:** the board's cards, the calendar's events and the list's rows take the task's colour
+  when it has one, and show assignees' initials (board and list).
+- **The plugin:** Copy link from the menu (`[[file.task#^id]]`, as links do); its strings; Tasks 0.3.0 on the
+  library's next minor.
+
+### Acceptance
+- [ ] A plan of three groups and their subtasks reads as the reference: solid coloured bars with their titles and
+  initials, groups as labelled lines, the outline's circles, durations and progress bars, the header's day letters
+  and today's pill.
+- [ ] Pinch and ⌘-scroll zoom smoothly from months to hours and back, the day under the pointer staying put; the
+  presets do the same; the zoom is there after a reload.
+- [ ] A colour picked in the menu, a person assigned in the editor, a reschedule and a completed circle are written
+  to the file, and other views show the colour.
+- [ ] 2,000 bars still scroll without a frame over 200 ms, and a zoom gesture on them keeps up (no frame over
+  100 ms).
+
+
 ## Not in this plan
 
 - A Table view; a year view; printing.
