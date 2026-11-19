@@ -11,6 +11,8 @@ export const WindowLabel = {
     settings: 'settings',
     about: 'about',
     sessionPrefix: 'session-',
+    /** `plugin:{plugin}:{window id}:{session uuid}`: `PLUGIN_WINDOW_PREFIX` in the kernel's `windows.rs`. */
+    pluginPrefix: 'plugin:',
 } as const
 
 export function sessionWindowLabel(sessionUuid: string) {
@@ -19,6 +21,16 @@ export function sessionWindowLabel(sessionUuid: string) {
 
 export function sessionUuidFromLabel(label: string): string | undefined {
     return label.startsWith(WindowLabel.sessionPrefix) ? label.slice(WindowLabel.sessionPrefix.length) : undefined
+}
+
+export const pluginWindowLabel = (plugin: string, id: string, session: string) => `${WindowLabel.pluginPrefix}${plugin}:${id}:${session}`
+
+/** What a plugin window's label names; `undefined` for any other window's. */
+export function pluginWindowFromLabel(label: string): { plugin: string, id: string, session: string } | undefined {
+    if (!label.startsWith(WindowLabel.pluginPrefix)) return undefined
+    const [plugin, id, ...rest] = label.slice(WindowLabel.pluginPrefix.length).split(':')
+    const session = rest.join(':')
+    return plugin && id && session ? {plugin, id, session} : undefined
 }
 
 export type SessionMode = 'workspace' | 'singlespace'

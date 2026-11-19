@@ -590,10 +590,53 @@ nothing is taken from what a webview says), with the user's rule on what the win
   stay on top. The session window sends it the list as it changes; a tick or a click goes back, and is done there.
 
 ### Acceptance
-- [ ] The window opens from the command, drawn themed; asked again it comes forward; it closes with its session
+- [x] The window opens from the command, drawn themed; asked again it comes forward; it closes with its session
   window.
-- [ ] From inside it, each refused: a file read, a session's kernel command, a window for an id the manifest lacks.
-- [ ] A task ticked in the window is done in its file; one added in the session window shows in the window.
+- [x] From inside it, each refused: a file read, a session's kernel command, a window for an id the manifest lacks.
+- [x] A task ticked in the window is done in its file; one added in the session window shows in the window.
+
+### As built
+- **The kernel** (uncommitted): `WindowKind::Plugin`; labels `plugin:{plugin}:{id}:{session uuid}` (`:` can't be in a
+  plugin id, a window id or a uuid, so the label parses back: `plugin_window_parts`). `WindowRequest::Plugin {plugin,
+  id, params}`; `window_open` now knows its caller (`Webview`), and `plan` refuses a caller that isn't a session
+  window, a plugin that isn't on there, an id its manifest doesn't declare (`grants::own_window`), params that aren't
+  an object or are over 16 KB. Route `/plugin-window/{plugin}/{id}?params=…&root=…` (the session's workspace, so the
+  window loads that workspace's copy of the plugin; `workspace_of` reads a plugin window's session), the declared
+  size and minimum, the manifest's `name` as its first title. Its grant: `SHARED`, then `window-message`,
+  `settings-get`, `plugins-list`, `plugin-read` (no `exists`/`stat`); its plugin alone is on there, while on in the
+  session window (`on_for`). `window_message`: a plugin window's message goes to its session window with the sender
+  named from its label; a session window's to the window it names, its own only. `destroyed`: a session window's
+  plugin windows go with it; a plugin window's going is told to its session window. The manifest's `ownWindows` and
+  `name` read in Rust. Tests: the plan's rules (one new test, 8 cases); 43 kernel tests, every crate's pass; clippy as
+  before (two old warnings).
+- **The contract:** `ownWindows` in the manifest (validated: ids, sizes 100–4000, no unknown keys; one test);
+  `ctx.windows.define/open/isOpen`; `WindowProps` (`params`, `channel`, `window`: `setTitle`, `setSize`,
+  `setAlwaysOnTop`, `close`); `PluginWindowHandle` (`post`, `on`, `focus`, `close`, `closed`); `ctx.window.kind`
+  may be `plugin`. The install dialog says a plugin opens windows of its own. Docs: `context.md` (Windows of its
+  own), `package.md`, `versions.md` (1.5.0), Concepts and Structures.
+- **The frontend:** `utils/plugins/windows.ts` (the session side's handles, the window side's props);
+  `pages/plugin-window/[plugin]/[id].vue` (a bar to drag by with its title, the plugin's UI through `PluginMount`);
+  `startPlugins` with kind `plugin` (the global settings, the owner alone, its requirements ignored, no following of
+  on/off: the window goes with its session window); `initialize` skips sessions there; `app.vue` leaves the app menu to
+  the other windows. Vertex's typecheck at its 7, 394 tests, lint clean; the SDK's 8.
+- **The plugin:** `ownWindows: [{id: list, 360×560, at least 280×300}]`; Open Tasks in a window (palette, workspace
+  windows): `TasksWindow.vue` draws the agenda the session window sends (`tasksWindow.ts`: on `ready` and on each
+  change), a tick or a click goes back and is done there (`completeEntry`, `openTask`); a pin keeps it on top. The
+  panel and the window draw the same list (`agenda.ts`, `AgendaList.vue`, taken out of the panel).
+- **Checked** in `tauri dev` by script (a harness in each window, the plugin window's answering over events): the
+  command opened `plugin:tasks:list:<session>`, drawn in the dark theme with its title bar and the agenda; asked again,
+  still one window; from inside it `fs read_text_file` on a workspace note, `scan_directory_recursive`,
+  `search_notes`, `data_get`, `sessions_list` and `window_open` were refused by the ACL ("not allowed on window
+  plugin:tasks:list:…"), `settings_get` allowed; from the session window, a window for `board` (undeclared) and one
+  for another plugin were refused (`"tasks" has no window "board" it may open here`). Ticking Draft the brief in the
+  window wrote `done` and `completedAt` to `plan.task` and the window dropped it; a task given a Due in the session
+  window's editor showed in the window's Today; a click in the window opened the task's editor in the session
+  window; the pin set it always on top; closing the session window closed both (System Events listed only Vertex's
+  start window after). Not checked: a workspace's own copy of a plugin in its window, `setSize`, a plugin with
+  `network` calling out from its window.
+- **Found:** the session windows weren't granted `window-message` at first (the session's post was refused): added
+  to the session kind. **Noticed, not mine:** Vue's "inject() can only be used inside setup()" (twice) in a session
+  window's console with Tasks off too.
 
 ## T9: Tools for the AI
 

@@ -392,6 +392,46 @@ export interface LinkExtractorDef {
     rewrite?(text: string, rename: Map<string, string>): { text: string, count: number }
 }
 
+// A plugin's own windows
+
+/** JSON, as the channel between a plugin's window and its session window carries it. */
+export type WindowMessage = null | boolean | number | string | WindowMessage[] | { [key: string]: WindowMessage }
+
+/** Messages one way and the other: `post` sends one, `on` hears them (and returns what stops it). */
+export interface WindowChannel {
+    post(message: WindowMessage): Promise<void>
+    on(fn: (message: WindowMessage) => void): () => void
+}
+
+/**
+ * What a plugin's window is drawn with: the `params` it was opened with, its `channel` to the plugin in the session
+ * window that opened it (the only way to the workspace: there's none in the window), and the window itself.
+ */
+export interface WindowProps {
+    params: Record<string, WindowMessage>
+    channel: WindowChannel
+    window: {
+        setTitle(title: string): Promise<void>
+        /** Its inner size, in logical pixels. */
+        setSize(width: number, height: number): Promise<void>
+        setAlwaysOnTop(on: boolean): Promise<void>
+        close(): Promise<void>
+    }
+}
+
+/** What one of a plugin's windows draws: an `id` its manifest's `ownWindows` declares, and its UI. */
+export interface PluginWindowDef extends UiSlot<WindowProps> {
+    id: string
+}
+
+/** A window of the plugin's, as the session window that opened it holds it: its channel, and its life. */
+export interface PluginWindowHandle extends WindowChannel {
+    focus(): Promise<void>
+    close(): Promise<void>
+    /** Resolves once the window is gone (closed by the user, by `close`, or with its session window). */
+    closed: Promise<void>
+}
+
 /** Every contribution point, by the name the host registers it under. */
 export interface ContributionPoints {
     command: PluginCommand & { plugin: string }
@@ -413,4 +453,5 @@ export interface ContributionPoints {
     toolbarItem: EditorActionDef
     noteMenuItem: NoteMenuItemDef
     linkExtractor: LinkExtractorDef
+    pluginWindow: PluginWindowDef & { plugin: string }
 }

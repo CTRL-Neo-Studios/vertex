@@ -311,6 +311,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             plugins::plugin_source_resolve,
             plugins::plugin_updates,
             windows::window_open,
+            windows::window_message,
             dialogs::dialog_open,
             dialogs::dialog_save,
         ]))

@@ -385,6 +385,7 @@
 					"otherOriginConfirm": "用这个插件替换它",
 					"permissions": "它请求",
 					"noPermissions": "仅限每个插件都有的权限。",
+					"ownWindows": "它会打开自己的窗口，这些窗口无法访问你的工作区。",
 					"warning": "插件以 Vertex 的身份运行：它可以读取、修改和删除你的笔记与文件。请只安装你信任其来源的插件。",
 					"install": "安装",
 					"cancel": "取消",
@@ -642,7 +643,8 @@
 			"updatesWaiting": "有插件更新等待处理（{count}）",
 			"review": "查看",
 			"workspaceChanged": "此工作区的插件是新的或已更改（{count}）",
-			"workspaceMissing": "此工作区使用了此设备没有的插件（{count}）"
+			"workspaceMissing": "此工作区使用了此设备没有的插件（{count}）",
+			"windowMissing": "此窗口的插件没有在这里运行。"
 		},
 		"panels": {
 			"moveUp": "上移",

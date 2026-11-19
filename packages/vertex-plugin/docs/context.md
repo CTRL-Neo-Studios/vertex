@@ -443,3 +443,43 @@ Vertex shows them only while it runs: one for later needs a window open then.
 ```ts
 await ctx.notifications.send({title: 'Due now', body: 'Ship invoice'})
 ```
+
+## Windows of its own
+
+### `ctx.windows.define`, `ctx.windows.open`, `ctx.windows.isOpen`
+
+A window of the plugin's own beside the workspace's (a list to keep on top, a timer, a preview). Declare each in
+`plugin.json`'s `ownWindows` ([manifest](package.md#pluginjson)): an `id` and its size. Vertex makes it, from a session
+window where the plugin is on, and refuses any other.
+
+```json
+"ownWindows": [{"id": "list", "width": 360, "height": 560, "minWidth": 280}]
+```
+
+```ts
+ctx.windows.define({id: 'list', component: () => import('./ListWindow.vue')})
+
+ctx.commands.register({id: 'open-list', label: 'plugins.hello.openList', palette: true, run: async () => {
+    const list = await ctx.windows.open('list', {params: {filter: 'today'}})
+    list.on(message => console.log('from the window', message))
+    await list.post({items: ['a', 'b']})
+}})
+```
+
+- **`define`** says what the window draws: a `component` or `mount` with `WindowProps`. Call it in `setup`, which runs
+  in the window too, so the window finds it.
+- **`open(id, {params})`** opens the window, or brings it forward when this session window has it open already, and
+  returns its handle: `post(message)` and `on(fn)` (JSON both ways), `focus()`, `close()`, and `closed`, a promise
+  that resolves once it's gone. It closes with the session window that opened it. `params`, a JSON object, are what
+  it starts from (16 KB at most).
+- **`isOpen(id)`**: whether this session window has it open.
+
+In the window, only the plugin runs (`ctx.window.kind` is `plugin`), with the app's settings, theme and language, and
+nothing of the workspace: no session (`onSession` doesn't run), no files, no index, no `ctx.data`. What it shows comes
+from the plugin in the session window, and what it wants done there it asks for over the channel, so everything the
+window does to the workspace goes through the plugin and the contract. The plugin's `permissions` hold there too
+(`ctx.http` with `network`). A plugin it `requires` isn't running in the window.
+
+The component gets `WindowProps`: `params`, `channel` (`post`, `on`: to and from the plugin in the session window
+that opened it, and nothing else), and `window` (`setTitle`, `setSize`, `setAlwaysOnTop`, `close`). Vertex draws a
+bar at its top with its title, to drag it by.

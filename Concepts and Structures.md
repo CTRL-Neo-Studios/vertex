@@ -118,6 +118,14 @@ the kernel grants each window just before it builds it (`grants.rs`, Window Perm
   or trust regrants first, then emits its change event. **Turned off,** it keeps its grants and runs on: Tauri can't
   take a grant back. `plugins_waiting_restart` lists those; `restart_app` flushes the session windows as quitting does
   and restarts, and the next launch reopens the session windows that were open, whatever the recovery setting.
+- **A plugin's own window** (kind `plugin`, label `plugin:{plugin}:{window id}:{session uuid}`): opened by
+  `window_open` only from a session window where that plugin is on, for a window its manifest's `ownWindows`
+  declares (`grants::own_window`). Its base is the shared one, its settings, the plugin list and code, and
+  `window_message`: no `exists`/`stat`, no files, no sessions, no data. Its plugin is the only one on there, while it's
+  on in the session window. `window_message` carries JSON between it and its session window only, the kernel naming
+  the sender from its label (`vertex://plugin-window-message`); it closes with its session window, which hears
+  `vertex://plugin-window-closed`. The frontend runs that plugin alone there (`startPlugins`, kind `plugin`) and draws
+  its `ctx.windows.define` at `/plugin-window/{plugin}/{id}`.
 
 A label keeps its grants once given (a reopened window isn't granted twice). The app crate's tests resolve each kind's
 grant, and a core crate's commands with its plugin on and off, against the real ACL.

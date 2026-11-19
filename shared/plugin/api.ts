@@ -11,8 +11,8 @@ import type {Vault} from '#shared/utils/vault'
 import type {PanelViewId} from '#shared/types/app/settings'
 import type {
     CodeBlockDef, EditorActionDef, EditorHost, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
-    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PanelViewDef, PluginMenuItem, SettingsPageDef, StatusItemDef,
-    TabKindDef, ViewerDef,
+    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PanelViewDef, PluginMenuItem, PluginWindowDef, PluginWindowHandle,
+    SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef, WindowMessage,
 } from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
 
@@ -408,7 +408,8 @@ export interface PluginContext<Config = Record<string, unknown>> extends HostSer
          */
         assetUrl(path: string): string
     }
-    window: { kind: WindowKind, label: string }
+    /** The window it runs in: one of Vertex's kinds, or `plugin`, one of its own windows (where it runs alone). */
+    window: { kind: WindowKind | 'plugin', label: string }
     config: PluginConfigAccess<Config>
     commands: {
         /** Removed when the plugin stops, or with the session when called from an `onSession` callback. */
@@ -450,6 +451,17 @@ export interface PluginContext<Config = Record<string, unknown>> extends HostSer
     }
     index: {
         linkExtractor(def: LinkExtractorDef): () => void
+    }
+    /**
+     * Windows of the plugin's own, each declared in its manifest's `ownWindows`. `define` says what one draws (in
+     * every window, so the plugin's window finds it); `open` opens it from a session window (or brings it forward)
+     * and gives its channel; `isOpen` says whether this session window has it open. Nothing of the workspace is in
+     * the window: what it needs, it asks the plugin here for, over the channel.
+     */
+    windows: {
+        define(def: PluginWindowDef): () => void
+        open(id: string, options?: { params?: Record<string, WindowMessage> }): Promise<PluginWindowHandle>
+        isOpen(id: string): Promise<boolean>
     }
     /** Runs for the window's session once its index is built (now, if it already is); what it starts stops with the session. */
     onSession(fn: (session: SessionContext) => unknown): void

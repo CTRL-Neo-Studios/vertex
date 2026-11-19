@@ -36,6 +36,7 @@ Unknown keys are errors; the build lists every problem.
 | `permissions` | Optional. `network`, `secrets`, `files-outside-workspace`, `notifications` ([what each grants](config.md#permissions)). |
 | `enabledByDefault` | Optional. Ignored for a plugin someone installs, which the install turns on. |
 | `config` | Optional. Its settings: `schema` (drawn by Settings), `overridable` (what a workspace may change) ([Config](config.md)). |
+| `ownWindows` | Optional. Windows of its own it may open ([`ctx.windows`](context.md#windows-of-its-own)): each `{id, width, height, minWidth?, minHeight?, resizable?}`, sizes in logical pixels from 100 to 4000. The install dialog says it opens windows; Vertex opens no other. |
 
 ## The build
 

@@ -10,7 +10,7 @@ import {useAppSettings} from "~/composables/app/useAppSettings";
 import {useAppUpdater} from "~/composables/app/useAppUpdater";
 import {cssFontName} from "~/composables/app/useAppTheme";
 import {useSettingsScope} from "~/composables/app/useSettingsScope";
-import {Routes} from "#shared/constants/app";
+import {pluginWindowFromLabel, Routes} from "#shared/constants/app";
 import {stateClient} from "~/utils/stateClient";
 import {registeredCommands} from "~/utils/commands";
 
@@ -49,11 +49,13 @@ useCommands({
 })
 
 // macOS has one app menu for all windows, so the focused window re-applies its own; route and
-// command changes re-evaluate which items are enabled.
+// command changes re-evaluate which items are enabled. A plugin's own window has no commands of Vertex's to give it.
+const pluginWindow = !!pluginWindowFromLabel(getCurrentWebviewWindow().label)
 let unlistenFocus: (() => void) | undefined
 let unlistenOpen: (() => void) | undefined
-const rebuildMenu = useDebounceFn(() => $menu.setMenu(), 50)
+const rebuildMenu = useDebounceFn(() => (pluginWindow ? undefined : $menu.setMenu()), 50)
 onMounted(async () => {
+    if (pluginWindow) return
     await $menu.setMenu()
     unlistenFocus = await getCurrentWebviewWindow().onFocusChanged(({payload: focused}) => {
         if (focused) rebuildMenu()

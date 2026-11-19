@@ -77,6 +77,19 @@ export interface PluginManifest {
     /** Whether it's on until the user turns it off; default `true`. */
     enabledByDefault?: boolean
     config?: PluginConfigManifest
+    /** Windows of its own it may open from a session window (`ctx.windows`), each by `id`; it runs alone in them. */
+    ownWindows?: OwnWindowManifest[]
+}
+
+/** One of a plugin's own windows: its id (lowercase letters, digits, inner hyphens) and size, in logical pixels. */
+export interface OwnWindowManifest {
+    id: string
+    width: number
+    height: number
+    minWidth?: number
+    minHeight?: number
+    /** Default `true`. */
+    resizable?: boolean
 }
 
 export const PLUGIN_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -95,7 +108,7 @@ export const pluginWindows = (manifest: PluginManifest): WindowKind[] => manifes
 
 export type ManifestResult = { ok: true, manifest: PluginManifest } | { ok: false, errors: string[] }
 
-const KEYS = new Set(['id', 'name', 'version', 'description', 'icon', 'author', 'repository', 'apiVersion', 'minAppVersion', 'windows', 'requires', 'permissions', 'enabledByDefault', 'config'])
+const KEYS = new Set(['id', 'name', 'version', 'description', 'icon', 'author', 'repository', 'apiVersion', 'minAppVersion', 'windows', 'requires', 'permissions', 'enabledByDefault', 'config', 'ownWindows'])
 const isString = (v: unknown): v is string => typeof v === 'string'
 const isStringList = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString)
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -221,8 +234,28 @@ export function validateManifest(raw: unknown, appVersion?: string): ManifestRes
     }
     if (m.enabledByDefault !== undefined && typeof m.enabledByDefault !== 'boolean') errors.push('"enabledByDefault" must be true or false')
     if (m.config !== undefined) validateConfig(m.config, errors)
+    if (m.ownWindows !== undefined) validateOwnWindows(m.ownWindows, errors)
 
     return errors.length ? {ok: false, errors} : {ok: true, manifest: m as unknown as PluginManifest}
+}
+
+const SIZE = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 100 && v <= 4000
+
+function validateOwnWindows(raw: unknown, errors: string[]) {
+    if (!Array.isArray(raw)) return void errors.push('"ownWindows" must be a list of windows')
+    const seen = new Set<string>()
+    raw.forEach((w: Record<string, unknown> | null, i) => {
+        const at = `"ownWindows"[${i}]`
+        if (!w || typeof w !== 'object') return void errors.push(`${at} must be an object`)
+        const unknown = Object.keys(w).filter(k => !['id', 'width', 'height', 'minWidth', 'minHeight', 'resizable'].includes(k))
+        if (unknown.length) errors.push(`${at} has unknown keys: ${unknown.join(', ')}`)
+        if (!isString(w.id) || !PLUGIN_ID.test(w.id)) errors.push(`${at}.id must be lowercase letters, digits and inner hyphens`)
+        else if (seen.has(w.id)) errors.push(`${at}.id "${w.id}" is declared twice`)
+        else seen.add(w.id)
+        for (const key of ['width', 'height'] as const) if (!SIZE(w[key])) errors.push(`${at}.${key} must be a number from 100 to 4000`)
+        for (const key of ['minWidth', 'minHeight'] as const) if (w[key] !== undefined && !SIZE(w[key])) errors.push(`${at}.${key} must be a number from 100 to 4000`)
+        if (w.resizable !== undefined && typeof w.resizable !== 'boolean') errors.push(`${at}.resizable must be true or false`)
+    })
 }
 
 /**

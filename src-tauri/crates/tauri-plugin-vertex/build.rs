@@ -50,6 +50,7 @@ const COMMANDS: &[&str] = &[
     "plugin_source_resolve",
     "plugin_updates",
     "window_open",
+    "window_message",
 ];
 
 fn main() {

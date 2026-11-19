@@ -116,6 +116,7 @@ const title = computed(() => {
                             <li v-for="p in manifest.permissions" :key="p">{{ permission(p) }}</li>
                         </ul>
                         <p v-else class="text-muted">{{ t('app.settings.plugins.installModal.noPermissions') }}</p>
+                        <p v-if="manifest.ownWindows?.length" class="text-muted" data-plugin-install-windows>{{ t('app.settings.plugins.installModal.ownWindows') }}</p>
                     </div>
                     <UAlert v-if="otherOrigin" color="error" variant="subtle" icon="i-lucide-shield-alert" data-plugin-install-other>
                         <template #description>

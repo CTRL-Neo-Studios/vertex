@@ -46,6 +46,22 @@ describe('validateManifest', () => {
         expect(validateManifest({...valid, id: 'trailing-'}).ok).toBe(false)
     })
 
+    it('takes windows of its own by id and size, and says what\'s wrong with others', () => {
+        expect(validateManifest({...valid, ownWindows: [{id: 'list', width: 360, height: 560, minWidth: 280, resizable: true}]}).ok).toBe(true)
+        const result = validateManifest({...valid, ownWindows: [
+            {id: 'list', width: 360, height: 560},
+            {id: 'list', width: 50, height: 560},
+            {id: 'Big One', width: 360, height: 'tall', title: 'x'},
+        ]})
+        expect(result.ok ? [] : result.errors).toEqual([
+            '"ownWindows"[1].id "list" is declared twice',
+            '"ownWindows"[1].width must be a number from 100 to 4000',
+            '"ownWindows"[2] has unknown keys: title',
+            '"ownWindows"[2].id must be lowercase letters, digits and inner hyphens',
+            '"ownWindows"[2].height must be a number from 100 to 4000',
+        ])
+    })
+
     it('accepts a config schema of every field type and an overridable map', () => {
         const result = validateManifest({...valid, icon: 'i-lucide-waypoints', config: {
             overridable: {depth: 'workspace', 'colors.tags': 'trustedWorkspace'},

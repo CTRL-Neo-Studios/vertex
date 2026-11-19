@@ -57,6 +57,10 @@ Save dialog) and `ctx.notifications.send`, behind a new permission, `notificatio
 also exports the core plugins' API types by name (`BaseViewProps` for a Bases layout's component, `AiApi`,
 `ChatApi`…), which 1.4.0 only put in `PluginApis`; types alone, so nothing changes at run time.
 
+1.5.0 also adds windows of a plugin's own: `ownWindows` in the manifest, `ctx.windows`, and `ctx.window.kind`
+`plugin` in them ([Windows of its own](context.md#windows-of-its-own)). An older Vertex refuses a manifest with
+`ownWindows` (an unknown key), so a plugin that declares them sets `minAppVersion` too.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

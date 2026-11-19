@@ -385,6 +385,7 @@
 					"otherOriginConfirm": "Replace it with this one",
 					"permissions": "It asks for",
 					"noPermissions": "Nothing beyond what every plugin gets.",
+					"ownWindows": "It opens windows of its own, which reach nothing of your workspace.",
 					"warning": "A plugin runs as Vertex does: it can read, change and delete your notes and files. Install it only if you trust where it came from.",
 					"install": "Install",
 					"cancel": "Cancel",
@@ -642,7 +643,8 @@
 			"updatesWaiting": "Plugin updates are waiting ({count})",
 			"review": "Review",
 			"workspaceChanged": "This workspace's plugins are new or changed ({count})",
-			"workspaceMissing": "This workspace uses plugins this device doesn't have ({count})"
+			"workspaceMissing": "This workspace uses plugins this device doesn't have ({count})",
+			"windowMissing": "This window's plugin isn't running here."
 		},
 		"panels": {
 			"moveUp": "Move up",

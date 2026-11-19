@@ -1206,6 +1206,32 @@ Denies the update_token_set command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex:allow-window-message`
+
+</td>
+<td>
+
+Enables the window_message command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex:deny-window-message`
+
+</td>
+<td>
+
+Denies the window_message command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex:allow-window-open`
 
 </td>

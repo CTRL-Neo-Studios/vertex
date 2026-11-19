@@ -2,6 +2,7 @@ import {effectScope, getCurrentScope, onScopeDispose, shallowReactive, type Effe
 import type {ContributionPoints, HostServices, PluginApis, PluginConfigAccess, PluginContext, PluginDefinition, PluginEntry, SessionContext} from '#shared/plugin/api'
 import {parseRequirement, pluginWindows, type PluginManifest, type WindowKind} from '#shared/plugin/manifest'
 import {resolvePlugins, type OffReason} from '#shared/plugin/resolve'
+import {pluginWindows as ownWindows} from '~/utils/plugins/windows'
 
 export type PluginState =
     | { status: 'off', reason: OffReason }
@@ -10,7 +11,8 @@ export type PluginState =
     | { status: 'failed', error: string }
 
 export interface PluginHostOptions {
-    window: { kind: WindowKind, label: string }
+    /** `plugin`: one of a plugin's own windows, where the entries given are that plugin alone. */
+    window: { kind: WindowKind | 'plugin', label: string }
     /** Adds a contribution (a command's id already `<plugin>:<id>`) on behalf of plugin `owner`; returns its removal. */
     contribute<P extends keyof ContributionPoints>(point: P, owner: string, def: ContributionPoints[P]): () => void
     /** A plugin's `ctx.config`: its settings in this window. */
@@ -58,7 +60,7 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
     function setEntries(entries: readonly PluginEntry[]) {
         byId = new Map([...[...running.values()].map(r => [r.entry.manifest.id, r.entry] as const), ...entries.map(e => [e.manifest.id, e] as const)])
         installed = new Set(entries.map(e => e.manifest.id))
-        forWindow = entries.filter(e => pluginWindows(e.manifest).includes(options.window.kind))
+        forWindow = options.window.kind === 'plugin' ? [...entries] : entries.filter(e => pluginWindows(e.manifest).includes(options.window.kind as WindowKind))
         for (const id of states.keys()) if (!byId.has(id)) states.delete(id)
     }
     const running = new Map<string, Running>()
@@ -153,6 +155,10 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
                 noteMenuItem: def => add('noteMenuItem', def),
             },
             index: {linkExtractor: def => add('linkExtractor', def)},
+            windows: {
+                define: def => add('pluginWindow', {...def, plugin: id}),
+                ...ownWindows(id, own),
+            },
             onSession(fn) {
                 r.hooks.push(fn)
                 // During `setup` the host runs it once `setup` is done; later, now.
@@ -175,7 +181,8 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
     function start(entry: PluginEntry, definition: PluginDefinition) {
         const id = entry.manifest.id
         for (const {id: requirement, optional} of (entry.manifest.requires ?? []).map(parseRequirement)) {
-            if (optional || states.get(requirement)?.status === 'active') continue
+            // In its own window a plugin runs alone: what it requires isn't there, and its `use` finds nothing.
+            if (optional || options.window.kind === 'plugin' || states.get(requirement)?.status === 'active') continue
             states.set(id, {status: 'off', reason: {kind: 'requirementFailed', requirement}})
             return
         }
@@ -201,7 +208,9 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
     }
 
     async function applyNow(isOn: (manifest: PluginManifest) => boolean) {
-        const {order, off} = resolvePlugins(forWindow.map(e => e.manifest), isOn, installed)
+        // In its own window a plugin runs alone, whatever it requires.
+        const manifests = forWindow.map(e => (options.window.kind === 'plugin' ? {...e.manifest, requires: []} : e.manifest))
+        const {order, off} = resolvePlugins(manifests, isOn, installed)
         // A running plugin turned off runs on until the app restarts: Rust can't take its window's grants back before
         // then, and nothing guarantees a plugin can undo itself.
         for (const [id, reason] of off) {

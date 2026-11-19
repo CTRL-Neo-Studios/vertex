@@ -1,4 +1,4 @@
-import {StateKey} from "#shared/constants/app";
+import {pluginWindowFromLabel, StateKey} from "#shared/constants/app";
 import type {AppSession} from "#shared/types/app/sessions";
 import {useAppSessions} from "~/composables/app/useAppSessions";
 import {useAppSettings} from "~/composables/app/useAppSettings";
@@ -26,11 +26,14 @@ export default defineNuxtPlugin({
         $theme.apply()
         // Window lifetime == listener lifetime; Tauri drops webview listeners when the window is destroyed.
         await $settings.listen()
-        await $asesh.listen()
-        const session = await $asesh.initializeCurrentAppSession()
-        // A workspace window uses its workspace's overrides; a broken `.vertex/settings.json` leaves the global ones.
-        if (session?.sessionType === 'workspace' && session.rootFileOrFolderAbsolutePath) {
-            await $scope.open(session.rootFileOrFolderAbsolutePath).catch(e => console.error('[initialize] workspace settings:', e))
+        // A plugin's own window knows no sessions (the kernel grants it none): the global settings draw it.
+        if (!pluginWindowFromLabel($win.getCurrentAppWindow().label)) {
+            await $asesh.listen()
+            const session = await $asesh.initializeCurrentAppSession()
+            // A workspace window uses its workspace's overrides; a broken `.vertex/settings.json` leaves the global ones.
+            if (session?.sessionType === 'workspace' && session.rootFileOrFolderAbsolutePath) {
+                await $scope.open(session.rootFileOrFolderAbsolutePath).catch(e => console.error('[initialize] workspace settings:', e))
+            }
         }
 
         // Re-apply the theme whenever it changes: any window saving it, the workspace's overrides, trusting it.

@@ -1,12 +1,34 @@
 //! The app's windows (Window Permissions Plan, W1). Only Rust creates them, so a window's label, and with it the
-//! capability it gets, is the kernel's to give: a webview can ask for a session it knows, Settings or About, never a
-//! label. Also the lifecycle around them: the start window shown only while no session window is, each window's
-//! style, and each session's `open` mark.
+//! capability it gets, is the kernel's to give: a webview can ask for a session it knows, Settings, About, or (from a
+//! session window) one of a plugin's own windows its manifest declares, never a label. Also the lifecycle around them:
+//! the start window shown only while no session window is, each window's style, each session's `open` mark, and a
+//! plugin's windows closing with their session window.
 
 use crate::api::SESSION_WINDOW_PREFIX;
+use crate::grants::OwnWindow;
 use crate::state::AppState;
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use serde_json::{json, Value};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+
+/// A plugin's own windows are labelled `plugin:{plugin}:{window id}:{session uuid}`: one per id and session window.
+pub const PLUGIN_WINDOW_PREFIX: &str = "plugin:";
+/// To a plugin's window, from its session window (`{message}`); to a session window, from a plugin's window
+/// (`{plugin, id, message}`): the kernel names the sender, from its label.
+pub const PLUGIN_WINDOW_MESSAGE: &str = "vertex://plugin-window-message";
+/// To a session window, when one of its plugins' windows is gone (`{plugin, id}`).
+pub const PLUGIN_WINDOW_CLOSED: &str = "vertex://plugin-window-closed";
+
+/// A plugin window's label: its plugin, its window id and its session's uuid.
+pub fn plugin_window_label(plugin: &str, id: &str, session: &str) -> String {
+    format!("{PLUGIN_WINDOW_PREFIX}{plugin}:{id}:{session}")
+}
+
+/// What a plugin window's label names: `(plugin, window id, session uuid)`.
+pub fn plugin_window_parts(label: &str) -> Option<(&str, &str, &str)> {
+    let mut parts = label.strip_prefix(PLUGIN_WINDOW_PREFIX)?.splitn(3, ':');
+    Some((parts.next()?, parts.next()?, parts.next().filter(|s| !s.is_empty())?))
+}
 
 /// What the app does to each window once it's built (its overlay title bar), given by the app crate, which knows the
 /// runtime the styling plugin works with ([`crate::api::set_window_style`]).
@@ -26,6 +48,18 @@ pub enum WindowRequest {
     /// Settings, on `path` (a page under `/settings`) and `scope` (a workspace root; none for the user's settings).
     Settings { path: Option<String>, scope: Option<String> },
     About,
+    /// One of plugin `plugin`'s own windows (its manifest's `ownWindows`), from a session window where it's on, with
+    /// `params` (a JSON object) for it to start from.
+    Plugin { plugin: String, id: String, params: Option<Value> },
+}
+
+/// What a plugin's window is made from: its manifest's declaration and name, and its session's workspace (the window
+/// loads that workspace's copy of the plugin when it has one).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PluginWindowInfo {
+    pub window: OwnWindow,
+    pub name: String,
+    pub root: Option<String>,
 }
 
 /// What [`window_open`] builds for a request.
@@ -36,12 +70,26 @@ pub struct WindowPlan {
     pub route: String,
     pub title: String,
     pub size: (f64, f64),
+    pub min_size: Option<(f64, f64)>,
     pub resizable: bool,
 }
 
-/// The window for `request`. `known` says whether a session is in `sessions.json`: a window for any other uuid would
-/// still carry a session window's label.
-pub fn plan(request: WindowRequest, known: impl Fn(&str) -> bool) -> Result<WindowPlan, String> {
+/// The longest `params` a plugin's window may start from, as JSON: they travel in its URL.
+const PARAMS_MAX: usize = 16 * 1024;
+
+fn encode(s: &str) -> String {
+    url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
+}
+
+/// The window for `request`, asked for by the window `caller`. `known` says whether a session is in `sessions.json`: a
+/// window for any other uuid would still carry a session window's label. `own(caller, plugin, id)` is what a plugin's
+/// window is made from, `None` unless that plugin is on in `caller` and declares the id.
+pub fn plan(
+    request: WindowRequest,
+    caller: &str,
+    known: impl Fn(&str) -> bool,
+    own: impl Fn(&str, &str, &str) -> Option<PluginWindowInfo>,
+) -> Result<WindowPlan, String> {
     match request {
         WindowRequest::Session { uuid, title } => {
             if !known(&uuid) {
@@ -52,6 +100,7 @@ pub fn plan(request: WindowRequest, known: impl Fn(&str) -> bool) -> Result<Wind
                 route: "/loading".into(),
                 title: format!("Vertex - {title}"),
                 size: (900.0, 600.0),
+                min_size: None,
                 resizable: true,
             })
         }
@@ -67,6 +116,7 @@ pub fn plan(request: WindowRequest, known: impl Fn(&str) -> bool) -> Result<Wind
                 route: format!("{path}{}", query.unwrap_or_default()),
                 title: "Vertex - Settings".into(),
                 size: (900.0, 600.0),
+                min_size: None,
                 resizable: true,
             })
         }
@@ -75,8 +125,31 @@ pub fn plan(request: WindowRequest, known: impl Fn(&str) -> bool) -> Result<Wind
             route: "/about".into(),
             title: "Vertex".into(),
             size: (420.0, 480.0),
+            min_size: None,
             resizable: false,
         }),
+        WindowRequest::Plugin { plugin, id, params } => {
+            let session = caller.strip_prefix(SESSION_WINDOW_PREFIX).ok_or("a plugin's window opens from a session window")?;
+            let info = own(caller, &plugin, &id).ok_or_else(|| format!("{plugin:?} has no window {id:?} it may open here"))?;
+            let params = params.unwrap_or_else(|| json!({}));
+            if !params.is_object() {
+                return Err("a plugin window's params must be an object".into());
+            }
+            let params = params.to_string();
+            if params.len() > PARAMS_MAX {
+                return Err(format!("a plugin window's params are over {PARAMS_MAX} bytes"));
+            }
+            let root = info.root.map(|r| format!("&root={}", encode(&r))).unwrap_or_default();
+            let OwnWindow { width, height, min_width, min_height, resizable, .. } = info.window;
+            Ok(WindowPlan {
+                label: plugin_window_label(&plugin, &id, session),
+                route: format!("/plugin-window/{plugin}/{id}?params={}{root}", encode(&params)),
+                title: info.name,
+                size: (width, height),
+                min_size: (min_width.is_some() || min_height.is_some()).then(|| (min_width.unwrap_or(0.0), min_height.unwrap_or(0.0))),
+                resizable,
+            })
+        }
     }
 }
 
@@ -84,8 +157,9 @@ pub fn plan(request: WindowRequest, known: impl Fn(&str) -> bool) -> Result<Wind
 /// Tauri runs a synchronous command on the main thread, and building a window there waits on that same thread, so the
 /// app froze (seen in W1's first run).
 #[tauri::command]
-pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) -> Result<(), String> {
-    let plan = plan(request, |uuid| app.state::<AppState>().has_session(&app, uuid))?;
+pub async fn window_open<R: Runtime>(app: AppHandle<R>, webview: Webview<R>, request: WindowRequest) -> Result<(), String> {
+    let caller = webview.label().to_owned();
+    let plan = plan(request, &caller, |uuid| app.state::<AppState>().has_session(&app, uuid), |caller, plugin, id| crate::grants::own_window(&app, caller, plugin, id))?;
     if let Some(window) = app.get_webview_window(&plan.label) {
         let _ = window.unminimize();
         let _ = window.show();
@@ -93,6 +167,32 @@ pub async fn window_open<R: Runtime>(app: AppHandle<R>, request: WindowRequest) 
         return Ok(());
     }
     build(&app, &plan)
+}
+
+/// Where a message goes from a session window: one of its plugins' windows.
+#[derive(Debug, Deserialize)]
+pub struct MessageTarget {
+    plugin: String,
+    id: String,
+}
+
+/// A message between a plugin's window and its session window, the only two that talk: from the plugin's window to its
+/// session window (`to` ignored, the sender named from its label), or from the session window to one of its plugins'
+/// windows (`to`). Any other caller is refused.
+#[tauri::command]
+pub async fn window_message<R: Runtime>(app: AppHandle<R>, webview: Webview<R>, to: Option<MessageTarget>, message: Value) -> Result<(), String> {
+    let caller = webview.label();
+    if let Some((plugin, id, session)) = plugin_window_parts(caller) {
+        let target = format!("{SESSION_WINDOW_PREFIX}{session}");
+        return app.emit_to(target.as_str(), PLUGIN_WINDOW_MESSAGE, json!({"plugin": plugin, "id": id, "message": message})).map_err(|e| e.to_string());
+    }
+    let session = caller.strip_prefix(SESSION_WINDOW_PREFIX).ok_or("only a session window and its plugins' windows message each other")?;
+    let MessageTarget { plugin, id } = to.ok_or("a message from a session window names its plugin's window")?;
+    let target = plugin_window_label(&plugin, &id, session);
+    if app.get_webview_window(&target).is_none() {
+        return Err(format!("{plugin:?}'s window {id:?} isn't open"));
+    }
+    app.emit_to(target.as_str(), PLUGIN_WINDOW_MESSAGE, json!({"message": message})).map_err(|e| e.to_string())
 }
 
 /// Builds the window `plan` describes, after granting what it may call.
@@ -107,6 +207,9 @@ fn build<R: Runtime>(app: &AppHandle<R>, plan: &WindowPlan) -> Result<(), String
         // Tauri's own file-drop handler would take every drop, so the page's HTML5 drag and drop (Files, the
         // editor, chat) would never get one; `tauri.conf.json` says the same for `main`.
         .disable_drag_drop_handler();
+    if let Some((width, height)) = plan.min_size {
+        builder = builder.min_inner_size(width, height);
+    }
     #[cfg(target_os = "macos")]
     {
         builder = builder
@@ -130,7 +233,7 @@ pub fn open_launch_windows<R: Runtime>(app: &AppHandle<R>) -> Result<(), String>
     if crate::state::take_restart(app) {
         for (uuid, root) in app.state::<AppState>().reopenable(app) {
             let title = std::path::Path::new(&root).file_name().map_or(root.clone(), |n| n.to_string_lossy().into_owned());
-            if let Err(e) = plan(WindowRequest::Session { uuid, title }, |_| true).and_then(|plan| build(app, &plan)) {
+            if let Err(e) = plan(WindowRequest::Session { uuid, title }, MAIN_WINDOW, |_| true, |_, _, _| None).and_then(|plan| build(app, &plan)) {
                 eprintln!("[windows] could not reopen {root} after the restart: {e}");
             }
         }
@@ -159,11 +262,19 @@ fn opened<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {
     }
 }
 
-/// A window is gone: for a session window, the start window back if it was the last, and the session marked closed.
+/// A window is gone: for a session window, the start window back if it was the last, the session marked closed, and
+/// its plugins' windows closed; for a plugin's window, its session window told.
 pub(crate) fn destroyed<R: Runtime>(app: &AppHandle<R>, label: &str) {
     if let Some(uuid) = label.strip_prefix(SESSION_WINDOW_PREFIX) {
         sync_main_visibility(app, Some(label));
         app.state::<AppState>().session_window(app, uuid, false);
+        for (other, window) in app.webview_windows() {
+            if plugin_window_parts(&other).is_some_and(|(_, _, session)| session == uuid) {
+                let _ = window.destroy();
+            }
+        }
+    } else if let Some((plugin, id, session)) = plugin_window_parts(label) {
+        let _ = app.emit_to(format!("{SESSION_WINDOW_PREFIX}{session}").as_str(), PLUGIN_WINDOW_CLOSED, json!({"plugin": plugin, "id": id}));
     }
 }
 
@@ -185,15 +296,42 @@ mod tests {
     use super::*;
 
     fn settings(path: Option<&str>, scope: Option<&str>) -> Result<WindowPlan, String> {
-        plan(WindowRequest::Settings { path: path.map(Into::into), scope: scope.map(Into::into) }, |_| false)
+        plan(WindowRequest::Settings { path: path.map(Into::into), scope: scope.map(Into::into) }, MAIN_WINDOW, |_| false, |_, _, _| None)
     }
 
     #[test]
     fn a_session_window_needs_a_known_session() {
         let request = || WindowRequest::Session { uuid: "abc".into(), title: "Notes".into() };
-        let opened = plan(request(), |uuid| uuid == "abc").unwrap();
+        let opened = plan(request(), MAIN_WINDOW, |uuid| uuid == "abc", |_, _, _| None).unwrap();
         assert_eq!((opened.label.as_str(), opened.route.as_str(), opened.title.as_str()), ("session-abc", "/loading", "Vertex - Notes"));
-        assert!(plan(request(), |_| false).is_err());
+        assert!(plan(request(), MAIN_WINDOW, |_| false, |_, _, _| None).is_err());
+    }
+
+    #[test]
+    fn a_plugin_window_is_one_its_plugin_declares_and_a_session_window_asks_for() {
+        let window = OwnWindow { id: "list".into(), width: 360.0, height: 560.0, min_width: Some(280.0), min_height: None, resizable: true };
+        // What `grants::own_window` answers: tasks is on in session-abc, with one window, `list`.
+        let own = |caller: &str, plugin: &str, id: &str| {
+            (caller == "session-abc" && plugin == "tasks" && id == "list")
+                .then(|| PluginWindowInfo { window: window.clone(), name: "Tasks".into(), root: Some("/Users/me/My Notes".into()) })
+        };
+        let request = |plugin: &str, id: &str, params: Option<Value>| WindowRequest::Plugin { plugin: plugin.into(), id: id.into(), params };
+        let opened = plan(request("tasks", "list", Some(json!({"a": 1}))), "session-abc", |_| true, own).unwrap();
+        assert_eq!(opened.label, "plugin:tasks:list:abc");
+        assert_eq!(opened.route, "/plugin-window/tasks/list?params=%7B%22a%22%3A1%7D&root=%2FUsers%2Fme%2FMy+Notes");
+        assert_eq!((opened.title.as_str(), opened.size, opened.min_size), ("Tasks", (360.0, 560.0), Some((280.0, 0.0))));
+        assert_eq!(plugin_window_parts(&opened.label), Some(("tasks", "list", "abc")));
+        assert_eq!(crate::grants::WindowKind::of(&opened.label), Some(crate::grants::WindowKind::Plugin));
+
+        // An id the manifest lacks, a plugin that's off or not there (both `None` from `own`), a caller that isn't a
+        // session window, params that aren't an object or are too long.
+        assert!(plan(request("tasks", "board", None), "session-abc", |_| true, own).is_err());
+        assert!(plan(request("other", "list", None), "session-abc", |_| true, own).is_err());
+        for caller in ["plugin:tasks:list:abc", "settings", MAIN_WINDOW] {
+            assert!(plan(request("tasks", "list", None), caller, |_| true, own).is_err(), "{caller}");
+        }
+        assert!(plan(request("tasks", "list", Some(json!([1]))), "session-abc", |_| true, own).is_err());
+        assert!(plan(request("tasks", "list", Some(json!({"x": "y".repeat(PARAMS_MAX)}))), "session-abc", |_| true, own).is_err());
     }
 
     #[test]

@@ -8,7 +8,7 @@
 use crate::api::SESSION_WINDOW_PREFIX;
 use crate::reach::Entry;
 use crate::state::AppState;
-use crate::windows::{ABOUT_WINDOW, MAIN_WINDOW, SETTINGS_WINDOW};
+use crate::windows::{plugin_window_parts, PluginWindowInfo, ABOUT_WINDOW, MAIN_WINDOW, SETTINGS_WINDOW};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -26,6 +26,10 @@ pub enum WindowKind {
     Session,
     Settings,
     About,
+    /// One of a plugin's own windows (`ownWindows`): only that plugin runs there, and it reaches no workspace. Not a
+    /// kind a manifest's `windows` can name.
+    #[serde(skip_deserializing)]
+    Plugin,
 }
 
 impl WindowKind {
@@ -36,6 +40,7 @@ impl WindowKind {
             SETTINGS_WINDOW => Some(Self::Settings),
             ABOUT_WINDOW => Some(Self::About),
             _ if label.starts_with(SESSION_WINDOW_PREFIX) => Some(Self::Session),
+            _ if plugin_window_parts(label).is_some() => Some(Self::Plugin),
             _ => None,
         }
     }
@@ -49,12 +54,32 @@ pub type Grants = &'static [(WindowKind, &'static [&'static str])];
 #[serde(rename_all = "camelCase")]
 pub struct PluginManifest {
     pub id: String,
+    #[serde(default)]
+    pub name: String,
     #[serde(default = "session_only")]
     pub windows: Vec<WindowKind>,
     #[serde(default)]
     pub permissions: Vec<String>,
     #[serde(default = "on")]
     pub enabled_by_default: bool,
+    /// The windows of its own it may open, from a session window where it's on.
+    #[serde(default)]
+    pub own_windows: Vec<OwnWindow>,
+}
+
+/// One of a plugin's own windows, as its manifest declares it: its id and its size (logical pixels).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnWindow {
+    pub id: String,
+    pub width: f64,
+    pub height: f64,
+    #[serde(default)]
+    pub min_width: Option<f64>,
+    #[serde(default)]
+    pub min_height: Option<f64>,
+    #[serde(default = "on")]
+    pub resizable: bool,
 }
 
 fn session_only() -> Vec<WindowKind> {
@@ -263,6 +288,7 @@ const KERNEL: Grants = &[
             "vertex:allow-trash-restore",
             "vertex:allow-update-token-get",
             "vertex:allow-search-notes",
+            "vertex:allow-window-message",
             "vertex:allow-data-get",
             "vertex:allow-data-set",
             "vertex:allow-plugins-list",
@@ -318,6 +344,17 @@ const KERNEL: Grants = &[
             "vertex:allow-update-token-get",
         ],
     ),
+    (
+        // A plugin's own window: what draws it (the settings for the theme and the language, its plugin's code) and its
+        // messages to its session window. No files, no sessions, no data: it asks its plugin there.
+        WindowKind::Plugin,
+        &[
+            "vertex:allow-window-message",
+            "vertex:allow-settings-get",
+            "vertex:allow-plugins-list",
+            "vertex:allow-plugin-read",
+        ],
+    ),
 ];
 
 /// Whether plugin `manifest` is on in a window of `kind`: the global `plugins.enabled`, and in a workspace's window
@@ -361,7 +398,7 @@ pub fn capabilities<'a>(
         for permission in SHARED {
             capability = capability.permission(*permission);
         }
-        if kind != WindowKind::About {
+        if !matches!(kind, WindowKind::About | WindowKind::Plugin) {
             for permission in METADATA {
                 capability = scoped(capability, permission, &["**".to_owned()]);
             }
@@ -481,9 +518,18 @@ pub(crate) fn check_permissions(manifest: &PluginManifest) -> Result<(), String>
     }
 }
 
-/// The workspace a session window `label` has open, if it's a workspace's (not a single file's).
+/// The session window a window belongs to: a session window itself, or a plugin's window's.
+fn session_label(label: &str) -> Option<String> {
+    if label.starts_with(SESSION_WINDOW_PREFIX) {
+        return Some(label.to_owned());
+    }
+    plugin_window_parts(label).map(|(_, _, session)| format!("{SESSION_WINDOW_PREFIX}{session}"))
+}
+
+/// The workspace a session window `label` (or a plugin's window of it) has open, if it's a workspace's.
 pub(crate) fn workspace_of<R: Runtime>(app: &AppHandle<R>, label: &str) -> Option<String> {
-    let uuid = label.strip_prefix(SESSION_WINDOW_PREFIX)?;
+    let session = session_label(label)?;
+    let uuid = session.strip_prefix(SESSION_WINDOW_PREFIX)?;
     app.state::<AppState>().session_root(app, uuid).filter(|(_, workspace)| *workspace).map(|(root, _)| root)
 }
 
@@ -497,12 +543,37 @@ fn catalog_for<R: Runtime>(app: &AppHandle<R>, label: &str, catalog: &[PluginMan
 }
 
 /// The plugins on in the window `label` now, from what Rust owns: the settings, a workspace window's
-/// `.vertex/settings.json` and whether its folder is trusted.
+/// `.vertex/settings.json` and whether its folder is trusted. A plugin's window has its plugin alone, while that's
+/// on in its session window.
 fn on_for<R: Runtime>(app: &AppHandle<R>, label: &str, kind: WindowKind, catalog: &[PluginManifest]) -> BTreeSet<String> {
+    if kind == WindowKind::Plugin {
+        let (Some((plugin, _, _)), Some(session)) = (plugin_window_parts(label), session_label(label)) else { return BTreeSet::new() };
+        let mut on = on_for(app, &session, WindowKind::Session, catalog);
+        on.retain(|id| id == plugin);
+        return on;
+    }
     let state = app.state::<AppState>();
     let global = state.read_settings(app, Value::clone);
     let workspace = workspace_of(app, label).map(|root| (crate::state::workspace_settings(&root), state.folder_trusted(app, &root)));
     plugins_on(kind, catalog, &global, workspace.as_ref().map(|(local, trusted)| (local, *trusted)))
+}
+
+/// What plugin `plugin`'s window `id` is made from, when the session window `caller` may open it: the plugin is on
+/// there and its manifest declares the window.
+pub(crate) fn own_window<R: Runtime>(app: &AppHandle<R>, caller: &str, plugin: &str, id: &str) -> Option<PluginWindowInfo> {
+    if WindowKind::of(caller) != Some(WindowKind::Session) {
+        return None;
+    }
+    let catalog = catalog_for(app, caller, &lock(&app.state::<WindowGrants>().catalog));
+    if !on_for(app, caller, WindowKind::Session, &catalog).contains(plugin) {
+        return None;
+    }
+    let manifest = catalog.iter().find(|m| m.id == plugin)?;
+    Some(PluginWindowInfo {
+        window: manifest.own_windows.iter().find(|w| w.id == id)?.clone(),
+        name: if manifest.name.is_empty() { manifest.id.clone() } else { manifest.name.clone() },
+        root: workspace_of(app, caller),
+    })
 }
 
 /// Adds what the window `label` isn't granted yet: its base, before it's first built, and the plugins on for it.

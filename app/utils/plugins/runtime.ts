@@ -2,7 +2,7 @@ import {computed, shallowRef, watch} from 'vue'
 import {listen} from '@tauri-apps/api/event'
 import {getCurrentWebviewWindow} from '@tauri-apps/api/webviewWindow'
 import {pluginConfig} from '#shared/plugin/config'
-import {sessionUuidFromLabel, WindowLabel} from '#shared/constants/app'
+import {pluginWindowFromLabel, sessionUuidFromLabel, WindowLabel} from '#shared/constants/app'
 import type {ContributionPoints, SessionContext} from '#shared/plugin/api'
 import type {WindowKind} from '#shared/plugin/manifest'
 import {pluginEnabled} from '#shared/plugin/resolve'
@@ -11,7 +11,7 @@ import type {AppSettingPath} from '#shared/utils/settings/scopes'
 import {registerCommand} from '~/utils/commands'
 import {
     codeBlocks, editorExtensions, embeds, fileMenuItems, fileTypes, fileViewers, homeActions, linkExtractors, markdownSyntax,
-    noteMenuItems, overlays, paletteGroups, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
+    noteMenuItems, overlays, paletteGroups, pluginWindowDefs, settingsPages, slashItems, statusItems, tabKinds, toolbarItems,
 } from '~/utils/contributions'
 import {registerPanelView} from '~/utils/panelViews'
 import {loadInstalledPlugins, missingPlugins, pluginEntries, workspacePlugins} from '~/utils/plugins/catalog'
@@ -62,13 +62,15 @@ const REGISTRIES: { [P in keyof ContributionPoints]: (def: ContributionPoints[P]
     toolbarItem: toolbarItems.register,
     noteMenuItem: noteMenuItems.register,
     linkExtractor: linkExtractors.register,
+    pluginWindow: pluginWindowDefs.register,
 }
 
 /** Which kind of window a label names; `undefined` for windows without plugins (About). */
-export function windowKindOf(label: string): WindowKind | undefined {
+export function windowKindOf(label: string): WindowKind | 'plugin' | undefined {
     if (label === WindowLabel.main) return 'main'
     if (label === WindowLabel.settings) return 'settings'
     if (sessionUuidFromLabel(label)) return 'session'
+    if (pluginWindowFromLabel(label)) return 'plugin'
 }
 
 /**
@@ -83,15 +85,19 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     const appSettings = useAppSettings()
     const scope = useSettingsScope()
     const trust = useTrust()
-    // The Settings window edits other scopes; its own plugins follow the global settings.
-    const settings = kind === 'settings' ? appSettings.config : scope.effective
-    const enabled = () => settings.value?.plugins.enabled ?? {}
+    // The Settings window edits other scopes; its own plugins follow the global settings, as a plugin's window does.
+    const settings = kind === 'settings' || kind === 'plugin' ? appSettings.config : scope.effective
+    // A plugin's own window runs its plugin alone, on while its session window runs it (the kernel's grant says so).
+    const owner = pluginWindowFromLabel(label)?.plugin
+    const enabled = () => (owner ? {[owner]: true} : settings.value?.plugins.enabled ?? {})
     /** A session window's workspace, the one a plugin's `workspace` config writes go to. */
     const workspace = () => (kind === 'session' ? scope.root.value : null)
     const nuxtApp = useNuxtApp()
-    // A session window runs its workspace's accepted plugins; the Settings window knows those of the one it edits.
-    const listed = () => (kind === 'settings' ? scope.root.value : workspace())
-    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp, nuxtApp.$i18n, listed(), kind === 'session').catch(e => console.error('[plugins] the installed plugins:', e))
+    // A session window runs its workspace's accepted plugins; the Settings window knows those of the one it edits; a
+    // plugin's window loads its session's copy of its plugin (the kernel puts that workspace in its URL).
+    const listed = () => (kind === 'settings' ? scope.root.value : kind === 'plugin' ? new URL(location.href).searchParams.get('root') : workspace())
+    const runsWorkspace = kind === 'session' || kind === 'plugin'
+    const listInstalled = () => loadInstalledPlugins(nuxtApp.vueApp, nuxtApp.$i18n, listed(), runsWorkspace).catch(e => console.error('[plugins] the installed plugins:', e))
     const i18n = nuxtApp.$i18n
     /** `ctx.i18n`: the app's strings, a plugin's own among them (`loadInstalledPlugins` merges them). */
     const strings = {
@@ -100,11 +106,12 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
             return i18n.locale.value
         },
     }
-    // The main window has no workspace, and no trust to read.
-    if (kind !== 'main') await trust.load()
+    // The main window and a plugin's own window have no workspace, and no trust to read.
+    if (kind !== 'main' && kind !== 'plugin') await trust.load()
     await listInstalled()
+    const entries = () => (owner ? pluginEntries().filter(e => e.manifest.id === owner) : pluginEntries())
 
-    host = createPluginHost(pluginEntries(), {
+    host = createPluginHost(entries(), {
         window: {kind, label},
         contribute(point, owner, def) {
             owners.set(def, owner)
@@ -146,6 +153,8 @@ export async function startPlugins(t: (key: string, params?: Record<string, unkn
     inApp = fn => nuxtApp.runWithContext(fn)
     const apply = () => nuxtApp.runWithContext(() => host!.apply(manifest => pluginEnabled(manifest, enabled())))
     await apply()
+    // A plugin's window doesn't follow on and off, installs or updates: it closes with its session window.
+    if (kind === 'plugin') return
     watch(() => JSON.stringify(enabled()), () => void apply())
     const running = (id: string) => ['active', 'failed'].includes(host!.states.get(id)?.status ?? '')
     const copies = () => new Map(pluginEntries().map(e => [e.manifest.id, e.source]))
