@@ -1,0 +1,26 @@
+[package]
+name = "tauri-plugin-vertex-media"
+version = "0.1.0"
+description = "Vertex's Now Playing: the system's audio levels (and, later, its volume and players), for the core plugin now-playing."
+authors = ["Type-32"]
+edition = "2021"
+rust-version = "1.90"
+publish = false
+links = "tauri-plugin-vertex-media"
+
+[build-dependencies]
+tauri-plugin = { version = "2.7.2", features = ["build"] }
+
+[dependencies]
+tauri = "2.12.5"
+tauri-plugin-vertex = { path = "../tauri-plugin-vertex" }
+rustfft = "6.2"
+
+# The system's audio, read by a Core Audio process tap (macOS 14.2+).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
+objc2-core-audio = "0.3.2"
+objc2-core-audio-types = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", features = ["CFDictionary"] }
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSDictionary", "NSString", "NSUUID", "NSValue"] }
+block2 = "0.6.2"

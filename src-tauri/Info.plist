@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <!-- Asked when Now Playing's line is set to move with the music (`tauri-plugin-vertex-media`). -->
+        <key>NSAudioCaptureUsageDescription</key>
+        <string>Vertex reads the sound your Mac is playing to move the Now Playing line with the music. Nothing is recorded or kept.</string>
+    </dict>
+</plist>

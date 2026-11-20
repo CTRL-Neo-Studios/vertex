@@ -18,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_vertex_ai::init())
         .plugin(tauri_plugin_vertex_chats::init())
         .plugin(tauri_plugin_vertex_git::init())
+        .plugin(tauri_plugin_vertex_media::init())
         .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
@@ -127,6 +128,7 @@ mod tests {
         (tauri_plugin_vertex_ai::PLUGIN, tauri_plugin_vertex_ai::GRANTS),
         (tauri_plugin_vertex_chats::PLUGIN, tauri_plugin_vertex_chats::GRANTS),
         (tauri_plugin_vertex_git::PLUGIN, tauri_plugin_vertex_git::GRANTS),
+        (tauri_plugin_vertex_media::PLUGIN, tauri_plugin_vertex_media::GRANTS),
     ];
 
     /// The app's real ACL with a window of each kind granted as the kernel does it, for the plugins `catalog` and the

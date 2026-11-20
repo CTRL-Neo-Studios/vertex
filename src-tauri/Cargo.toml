@@ -39,6 +39,7 @@ tauri-plugin-vertex = { path = "crates/tauri-plugin-vertex" }
 tauri-plugin-vertex-ai = { path = "crates/tauri-plugin-vertex-ai" }
 tauri-plugin-vertex-chats = { path = "crates/tauri-plugin-vertex-chats" }
 tauri-plugin-vertex-git = { path = "crates/tauri-plugin-vertex-git" }
+tauri-plugin-vertex-media = { path = "crates/tauri-plugin-vertex-media" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = { version = "2.5.5", features = [] }
