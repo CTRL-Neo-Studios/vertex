@@ -138,7 +138,29 @@ decide the scope.
 | A click on a window drag region | — | Whether a click still arrives on the line while a drag still moves the window; else the line stops being a drag region |
 
 ### Acceptance
-- [ ] Each row answered with what was run and seen; the scope of B1–B3 restated from it and agreed.
+- [ ] Each row answered with what was run and seen; the scope of B1–B3 restated from it and agreed. (Answered
+  below; the scope waits on the user.)
+
+### Found (20 Nov, macOS 27.0.1, MacBook Pro speakers; Swift probes in `/tmp`, the user's go-ahead)
+- **Levels: yes.** A global process tap (`CATapDescription(stereoGlobalTapButExcludeProcesses: [])`, private, read
+  through a private aggregate device with tap auto-start) read Cider's music: 48 kHz stereo floats, peaks 0.14–0.5,
+  created in 60–72 ms, about 1.5–2 ms of CPU a second. It captures what apps play, before the device's volume or
+  mute: the speakers read volume 0 and muted while it heard the music. The user allowed the capture prompt when it
+  came (for the process running the probe; Vertex's own will need `NSAudioCaptureUsageDescription`).
+- **Volume: yes.** The default output's `VirtualMainVolume` is readable and settable; mute is readable.
+- **Title, artist, duration, position, rate: only by a workaround.** `MRMediaRemoteGetNowPlayingInfo` answers
+  nothing to an ordinary process (as since macOS 15.4), but answers in full from inside `/usr/bin/perl` (a dylib
+  loaded by `DynaLoader`): "Intro", No Party for Cao Dong, 245.9 s, elapsed 132 s, rate 1; it followed Music's pause
+  (rate 0) and play (1). The same trick third-party now-playing apps use. Apple may close it in any update.
+- **Play/pause, next, previous: no general way.** Nothing sent paused Cider or Apple Music: a system-defined media-key
+  event posted at the HID tap or at the session tap (Accessibility granted), `IOHIDPostEvent` with
+  `NX_SUBTYPE_AUX_CONTROL_BUTTONS`, `MRMediaRemoteSendCommand(togglePlayPause)` from the process and from perl (each
+  answered true). Cider's level and Music's rate didn't change. The keyboard's own play key does pause Cider (the
+  user, pressed by hand). Only an app's scripting works: `tell application "Music" to playpause` paused and resumed
+  (rate 0, 1); Spotify is scriptable the same way; **Cider isn't** (no scripting dictionary). Scripting an app makes
+  macOS ask, once per app, to let Vertex control it.
+- **A click on the drag region:** not tried; it needs the app, and is settled in B2 either way (the line stops being
+  a drag region if a click doesn't arrive).
 
 ## B1: The kernel's media crate
 
