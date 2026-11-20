@@ -1,0 +1,18 @@
+{
+	"plugins": {
+		"now-playing": {
+			"showControls": "Show play controls",
+			"nothing": "Nothing playing",
+			"noInfo": "macOS isn't saying what's playing",
+			"previous": "Previous",
+			"next": "Next",
+			"play": "Play",
+			"pause": "Pause",
+			"controlsOnly": "Play controls work with Music and Spotify",
+			"volume": "Volume",
+			"moveWithMusic": "Move with the music",
+			"moveWithMusicHelp": "The line follows the sound your Mac plays. macOS asks the first time.",
+			"levelsUnsupported": "This system can't share its sound (macOS 14.2 or later)."
+		}
+	}
+}

@@ -1,0 +1,20 @@
+{
+  "id": "now-playing",
+  "name": "Now Playing",
+  "description": "The line in each panel's header moves with the music; a click shows what's playing, its controls and the volume.",
+  "icon": "i-lucide-audio-lines",
+  "version": "0",
+  "apiVersion": 1,
+  "windows": ["session", "settings"],
+  "config": {
+    "schema": [
+      {
+        "key": "visualizer",
+        "type": "switch",
+        "default": false,
+        "label": "plugins.now-playing.moveWithMusic",
+        "description": "plugins.now-playing.moveWithMusicHelp"
+      }
+    ]
+  }
+}

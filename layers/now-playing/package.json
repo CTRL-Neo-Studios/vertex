@@ -1,0 +1,5 @@
+{
+  "name": "@vertex-plugins/now-playing",
+  "private": true,
+  "type": "module"
+}

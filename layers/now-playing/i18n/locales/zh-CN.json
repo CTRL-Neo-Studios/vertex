@@ -1,0 +1,18 @@
+{
+	"plugins": {
+		"now-playing": {
+			"showControls": "显示播放控制",
+			"nothing": "没有正在播放的内容",
+			"noInfo": "macOS 没有提供正在播放的信息",
+			"previous": "上一首",
+			"next": "下一首",
+			"play": "播放",
+			"pause": "暂停",
+			"controlsOnly": "播放控制仅支持“音乐”和 Spotify",
+			"volume": "音量",
+			"moveWithMusic": "随音乐律动",
+			"moveWithMusicHelp": "线条随 Mac 播放的声音跳动。macOS 会在第一次时询问。",
+			"levelsUnsupported": "此系统无法共享声音（需要 macOS 14.2 或更高版本）。"
+		}
+	}
+}
