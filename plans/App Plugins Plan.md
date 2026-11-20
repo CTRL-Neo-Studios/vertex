@@ -254,6 +254,7 @@ decide the scope.
 - **Found:** `media_player` can't tell that another app (Cider) is the one playing while Music sits paused: it
   offers Music's controls. B1c's now-playing app (its bundle id) settles it: controls only when that app is Music or
   Spotify.
+
 ## B1c: Now playing
 
 ### Change
