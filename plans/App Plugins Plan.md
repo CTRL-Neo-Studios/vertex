@@ -446,9 +446,9 @@ output's `IAudioEndpointVolume`.
 - [ ] The slider moves the system volume; a change from the flyout shows in the open popover within a poll.
 
 ### B4e: Checked on Windows
-- Run by someone with a Windows 10 or 11 machine: the release build from `main`, or `bun tauri dev` there. Each of
-  B4b–B4d's boxes, then B3's (line in two windows, typing with the line moving). Without that run B4 isn't done:
-  everything before it is only compiled.
+- Run by the user on their x86_64 Windows 11 PC (20 Nov): `bun tauri dev` there, or the release build from `main`.
+  Each of B4b–B4d's boxes, then B3's (line in two windows, typing with the line moving). Without that run B4 isn't
+  done: everything before it is only compiled.
 
 ## Not in this plan
 
@@ -464,5 +464,4 @@ output's `IAudioEndpointVolume`.
 2. ~~If macOS gives no title or position (B0), is a popover of three buttons and a volume slider still wanted?~~
    Settled by the scope above.
 3. Should the kitty be out at launch by default, or only once the user has let it out?
-4. **Who runs B4 on Windows** (B4e): there's no Windows machine here. A Windows PC of yours, a VM (Parallels or UTM
-   with Windows 11 on ARM, which runs x64 apps), or a tester's?
+4. ~~Who runs B4 on Windows (B4e)?~~ The user, on their x86_64 Windows 11 PC.
