@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-media-levels-listen"
+description = "Enables the media_levels_listen command without any pre-configured scope."
+commands.allow = ["media_levels_listen"]
+
+[[permission]]
+identifier = "deny-media-levels-listen"
+description = "Denies the media_levels_listen command without any pre-configured scope."
+commands.deny = ["media_levels_listen"]
