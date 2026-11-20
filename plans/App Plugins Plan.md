@@ -216,6 +216,7 @@ decide the scope.
   Sandbox. A sandboxed app needs `com.apple.security.automation.apple-events` and a scripting-targets exception for
   Music and Spotify (B1b), and its child processes inherit the sandbox, which may stop `/usr/bin/perl` reaching
   MediaRemote (B1c). `tauri dev` isn't sandboxed, so dev checks won't show it; each needs a signed build to check.
+
 ## B1b: Volume and the scriptable players
 
 ### Change
@@ -225,10 +226,34 @@ decide the scope.
   call asks macOS to let Vertex control that app (`NSAppleEventsUsageDescription`).
 
 ### Acceptance
-- [ ] The slider's value moves the system volume and follows changes made elsewhere.
+- [ ] The slider's value moves the system volume and follows changes made elsewhere. (Set and read back; following
+  is B3's: the popover reads `media_volume` while it's open.)
 - [ ] With Music (then Spotify) playing, each command does what it says; with Cider playing, `media_player()` says
-  none, so no buttons.
+  none, so no buttons. (Music checked; Spotify isn't installed here; Cider playing with Music open and paused gives
+  Music, see below.)
 
+### As built
+- `system.rs` (macOS; elsewhere every command answers `unsupported`), four commands, all `async` over
+  `api::blocking` (a sync command would run `osascript` on the main thread), granted to session windows:
+  - `media_volume()` → `{volume, muted}`: the default output's main volume, or the mean of its first two channels
+    for a device with one per channel; `unsupported` for a device with neither.
+    `media_set_volume(v)` sets those and, above 0, unmutes (as the system's slider does).
+  - `media_player()` → `{app: "music" | "spotify", state}` or `null`: of the two that are running
+    (`NSRunningApplication`, so neither is launched), one playing, else one paused (so play can resume it).
+  - `media_command(app, play_pause | next | previous)`: only those two apps and those three scripts (anything else
+    refused before a script is built); `tell application id … to playpause / next track / previous track` by
+    `/usr/bin/osascript`, not `NSAppleScript` (which wants the main thread). A refusal (-1743) answers `denied`.
+- `NSAppleEventsUsageDescription` in `Info.plist`; `Entitlements.plist` gains `automation.apple-events` and a
+  `temporary-exception.apple-events` for `com.apple.Music` and `com.spotify.client` (the sandbox's way; unchecked
+  until a signed build is run).
+- **Test:** an unknown player, an unknown control and a control carrying script are refused (5 in the crate).
+- **Checked live** (a temporary ignored test run by hand, removed): volume read `0.0, muted`; set to 0.25 → read
+  0.25 unmuted, and `get volume settings` said 25 / not muted; put back (0, muted) with `osascript`. With Music open
+  and paused: `media_player` → music, paused; play_pause → playing; next "[12:00am] Motif" → "[7:12am] Leitmotif";
+  previous → back to "Motif"; play_pause → paused. Spotify, not running → "spotify isn't running".
+- **Found:** `media_player` can't tell that another app (Cider) is the one playing while Music sits paused: it
+  offers Music's controls. B1c's now-playing app (its bundle id) settles it: controls only when that app is Music or
+  Spotify.
 ## B1c: Now playing
 
 ### Change
