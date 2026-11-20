@@ -140,6 +140,32 @@ Denies the media_player command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex-media:allow-media-seek`
+
+</td>
+<td>
+
+Enables the media_seek command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-seek`
+
+</td>
+<td>
+
+Denies the media_seek command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex-media:allow-media-set-volume`
 
 </td>

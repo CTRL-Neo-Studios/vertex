@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-media-seek"
+description = "Enables the media_seek command without any pre-configured scope."
+commands.allow = ["media_seek"]
+
+[[permission]]
+identifier = "deny-media-seek"
+description = "Denies the media_seek command without any pre-configured scope."
+commands.deny = ["media_seek"]

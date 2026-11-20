@@ -188,13 +188,23 @@ pub fn script(command: &str) -> Option<&'static str> {
     }
 }
 
-pub fn command(app: &str, command: &str) -> Result<(), String> {
+/// The bundle id of a player Vertex controls, by the plugin's name for it, if it's running.
+fn controlled(app: &str) -> Result<&'static str, String> {
     let bundle = PLAYERS.iter().find(|(name, _)| *name == app).map(|(_, b)| *b).ok_or_else(|| format!("not a player Vertex controls: {app:?}"))?;
+    if running(bundle) { Ok(bundle) } else { Err(format!("{app} isn't running")) }
+}
+
+pub fn command(app: &str, command: &str) -> Result<(), String> {
     let script = script(command).ok_or_else(|| format!("not a control: {command:?}"))?;
-    if !running(bundle) {
-        return Err(format!("{app} isn't running"));
+    tell(controlled(app)?, script).map(drop)
+}
+
+/// Moves the track to `seconds` (Music and Spotify both script `player position`).
+pub fn seek(app: &str, seconds: f64) -> Result<(), String> {
+    if !seconds.is_finite() || seconds < 0.0 {
+        return Err(format!("not a position: {seconds}"));
     }
-    tell(bundle, script).map(drop)
+    tell(controlled(app)?, &format!("set player position to {seconds:.1}")).map(drop)
 }
 
 #[cfg(test)]
@@ -207,6 +217,9 @@ mod tests {
         assert!(command("music", "quit").unwrap_err().contains("not a control"));
         // A name that would end the `tell` and run more script never gets that far.
         assert!(command("music", "playpause\" & do shell script \"x").is_err());
+        assert!(seek("cider", 10.0).unwrap_err().contains("not a player"));
+        assert!(seek("music", -1.0).unwrap_err().contains("not a position"));
+        assert!(seek("music", f64::NAN).unwrap_err().contains("not a position"));
     }
 
     #[test]

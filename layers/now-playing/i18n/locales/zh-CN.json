@@ -10,6 +10,7 @@
 			"pause": "暂停",
 			"controlsOnly": "播放控制仅支持“音乐”和 Spotify",
 			"volume": "音量",
+			"position": "播放位置",
 			"moveWithMusic": "随音乐律动",
 			"moveWithMusicHelp": "线条随 Mac 播放的声音跳动。macOS 会在第一次时询问。",
 			"levelsUnsupported": "此系统无法共享声音（需要 macOS 14.2 或更高版本）。"

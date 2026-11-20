@@ -27,6 +27,7 @@ export const media = {
     nowPlaying: () => invoke<NowPlaying | null>('media_now_playing'),
     player: () => invoke<Player | null>('media_player'),
     command: (app: Player['app'], command: 'play_pause' | 'next' | 'previous') => invoke<void>('media_command', {app, command}),
+    seek: (app: Player['app'], seconds: number) => invoke<void>('media_seek', {app, seconds}),
     volume: () => invoke<{ volume: number, muted: boolean }>('media_volume'),
     setVolume: (volume: number) => invoke<void>('media_set_volume', {volume}),
 }

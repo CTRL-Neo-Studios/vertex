@@ -40,8 +40,18 @@ onBeforeUnmount(() => {
     clearInterval(tick)
 })
 
-const at = computed(() => (now.value ? position(now.value, clock.value) : undefined))
+/** Where the bar is being dragged to, in seconds, until the seek it ends with lands. */
+const scrub = ref<number>()
+const at = computed(() => scrub.value ?? (now.value ? position(now.value, clock.value) : undefined))
 const progress = computed(() => (now.value?.duration && at.value !== undefined ? (at.value / now.value.duration) * 100 : undefined))
+/** Music and Spotify can be sent to a position (by script); anything else's bar only shows it. */
+const seekable = computed(() => !!player.value && !!now.value?.duration)
+async function seek() {
+    if (!player.value || scrub.value === undefined) return
+    await media.seek(player.value.app, scrub.value).catch(e => (nowError.value = String(e)))
+    await refresh()
+    scrub.value = undefined
+}
 const time = (s: number | undefined) => (s === undefined ? '' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`)
 
 async function send(command: 'play_pause' | 'next' | 'previous') {
@@ -71,7 +81,20 @@ const visualizer = computed({
       <div v-if="now.artist" class="truncate text-muted">{{ now.artist }}</div>
       <div v-if="progress !== undefined" class="mt-2 flex items-center gap-2 text-xs text-muted tabular-nums">
         <span>{{ time(at) }}</span>
-        <UProgress :model-value="progress" size="xs" class="flex-1"/>
+        <USlider
+          v-if="seekable"
+          :model-value="at"
+          :min="0"
+          :max="now.duration ?? 0"
+          :step="1"
+          size="xs"
+          class="flex-1"
+          :aria-label="t('plugins.now-playing.position')"
+          data-now-playing-seek
+          @update:model-value="(v?: number) => (scrub = v)"
+          @change="seek"
+        />
+        <UProgress v-else :model-value="progress" size="xs" class="flex-1"/>
         <span>{{ time(now.duration ?? undefined) }}</span>
       </div>
     </div>

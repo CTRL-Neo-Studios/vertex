@@ -355,6 +355,18 @@
           "markdownDescription": "Denies the media_player command without any pre-configured scope."
         },
         {
+          "description": "Enables the media_seek command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-seek",
+          "markdownDescription": "Enables the media_seek command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_seek command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-seek",
+          "markdownDescription": "Denies the media_seek command without any pre-configured scope."
+        },
+        {
           "description": "Enables the media_set_volume command without any pre-configured scope.",
           "type": "string",
           "const": "allow-media-set-volume",
