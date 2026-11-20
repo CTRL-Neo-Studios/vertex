@@ -138,6 +138,10 @@ export function createPluginHost(initial: readonly PluginEntry[], options: Plugi
                 fileViewer: def => add('viewer', def),
                 statusItem: def => add('statusItem', def),
                 overlay: def => add('overlay', def),
+                paneRule: def => {
+                    if (source !== 'core') throw new Error('ctx.views.paneRule is for Vertex\'s own plugins')
+                    return add('paneRule', def)
+                },
             },
             files: {
                 type: def => add('fileType', def),

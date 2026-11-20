@@ -1,6 +1,6 @@
 import type {
     CodeBlockDef, EditorActionDef, EditorExtensionDef, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
-    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PluginWindowDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
+    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PaneRuleDef, PluginWindowDef, SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef,
 } from '#shared/plugin/api'
 import {panelViews} from '~/utils/panelViews'
 import {createList, createRegistry} from '~/utils/registry'
@@ -18,6 +18,8 @@ export const paletteGroups = createRegistry<PaletteGroupDef>('palette group', d 
 export const homeActions = createRegistry<HomeActionDef>('home action', d => d.id)
 /** Drawn once in each session window (`session.vue`). */
 export const overlays = createRegistry<OverlayDef>('overlay', d => d.id)
+/** The rest of each pane's action row, instead of its hairline (`PanelPane.vue`); the first registered is drawn. */
+export const paneRules = createRegistry<PaneRuleDef>('pane rule', d => d.id)
 /** What each plugin's own windows draw, by `<plugin>:<id>`: found by the window's page (`pages/plugin-window`). */
 export const pluginWindowDefs = createRegistry<PluginWindowDef & { plugin: string }>('plugin window', d => `${d.plugin}:${d.id}`)
 

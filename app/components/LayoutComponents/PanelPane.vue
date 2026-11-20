@@ -9,6 +9,7 @@ import {useScrollFade} from "~/composables/utility/useScrollFade";
 import type {PanelViewAction, PanelViewProps} from "#shared/plugin/api";
 import {PANEL_ACTIONS, panelViews} from "~/utils/panelViews";
 import {pluginSession} from "~/utils/plugins/runtime";
+import {paneRules} from "~/utils/contributions";
 
 /**
  * One pane of a panel: its view buttons, a row with the view's name and header actions, and the view. On a side: a
@@ -60,8 +61,14 @@ const actions = computed(() => toValue(props.actions.value) ?? [])
 // only: In the panels, that header holds its pills and collapse button, so the row stays under it.
 const showBar = computed(() => !props.inHeader || !strip.value)
 const barLabel = computed(() => (strip.value || props.area === 'right') && view.value ? t(view.value.label) : '')
-/** The rest of the row: a hairline across its middle, the full height a drag region. */
-const SEPARATOR = 'relative flex-1 self-stretch ms-1 after:absolute after:inset-x-0 after:top-1/2 after:border-t after:border-default'
+/** The rest of the row, the full height a drag region: a plugin's rule (Now Playing's line), else a hairline. */
+const SEPARATOR = 'relative flex-1 self-stretch ms-1'
+const HAIRLINE = 'after:absolute after:inset-x-0 after:top-1/2 after:border-t after:border-default'
+const rule = computed(() => {
+    const def = [...paneRules.items.values()][0]
+    const session = pluginSession()
+    return def && session && {def, props: {area: props.area, session}}
+})
 
 const scrollAreaRef = useTemplateRef<{ $el: HTMLElement }>('scrollAreaRef')
 const fade = useScrollFade(() => scrollAreaRef.value?.$el)
@@ -87,7 +94,9 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'top' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
             </UTooltip>
-            <div :class="SEPARATOR" data-tauri-drag-region/>
+            <div :class="[SEPARATOR, !rule && HAIRLINE]" data-tauri-drag-region>
+                <PluginMount v-if="rule" class="absolute inset-0" :ui="rule.def" :props="rule.props"/>
+            </div>
             <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'top' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" icon="i-lucide-square-arrow-out-up-left" :aria-label="t('app.panels.openInTab')" @click="panels.openInTab(pane.active)"/>
             </UTooltip>
@@ -129,7 +138,9 @@ const fade = useScrollFade(() => scrollAreaRef.value?.$el)
             <UTooltip v-for="action in actions" :key="action.id" :text="action.label" :content="{ side: 'bottom' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" :icon="action.icon" :aria-label="action.label" :disabled="action.disabled" :data-panel-action="action.id" @click="action.onSelect()"/>
             </UTooltip>
-            <div :class="SEPARATOR" data-tauri-drag-region/>
+            <div :class="[SEPARATOR, !rule && HAIRLINE]" data-tauri-drag-region>
+                <PluginMount v-if="rule" class="absolute inset-0" :ui="rule.def" :props="rule.props"/>
+            </div>
             <UTooltip v-if="view?.tab" :text="t('app.panels.openInTab')" :content="{ side: 'bottom' }">
                 <UButton color="neutral" variant="ghost" size="xs" class="text-muted" icon="i-lucide-square-arrow-out-up-left" :aria-label="t('app.panels.openInTab')" @click="panels.openInTab(pane.active)"/>
             </UTooltip>

@@ -190,6 +190,12 @@ shows for (Vertex's note editor is `markdown`); default every viewer that loads 
 UI drawn once in each session window, over everything (the command palette is one). It gets `{session}`; `when`
 limits it to some windows.
 
+### `ctx.views.paneRule`
+
+What fills the rest of each pane's action row, where Vertex draws a hairline (Now Playing's line is one). Vertex's own
+plugins only: an installed plugin's call throws, and its setup fails. It gets `{area, session}`; the row is a window
+drag region, so only the rule's own elements take the pointer.
+
 ## Files
 
 ### `ctx.files.type`

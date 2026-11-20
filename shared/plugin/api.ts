@@ -11,7 +11,7 @@ import type {Vault} from '#shared/utils/vault'
 import type {PanelViewId} from '#shared/types/app/settings'
 import type {
     CodeBlockDef, EditorActionDef, EditorHost, EmbedDef, FileMenuItemDef, FileTypeDef, HomeActionDef, LinkExtractorDef,
-    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PanelViewDef, PluginMenuItem, PluginWindowDef, PluginWindowHandle,
+    MarkdownSyntaxDef, NoteMenuItemDef, OverlayDef, PaletteGroupDef, PaneRuleDef, PanelViewDef, PluginMenuItem, PluginWindowDef, PluginWindowHandle,
     SettingsPageDef, StatusItemDef, TabKindDef, ViewerDef, WindowMessage,
 } from './contributions'
 import type {PluginManifest, WindowKind} from './manifest'
@@ -425,6 +425,8 @@ export interface PluginContext<Config = Record<string, unknown>> extends HostSer
         fileViewer(def: ViewerDef): () => void
         statusItem(def: StatusItemDef): () => void
         overlay(def: OverlayDef): () => void
+        /** The rest of each pane's action row, for Vertex's own plugins: an installed plugin's call throws. */
+        paneRule(def: PaneRuleDef): () => void
     }
     files: {
         type(def: FileTypeDef): () => void

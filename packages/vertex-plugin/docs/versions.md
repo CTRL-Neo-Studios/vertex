@@ -75,6 +75,9 @@ A plugin that uses them sets `minAppVersion` to the first Vertex on 4.13.
 ([Windows of its own](context.md#windows-of-its-own)). An older Vertex refuses a manifest with `bare` (an unknown key),
 so a plugin that declares one sets `minAppVersion` to the first Vertex with them.
 
+1.8.0 adds `ctx.views.paneRule` and its types (`PaneRuleDef`, `PaneRuleProps`), for Vertex's own plugins: an
+installed plugin can't use it, so nothing changes for one.
+
 The contract's `/ui` components are Vue components drawn with Nuxt UI, so they follow those packages: a plugin that
 draws with them may need changes when Vertex moves to Nuxt UI's next major. One drawn through `mount` doesn't
 ([UI](ui.md)).

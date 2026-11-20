@@ -101,6 +101,21 @@ describe('createPluginHost', () => {
         expect(host.states.get('unloadable')).toEqual({status: 'failed', error: 'chunk missing'})
     })
 
+    it('lets only Vertex\'s own plugins draw the pane rule', async () => {
+        const rule = {id: 'line', mount: () => undefined}
+        const {host, commands} = setup({core: {setup: ctx => { ctx.views.paneRule(rule) }}})
+        await host.apply(allOn)
+        expect(commands.has('paneRule:core')).toBe(true)
+        host.setEntries([{
+            manifest: {id: 'installed', name: 'Installed', version: '1.0.0', apiVersion: 1},
+            source: 'global',
+            load: async () => ({default: {setup: ctx => { ctx.views.paneRule(rule) }}}),
+        }])
+        await host.apply(allOn)
+        expect(host.states.get('installed')).toEqual({status: 'failed', error: 'ctx.views.paneRule is for Vertex\'s own plugins'})
+        expect(commands.has('paneRule:installed')).toBe(false)
+    })
+
     it('starts a plugin installed later, and keeps one removed while it runs', async () => {
         const {host, log} = setup({graph: {}})
         await host.apply(allOn)

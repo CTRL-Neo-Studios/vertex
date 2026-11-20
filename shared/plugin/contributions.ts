@@ -100,6 +100,20 @@ export interface OverlayDef extends UiSlot<OverlayProps> {
     when?: (ctx: PanelViewContext) => boolean
 }
 
+/** What a pane rule is drawn with: which panel's row it's in, and the window's session. */
+export interface PaneRuleProps {
+    area: PanelArea
+    session: SessionContext
+}
+
+/**
+ * What fills the rest of each pane's action row instead of its hairline (Now Playing's line). Vertex's own plugins
+ * only; the first registered is drawn. It sits in a window drag region: only its own elements take the pointer.
+ */
+export interface PaneRuleDef extends UiSlot<PaneRuleProps> {
+    id: string
+}
+
 // Tabs
 
 export interface TabProps {
@@ -446,6 +460,7 @@ export interface ContributionPoints {
     paletteGroup: PaletteGroupDef
     panel: PanelViewDef
     overlay: OverlayDef
+    paneRule: PaneRuleDef
     tabKind: TabKindDef
     viewer: ViewerDef
     statusItem: StatusItemDef
