@@ -294,7 +294,21 @@ decide the scope.
   hairline in every pane; without one, the hairline as now. Core plugins only.
 
 ### Acceptance
-- [ ] With the plugin off, the row looks and drags as it does today.
+- [ ] With the plugin off, the row looks and drags as it does today. (Same classes, no child, by construction; not
+  looked at in the app. The row with a rule in it is B3's to check, drag included.)
+
+### As built
+- **Contract** (SDK 1.8.0, unpublished): `ctx.views.paneRule(def)`, `PaneRuleDef` (`UiSlot<PaneRuleProps>` + `id`),
+  `PaneRuleProps` (`area`, `session`), `ContributionPoints.paneRule`. A public point rather than a kernel import:
+  core layers import only the contract and `~/plugin/ui` today, and this keeps it so.
+- **Core only:** the host throws for any other source (`ctx.views.paneRule is for Vertex's own plugins`), so an
+  installed plugin's setup fails and nothing of it stays registered.
+- **Drawing:** `paneRules` registry; `PanelPane.vue`'s row end is `SEPARATOR` (`relative flex-1 self-stretch ms-1`,
+  the drag region) plus `HAIRLINE` when no rule, or the first rule's `PluginMount` filling it (`absolute inset-0`,
+  props `{area, session}`) once the window's plugin session exists. Both rows: the bottom panel's and the sides'.
+- **Docs:** `context.md` (`ctx.views.paneRule`, which the docs test requires), `versions.md` (1.8.0).
+- **Checks:** a host test (a core plugin registers one; an installed one fails with that message and registers
+  nothing); Vertex typecheck 7 errors (the baseline, all `@type32/latex2vue`), 398 tests; SDK build, `tsc`, 8 tests.
 
 ## B3: The plugin
 
