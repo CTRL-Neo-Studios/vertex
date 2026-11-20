@@ -369,11 +369,92 @@ decide the scope.
   in the app, the slider's End key then Home key: End seeked to its end, so Music moved on to the next track ("Menu
   Music", 4:03), and Home took that to 2.3 s, the popover showing 0:02 / 4:03.
 
+## B4: Windows
+
+The user (20 Nov): Windows support, planned. Today every system call in `tauri-plugin-vertex-media` is macOS's; on
+Windows each command answers `unsupported`, so the line stays dots, the switch shows "macOS 14.2 or later", and the
+popover says "macOS isn't saying what's playing" (read from the code: never built or run on Windows). The release
+workflow (`tauri-updater-backend`'s `tauri-release.yml`) already builds `windows-x86_64` from `main`, so the crate
+must at least compile there.
+
+**Windows gives more than macOS here.** The System Media Transport Controls (SMTC: the media flyout by the volume)
+list every app that plays through them (Spotify, browsers, most players; Cider on Windows too, if it registers) with
+title, artist, position, and play/pause, next, previous and seek that work for any of them, not two scripted apps.
+Levels come from a WASAPI loopback capture of the default output, which asks no permission. Volume is the default
+output's `IAudioEndpointVolume`.
+
+**Mapped onto the commands as they are,** so the plugin barely changes:
+
+| Command | macOS (now) | Windows |
+| --- | --- | --- |
+| `media_levels_listen` / `_stop` | process tap → ring | WASAPI loopback (shared mode, the mix format, usually float) → the same ring; no packets while silent, as the tap |
+| `media_now_playing` | MediaRemote via `osascript` | `GlobalSystemMediaTransportControlsSessionManager::GetCurrentSession`: media properties, timeline (`Position`, `EndTime`, `LastUpdatedTime` → `elapsed`, `duration`, `timestamp`), playback info (status, rate); `app` = the session's `SourceAppUserModelId` |
+| `media_player` | Music or Spotify by script | the current session, with what its playback info says it allows |
+| `media_command` / `media_seek` | `osascript` to Music / Spotify | `TryTogglePlayPauseAsync`, `TrySkipNextAsync`, `TrySkipPreviousAsync`, `TryChangePlaybackPositionAsync` (100 ns ticks) on the session whose app id is given |
+| `media_volume` / `_set_volume` | Core Audio | `IAudioEndpointVolume` (`MasterVolumeLevelScalar`, `Mute`) |
+
+### B4a: What each system can do, said
+
+#### Change
+- `media_player()` answers `{app, state, can: {playPause, next, previous, seek}}`: on macOS all four for Music and
+  Spotify; on Windows the session's own `Controls` flags. `media_command` and `media_seek` take the `app` the popover
+  was showing and refuse if it's no longer the one playing (a click mustn't land on another app). The plugin draws
+  each button, and the slider, only when `can` says so.
+- `media_capabilities()` → `{levels, nowPlaying, volume, controls}` for this system: the switch shows only with
+  `levels`; with none of them (Linux for now) the line stays the plain hairline and opens nothing.
+- Strings without "macOS"/"Mac" where they're shown on both: "The system isn't saying what's playing", "The line
+  follows the sound your computer plays." with "macOS asks the first time." added on macOS only; "Play controls work
+  with Music and Spotify" only on macOS.
+- A Windows check that runs before `main`: a workflow on `windows-latest` (pull requests touching `src-tauri/` or
+  `layers/now-playing/`) running `cargo check --workspace` and `cargo test -p tauri-plugin-vertex-media`. Locally,
+  `cargo check --target x86_64-pc-windows-msvc -p tauri-plugin-vertex-media` where it works without MSVC.
+
+#### Acceptance
+- [ ] The kernel compiles and its tests pass on `windows-latest`, before any Windows code is written (today's stubs).
+- [ ] On macOS nothing changes (B3's checks, quickly again); with every capability off, the row is the hairline.
+
+### B4b: Windows levels
+
+#### Change
+- `tap.rs` gets a Windows twin (`loopback.rs`, `windows` crate, `Win32_Media_Audio`): the default render endpoint in
+  loopback shared mode, a capture thread (event-driven) mixing each packet to mono into the `Ring`, its sample rate
+  from the mix format; started and stopped exactly as the tap is (`Levels` doesn't change). Integer formats
+  converted to float. The default device changing mid-capture: the capture restarts on the new one.
+
+#### Acceptance
+- [ ] Music playing: 30 frames a second that follow it; paused: a zero frame, then none; the last listener gone:
+  the capture thread ends. Under 1% of a core.
+
+### B4c: Windows now playing, controls and seek
+
+#### Change
+- `smtc.rs` (`windows` crate, `Media_Control`): `now_playing` from the current session; `player` with `can` from its
+  playback info; commands and seek on the session matching `app`. WinRT calls are async: run on the blocking pool
+  (`.get()`), as `osascript` is now.
+
+#### Acceptance
+- [ ] With Spotify, then a browser tab (YouTube), then the Windows Media Player: title, artist and position read;
+  play/pause, next, previous and seek do what they say where the app allows them; buttons it doesn't allow aren't
+  drawn.
+
+### B4d: Windows volume
+
+#### Change
+- `IAudioEndpointVolume` on the default render endpoint: get, set, and unmute above 0, as on macOS.
+
+#### Acceptance
+- [ ] The slider moves the system volume; a change from the flyout shows in the open popover within a poll.
+
+### B4e: Checked on Windows
+- Run by someone with a Windows 10 or 11 machine: the release build from `main`, or `bun tauri dev` there. Each of
+  B4b–B4d's boxes, then B3's (line in two windows, typing with the line moving). Without that run B4 isn't done:
+  everything before it is only compiled.
+
 ## Not in this plan
 
 - A plugin acting on a workspace that isn't open (taking a note or a task into it). After A4, if wanted.
-- Windows and Linux for Part B; a kitty that dances to the music (A and B meeting: the levels would have to be an API
-  plugins may read, which is a permission of its own).
+- Linux for Part B (PipeWire / MPRIS would be its B4); a kitty that dances to the music (A and B meeting: the levels
+  would have to be an API plugins may read, which is a permission of its own).
 - Choosing which app's audio moves the line; an equalizer look; album art.
 
 ## Open questions
@@ -383,3 +464,5 @@ decide the scope.
 2. ~~If macOS gives no title or position (B0), is a popover of three buttons and a volume slider still wanted?~~
    Settled by the scope above.
 3. Should the kitty be out at launch by default, or only once the user has let it out?
+4. **Who runs B4 on Windows** (B4e): there's no Windows machine here. A Windows PC of yours, a VM (Parallels or UTM
+   with Windows 11 on ARM, which runs x64 apps), or a tester's?
