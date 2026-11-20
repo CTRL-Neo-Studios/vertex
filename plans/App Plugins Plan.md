@@ -264,8 +264,28 @@ decide the scope.
 - If perl or MediaRemote doesn't answer, `media_now_listen` fails with `unsupported` and the popover shows no title.
 
 ### Acceptance
-- [ ] Title, artist and position follow a playing track in Cider and in Music; the process is gone when the popover
-  closes.
+- [x] Title, artist and position follow a playing track in Cider and in Music; the process is gone when the popover
+  closes. (Read from Music and from Cider; there's no lasting process to end, see below.)
+
+### As built
+- **No dylib, no perl:** `osascript -l JavaScript` is also an Apple process MediaRemote answers, and its ObjC bridge
+  reaches `MRNowPlayingRequest` (`localNowPlayingItem.nowPlayingInfo`, `localIsPlaying`,
+  `localNowPlayingPlayerPath.client.bundleIdentifier`). Found by trying it before building the planned dylib: one
+  call in 40–80 ms, so a one-shot command replaces the listening process (nothing to start, track or kill).
+- `media_now_playing()` → `{app, playing, title, artist, album, duration, elapsed, rate, timestamp}` or `null`;
+  `unsupported` if the script fails (MediaRemote closed, or the sandbox). The position now is
+  `elapsed + rate × (now − timestamp)`, so the popover asks about once a second while open and moves the bar between.
+- **B1b's gap closed:** `media_player()` asks now-playing first; when macOS names an app, controls are only for it,
+  and only if it's Music or Spotify (`pick`). If macOS can't say, B1b's rule (playing, else paused) stands.
+- **Tests** (7 in the crate): `pick` (Cider named → none; Music named → Music even paused while Spotify plays; unnamed
+  → playing first, else paused; neither running → none); the script's JSON read, and `null`.
+- **Checked live** (a temporary ignored test, removed): Music paused → `com.apple.Music`, "[12:00am] Motif", aksfx,
+  album "Radio: Lobby (Original Music from Big Walk)", 270.0 s, at 1.68 s, rate 0, in 61 ms; `media_player` → music,
+  paused, 151 ms. Then with Cider (Music quit by then): `sh.cider.genten.mac`, "Pool", No Party for Cao Dong, "The
+  Clod", 186.5 s, at 28.6 s, rate 0 (Cider was paused: no "playing audio" assertion, and the position didn't move in
+  3 s); `media_player` → none, 40 ms. Music open and paused while Cider plays wasn't seen live; `pick`'s test holds it.
+- **Still the sandbox's question:** a sandboxed `osascript` child may be refused MediaRemote; then this answers
+  `unsupported` and the popover has no title.
 
 ## B2: The host's slot
 
