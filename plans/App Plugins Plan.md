@@ -162,23 +162,84 @@ decide the scope.
 - **A click on the drag region:** not tried; it needs the app, and is settled in B2 either way (the line stops being
   a drag region if a click doesn't arrive).
 
-## B1: The kernel's media crate
+### Scope, from B0 (the user's call, 20 Nov)
+- **The line:** levels from the global process tap, as planned.
+- **The popover:** title, artist and a progress bar through the `/usr/bin/perl` workaround, gone (not broken) if
+  Apple closes it; a volume slider (the default output's); previous, play/pause and next **only while Apple Music or
+  Spotify is the app playing**, by their scripting. For anything else (Cider) the buttons aren't drawn.
+
+## B1a: Levels
 
 ### Change
-- `src-tauri/crates/tauri-plugin-vertex-media`, for the core plugin's windows only:
-  - `media_levels(channel)`: about 32 band levels, 0–1, 30 times a second, over a Tauri channel. One capture for the
-    app however many windows listen; it stops with the last listener; a window that's hidden or minimized stops
-    listening. Silence sends nothing.
-  - `media_command(play_pause | next | previous)`, `media_volume()` / `media_set_volume(0–1)`, and
-    `media_now_playing()` only if B0 found a way.
-  - `media_capabilities()`: which of these this system has, so the plugin draws only the controls that work.
-  - Other systems: every command answers `unsupported`.
-- The usage string macOS shows in its prompt, in `Info.plist`.
+- `src-tauri/crates/tauri-plugin-vertex-media` (plugin `vertex-media`; granted to session windows while the core
+  plugin `now-playing` is on), macOS only, `objc2-core-audio`:
+  - `media_levels_listen(channel)` → a listener id; `media_levels_stop(id)`. One tap and one aggregate device for the
+    app however many listen; started by the first listener, torn down after the last stops (and when a window that
+    listened is destroyed). The IO block only copies samples into a ring; a thread every ~33 ms takes the last 1,024
+    mono samples, windows them, FFTs them (`rustfft`), and sends 32 bands (log-spaced 60 Hz–16 kHz, 0–1, dB-scaled)
+    to each channel; silence (every band under a floor) for half a second sends one zero frame, then nothing.
+  - Errors as words the plugin can show: `unsupported` (not macOS 14.2+), `denied` (the capture refused).
+- `NSAudioCaptureUsageDescription` in the app's `Info.plist`.
+- Kernel tests: the band maths (a sine lands in its band; silence is zeros), the listener count (start once, stop
+  after the last).
 
 ### Acceptance
-- [ ] With music playing, levels arrive and follow it; paused, they stop; no listener, no capture (checked by the
-  system's indicator or the process's CPU).
-- [ ] Each command does what it says in the playing app.
+- [x] With music playing, a listener gets 30 frames a second that follow it; paused, frames stop after a zero frame;
+  the last listener gone, the tap and device are destroyed (the capture indicator goes, the CPU drops).
+- [x] Capture costs under 1% of a core with one listener and with three (measured).
+
+### As built
+- **The crate** `tauri-plugin-vertex-media` (`PLUGIN = "now-playing"`, granted to session windows):
+  `media_levels_listen(channel)` → id, `media_levels_stop(id)`; a destroyed window's listeners go
+  (`RunEvent::WindowEvent Destroyed`). `Levels` keeps the listeners and, while there are any, one `Running`: the
+  `tap::Tap` (process tap + private aggregate device + IO block, destroyed on drop) and the analyzer thread, stopped
+  and joined outside the lock. Frames go as raw bytes (`InvokeResponseBody::Raw`, 32 × 0–255).
+- **The IO block** mixes the first buffer to mono into `Ring` with `try_lock` (a busy ring drops that buffer; nothing
+  waits or allocates on the audio thread). The ring counts what was written: no new samples since the last frame
+  counts as silence (a paused player stops the tap's buffers rather than sending zeros).
+- **The bands** (`bands.rs`): 2,048-sample Hann FFT (`rustfft`), 32 log bands 60 Hz–16 kHz, a band's loudest bin,
+  −60..0 dB → 0..255. Frames by deadline (sleeping a fixed 33 ms gave 25 a second).
+- **Errors:** `unsupported` (no `CATapDescription`: before macOS 14.2, or not macOS); otherwise the failing step and
+  its status. A refused capture's status wasn't seen (the probes' process was allowed), so there's no `denied` word
+  yet; B3 shows what comes.
+- `src-tauri/Info.plist` with `NSAudioCaptureUsageDescription` (Tauri merges it into the bundle and the dev binary).
+- **Tests:** 4 (a sine at 100 Hz, 1 kHz and 8 kHz is loudest in its band and quiet far from it; silence and too few
+  samples are zeros; every band has bins at 44.1, 48 and 96 kHz; the ring keeps the latest without growing). The
+  listener lifecycle was checked live, not by a test (it needs the hardware). Kernel: every crate's tests pass.
+- **Checked live** (a throwaway example calling `Levels` directly, deleted after; a 200 Hz + 1 kHz tone played by
+  `afplay` on the muted speakers): the first listener started the capture in ~105 ms; 30.3 frames a second; the
+  tone's bands lit (bands 5–8 around 200 Hz at 45–179, band 15 at 1 kHz at 112, the rest 0); three listeners (two in
+  one "window") each 91 frames in 3 s; dropping that window stopped its two; the last stop tore down in 18 ms, after
+  which no frames came and CPU was 0.02–0.04%. CPU while capturing: 0.30% of a core with one listener, 0.28% with
+  three. With nothing playing: 15 frames (half a second of quiet ending in zeros), then none.
+- **Risk for B1b and B1c, found here:** release builds are signed with `Entitlements.plist`, which turns on the App
+  Sandbox. A sandboxed app needs `com.apple.security.automation.apple-events` and a scripting-targets exception for
+  Music and Spotify (B1b), and its child processes inherit the sandbox, which may stop `/usr/bin/perl` reaching
+  MediaRemote (B1c). `tauri dev` isn't sandboxed, so dev checks won't show it; each needs a signed build to check.
+## B1b: Volume and the scriptable players
+
+### Change
+- `media_volume()` / `media_set_volume(0–1)` on the default output (`unsupported` for a device without one).
+- `media_player()`: which of Music and Spotify is running and playing (asked of the running one only, never
+  launching it), with its state; `media_command(app, play_pause | next | previous)` by `NSAppleScript`. The first
+  call asks macOS to let Vertex control that app (`NSAppleEventsUsageDescription`).
+
+### Acceptance
+- [ ] The slider's value moves the system volume and follows changes made elsewhere.
+- [ ] With Music (then Spotify) playing, each command does what it says; with Cider playing, `media_player()` says
+  none, so no buttons.
+
+## B1c: Now playing
+
+### Change
+- A small dylib built with the crate (`cc`, Objective-C), shipped as a resource and loaded into `/usr/bin/perl`, which
+  prints now-playing as JSON lines (title, artist, duration, elapsed, rate, the app's bundle id) when it changes.
+  The kernel runs one such process while anyone listens (`media_now_listen(channel)`), and kills it after.
+- If perl or MediaRemote doesn't answer, `media_now_listen` fails with `unsupported` and the popover shows no title.
+
+### Acceptance
+- [ ] Title, artist and position follow a playing track in Cider and in Music; the process is gone when the popover
+  closes.
 
 ## B2: The host's slot
 
@@ -197,9 +258,10 @@ decide the scope.
     line, its height its band's level × the envelope (0 at the ends, 1 in the middle) × the row's height; eased so it
     doesn't flicker. Muted colour; primary when hovered. Redrawn only while levels arrive; one draw under a
     millisecond; nothing laid out. Reduced motion (the system's setting): bars don't move, the line only brightens.
-  - **Hover and click:** tooltip "Show play controls"; a click opens a `UPopover`: previous, play/pause, next;
-    volume; title and progress if B0 allowed; and the switch "Move with the music", which is what asks macOS for
-    system audio the first time. Refused, the switch says so and how to allow it in System Settings.
+  - **Hover and click:** tooltip "Show play controls"; a click opens a `UPopover`: the title, artist and progress
+    (B1c); previous, play/pause, next when Music or Spotify plays (B1b); volume; and the switch "Move with the
+    music", which is what asks macOS for system audio the first time. Refused, the switch says so and how to allow
+    it in System Settings.
   - Settings page: the switch again; strings en and zh-CN.
 
 ### Acceptance
@@ -220,5 +282,6 @@ decide the scope.
 
 1. Should the visualiser's permission be asked at the switch (planned), or should the plugin be off entirely until
    turned on in Settings?
-2. If macOS gives no title or position (B0), is a popover of three buttons and a volume slider still wanted?
+2. ~~If macOS gives no title or position (B0), is a popover of three buttons and a volume slider still wanted?~~
+   Settled by the scope above.
 3. Should the kitty be out at launch by default, or only once the user has let it out?
