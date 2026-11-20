@@ -325,11 +325,44 @@ decide the scope.
   - Settings page: the switch again; strings en and zh-CN.
 
 ### Acceptance
-- [ ] Music playing and the switch on: the line moves as described, in both panels and in two windows at once;
-  hovered it's the primary colour; paused it settles to dots.
-- [ ] The popover's controls work on the playing app; what the system doesn't give isn't drawn.
-- [ ] The switch off, or the permission refused: no capture runs, the line is dots, the controls still work.
-- [ ] Typing in the editor with the line moving shows no frame over what it had without it (measured).
+- [x] Music playing and the switch on: the line moves as described, in both panels and in two windows at once;
+  hovered it's the primary colour; paused it settles to dots. (Two windows, one panel each: the right panel was
+  closed.)
+- [x] The popover's controls work on the playing app; what the system doesn't give isn't drawn.
+- [ ] The switch off, or the permission refused: no capture runs, the line is dots, the controls still work. (Off:
+  checked. Refused: not tried; the user had allowed it.)
+- [x] Typing in the editor with the line moving shows no frame over what it had without it (measured).
+
+### As built
+- `layers/now-playing` (commit `8b379ee`, the user's; it took the throwaway harness too, removed after): manifest
+  (`windows` session and settings; config `visualizer`, a switch, default off), en and zh-CN strings; `plugin.ts`
+  registers the pane rule; `lib/media.ts` (the kernel's commands; `position` from elapsed, rate and timestamp; one
+  levels listener per window, ref-counted, stopped while the window is hidden); `lib/shape.ts` (`heights`: bands
+  mirrored about the middle, lowest there, times sin(πt); `ease`: up at once, down ×0.82 a frame) with 5 tests.
+- **Line.vue:** a button filling the row's end with a canvas; one 2 px dot every 6 px; bars `level × (height − 4)`;
+  drawn by `requestAnimationFrame` only while something moves; colour read from the button (`text-dimmed`,
+  `text-primary` hovered or open), so no colour transition (the canvas drew mid-transition grey). Reduced motion:
+  dots that brighten instead of bars. Tooltip "Show play controls"; a click opens `Controls.vue` in a popover.
+- **Controls.vue:** title, artist, a progress bar with times (moved every 250 ms between polls); previous,
+  play/pause, next when `media_player` names Music or Spotify, else "Play controls work with Music and Spotify";
+  the volume slider; the "Move with the music" switch (`ctx.config.set`), and the capture's error under it. Polls
+  `now_playing`, `player`, `volume` every 1.5 s while open.
+- **Checked in `tauri dev`** (harness, synthetic events; Music playing on muted speakers): at rest a dotted line where
+  the hairline was; colour `oklch(0.552 …)` at rest, `oklch(0.673 0.182 277)` (primary) hovered and open. Popover:
+  "Big Walk Theme (Jumping Voices)", aksfx, 1:38 / 3:45, Previous / Pause / Next, volume, the switch. Pause → Music
+  `paused`, the button turned to Play; Play → `playing`. With Cider (an earlier run): "Pool", 0:28 / 3:06, no
+  buttons, the note. Switch on (the user turned it on and answered the prompt): the canvas changed in each of 6
+  samples 150 ms apart, in both of two workspace windows (1,100–1,470 lit pixels). Off: both settled to 544 lit
+  pixels, unchanging. Typing 60 characters into the editor, 50 ms apart: worst frames 24/23/22 ms moving, 28/25/24 ms
+  still, median 17 ms both.
+- **Found:**
+  - Editing `Line.vue` under `nuxt dev` hot-swapped it and the plugin's context read undefined ("Now Playing couldn't
+    draw this … ctx.config", the user's screenshot); a reload cleared it. Dev only.
+  - The line's button now takes the pointer where the row was a window drag region; the rest of the row still drags.
+- **Not checked:** a refused capture (what the switch then says), the settings page's switch, a hidden window
+  stopping its listener, the right panel's and bottom panel's rows, a signed (sandboxed) build.
+- **Asked, not decided:** the progress bar is display-only; seeking would work for Music and Spotify by script
+  (`set player position`), not Cider.
 
 ## Not in this plan
 
