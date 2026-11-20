@@ -6078,6 +6078,7 @@ dependencies = [
  "objc2-foundation",
  "rustfft",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-plugin",
  "tauri-plugin-vertex",

@@ -23,6 +23,10 @@ mod system;
 mod system {
     pub type Volume = ();
     pub type Player = ();
+    pub type NowPlaying = ();
+    pub fn now_playing() -> Result<Option<NowPlaying>, String> {
+        Err("unsupported".into())
+    }
     pub fn volume() -> Result<Volume, String> {
         Err("unsupported".into())
     }
@@ -61,6 +65,7 @@ pub const GRANTS: api::Grants = &[(
         "vertex-media:allow-media-set-volume",
         "vertex-media:allow-media-player",
         "vertex-media:allow-media-command",
+        "vertex-media:allow-media-now-playing",
     ],
 )];
 
@@ -233,9 +238,16 @@ async fn media_command(app: String, command: String) -> Result<(), String> {
     api::blocking(move || system::command(&app, &command)).await
 }
 
+/// The track macOS says is playing (any app): title, artist, position, the app's bundle id; `null` when none;
+/// `unsupported` when macOS won't say. One call is ~80 ms; the popover asks while it's open.
+#[tauri::command]
+async fn media_now_playing() -> Result<Option<system::NowPlaying>, String> {
+    api::blocking(system::now_playing).await
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-media")
-        .invoke_handler(tauri::generate_handler![media_levels_listen, media_levels_stop, media_volume, media_set_volume, media_player, media_command])
+        .invoke_handler(tauri::generate_handler![media_levels_listen, media_levels_stop, media_volume, media_set_volume, media_player, media_command, media_now_playing])
         .setup(|app, _api| {
             app.manage(Levels::default());
             api::grant(app, PLUGIN, GRANTS);

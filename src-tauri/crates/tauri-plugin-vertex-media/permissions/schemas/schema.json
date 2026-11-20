@@ -331,6 +331,18 @@
           "markdownDescription": "Denies the media_levels_stop command without any pre-configured scope."
         },
         {
+          "description": "Enables the media_now_playing command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-now-playing",
+          "markdownDescription": "Enables the media_now_playing command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_now_playing command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-now-playing",
+          "markdownDescription": "Denies the media_now_playing command without any pre-configured scope."
+        },
+        {
           "description": "Enables the media_player command without any pre-configured scope.",
           "type": "string",
           "const": "allow-media-player",

@@ -88,6 +88,32 @@ Denies the media_levels_stop command without any pre-configured scope.
 <tr>
 <td>
 
+`vertex-media:allow-media-now-playing`
+
+</td>
+<td>
+
+Enables the media_now_playing command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-now-playing`
+
+</td>
+<td>
+
+Denies the media_now_playing command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex-media:allow-media-player`
 
 </td>

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-media-now-playing"
+description = "Enables the media_now_playing command without any pre-configured scope."
+commands.allow = ["media_now_playing"]
+
+[[permission]]
+identifier = "deny-media-now-playing"
+description = "Denies the media_now_playing command without any pre-configured scope."
+commands.deny = ["media_now_playing"]

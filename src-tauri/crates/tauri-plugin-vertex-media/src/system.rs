@@ -9,7 +9,7 @@ use objc2_core_audio::{
     AudioObjectID, AudioObjectPropertyAddress, AudioObjectSetPropertyData,
 };
 use objc2_foundation::NSString;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
 use std::process::Command;
 use std::ptr::{self, NonNull};
@@ -97,33 +97,85 @@ fn running(bundle: &str) -> bool {
     NSRunningApplication::runningApplicationsWithBundleIdentifier(&NSString::from_str(bundle)).count() > 0
 }
 
-/// Runs `body` in `tell application id "bundle"`, answering its text; the first call asks the user to let Vertex
-/// control that app.
-fn tell(bundle: &str, body: &str) -> Result<String, String> {
-    let out = Command::new("/usr/bin/osascript").args(["-e", &format!("tell application id \"{bundle}\" to {body}")]).output().map_err(|e| e.to_string())?;
+/// `osascript` with `args`, its output's text; a refusal to control an app (-1743) answers `denied`.
+fn osascript(args: &[&str]) -> Result<String, String> {
+    let out = Command::new("/usr/bin/osascript").args(args).output().map_err(|e| e.to_string())?;
     if !out.status.success() {
         let error = String::from_utf8_lossy(&out.stderr);
-        // -1743: the user (or the sandbox) didn't allow Vertex to control the app.
         return Err(if error.contains("-1743") { "denied".into() } else { error.trim().to_string() });
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// The scriptable player to show controls for: one that's playing, else one that's paused (so it can be resumed);
-/// none when neither runs. Never launches either.
+/// Runs `body` in `tell application id "bundle"`; the first call asks the user to let Vertex control that app.
+fn tell(bundle: &str, body: &str) -> Result<String, String> {
+    osascript(&["-e", &format!("tell application id \"{bundle}\" to {body}")])
+}
+
+/// What macOS says is playing, any app. Since macOS 15.4 MediaRemote answers only Apple's own processes; `osascript`
+/// is one, and its JavaScript bridge reaches `MRNowPlayingRequest`. `null` when nothing is.
+const NOW_PLAYING: &str = r#"
+ObjC.import('Foundation')
+$.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework/').load
+const request = $.NSClassFromString('MRNowPlayingRequest')
+const info = request.localNowPlayingItem.nowPlayingInfo
+if (info.isNil()) 'null'; else {
+  const value = (key) => { const v = info.valueForKey('kMRMediaRemoteNowPlayingInfo' + key); return v.isNil() ? null : v.js }
+  const client = request.localNowPlayingPlayerPath.client
+  JSON.stringify({
+    app: client.isNil() ? null : client.bundleIdentifier.js,
+    playing: request.localIsPlaying,
+    title: value('Title'), artist: value('Artist'), album: value('Album'),
+    duration: value('Duration'), elapsed: value('ElapsedTime'), rate: value('PlaybackRate'), timestamp: value('Timestamp'),
+  })
+}
+"#;
+
+/// A track as macOS reports it. `elapsed` is the position at `timestamp`; the position now is
+/// `elapsed + rate × (now − timestamp)`.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct NowPlaying {
+    /// The bundle id of the app playing.
+    pub app: Option<String>,
+    pub playing: bool,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    /// Seconds.
+    pub duration: Option<f64>,
+    pub elapsed: Option<f64>,
+    pub rate: Option<f64>,
+    /// ISO 8601.
+    pub timestamp: Option<String>,
+}
+
+fn parse_now_playing(json: &str) -> Result<Option<NowPlaying>, String> {
+    serde_json::from_str(json).map_err(|e| format!("now playing: {e}"))
+}
+
+/// `unsupported` when MediaRemote no longer answers (the sandbox, or a macOS that closed this way too).
+pub fn now_playing() -> Result<Option<NowPlaying>, String> {
+    parse_now_playing(&osascript(&["-l", "JavaScript", "-e", NOW_PLAYING]).map_err(|_| "unsupported".to_string())?)
+}
+
+/// The scriptable player to show controls for: the app macOS says is playing, when it's Music or Spotify; none when
+/// it's another (Cider). If macOS can't say, one of the two that's playing, else one that's paused (so it can be
+/// resumed). Never launches either.
 pub fn player() -> Result<Option<Player>, String> {
-    let mut paused = None;
+    let now = now_playing().ok().flatten().and_then(|n| n.app);
+    let mut states = Vec::new();
     for &(app, bundle) in PLAYERS {
-        if !running(bundle) {
-            continue;
-        }
-        match tell(bundle, "player state as text")?.as_str() {
-            "playing" => return Ok(Some(Player { app, state: "playing".into() })),
-            "paused" if paused.is_none() => paused = Some(Player { app, state: "paused".into() }),
-            _ => {}
+        if running(bundle) {
+            states.push((app, bundle, tell(bundle, "player state as text")?));
         }
     }
-    Ok(paused)
+    Ok(pick(now.as_deref(), &states))
+}
+
+fn pick(now: Option<&str>, states: &[(&'static str, &str, String)]) -> Option<Player> {
+    let candidates: Vec<_> = states.iter().filter(|(_, bundle, _)| now.is_none_or(|n| n == *bundle)).collect();
+    let with = |state: &str| candidates.iter().find(|(_, _, s)| s == state).map(|(app, _, s)| Player { app, state: s.clone() });
+    with("playing").or_else(|| with("paused"))
 }
 
 /// The script for a control, or `None` for one that isn't.
@@ -155,5 +207,28 @@ mod tests {
         assert!(command("music", "quit").unwrap_err().contains("not a control"));
         // A name that would end the `tell` and run more script never gets that far.
         assert!(command("music", "playpause\" & do shell script \"x").is_err());
+    }
+
+    #[test]
+    fn controls_follow_the_app_macos_says_is_playing() {
+        let music_paused = ("music", "com.apple.Music", "paused".to_string());
+        let spotify_playing = ("spotify", "com.spotify.client", "playing".to_string());
+        let both = [music_paused.clone(), spotify_playing.clone()];
+        // Cider plays while Music sits paused: no controls.
+        assert_eq!(pick(Some("sh.cider.genten.mac"), &[music_paused.clone()]), None);
+        // macOS names one of the two: that one, even paused while the other plays.
+        assert_eq!(pick(Some("com.apple.Music"), &both), Some(Player { app: "music", state: "paused".into() }));
+        // macOS can't say: playing first, else paused.
+        assert_eq!(pick(None, &both), Some(Player { app: "spotify", state: "playing".into() }));
+        assert_eq!(pick(None, &[music_paused]), Some(Player { app: "music", state: "paused".into() }));
+        assert_eq!(pick(None, &[]), None);
+    }
+
+    #[test]
+    fn now_playing_reads_what_the_script_prints() {
+        let json = r#"{"app":"com.apple.Music","playing":false,"title":"[12:00am] Motif","artist":"aksfx","album":null,"duration":270.015,"elapsed":1.68,"rate":0,"timestamp":"2026-11-20T03:25:20.212Z"}"#;
+        let now = parse_now_playing(json).unwrap().unwrap();
+        assert_eq!((now.app.as_deref(), now.title.as_deref(), now.duration, now.rate), (Some("com.apple.Music"), Some("[12:00am] Motif"), Some(270.015), Some(0.0)));
+        assert_eq!(parse_now_playing("null").unwrap(), None);
     }
 }
