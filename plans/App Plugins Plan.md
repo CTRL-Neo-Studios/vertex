@@ -361,8 +361,13 @@ decide the scope.
   - The line's button now takes the pointer where the row was a window drag region; the rest of the row still drags.
 - **Not checked:** a refused capture (what the switch then says), the settings page's switch, a hidden window
   stopping its listener, the right panel's and bottom panel's rows, a signed (sandboxed) build.
-- **Asked, not decided:** the progress bar is display-only; seeking would work for Music and Spotify by script
-  (`set player position`), not Cider.
+- **Seeking** (the user's call after B3): `media_seek(app, seconds)` (Music or Spotify, running; a position that
+  isn't finite or is below 0 refused before any script: `set player position to N`), granted to session windows. The
+  popover's bar is a `USlider` while Music or Spotify plays (`scrub` holds the dragged position, `change`, which
+  Nuxt UI sends on commit, seeks, then a refresh lets go of it); anything else keeps the `UProgress`. Kernel test:
+  Cider, −1 and NaN refused (7 in the crate). **Checked:** the kernel took "Silent Gauntlet" from 139.3 s to 30.5 s;
+  in the app, the slider's End key then Home key: End seeked to its end, so Music moved on to the next track ("Menu
+  Music", 4:03), and Home took that to 2.3 s, the popover showing 0:02 / 4:03.
 
 ## Not in this plan
 
