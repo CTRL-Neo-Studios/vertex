@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the media_command command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-command",
+          "markdownDescription": "Enables the media_command command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_command command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-command",
+          "markdownDescription": "Denies the media_command command without any pre-configured scope."
+        },
+        {
           "description": "Enables the media_levels_listen command without any pre-configured scope.",
           "type": "string",
           "const": "allow-media-levels-listen",
@@ -317,6 +329,42 @@
           "type": "string",
           "const": "deny-media-levels-stop",
           "markdownDescription": "Denies the media_levels_stop command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the media_player command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-player",
+          "markdownDescription": "Enables the media_player command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_player command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-player",
+          "markdownDescription": "Denies the media_player command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the media_set_volume command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-set-volume",
+          "markdownDescription": "Enables the media_set_volume command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_set_volume command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-set-volume",
+          "markdownDescription": "Denies the media_set_volume command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the media_volume command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-media-volume",
+          "markdownDescription": "Enables the media_volume command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the media_volume command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-media-volume",
+          "markdownDescription": "Denies the media_volume command without any pre-configured scope."
         }
       ]
     }

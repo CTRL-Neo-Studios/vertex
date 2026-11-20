@@ -10,6 +10,32 @@
 <tr>
 <td>
 
+`vertex-media:allow-media-command`
+
+</td>
+<td>
+
+Enables the media_command command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-command`
+
+</td>
+<td>
+
+Denies the media_command command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `vertex-media:allow-media-levels-listen`
 
 </td>
@@ -55,6 +81,84 @@ Enables the media_levels_stop command without any pre-configured scope.
 <td>
 
 Denies the media_levels_stop command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:allow-media-player`
+
+</td>
+<td>
+
+Enables the media_player command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-player`
+
+</td>
+<td>
+
+Denies the media_player command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:allow-media-set-volume`
+
+</td>
+<td>
+
+Enables the media_set_volume command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-set-volume`
+
+</td>
+<td>
+
+Denies the media_set_volume command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:allow-media-volume`
+
+</td>
+<td>
+
+Enables the media_volume command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`vertex-media:deny-media-volume`
+
+</td>
+<td>
+
+Denies the media_volume command without any pre-configured scope.
 
 </td>
 </tr>

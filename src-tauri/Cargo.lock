@@ -6071,11 +6071,13 @@ version = "0.1.0"
 dependencies = [
  "block2",
  "objc2",
+ "objc2-app-kit",
  "objc2-core-audio",
  "objc2-core-audio-types",
  "objc2-core-foundation",
  "objc2-foundation",
  "rustfft",
+ "serde",
  "tauri",
  "tauri-plugin",
  "tauri-plugin-vertex",

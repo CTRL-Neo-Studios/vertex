@@ -6,5 +6,13 @@
         <true/>
         <key>aps-environment</key>
         <string>development</string>
+        <!-- Now Playing's controls: Apple Events to Music and Spotify only (`tauri-plugin-vertex-media`). -->
+        <key>com.apple.security.automation.apple-events</key>
+        <true/>
+        <key>com.apple.security.temporary-exception.apple-events</key>
+        <array>
+            <string>com.apple.Music</string>
+            <string>com.spotify.client</string>
+        </array>
     </dict>
 </plist>

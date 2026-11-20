@@ -1,7 +1,9 @@
 //! Now Playing's system side (plugin `vertex-media`, for the core plugin `now-playing`): the system's audio as the line's
-//! bands. One capture for the app, started by the first listener and torn down after the last; every ~33 ms a thread
-//! turns the latest samples into `bands::BANDS` levels (0–255) and sends them to each listener as raw bytes. A pause
-//! sends one frame of zeros, then nothing until sound comes back.
+//! bands, the output's volume, and the scriptable players' controls (`system.rs`).
+//!
+//! The bands: one capture for the app, started by the first listener and torn down after the last; every ~33 ms a
+//! thread turns the latest samples into `bands::BANDS` levels (0–255) and sends them to each listener as raw bytes. A
+//! pause sends one frame of zeros, then nothing until sound comes back.
 
 mod bands;
 #[cfg(target_os = "macos")]
@@ -12,6 +14,25 @@ mod tap {
         pub sample_rate: f32,
     }
     pub fn start(_: std::sync::Arc<std::sync::Mutex<crate::Ring>>) -> Result<Tap, String> {
+        Err("unsupported".into())
+    }
+}
+#[cfg(target_os = "macos")]
+mod system;
+#[cfg(not(target_os = "macos"))]
+mod system {
+    pub type Volume = ();
+    pub type Player = ();
+    pub fn volume() -> Result<Volume, String> {
+        Err("unsupported".into())
+    }
+    pub fn set_volume(_: f32) -> Result<(), String> {
+        Err("unsupported".into())
+    }
+    pub fn player() -> Result<Option<Player>, String> {
+        Err("unsupported".into())
+    }
+    pub fn command(_: &str, _: &str) -> Result<(), String> {
         Err("unsupported".into())
     }
 }
@@ -30,8 +51,18 @@ use tauri_plugin_vertex::api;
 /// The core plugin whose windows may call this.
 pub const PLUGIN: &str = "now-playing";
 
-/// Session windows draw the line.
-pub const GRANTS: api::Grants = &[(api::WindowKind::Session, &["vertex-media:allow-media-levels-listen", "vertex-media:allow-media-levels-stop"])];
+/// Session windows draw the line and its popover.
+pub const GRANTS: api::Grants = &[(
+    api::WindowKind::Session,
+    &[
+        "vertex-media:allow-media-levels-listen",
+        "vertex-media:allow-media-levels-stop",
+        "vertex-media:allow-media-volume",
+        "vertex-media:allow-media-set-volume",
+        "vertex-media:allow-media-player",
+        "vertex-media:allow-media-command",
+    ],
+)];
 
 const FRAME: Duration = Duration::from_millis(33);
 /// Silent frames (no new samples, or every band near zero) before the zero frame; about half a second.
@@ -179,9 +210,32 @@ fn media_levels_stop(levels: State<'_, Levels>, id: u32) {
     levels.stop(id);
 }
 
+/// The default output's volume (0–1) and mute; `unsupported` for a device without a volume.
+#[tauri::command]
+async fn media_volume() -> Result<system::Volume, String> {
+    api::blocking(system::volume).await
+}
+
+#[tauri::command]
+async fn media_set_volume(volume: f32) -> Result<(), String> {
+    api::blocking(move || system::set_volume(volume)).await
+}
+
+/// Music or Spotify, when one is running and playing or paused; `null` otherwise (no controls to draw).
+#[tauri::command]
+async fn media_player() -> Result<Option<system::Player>, String> {
+    api::blocking(system::player).await
+}
+
+/// `play_pause`, `next` or `previous` to `music` or `spotify`.
+#[tauri::command]
+async fn media_command(app: String, command: String) -> Result<(), String> {
+    api::blocking(move || system::command(&app, &command)).await
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("vertex-media")
-        .invoke_handler(tauri::generate_handler![media_levels_listen, media_levels_stop])
+        .invoke_handler(tauri::generate_handler![media_levels_listen, media_levels_stop, media_volume, media_set_volume, media_player, media_command])
         .setup(|app, _api| {
             app.manage(Levels::default());
             api::grant(app, PLUGIN, GRANTS);

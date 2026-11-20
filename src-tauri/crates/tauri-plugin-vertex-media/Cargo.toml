@@ -14,6 +14,7 @@ tauri-plugin = { version = "2.7.2", features = ["build"] }
 [dependencies]
 tauri = "2.12.5"
 tauri-plugin-vertex = { path = "../tauri-plugin-vertex" }
+serde = { version = "1.0", features = ["derive"] }
 rustfft = "6.2"
 
 # The system's audio, read by a Core Audio process tap (macOS 14.2+).
@@ -24,3 +25,5 @@ objc2-core-audio-types = "0.3.2"
 objc2-core-foundation = { version = "0.3.2", features = ["CFDictionary"] }
 objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSDictionary", "NSString", "NSUUID", "NSValue"] }
 block2 = "0.6.2"
+# Whether Music or Spotify runs, without launching it.
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSRunningApplication"] }

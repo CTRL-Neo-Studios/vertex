@@ -5,5 +5,8 @@
         <!-- Asked when Now Playing's line is set to move with the music (`tauri-plugin-vertex-media`). -->
         <key>NSAudioCaptureUsageDescription</key>
         <string>Vertex reads the sound your Mac is playing to move the Now Playing line with the music. Nothing is recorded or kept.</string>
+        <!-- Asked the first time Now Playing's popover controls Music or Spotify. -->
+        <key>NSAppleEventsUsageDescription</key>
+        <string>Vertex sends play, pause, next and previous to Music or Spotify when you use Now Playing's controls.</string>
     </dict>
 </plist>
